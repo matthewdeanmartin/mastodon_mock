@@ -184,6 +184,9 @@
                    which is indistinguishable from a follow-bot. Do not "finish"
                    this by adding a delay and enabling it for authenticated users —
                    see sprint/anonymous-great-2-clone-friends.md. -->
+              <button type="button" (click)="toggleSearch()">
+                {{ searchOpen() ? 'Close search' : 'Search account…' }}
+              </button>
               @if (canCopyAccount()) {
                 <button type="button" (click)="openCopyAccount()">Copy account…</button>
               }
@@ -651,22 +654,106 @@
       </div>
     }
 
-    @if (showPinned()) {
-      @for (s of pinnedStatuses(); track s.id) {
-        <div class="pinned-label muted">📌 Pinned</div>
-        <app-status-card
-          [status]="s"
-          filterContext="account"
-          (changed)="onChanged($event)"
-          (deleted)="onDeleted($event)"
-        />
-      }
+    <!--
+      Account search. Results render here, where the reverse-chron timeline
+      normally goes, rather than in a dialog: the posts are the same posts, and
+      a modal would hide the profile you are searching.
+
+      Two halves, merged — the account's own server (`from:` full-text, which
+      real Mastodon indexes patchily and for remote accounts often not at all)
+      and a scan of the posts already paged in. See Profile.runSearch.
+    -->
+    @if (searchOpen()) {
+      <div class="profile-search">
+        <form class="profile-search-row" (ngSubmit)="runSearch()">
+          <input
+            type="search"
+            [ngModel]="searchCriteria().words"
+            (ngModelChange)="patchSearch({ words: $event })"
+            name="profile-search-words"
+            [placeholder]="'Search @' + a.acct + '&#8217;s posts…'"
+            aria-label="Search this account's posts"
+          />
+          <button class="btn" type="submit" [disabled]="searching()">
+            {{ searching() ? 'Searching…' : 'Search' }}
+          </button>
+          @if (searchResults()) {
+            <button class="link" type="button" (click)="clearSearch()">clear</button>
+          }
+        </form>
+
+        <div class="profile-search-filters">
+          <label>
+            <span class="muted small">After</span>
+            <input
+              type="date"
+              [ngModel]="searchCriteria().after ?? ''"
+              (ngModelChange)="patchSearch({ after: $event || undefined })"
+              name="profile-search-after"
+            />
+          </label>
+          <label>
+            <span class="muted small">Before</span>
+            <input
+              type="date"
+              [ngModel]="searchCriteria().before ?? ''"
+              (ngModelChange)="patchSearch({ before: $event || undefined })"
+              name="profile-search-before"
+            />
+          </label>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [class.active]="searchCriteria().hasMedia"
+            [attr.aria-pressed]="!!searchCriteria().hasMedia"
+            (click)="patchSearch({ hasMedia: !searchCriteria().hasMedia })"
+          >
+            🖼 Has media
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [class.active]="searchCriteria().hasLink"
+            [attr.aria-pressed]="!!searchCriteria().hasLink"
+            (click)="patchSearch({ hasLink: !searchCriteria().hasLink })"
+          >
+            🔗 Has link
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [class.active]="searchCriteria().excludeReplies"
+            [attr.aria-pressed]="!!searchCriteria().excludeReplies"
+            (click)="patchSearch({ excludeReplies: !searchCriteria().excludeReplies })"
+          >
+            🚫 No replies
+          </button>
+        </div>
+
+        @if (searchLoadingMore()) {
+          <p class="muted small" role="status">Loading more of their history to search…</p>
+        }
+        @if (searchError(); as error) {
+          <p class="muted small profile-search-note">{{ error }}</p>
+        }
+        @if (searchResults(); as results) {
+          <p class="muted small profile-search-note" role="status">
+            {{ results.length }} {{ results.length === 1 ? 'post' : 'posts' }} ·
+            <!-- Said plainly, because "12 results" from a patchy index reads as
+                 "they only posted about this 12 times", which is not what it
+                 means. -->
+            searched {{ searchScanned() }} loaded
+            {{ searchScanned() === 1 ? 'post' : 'posts' }}
+            @if (searchUsedServer()) {
+              and this server&#8217;s index
+            }
+          </p>
+        }
+      </div>
     }
 
-    @if (statusesLoading()) {
-      <p class="muted center">Loading posts…</p>
-    } @else {
-      @for (s of visibleStatuses(); track s.id) {
+    @if (searchResults(); as results) {
+      @for (s of results; track s.id) {
         <app-status-card
           [status]="s"
           filterContext="account"
@@ -674,20 +761,47 @@
           (deleted)="onDeleted($event)"
         />
       } @empty {
-        @if (!showPinned() || !pinnedStatuses().length) {
-          <p class="muted center">No posts match these filters.</p>
+        <p class="muted center">No posts matched.</p>
+      }
+    } @else {
+      @if (showPinned()) {
+        @for (s of pinnedStatuses(); track s.id) {
+          <div class="pinned-label muted">📌 Pinned</div>
+          <app-status-card
+            [status]="s"
+            filterContext="account"
+            (changed)="onChanged($event)"
+            (deleted)="onDeleted($event)"
+          />
         }
       }
-      @if (statuses().length) {
-        <div class="load-more-row">
-          @if (exhausted()) {
-            <span class="muted small">No older posts.</span>
-          } @else {
-            <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
-              {{ loadingMore() ? 'Loading…' : 'Load more' }}
-            </button>
+
+      @if (statusesLoading()) {
+        <p class="muted center">Loading posts…</p>
+      } @else {
+        @for (s of visibleStatuses(); track s.id) {
+          <app-status-card
+            [status]="s"
+            filterContext="account"
+            (changed)="onChanged($event)"
+            (deleted)="onDeleted($event)"
+          />
+        } @empty {
+          @if (!showPinned() || !pinnedStatuses().length) {
+            <p class="muted center">No posts match these filters.</p>
           }
-        </div>
+        }
+        @if (statuses().length) {
+          <div class="load-more-row">
+            @if (exhausted()) {
+              <span class="muted small">No older posts.</span>
+            } @else {
+              <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
+                {{ loadingMore() ? 'Loading…' : 'Load more' }}
+              </button>
+            }
+          </div>
+        }
       }
     }
   }

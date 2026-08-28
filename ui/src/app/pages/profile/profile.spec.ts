@@ -1328,3 +1328,142 @@ describe('Profile handle-in-path route', () => {
     );
   });
 });
+
+/**
+ * Account search, at the HTTP boundary.
+ *
+ * The two halves are covered as pure functions in profile-search.spec.ts; what
+ * matters here is the wiring — that the server is asked with `from:`, that its
+ * answer is checked rather than trusted, and that the two merge.
+ */
+describe('Profile account search', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => localStorage.clear());
+  afterEach(() => httpMock.verify());
+
+  interface SearchInternals {
+    searchCriteria: { set(v: { words: string }): void };
+    searchResults(): Status[] | null;
+    searchUsedServer(): boolean;
+    runSearch(): Promise<void>;
+    statuses: { set(v: Status[]): void };
+    exhausted: { set(v: boolean): void };
+  }
+
+  function setUp() {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: '900' })) },
+        },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(Profile);
+    fixture.detectChanges();
+
+    httpMock.expectOne('/api/v1/accounts/900').flush({
+      id: '900',
+      username: 'eve',
+      acct: 'eve@remote.social',
+      url: 'https://remote.social/@eve',
+      fields: [],
+    } as unknown as Account);
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/accounts/900/statuses' && !r.params.has('pinned'))
+      .flush([]);
+    httpMock
+      .expectOne(
+        (r) => r.url === '/api/v1/accounts/900/statuses' && r.params.get('pinned') === 'true',
+      )
+      .flush([]);
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/accounts/relationships')
+      .flush([{ id: '900' } as Relationship]);
+    httpMock.expectOne('/api/v1/accounts/900/endorsements').flush([]);
+    httpMock.expectOne('/api/v1/accounts/900/collections').flush({ collections: [] });
+
+    return fixture;
+  }
+
+  function post(id: string, content: string, accountId = '900'): Status {
+    return {
+      id,
+      content: `<p>${content}</p>`,
+      created_at: `2026-06-${id.padStart(2, '0')}T00:00:00Z`,
+      account: { id: accountId, username: 'eve' },
+      media_attachments: [],
+      spoiler_text: '',
+      in_reply_to_id: null,
+      poll: null,
+    } as unknown as Status;
+  }
+
+  it('asks the server with from:, and merges its hits with the local scan', async () => {
+    const fixture = setUp();
+    const inner = fixture.componentInstance as unknown as SearchInternals;
+    // Already loaded locally, and the history ends here so no deepening runs.
+    inner.statuses.set([post('10', 'local angular note')]);
+    inner.exhausted.set(true);
+    inner.searchCriteria.set({ words: 'angular' });
+
+    const run = inner.runSearch();
+    // runSearch awaits the sample-deepening step before it asks the server, so
+    // the request does not exist until the microtask queue drains.
+    await Promise.resolve();
+    const req = httpMock.expectOne((r) => r.url === '/api/v2/search');
+    expect(req.request.params.get('q')).toBe('from:@eve@remote.social angular');
+    req.flush({ accounts: [], statuses: [post('20', 'server angular note')], hashtags: [] });
+    await run;
+
+    // Both halves, newest first.
+    expect(inner.searchResults()?.map((s) => s.id)).toEqual(['20', '10']);
+    expect(inner.searchUsedServer()).toBe(true);
+  });
+
+  it('drops server hits by other authors rather than trusting from:', async () => {
+    const fixture = setUp();
+    const inner = fixture.componentInstance as unknown as SearchInternals;
+    inner.statuses.set([]);
+    inner.exhausted.set(true);
+    inner.searchCriteria.set({ words: 'angular' });
+
+    const run = inner.runSearch();
+    await Promise.resolve();
+    // A server that ignores `from:` answers on the words alone; taking that at
+    // face value would show a stranger's posts on this profile.
+    httpMock
+      .expectOne((r) => r.url === '/api/v2/search')
+      .flush({
+        accounts: [],
+        statuses: [post('30', 'someone else', 'other-account')],
+        hashtags: [],
+      });
+    await run;
+
+    expect(inner.searchResults()).toEqual([]);
+  });
+
+  it('still searches locally when the server has no index to offer', async () => {
+    const fixture = setUp();
+    const inner = fixture.componentInstance as unknown as SearchInternals;
+    inner.statuses.set([post('10', 'local angular note'), post('11', 'unrelated')]);
+    inner.exhausted.set(true);
+    inner.searchCriteria.set({ words: 'angular' });
+
+    const run = inner.runSearch();
+    await Promise.resolve();
+    httpMock
+      .expectOne((r) => r.url === '/api/v2/search')
+      .flush('nope', { status: 404, statusText: 'Not Found' });
+    await run;
+
+    // The local half is the whole point of the hybrid.
+    expect(inner.searchResults()?.map((s) => s.id)).toEqual(['10']);
+    expect(inner.searchUsedServer()).toBe(false);
+  });
+});

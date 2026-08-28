@@ -2,6 +2,7 @@ import { Component, computed, DestroyRef, inject, OnDestroy, OnInit, signal } fr
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Location, NgOptimizedImage } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { firstValueFrom, map, of, Subscription, switchMap, tap } from 'rxjs';
 import { Api } from '../../api';
 import { accountRoutePath, parseAccountRoute } from '../../account-route';
@@ -13,6 +14,14 @@ import { LocalModeration } from '../../local-moderation';
 import { TrustedAccounts } from '../../trusted-accounts';
 import { Account, Collection, Relationship, Status } from '../../models';
 import { homeServerLink } from '../../home-server-link';
+import {
+  emptyProfileSearch,
+  filterStatuses,
+  isEmptyCriteria,
+  mergeResults,
+  ProfileSearchCriteria,
+  serverQuery,
+} from './profile-search';
 import { StatusCard } from '../../status-card/status-card';
 import { ReportDialog } from '../../report-dialog/report-dialog';
 import { ListDialog } from '../../list-dialog/list-dialog';
@@ -67,6 +76,7 @@ type ProfileTab = 'posts' | 'media' | 'following' | 'followers' | 'collections' 
 @Component({
   selector: 'app-profile',
   imports: [
+    FormsModule,
     RouterLink,
     StatusCard,
     ReportDialog,
@@ -256,7 +266,22 @@ export class Profile implements OnInit, OnDestroy {
   /** Set when recovery ran and the current server has never heard of them. */
   protected recoveryFailed = signal(false);
   protected statusesLoading = signal(false);
+
+  // --- Account search (the "Search account" item in the ••• menu) ---
+  /** Open state of the search panel above the timeline. */
+  protected searchOpen = signal(false);
+  protected searchCriteria = signal<ProfileSearchCriteria>(emptyProfileSearch());
+  /** Results of the last run, or null when no search has been run. */
+  protected searchResults = signal<Status[] | null>(null);
+  protected searching = signal(false);
+  /** How many already-fetched posts the client half looked at, for the count line. */
+  protected searchScanned = signal(0);
+  /** True when the server's own index answered as well as the local scan. */
+  protected searchUsedServer = signal(false);
+  protected searchError = signal<string | null>(null);
   protected loadingMore = signal(false);
+  /** Fetching more history specifically to widen the local search. */
+  protected searchLoadingMore = signal(false);
   /** An older page came back empty: the account's history is fully loaded. */
   protected exhausted = signal(false);
 
@@ -1418,6 +1443,143 @@ export class Profile implements OnInit, OnDestroy {
   }
 
   /** Fetch one older page below the current list ("Load more" at the bottom). */
+  /**
+   * How many of the account's posts the local half tries to have on hand.
+   *
+   * The profile loads 20 for the timeline, which is far too thin to search. A
+   * search deepens that to this, which is ~5 extra requests once per profile —
+   * paid when someone actually searches, not on every profile view.
+   */
+  private static readonly SEARCH_SAMPLE = 100;
+
+  protected toggleSearch(): void {
+    const open = !this.searchOpen();
+    this.searchOpen.set(open);
+    if (!open) {
+      this.clearSearch();
+    }
+  }
+
+  protected clearSearch(): void {
+    this.searchCriteria.set(emptyProfileSearch());
+    this.searchResults.set(null);
+    this.searchError.set(null);
+    this.searchScanned.set(0);
+    this.searchUsedServer.set(false);
+  }
+
+  protected patchSearch(changes: Partial<ProfileSearchCriteria>): void {
+    this.searchCriteria.update((c) => ({ ...c, ...changes }));
+  }
+
+  /**
+   * Search this account's posts: the server's index and the local sample.
+   *
+   * Neither half is sufficient alone. Mastodon's full-text search covers the
+   * account's whole history but indexes only what its own instance chose to
+   * index — famously little, and for a *remote* account often nothing at all.
+   * The local scan sees every post it was given but only as far back as the
+   * profile has paged. Running both and merging is what makes the feature work
+   * on a stranger's profile as well as your own.
+   */
+  protected async runSearch(): Promise<void> {
+    const criteria = this.searchCriteria();
+    if (this.searching() || isEmptyCriteria(criteria)) {
+      return;
+    }
+    this.searching.set(true);
+    this.searchError.set(null);
+    this.searchUsedServer.set(false);
+    try {
+      await this.deepenSample();
+      const local = filterStatuses(this.statuses(), criteria);
+      this.searchScanned.set(this.statuses().length);
+
+      const fromServer = await this.searchOnServer(criteria);
+      this.searchResults.set(mergeResults(fromServer, local));
+      if (!fromServer.length && !local.length) {
+        this.searchError.set(
+          'Nothing matched. Mastodon only indexes some posts, so try fewer words or load more history.',
+        );
+      }
+    } finally {
+      this.searching.set(false);
+    }
+  }
+
+  /**
+   * Ask the account's own server, using the `from:` operator.
+   *
+   * Anonymous browsing has no full-text search to ask — mastodon.social does
+   * not give logged-out visitors one — so that path skips straight to the local
+   * scan rather than issuing a request that cannot work.
+   */
+  private async searchOnServer(criteria: ProfileSearchCriteria): Promise<Status[]> {
+    const account = this.account();
+    const handle = account ? qualifiedHandle(account) : null;
+    if (!handle || this.auth.isAnonymous || this.isBluesky() || this.isRss() || this.isTwitter()) {
+      return [];
+    }
+    const q = serverQuery(handle, criteria);
+    if (!q) {
+      return [];
+    }
+    try {
+      const results = await firstValueFrom(this.api.search(q, 'statuses', { limit: 40 }));
+      this.searchUsedServer.set(true);
+      // A server that ignores `from:` returns other people's posts for the
+      // words alone, which would be a silent wrong answer — so the author is
+      // re-checked here rather than trusted.
+      return (results.statuses ?? []).filter((s) => s.account?.id === account?.id);
+    } catch {
+      // No index, or the server refused: the local half still stands.
+      return [];
+    }
+  }
+
+  /** Page in more history, once, so the local scan has something to search. */
+  private async deepenSample(): Promise<void> {
+    const id = this.publicProfileRef?.id ?? this.account()?.id;
+    if (!id || this.isBluesky() || this.exhausted()) {
+      return;
+    }
+    this.searchLoadingMore.set(true);
+    const seq = this.loadSeq;
+    try {
+      while (this.statuses().length < Profile.SEARCH_SAMPLE) {
+        const last = this.statuses().at(-1);
+        if (!last) {
+          break;
+        }
+        const batch = await firstValueFrom(
+          this.getAccountStatuses(id, {
+            excludeReblogs: !this.showBoosts(),
+            excludeReplies: !this.showReplies(),
+            limit: Profile.TARGET_COUNT,
+            maxId: this.nativeStatusId(last),
+          }),
+        );
+        if (seq !== this.loadSeq) {
+          return; // The route moved or filters changed mid-search.
+        }
+        if (!batch.length) {
+          this.exhausted.set(true);
+          break;
+        }
+        const seen = new Set(this.statuses().map((s) => s.id));
+        const added = batch.filter((s) => !seen.has(s.id));
+        if (!added.length) {
+          break; // Paging stopped advancing; stop rather than spin.
+        }
+        this.statuses.update((list) => [...list, ...added]);
+      }
+    } catch {
+      // Whatever was already loaded is still searchable.
+    } finally {
+      this.searchLoadingMore.set(false);
+    }
+  }
+
   loadMore(): void {
     if (this.isBluesky()) {
       if (this.loadingMore() || this.exhausted() || !this.bskyCursor) {

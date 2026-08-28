@@ -702,3 +702,39 @@ h2 {
   opacity: 0.6;
   cursor: default;
 }
+
+/* Account search: box, filters and result count, above the timeline it
+   replaces while a search is active. */
+.profile-search {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-search-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.profile-search-row input[type='search'] {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-search-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.profile-search-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-search-note {
+  margin: 6px 0 0;
+}
