@@ -147,6 +147,36 @@ export class SettingsImportExport {
   protected tagFollowedCount = computed(
     () => this.tagImporter.rows().filter((row) => row.status === 'followed').length,
   );
+  protected tagAlreadyCount = computed(
+    () => this.tagImporter.rows().filter((row) => row.status === 'already_followed').length,
+  );
+  protected tagFailedCount = computed(
+    () => this.tagImporter.rows().filter((row) => row.status === 'failed').length,
+  );
+  /**
+   * The net-change line, or null when we don't actually know the net change.
+   *
+   * Only shown when the importer confirmed the follow state of every tag. With
+   * a partial answer the "already followed" count is a floor, not a fact, and a
+   * number presented as fact is worse than no number.
+   */
+  protected tagRunSummary = computed(() => {
+    const rows = this.tagImporter.rows();
+    if (!rows.length || this.tagImporter.running() || !this.tagImporter.knowsFollowState()) {
+      return null;
+    }
+    if (this.tagDoneCount() < rows.length) {
+      return null;
+    }
+    const parts = [`${this.tagFollowedCount()} newly followed`];
+    if (this.tagAlreadyCount()) {
+      parts.push(`${this.tagAlreadyCount()} already followed`);
+    }
+    if (this.tagFailedCount()) {
+      parts.push(`${this.tagFailedCount()} failed`);
+    }
+    return parts.join(' · ');
+  });
   protected contactMisses = computed(() =>
     this.contactDiscovery
       .rows()
@@ -688,6 +718,8 @@ export class SettingsImportExport {
         return 'following…';
       case 'followed':
         return 'followed ✓';
+      case 'already_followed':
+        return 'already following';
       default:
         return 'failed';
     }

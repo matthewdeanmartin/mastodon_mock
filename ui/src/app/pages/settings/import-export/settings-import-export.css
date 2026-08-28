@@ -589,3 +589,10 @@
 .suggest-tags input {
   flex: none;
 }
+
+/* The net-change line after a hashtag import. Only rendered when the run
+   actually established the numbers, so it reads as a result, not a guess. */
+.tag-run-summary {
+  margin: 8px 0 0;
+  font-weight: 600;
+}

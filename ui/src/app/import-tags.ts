@@ -5,7 +5,7 @@ import { Api } from './api';
 import { Auth } from './auth';
 import { AnonymousTags } from './providers/anonymous/anonymous-tags';
 
-export type ImportTagStatus = 'pending' | 'following' | 'followed' | 'failed';
+export type ImportTagStatus = 'pending' | 'following' | 'followed' | 'already_followed' | 'failed';
 
 export interface ImportTagRow {
   /** Normalized tag name, without the leading '#'. */
@@ -13,6 +13,19 @@ export interface ImportTagRow {
   status: ImportTagStatus;
   error?: string;
 }
+
+/**
+ * How many `followed_tags` pages the importer will read to learn what you
+ * already follow. Two pages is 200 tags — enough to cover most people's whole
+ * list in one or two requests, and a hard ceiling so a 5,000-tag account cannot
+ * turn "import 20 tags" into fifty reads.
+ */
+export const PROBE_PAGES = 2;
+/**
+ * Below this many tags, an incomplete bulk probe is topped up with one `getTag`
+ * per unknown tag. Worth ≤9 requests to know the answer exactly; not worth 50.
+ */
+export const SMALL_IMPORT = 10;
 
 /** Longest hashtag we'll accept; Mastodon's own limit is 30 characters. */
 const MAX_TAG_LENGTH = 30;
@@ -103,6 +116,15 @@ export class ImportTags {
 
   readonly rows = signal<ImportTagRow[]>([]);
   readonly running = signal(false);
+  /**
+   * True when we learned the follow state of every tag in the list, so the
+   * "already followed" count is the whole truth rather than a lower bound.
+   *
+   * The UI reports a net change only when this is set. A partial answer — we
+   * checked the first 200 of your 5,000 tags — would make "3 of 50 were already
+   * followed" read as fact when it is a floor, so nothing is claimed instead.
+   */
+  readonly knowsFollowState = signal(false);
 
   /** Spacing between tags; tests set this to 0. */
   delayMs = 250;
@@ -122,6 +144,7 @@ export class ImportTags {
   reset(): void {
     this.rows.set([]);
     this.running.set(false);
+    this.knowsFollowState.set(false);
     this.stopRequested = false;
   }
 
@@ -133,6 +156,7 @@ export class ImportTags {
     this.stopRequested = false;
     this.running.set(true);
     try {
+      await this.markAlreadyFollowed();
       for (let i = 0; i < this.rows().length; i++) {
         if (this.stopRequested) {
           break;
@@ -148,6 +172,101 @@ export class ImportTags {
     } finally {
       this.running.set(false);
     }
+  }
+
+  /**
+   * Mark the rows you already follow, so the run can skip them.
+   *
+   * Bounded on purpose. Following an already-followed tag is a harmless no-op
+   * server-side, so this is an optimization and an honesty fix, never a
+   * correctness one — which is why it is allowed to give up. The budget:
+   *
+   * - Up to {@link PROBE_PAGES} pages of `followed_tags` (2 requests). If the
+   *   list ended inside that budget we know everything and can report a net
+   *   change; if it did not, we still skip whatever overlap we found.
+   * - Then, only for a small import whose bulk probe fell short, one `getTag`
+   *   per still-unknown tag — at most {@link SMALL_IMPORT} - 1 requests.
+   *
+   * Anything past that is followed blind, because reading a 5,000-tag follow
+   * list to save a handful of no-op writes is the trade backwards.
+   *
+   * A failed probe is not a failed import: it leaves every row pending and the
+   * run proceeds exactly as it did before this existed.
+   */
+  private async markAlreadyFollowed(): Promise<void> {
+    this.knowsFollowState.set(false);
+    const tags = this.rows().map((row) => row.tag);
+    if (!tags.length) {
+      return;
+    }
+
+    if (this.auth.isAnonymous) {
+      // Local state: the whole set is already in memory, so this is free and
+      // always complete.
+      this.skipFollowed(new Set(this.anonymousTags.tags()));
+      this.knowsFollowState.set(true);
+      return;
+    }
+
+    const followed = new Set<string>();
+    let complete = false;
+    try {
+      let maxId: string | undefined;
+      for (let page = 0; page < PROBE_PAGES; page++) {
+        const result = await firstValueFrom(this.api.followedTagsPage(maxId));
+        for (const tag of result.tags) {
+          followed.add(tag.name.toLowerCase());
+        }
+        if (!result.nextMaxId || result.nextMaxId === maxId || !result.tags.length) {
+          complete = true;
+          break;
+        }
+        maxId = result.nextMaxId;
+      }
+    } catch {
+      // Probing is optional, so a failure mid-walk is not fatal — but the tags
+      // read before it are still known-followed and worth skipping, so fall
+      // through with what we have rather than discarding it. `complete` stays
+      // false, so nothing is claimed about the net change.
+    }
+    this.skipFollowed(followed);
+
+    if (!complete && tags.length < SMALL_IMPORT) {
+      // Few enough left that asking about each is cheaper than not knowing.
+      complete = await this.probeRemaining();
+    }
+    this.knowsFollowState.set(complete);
+  }
+
+  /** Ask about each still-pending tag individually. False if any ask failed. */
+  private async probeRemaining(): Promise<boolean> {
+    const pending = this.rows()
+      .map((row, index) => ({ row, index }))
+      .filter(({ row }) => row.status === 'pending');
+    for (const { row, index } of pending) {
+      if (this.stopRequested) {
+        return false;
+      }
+      try {
+        const tag = await firstValueFrom(this.api.getTag(row.tag));
+        if (tag.following) {
+          this.patch(index, { status: 'already_followed' });
+        }
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private skipFollowed(followed: ReadonlySet<string>): void {
+    this.rows.update((rows) =>
+      rows.map((row) =>
+        row.status === 'pending' && followed.has(row.tag.toLowerCase())
+          ? { ...row, status: 'already_followed' as const }
+          : row,
+      ),
+    );
   }
 
   private async processRow(i: number): Promise<void> {

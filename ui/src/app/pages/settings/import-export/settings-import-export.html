@@ -202,6 +202,12 @@
           {{ tagFollowedCount() }} followed
         </p>
       }
+      <!-- Only rendered when the importer actually established the net change;
+           see tagRunSummary. A partial count stated as fact would be worse
+           than the silence. -->
+      @if (tagRunSummary(); as summary) {
+        <p class="tag-run-summary" role="status">{{ summary }}</p>
+      }
       <ul class="import-rows">
         @for (row of tagImporter.rows(); track row.tag) {
           <li class="import-row" [class]="'row-' + row.status">
