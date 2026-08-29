@@ -20,7 +20,7 @@ const DESIGN_BODY = `
 · The algorithm isn't evil: no injected rage or stranger content you didn't ask for. It's your tags and feed sorted by the product of likes, replies and retweets.<br>
 · Failwhale is back.<br>
 · Follow everyone on a collection.<br>
-· House ads for my other projects.<br>
+· House endorsements for my other projects.<br>
 · Cyber-begging links for the Mastodon network and your instance — this stuff isn't free, go help them out.<br>
 · Bsky and RSS as feed providers.<br>
 · Twitter-style Analytics (on a little data).<br>

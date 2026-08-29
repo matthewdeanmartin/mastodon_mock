@@ -40,10 +40,26 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* Kept visible rather than hidden: this page is where a dismissed
-   announcement is supposed to remain findable. */
+/*
+  Read vs. dismissed, both at full contrast.
+
+  This was `opacity: 0.6`, which in dark mode dimmed near-white text toward the
+  near-black background and produced exactly the unreadable grey the theme's
+  --muted is defined to avoid. Dimming is the wrong tool: the point of this page
+  is that a dismissed announcement stays *findable*, and findable means legible.
+
+  So the state is carried by the accent stripe instead — present and coloured
+  when there is something to act on, present and neutral when there is not.
+  Text colour never changes, so both states inherit --text and stay AAA in both
+  themes.
+*/
+.server-announcement {
+  border-left: 3px solid var(--accent);
+}
+
 .server-announcement.dismissed {
-  opacity: 0.6;
+  border-left-color: var(--border);
+  background: var(--hover);
 }
 
 .announcement-meta {

@@ -184,9 +184,6 @@
                    which is indistinguishable from a follow-bot. Do not "finish"
                    this by adding a delay and enabling it for authenticated users —
                    see sprint/anonymous-great-2-clone-friends.md. -->
-              <button type="button" (click)="toggleSearch()">
-                {{ searchOpen() ? 'Close search' : 'Search account…' }}
-              </button>
               @if (canCopyAccount()) {
                 <button type="button" (click)="openCopyAccount()">Copy account…</button>
               }
@@ -622,34 +619,52 @@
         </div>
       </a>
     }
-    @if (!isRss() && !isTwitter() && (!auth.isAnonymous || !isSelf())) {
+    <!-- The row shows for Search alone on your own anonymous profile, where the
+         three timeline toggles below are meaningless (there are no boosts,
+         replies or pins on browser-local posts) but searching what you wrote
+         still works. -->
+    @if (!isRss() && !isTwitter()) {
       <div class="profile-filters" role="group" aria-label="Timeline filters">
+        @if (!auth.isAnonymous || !isSelf()) {
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [class.active]="showBoosts()"
+            [attr.aria-pressed]="showBoosts()"
+            (click)="toggleBoosts()"
+          >
+            🔁 {{ words().Boosts }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [class.active]="showReplies()"
+            [attr.aria-pressed]="showReplies()"
+            (click)="toggleReplies()"
+          >
+            💬 Replies
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            [class.active]="showPinned()"
+            [attr.aria-pressed]="showPinned()"
+            (click)="togglePinned()"
+          >
+            📌 Pinned
+          </button>
+        }
+        <!-- Fourth and last button this row takes. Search belongs here with the
+             other things that change what the timeline shows, not buried in the
+             ••• menu with the moderation actions. -->
         <button
           type="button"
           class="btn btn-outline btn-sm"
-          [class.active]="showBoosts()"
-          [attr.aria-pressed]="showBoosts()"
-          (click)="toggleBoosts()"
+          [class.active]="searchOpen()"
+          [attr.aria-pressed]="searchOpen()"
+          (click)="toggleSearch()"
         >
-          🔁 {{ words().Boosts }}
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          [class.active]="showReplies()"
-          [attr.aria-pressed]="showReplies()"
-          (click)="toggleReplies()"
-        >
-          💬 Replies
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline btn-sm"
-          [class.active]="showPinned()"
-          [attr.aria-pressed]="showPinned()"
-          (click)="togglePinned()"
-        >
-          📌 Pinned
+          🔍 Search
         </button>
       </div>
     }

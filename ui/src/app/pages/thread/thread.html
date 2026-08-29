@@ -442,7 +442,7 @@
     } @else if (isTwitter()) {
       <!-- No composer: replying on Twitter needs an authenticated Twitter account, which
            this app never asks for. Ancestors are not fetched either (one
-           request per level, unknown depth), so Nitter is how a reader reaches
+           request per level, unknown depth), so the mirror is how a reader reaches
            the rest of the conversation — and it costs nothing. -->
       @if (twitterError(); as error) {
         <p class="muted center">{{ error }}</p>
@@ -451,7 +451,7 @@
         <p class="muted center">
           Replies only — Mawkingbird cannot post to Twitter.
           <a [href]="url" target="_blank" rel="noopener noreferrer">
-            Read the full conversation on Nitter ↗
+            Read the full conversation on {{ nitterLabel }} ↗
           </a>
         </p>
       }

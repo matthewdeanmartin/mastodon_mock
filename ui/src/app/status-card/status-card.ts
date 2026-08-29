@@ -61,7 +61,7 @@ import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { BskyRef } from '../providers/bluesky/bluesky-types';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
 import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
-import { toNitterUrl } from '../providers/twitter/nitter';
+import { nitterHost, toNitterUrl } from '../providers/twitter/nitter';
 import { StatusActions } from '../providers/status-actions';
 import { ReportDialog } from '../report-dialog/report-dialog';
 import { HumanTimePipe } from '../human-time.pipe';
@@ -1090,6 +1090,11 @@ export class StatusCard {
    * every other foreign provider — an RSS item's original site is the whole
    * point of the link, and there is nothing to rewrite it to.
    */
+  /** The mirror's host, so the link names where it actually goes. */
+  protected get nitterLabel(): string {
+    return nitterHost();
+  }
+
   protected get nitterLink(): string | null {
     return this.display.provider === 'twitter' ? toNitterUrl(this.display.url) : null;
   }

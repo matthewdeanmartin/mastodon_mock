@@ -1,5 +1,5 @@
 /**
- * Rewrites x.com links to a Nitter instance.
+ * Rewrites x.com links to a privacy-respecting front-end.
  *
  * ## Why the app steers away from x.com
  *
@@ -9,23 +9,28 @@
  * connector is trying to break. Mawkingbird cannot host the content itself, but
  * it can point at a front-end that does not do those things.
  *
- * Nitter is a privacy-respecting front-end for Twitter: no JavaScript required, no
- * tracking, no account. `https://x.com/NASA` becomes
- * `https://<instance>/NASA`, and the path shape is otherwise identical —
- * `/user/status/123` works unchanged.
- *
  * ## Why the instance is configurable, and why the default is soft
  *
- * The public Nitter ecosystem is unstable and has been since X closed guest
- * access; instances appear and vanish on a scale of months. That is the same
- * reason `sprint/roadmap-providers.md` decided to treat Nitter as "just an RSS
- * URL the user supplies" rather than build it in.
+ * The public mirror ecosystem is unstable and has been since X closed guest
+ * access; instances appear and vanish on a scale of months — nitter.space, the
+ * previous default, is itself gone. That is the same reason
+ * `sprint/roadmap-providers.md` decided to treat these as "just an RSS URL the
+ * user supplies" rather than build one in.
  *
  * So this ships a default that works today, and lets the user replace it in one
  * field when it stops working. A hardcoded host would turn a dead instance into
  * a dead feature with no recourse; a required setting would make every reader
- * research Nitter instances before their first click. The default is the
- * compromise: working out of the box, replaceable in ten seconds.
+ * research mirrors before their first click.
+ *
+ * ## Why the path is rewritten too, not just the host
+ *
+ * Nitter mirrored Twitter's URL shape exactly, so this used to carry the path
+ * over untouched. Sotwe does not: a profile is `/user` as before, but a tweet
+ * is `/tweet/<id>` — the author is dropped from the path entirely. Swapping
+ * only the host would have produced a dead link for every single tweet, which
+ * is worse than not rewriting at all. So each known mirror declares how it
+ * spells a status, and an unknown host falls back to Nitter's shape, which is
+ * what every remaining Nitter fork uses.
  */
 
 const NITTER_HOST_KEY = 'mockingbird_nitter_host';
@@ -34,10 +39,10 @@ const NITTER_HOST_KEY = 'mockingbird_nitter_host';
  * The instance used when the user has not chosen one.
  *
  * Not a promise that it is up — see the note above. It is the most reliable
- * public instance at the time of writing, and the settings field exists
- * precisely because that sentence has a shelf life.
+ * public mirror at the time of writing, and the settings field exists precisely
+ * because that sentence has a shelf life.
  */
-export const DEFAULT_NITTER_HOST = 'nitter.space';
+export const DEFAULT_NITTER_HOST = 'www.sotwe.com';
 
 /** Hosts whose links are worth rewriting. */
 const X_HOSTS = new Set([
@@ -47,6 +52,24 @@ const X_HOSTS = new Set([
   'www.twitter.com',
   'mobile.twitter.com',
 ]);
+
+/**
+ * How a mirror spells a single tweet, keyed by host.
+ *
+ * Only the status path differs between the mirrors we know about; profiles are
+ * `/<user>` everywhere. A host absent from this map keeps Twitter's own shape.
+ */
+const STATUS_PATH: Record<string, (user: string, id: string) => string> = {
+  // Sotwe drops the author: /tweet/<id>.
+  'sotwe.com': (_user, id) => `/tweet/${id}`,
+  'www.sotwe.com': (_user, id) => `/tweet/${id}`,
+};
+
+/** `/user/status/123` → the user and id, or null when the path is not a status. */
+function parseStatusPath(pathname: string): { user: string; id: string } | null {
+  const match = /^\/([^/]+)\/status(?:es)?\/(\d+)/.exec(pathname);
+  return match ? { user: match[1], id: match[2] } : null;
+}
 
 /** The configured instance host, without scheme or trailing slash. */
 export function nitterHost(): string {
@@ -81,7 +104,7 @@ function normalizeHost(value: string): string {
 }
 
 /**
- * Rewrite an x.com URL onto the configured Nitter instance.
+ * Rewrite an x.com URL onto the configured mirror.
  *
  * Returns the original URL unchanged when it is not an X link or cannot be
  * parsed — this is a convenience, and a link that fails to rewrite should still
@@ -100,7 +123,14 @@ export function toNitterUrl(url: string | null | undefined, host = nitterHost())
   if (!X_HOSTS.has(parsed.hostname.toLowerCase())) {
     return url;
   }
-  // Path, query and fragment carry over: Nitter mirrors Twitter's URL shape, so
-  // `/NASA/status/123` needs no translation.
+  const status = parseStatusPath(parsed.pathname);
+  const spell = STATUS_PATH[host.toLowerCase()];
+  if (status && spell) {
+    // A mirror with its own status shape: query and fragment are Twitter's and
+    // mean nothing there, so they are dropped rather than carried over.
+    return `https://${host}${spell(status.user, status.id)}`;
+  }
+  // Nitter's shape, and the shape of a profile link on every mirror: the path
+  // carries over untouched.
   return `https://${host}${parsed.pathname}${parsed.search}${parsed.hash}`;
 }

@@ -4,9 +4,19 @@ import { DEFAULT_NITTER_HOST, nitterHost, setNitterHost, toNitterUrl } from './n
 describe('toNitterUrl', () => {
   beforeEach(() => localStorage.clear());
 
-  it('rewrites an x.com post onto the configured instance', () => {
+  it('spells a tweet the way the configured mirror spells it', () => {
+    // Sotwe drops the author: /tweet/<id>, not /NASA/status/123. Swapping only
+    // the host — which is what this used to do — produced a dead link for every
+    // tweet when nitter.space went away and the default moved.
     expect(toNitterUrl('https://x.com/NASA/status/123')).toBe(
-      `https://${DEFAULT_NITTER_HOST}/NASA/status/123`,
+      `https://${DEFAULT_NITTER_HOST}/tweet/123`,
+    );
+  });
+
+  it('keeps Twitter’s own shape on a mirror that mirrors it', () => {
+    // Every remaining Nitter fork does; an unknown host is assumed to as well.
+    expect(toNitterUrl('https://x.com/NASA/status/123', 'nitter.example.org')).toBe(
+      'https://nitter.example.org/NASA/status/123',
     );
   });
 
@@ -40,9 +50,17 @@ describe('toNitterUrl', () => {
     expect(toNitterUrl(undefined)).toBeNull();
   });
 
-  it('preserves query and fragment', () => {
+  it('preserves query and fragment where the path carries over', () => {
+    expect(toNitterUrl('https://x.com/NASA/status/1?s=20#reply', 'nitter.example.org')).toBe(
+      'https://nitter.example.org/NASA/status/1?s=20#reply',
+    );
+  });
+
+  it('drops Twitter’s query when the mirror rewrites the path', () => {
+    // `?s=20` is a Twitter share token; it means nothing on sotwe and carrying
+    // it onto a rewritten path would just be noise.
     expect(toNitterUrl('https://x.com/NASA/status/1?s=20#reply')).toBe(
-      `https://${DEFAULT_NITTER_HOST}/NASA/status/1?s=20#reply`,
+      `https://${DEFAULT_NITTER_HOST}/tweet/1`,
     );
   });
 });

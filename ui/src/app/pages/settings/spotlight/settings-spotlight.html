@@ -1,20 +1,20 @@
 <div class="spage-head">
   <h1>Endorsements</h1>
   <p>
-    The ads in the right rail are house endorsements — our own projects, and things we think are
+    The cards in the right rail are house endorsements — our own projects, and things we think are
     worth your time. Nobody pays for them, no third party is involved, and nothing about you leaves
     this browser.
   </p>
   <p class="muted small">
     Only {{ shown }} are shown at a time, and they change every half hour. The donate links further
-    down the rail are not ads and stay put.
+    down the rail are not endorsements and stay put.
   </p>
 </div>
 
 <div class="spage-body">
   <div class="ssection">
     <div class="srow">
-      <span class="slabel">Show ads</span>
+      <span class="slabel">Show endorsements</span>
       <div class="scontrol">
         <label class="checkline">
           <input
@@ -56,7 +56,7 @@
             <p class="spotlight-name">
               {{ row.ad.title }}
               @if (!store.enabled()) {
-                <span class="pill">All ads off</span>
+                <span class="pill">All endorsements off</span>
               } @else if (row.disabled) {
                 <span class="pill">Off</span>
               } @else if (row.dismissed) {

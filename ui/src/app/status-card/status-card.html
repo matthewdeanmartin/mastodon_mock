@@ -602,18 +602,20 @@
         }
         @if (foreign) {
           @if (nitterLink; as nitter) {
-            <!-- tweets point at Nitter rather than x.com: no trackers, no
+            <!-- tweets point at a mirror rather than x.com: no trackers, no
                  login wall, and clicking through to Twitter is the habit this
-                 connector exists to avoid. The instance is configurable
-                 because the public Nitter ecosystem is unstable. -->
+                 connector exists to avoid. The instance is configurable because
+                 the mirror ecosystem is unstable, so the label names the host
+                 actually configured rather than hardcoding one that may not be
+                 where the link goes. -->
             <a
               class="action open-original"
               [href]="nitter"
               target="_blank"
               rel="noopener noreferrer"
-              title="Open on Nitter, a tracker-free front-end for Twitter"
+              [title]="'Open on ' + nitterLabel + ', a tracker-free front-end for Twitter'"
             >
-              ↗ Nitter
+              ↗ {{ nitterLabel }}
             </a>
           } @else {
             <a

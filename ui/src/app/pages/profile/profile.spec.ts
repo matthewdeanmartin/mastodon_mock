@@ -427,10 +427,13 @@ describe('Profile block/unblock', () => {
       'anonymous-mastodon:social.example:50',
     );
     const filters = fixture.nativeElement.querySelectorAll('.profile-filters button');
-    expect(filters).toHaveLength(3);
+    // Search joined this row rather than living in the ••• menu, where it sat
+    // among the moderation actions instead of with the other controls that
+    // change what the timeline shows. Four is this row's ceiling.
+    expect(filters).toHaveLength(4);
     expect(
       Array.from(filters).map((button) => (button as HTMLButtonElement).textContent?.trim()),
-    ).toEqual(['🔁 Boosts', '💬 Replies', '📌 Pinned']);
+    ).toEqual(['🔁 Boosts', '💬 Replies', '📌 Pinned', '🔍 Search']);
     const collectionCount = fixture.nativeElement.querySelector(
       '.collection-count-btn',
     ) as HTMLButtonElement;

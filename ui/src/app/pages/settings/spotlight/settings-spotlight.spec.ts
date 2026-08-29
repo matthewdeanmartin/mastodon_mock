@@ -91,7 +91,7 @@ describe('SettingsSpotlight (Ads)', () => {
     // page can't claim an ad is "on" while nothing shows.
     for (const row of rows(fixture)) {
       expect(row.querySelector<HTMLInputElement>('input')!.disabled).toBe(true);
-      expect(row.textContent).toContain('All ads off');
+      expect(row.textContent).toContain('All endorsements off');
     }
   });
 

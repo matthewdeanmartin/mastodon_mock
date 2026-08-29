@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../../client-prefs';
 import { Auth } from '../../auth';
 import { Account, Context, Status } from '../../models';
+import { DEFAULT_NITTER_HOST } from '../../providers/twitter/nitter';
 import { Thread } from './thread';
 import { anonymousStatusRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 import { settleRssCache } from '../../testing/settle-rss-cache';
@@ -371,7 +372,9 @@ describe('Thread', () => {
       const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
         'a.reader-original',
       );
-      expect(link?.href).toContain('nitter');
+      // The point is that it leaves x.com, not which mirror it lands on — the
+      // default host moves whenever the current one goes down.
+      expect(link?.href).toContain(DEFAULT_NITTER_HOST);
       expect(link?.href).not.toContain('x.com');
     });
 

@@ -36,7 +36,7 @@ import { serverKnowsStatus, capabilitiesFor } from '../../providers/provider';
 import { RssProvider } from '../../providers/rss/rss-provider';
 import { TwitterApi } from '../../providers/twitter/twitter-api';
 import { TwitterFeed } from '../../providers/twitter/twitter-feed';
-import { toNitterUrl } from '../../providers/twitter/nitter';
+import { nitterHost, toNitterUrl } from '../../providers/twitter/nitter';
 import { Subscription } from 'rxjs';
 import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import {
@@ -161,6 +161,9 @@ export class Thread implements OnInit {
    * depth), so this is how a reader reaches the rest of the conversation — and
    * it is free, because it leaves the app.
    */
+  /** The mirror's host, so the link names where it actually goes. */
+  protected nitterLabel = nitterHost();
+
   protected nitterThreadUrl = computed(() => {
     const status = this.status();
     return this.isTwitter() && status ? toNitterUrl(status.url) : null;
