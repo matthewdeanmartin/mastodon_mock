@@ -642,6 +642,19 @@ describe('Home', () => {
     expect(buttons[0].textContent).toContain('Write');
   });
 
+  it('does not narrate the drafts workflow back to the user', () => {
+    // "Posts go through Drafts first." — the app explaining its own settings on
+    // a screen the reader came to for their feed. Removed rather than reworded:
+    // thoughtful posting is the user's own choice and needs no running
+    // commentary, and Home has no other self-talk to keep it company.
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.setThoughtfulPosting(true);
+    const fixture = setUp();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Drafts first');
+    expect(fixture.nativeElement.querySelector('.write-note')).toBeNull();
+  });
+
   it('resumes an empty draft rather than leaving blank ones behind', () => {
     const drafts = TestBed.inject(Drafts);
     const existing = drafts.save(emptyDraftSnapshot('public'));

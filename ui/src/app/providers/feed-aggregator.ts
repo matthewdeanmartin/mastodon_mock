@@ -16,6 +16,7 @@ import { Auth } from '../auth';
 import { ClientPrefs, homeWindowMs } from '../client-prefs';
 import { HomeDiagnostics } from '../home-diagnostics';
 import { Status } from '../models';
+import { byNewestFirst } from '../status-sort';
 import { MastodonConnector } from './mastodon/mastodon-connector';
 import { FeedProvider } from './provider';
 import { ProviderRegistry } from './provider-registry';
@@ -67,11 +68,6 @@ const SOURCE_HARD_CAP = 500;
 interface ForeignSource {
   provider: FeedProvider;
   exhausted: boolean;
-}
-
-function time(status: Status): number {
-  const ms = Date.parse(status.created_at);
-  return Number.isNaN(ms) ? 0 : ms;
 }
 
 /**
@@ -252,7 +248,7 @@ export class FeedAggregator {
       return of([]);
     }
     return forkJoin(sourcePages).pipe(
-      map((pages) => pages.flat().sort((a, b) => time(b) - time(a))),
+      map((pages) => pages.flat().sort(byNewestFirst)),
       tap((items) =>
         this.diagnostics.info('aggregator:round-success', {
           posts: items.length,

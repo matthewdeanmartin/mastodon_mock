@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api } from '../../../api';
+import { MockApi } from '../../../mock-api';
 import { ClientPrefs } from '../../../client-prefs';
 import { AppearanceSettings } from '../../../models';
 import { Server } from '../../../server';
@@ -17,7 +17,7 @@ import { BlueControls } from '../blue/blue-controls';
   templateUrl: './settings-appearance.html',
 })
 export class SettingsAppearance implements OnInit {
-  private api = inject(Api);
+  private api = inject(MockApi);
   private server = inject(Server);
 
   protected readonly prefs = inject(ClientPrefs);

@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api } from '../../../api';
+import { MockApi } from '../../../mock-api';
 import { Invite } from '../../../models';
 
 /** Invite links: generate, list, revoke. */
@@ -11,7 +11,7 @@ import { Invite } from '../../../models';
   styleUrl: './settings-invites.css',
 })
 export class SettingsInvites implements OnInit {
-  private api = inject(Api);
+  private api = inject(MockApi);
 
   protected invites = signal<Invite[]>([]);
   protected maxUses = signal<number | null>(null);

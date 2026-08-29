@@ -1,7 +1,16 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { DevUser, FaultRule, FaultRuleDraft, GenerationReport } from './models';
+import {
+  AuthorizedApp,
+  DevUser,
+  FaultRule,
+  FaultRuleDraft,
+  GenerationReport,
+  ImportReport,
+  Invite,
+  MockSettings,
+} from './models';
 
 /**
  * Mock-server-only control plane (`/api/v1/_mock/*`): dev login, sample-data seeding,
@@ -49,5 +58,47 @@ export class MockApi {
 
   clearFaults(): Observable<unknown> {
     return this.http.delete('/api/v1/_mock/faults');
+  }
+
+  // --- mock-only settings, invites, apps, and CSV import/export ---
+  //
+  // These moved here from `Api`. They are mock-server endpoints like everything
+  // else in this class, but living on `Api` meant their URLs were compiled into
+  // the standalone client, where no server answers them. Real Mastodon has no
+  // public equivalent for any of them: settings and invites are web-UI only, and
+  // follows/mutes/blocks CSV is an account-export download, not this endpoint.
+  mockSettings(): Observable<MockSettings> {
+    return this.http.get<MockSettings>('/api/v1/_mock/settings');
+  }
+
+  updateMockSettings(changes: Partial<MockSettings>): Observable<MockSettings> {
+    return this.http.put<MockSettings>('/api/v1/_mock/settings', changes);
+  }
+
+  invites(): Observable<Invite[]> {
+    return this.http.get<Invite[]>('/api/v1/_mock/invites');
+  }
+
+  createInvite(draft: {
+    max_uses?: number | null;
+    expires_in?: number | null;
+  }): Observable<Invite> {
+    return this.http.post<Invite>('/api/v1/_mock/invites', draft);
+  }
+
+  revokeInvite(id: string): Observable<Invite> {
+    return this.http.delete<Invite>(`/api/v1/_mock/invites/${id}`);
+  }
+
+  authorizedApps(): Observable<AuthorizedApp[]> {
+    return this.http.get<AuthorizedApp[]>('/api/v1/_mock/apps');
+  }
+
+  exportCsv(kind: 'following' | 'mutes' | 'blocks'): Observable<string> {
+    return this.http.get(`/api/v1/_mock/export/${kind}`, { responseType: 'text' });
+  }
+
+  importCsv(kind: 'following' | 'mutes' | 'blocks', csv: string): Observable<ImportReport> {
+    return this.http.post<ImportReport>('/api/v1/_mock/import', { type: kind, csv });
   }
 }

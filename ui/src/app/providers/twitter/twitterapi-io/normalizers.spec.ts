@@ -143,9 +143,13 @@ describe('toStatus', () => {
     expect(status.bookmarked).toBe(false);
   });
 
-  it('sorts an undated post to the bottom rather than the top', () => {
-    const status = toStatus({ id: '1', author: { userName: 'a' }, createdAt: 'garbage' });
-    expect(Date.parse(status.created_at)).toBe(0);
+  it('leaves an unreadable date unreadable rather than forging epoch', () => {
+    // Previously stamped `new Date(0)`. Epoch is older than every real post, so
+    // the status pinned itself to the end of Home and every later page merged
+    // above it. `byNewestFirst` now treats an unparseable date as unknown and
+    // holds the post in place, so the raw value is passed through instead.
+    const status = toStatus({ id: '1', author: { userName: 'a' }, createdAt: 'nonsense' });
+    expect(Number.isNaN(Date.parse(status.created_at))).toBe(true);
   });
 });
 

@@ -1,6 +1,15 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { DevUser, FaultRule, FaultRuleDraft, GenerationReport } from './models';
+import {
+  AuthorizedApp,
+  DevUser,
+  FaultRule,
+  FaultRuleDraft,
+  GenerationReport,
+  ImportReport,
+  Invite,
+  MockSettings,
+} from './models';
 
 /**
  * Mocking Bird stub for {@link MockApi}. The mock-server control plane does not exist on
@@ -43,6 +52,41 @@ export class MockApi {
   }
 
   clearFaults(): Observable<unknown> {
+    return this.unavailable();
+  }
+
+  mockSettings(): Observable<MockSettings> {
+    return this.unavailable();
+  }
+
+  updateMockSettings(_changes: Partial<MockSettings>): Observable<MockSettings> {
+    return this.unavailable();
+  }
+
+  invites(): Observable<Invite[]> {
+    return this.unavailable();
+  }
+
+  createInvite(_draft: {
+    max_uses?: number | null;
+    expires_in?: number | null;
+  }): Observable<Invite> {
+    return this.unavailable();
+  }
+
+  revokeInvite(_id: string): Observable<Invite> {
+    return this.unavailable();
+  }
+
+  authorizedApps(): Observable<AuthorizedApp[]> {
+    return this.unavailable();
+  }
+
+  exportCsv(_kind: 'following' | 'mutes' | 'blocks'): Observable<string> {
+    return this.unavailable();
+  }
+
+  importCsv(_kind: 'following' | 'mutes' | 'blocks', _csv: string): Observable<ImportReport> {
     return this.unavailable();
   }
 }

@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api } from '../../../api';
+import { MockApi } from '../../../mock-api';
 import { EmailNotificationSettings } from '../../../models';
 
 /** Email notification toggles (mock-only settings section). */
@@ -10,7 +10,7 @@ import { EmailNotificationSettings } from '../../../models';
   templateUrl: './settings-notifications.html',
 })
 export class SettingsNotifications implements OnInit {
-  private api = inject(Api);
+  private api = inject(MockApi);
 
   protected follow = signal(false);
   protected followRequest = signal(false);

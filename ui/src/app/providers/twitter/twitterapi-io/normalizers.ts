@@ -285,9 +285,16 @@ export function toStatus(tweet: WireTweet, depth = 0): Status {
     // What a later interaction needs to find this post again without reparsing.
     providerRef: { tweetId: tweet.id, authorId: tweet.author?.id },
     id: statusId(tweet.id ?? ''),
-    // A post with an unparseable date sorts last rather than jumping to the top
-    // of the feed — see normalizeTimestamp.
-    created_at: normalizeTimestamp(tweet.createdAt) ?? new Date(0).toISOString(),
+    // An unreadable date stays unreadable rather than being forged into epoch.
+    //
+    // This used to be `new Date(0)`, chosen so such a post "sorts last rather
+    // than jumping to the top". The bottom turned out to be the worse end: epoch
+    // is older than every real post, so the status stuck to the end of Home and
+    // every later page merged above it — one permanently pinned post per
+    // session. `byNewestFirst` in status-sort.ts now treats an unparseable date
+    // as *unknown* and holds the post where it arrived, so passing the bad value
+    // through is both honest and correctly ordered.
+    created_at: normalizeTimestamp(tweet.createdAt) ?? tweet.createdAt ?? '',
     edited_at: null,
     content: reblog ? '' : renderContent(tweet),
     spoiler_text: '',

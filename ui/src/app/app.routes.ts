@@ -10,7 +10,7 @@ import { featureFlagGuard } from './feature-flag.guard';
 import { inviteAccessGuard } from './invites/invite-access.guard';
 import { justMyServerUpdateCanDeactivate, justMyServerUpdateGuard } from './just-my-server.guard';
 // Mock-only routes; file-replaced with an empty list in the Mocking Bird build.
-import { mockOnlyChildren } from './mock-routes';
+import { mockOnlyChildren, mockOnlySettingsChildren } from './mock-routes';
 
 export const routes: Routes = [
   // The front door: a dispatcher that renders nothing. It sends a signed-in or
@@ -413,16 +413,6 @@ export const routes: Routes = [
               import('./pages/settings/writing/settings-writing').then((m) => m.SettingsWriting),
           },
           {
-            path: 'notifications',
-            title: 'Inbox',
-            canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Email notifications', preloadSettings: true },
-            loadComponent: () =>
-              import('./pages/settings/notifications/settings-notifications').then(
-                (m) => m.SettingsNotifications,
-              ),
-          },
-          {
             path: 'follows',
             title: 'Follows',
             canActivate: [anonymousUnavailableGuard],
@@ -517,22 +507,6 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'deletion',
-            title: 'Delete account',
-            canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Automatic post deletion', preloadSettings: true },
-            loadComponent: () =>
-              import('./pages/settings/deletion/settings-deletion').then((m) => m.SettingsDeletion),
-          },
-          {
-            path: 'account',
-            title: 'Account',
-            canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Account settings', preloadSettings: true },
-            loadComponent: () =>
-              import('./pages/settings/account/settings-account').then((m) => m.SettingsAccount),
-          },
-          {
             // Reachable while anonymous, unlike its neighbours.
             //
             // This page is several tools, and only some of them need an account
@@ -561,14 +535,6 @@ export const routes: Routes = [
               import('./pages/settings/config/settings-config').then((m) => m.SettingsConfig),
           },
           {
-            path: 'invites',
-            title: 'Invites',
-            canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Invites', preloadSettings: true },
-            loadComponent: () =>
-              import('./pages/settings/invites/settings-invites').then((m) => m.SettingsInvites),
-          },
-          {
             path: 'i18n',
             title: 'Languages',
             data: { preloadSettings: true },
@@ -584,16 +550,7 @@ export const routes: Routes = [
                 (m) => m.SettingsFeatureFlags,
               ),
           },
-          {
-            path: 'development',
-            title: 'Development',
-            canActivate: [anonymousUnavailableGuard],
-            data: { anonymousFeature: 'Development settings', preloadSettings: true },
-            loadComponent: () =>
-              import('./pages/settings/development/settings-development').then(
-                (m) => m.SettingsDevelopment,
-              ),
-          },
+          ...mockOnlySettingsChildren,
         ],
       },
       ...mockOnlyChildren,

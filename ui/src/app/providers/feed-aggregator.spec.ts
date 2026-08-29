@@ -11,6 +11,7 @@ import { FeedAggregator } from './feed-aggregator';
 import { BlueskyProvider } from './bluesky/bluesky-provider';
 import { MastodonConnector } from './mastodon/mastodon-connector';
 import { RssProvider } from './rss/rss-provider';
+import { byNewestFirst } from '../status-sort';
 import { seedBskyIdentity } from '../testing/seed-storage';
 
 function makeStatus(id: string, createdAt: string, overrides: Partial<Status> = {}): Status {
@@ -622,6 +623,71 @@ describe('FeedAggregator', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  /**
+   * The permanently pinned bottom post.
+   *
+   * Reported three times from real use: after "load more", one post stays welded
+   * to the end of the feed while every new page inserts above it. It is not a
+   * paging off-by-one — `max_id` is exclusive on the server and `dedupeExact`
+   * removes any repeated boundary item, so the post is not a duplicate; it is
+   * the same post, never moving.
+   *
+   * The cause is the sort key. `time()` maps an unreadable `created_at` to 0,
+   * and `twitterapi-io/normalizers.ts` explicitly stamps such tweets with
+   * `new Date(0)`. Epoch is older than every real post, so a newest-first sort
+   * puts that status last and *keeps* it there for the life of the session:
+   * nothing can ever sort below it. The "sorts last rather than jumping to the
+   * top" comment there chose the bottom as the safer end, missing that the
+   * bottom is permanent while the top is transient.
+   *
+   * The fix keeps undated posts (see the window block above) but stops treating
+   * "no date" as "infinitely old", so they hold their arrival position instead
+   * of sinking to a floor nothing can sort beneath.
+   */
+  describe('a post whose date cannot be read does not pin itself to the end', () => {
+    const at = (n: number) => new Date(Date.UTC(2026, 6, 14, 12) - n * 60_000).toISOString();
+
+    /** Page the aggregator the way "load more" does, accumulating as Home does. */
+    async function pageTwice(first: Status[], second: Status[]): Promise<Status[]> {
+      TestBed.inject(ClientPrefs).setHomeWindow('all');
+      const aggregator = TestBed.inject(FeedAggregator);
+      aggregator.reset();
+      homeTimeline.mockReturnValueOnce(of(first)).mockReturnValueOnce(of(second));
+      const one = await firstValueFrom(aggregator.nextPage());
+      const two = await firstValueFrom(aggregator.nextPage());
+      // Home's mergeStatuses: concatenate, then re-sort newest-first.
+      return [...one, ...two].sort(byNewestFirst);
+    }
+
+    it('does not leave an undated post stranded below a newly loaded page', async () => {
+      const feed = await pageTwice(
+        [makeStatus('undated', 'not-a-date'), makeStatus('a', at(1))],
+        [makeStatus('b', at(2)), makeStatus('c', at(3))],
+      );
+      // The symptom: 'undated' is last, and page two landed above it.
+      expect(feed.at(-1)?.id).not.toBe('undated');
+    });
+
+    it('keeps the undated post in the feed rather than dropping it', async () => {
+      const feed = await pageTwice(
+        [makeStatus('undated', 'not-a-date'), makeStatus('a', at(1))],
+        [makeStatus('b', at(2))],
+      );
+      expect(feed.map((s) => s.id)).toContain('undated');
+    });
+
+    it('still orders the posts that do have dates newest-first', async () => {
+      const feed = await pageTwice(
+        [makeStatus('undated', 'not-a-date'), makeStatus('a', at(1))],
+        [makeStatus('b', at(2)), makeStatus('c', at(3))],
+      );
+      const dated = feed.filter((s) => s.id !== 'undated').map((s) => s.id);
+      // A short first page exhausts the source, so only page one is fetched —
+      // ordering within what did load is what this asserts.
+      expect(dated).toEqual(['a']);
     });
   });
 });

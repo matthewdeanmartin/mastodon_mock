@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api } from '../../../api';
+import { MockApi } from '../../../mock-api';
 import { PostDeletionSettings } from '../../../models';
 
 /** Automatic post deletion policy (mock-only settings section). */
@@ -10,7 +10,7 @@ import { PostDeletionSettings } from '../../../models';
   templateUrl: './settings-deletion.html',
 })
 export class SettingsDeletion implements OnInit {
-  private api = inject(Api);
+  private api = inject(MockApi);
 
   protected enabled = signal(false);
   protected minAgeDays = signal(30);

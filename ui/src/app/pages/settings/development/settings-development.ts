@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { Api } from '../../../api';
+import { MockApi } from '../../../mock-api';
 import { BugReportDialog } from '../../../bug-report-dialog/bug-report-dialog';
 import { AuthorizedApp } from '../../../models';
 
@@ -11,7 +11,7 @@ import { AuthorizedApp } from '../../../models';
   styleUrl: './settings-development.css',
 })
 export class SettingsDevelopment implements OnInit {
-  private api = inject(Api);
+  private api = inject(MockApi);
 
   protected apps = signal<AuthorizedApp[]>([]);
   protected loading = signal(true);

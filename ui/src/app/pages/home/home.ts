@@ -7,6 +7,7 @@ import { Auth } from '../../auth';
 import { Drafts, draftHasContent, emptyDraftSnapshot } from '../../drafts';
 import { ClientPrefs, FEED_MAX_COOLDOWN_MS, HomeWindow } from '../../client-prefs';
 import { Status } from '../../models';
+import { byNewestFirst } from '../../status-sort';
 import { CalmVerdicts } from '../../calm-verdicts';
 import { FeedLanguageFilter } from '../../trend-language-filter';
 import { CommandBar, FeedView } from '../../command-bar/command-bar';
@@ -241,9 +242,7 @@ export class Home implements OnInit, OnDestroy {
     // Drop any real feed item colliding with an injected synthetic id.
     const injectedIds = new Set(injected.map((s) => s.id));
     const base = feed.filter((s) => !injectedIds.has(s.id) && !isElizaId(s.id));
-    return this.applyTimelineFilters(
-      [...injected, ...base].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)),
-    );
+    return this.applyTimelineFilters([...injected, ...base].sort(byNewestFirst));
   });
 
   /** Which view the command bar's Members/Analytics toggles have selected. */
@@ -820,9 +819,7 @@ export class Home implements OnInit, OnDestroy {
     this.statuses.update((statuses) => {
       const merged = this.auth.isAnonymous
         ? this.dedupeAnonymous([...statuses, ...more])
-        : this.dedupeExact([...statuses, ...more]).sort(
-            (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
-          );
+        : this.dedupeExact([...statuses, ...more]).sort(byNewestFirst);
       const max = this.prefs.feedMax();
       if (merged.length <= max) {
         return merged;
@@ -866,9 +863,7 @@ export class Home implements OnInit, OnDestroy {
 
   /** Collapse duplicate public posts acquired through different Anonymous read routes. */
   private dedupeAnonymous(statuses: Status[]): Status[] {
-    const newestFirst = statuses.sort(
-      (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
-    );
+    const newestFirst = statuses.sort(byNewestFirst);
     const seen = new Set<string>();
     return newestFirst.filter((status) => {
       const key = canonicalStatusKey(status);

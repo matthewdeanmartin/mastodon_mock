@@ -8,6 +8,7 @@
     "build": "ng build",
     "prebuild:mockingbird": "node scripts/vendor-analytics.mjs",
     "build:mockingbird": "ng build --configuration mockingbird",
+    "postbuild:mockingbird": "node scripts/check-mock-leakage.mjs",
     "vendor:analytics": "node scripts/vendor-analytics.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
@@ -28,7 +29,8 @@
     "gen:api-docs": "node scripts/gen-api-docs.mjs",
     "starter-kits:update": "node scripts/update-bundled-starter-kits.mjs",
     "starter-kits:check": "node scripts/update-bundled-starter-kits.mjs --check",
-    "check:subpaths": "node scripts/check-subpath-deployments.mjs"
+    "check:subpaths": "node scripts/check-subpath-deployments.mjs",
+    "check:mock-leakage": "node scripts/check-mock-leakage.mjs"
   },
   "private": true,
   "packageManager": "npm@11.17.0",

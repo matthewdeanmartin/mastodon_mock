@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
+import { MockApi } from '../../../mock-api';
 import { Auth } from '../../../auth';
 import { ImportFollows, parseHandles } from '../../../import-follows';
 import { followedTagsCsv, ImportTags, parseTags } from '../../../import-tags';
@@ -72,6 +73,9 @@ function saveCsv(csv: string, filename: string): void {
 export class SettingsImportExport {
   private readonly diagnostics = inject(PageDiagnostics);
   private api = inject(Api);
+  // CSV import/export is a mock-server control-plane endpoint, not public
+  // Mastodon; its UI is already gated on `mockTooling` below.
+  private mockApi = inject(MockApi);
   private auth = inject(Auth);
   protected importer = inject(ImportFollows);
   protected tagImporter = inject(ImportTags);
@@ -351,7 +355,7 @@ export class SettingsImportExport {
   protected report = signal<ImportReport | null>(null);
 
   protected download(kind: CsvKind): void {
-    this.api.exportCsv(kind).subscribe((csv) => {
+    this.mockApi.exportCsv(kind).subscribe((csv) => {
       saveCsv(csv, `${kind}.csv`);
     });
   }
@@ -372,7 +376,7 @@ export class SettingsImportExport {
     }
     this.uploading.set(true);
     this.report.set(null);
-    this.api.importCsv(this.importKind(), this.csvText()).subscribe({
+    this.mockApi.importCsv(this.importKind(), this.csvText()).subscribe({
       next: (report) => {
         this.uploading.set(false);
         this.report.set(report);

@@ -6,7 +6,6 @@ import { SERVER_ROLE, serverRole } from './server-role';
 import {
   Account,
   Announcement,
-  AuthorizedApp,
   Collection,
   CollectionItem,
   CollectionWithAccounts,
@@ -20,14 +19,11 @@ import {
   FilterContext,
   FilterKeyword,
   FilterKeywordDraft,
-  ImportReport,
   InstanceInfo,
   InstanceRule,
-  Invite,
   TrendLink,
   MastodonNotification,
   MediaAttachment,
-  MockSettings,
   OAuthApp,
   OAuthTokenResponse,
   Poll,
@@ -63,7 +59,14 @@ export interface AccountStatusesOptions {
   limit?: number;
 }
 
-/** Thin wrapper over the mastodon_mock REST API, served same-origin. */
+/**
+ * Thin wrapper over the Mastodon REST API.
+ *
+ * Every endpoint here is public Mastodon, so this class works against any
+ * compliant instance as well as the bundled mock server. Mock-server-only
+ * endpoints (`/api/v1/_mock/*`) live on {@link MockApi}, which is file-replaced
+ * in the standalone Mocking Bird build so those URLs never ship.
+ */
 @Injectable({ providedIn: 'root' })
 export class Api {
   private http = inject(HttpClient);
@@ -1072,42 +1075,6 @@ export class Api {
 
   deleteFilterKeyword(keywordId: string): Observable<unknown> {
     return this.http.delete(`/api/v2/filters/keywords/${keywordId}`);
-  }
-
-  // --- mock-only settings (`/api/v1/_mock/...`; no upstream API equivalent) ---
-  mockSettings(): Observable<MockSettings> {
-    return this.http.get<MockSettings>('/api/v1/_mock/settings');
-  }
-
-  updateMockSettings(changes: Partial<MockSettings>): Observable<MockSettings> {
-    return this.http.put<MockSettings>('/api/v1/_mock/settings', changes);
-  }
-
-  invites(): Observable<Invite[]> {
-    return this.http.get<Invite[]>('/api/v1/_mock/invites');
-  }
-
-  createInvite(draft: {
-    max_uses?: number | null;
-    expires_in?: number | null;
-  }): Observable<Invite> {
-    return this.http.post<Invite>('/api/v1/_mock/invites', draft);
-  }
-
-  revokeInvite(id: string): Observable<Invite> {
-    return this.http.delete<Invite>(`/api/v1/_mock/invites/${id}`);
-  }
-
-  authorizedApps(): Observable<AuthorizedApp[]> {
-    return this.http.get<AuthorizedApp[]>('/api/v1/_mock/apps');
-  }
-
-  exportCsv(kind: 'following' | 'mutes' | 'blocks'): Observable<string> {
-    return this.http.get(`/api/v1/_mock/export/${kind}`, { responseType: 'text' });
-  }
-
-  importCsv(kind: 'following' | 'mutes' | 'blocks', csv: string): Observable<ImportReport> {
-    return this.http.post<ImportReport>('/api/v1/_mock/import', { type: kind, csv });
   }
 
   private pageParams(maxId?: string): HttpParams {

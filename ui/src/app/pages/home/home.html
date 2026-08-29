@@ -46,12 +46,15 @@
 @if (!fromDraft() && !openedDraft() && !miniComposerOpen()) {
   <div class="write-cta">
     <button class="btn write-btn" type="button" (click)="startWriting()">✍ Write</button>
+    <!-- Under thoughtful posting there is no Quick post button and no note
+         explaining its absence: the setting is the user's own choice, and
+         narrating it back to them on every visit to Home is the app talking
+         about itself instead of showing their feed. Write is the only path,
+         and the button says so. -->
     @if (offersMiniComposer()) {
       <button class="btn btn-outline write-btn" type="button" (click)="openMiniComposer()">
         💬 Quick post
       </button>
-    } @else {
-      <span class="write-note">Posts go through Drafts first.</span>
     }
   </div>
 } @else {
