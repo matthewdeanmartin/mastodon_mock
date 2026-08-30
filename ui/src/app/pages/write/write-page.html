@@ -207,26 +207,63 @@
             />
           }
 
-          <textarea
-            #editorBox
-            class="editor-box"
-            spellcheck="true"
-            aria-label="Write"
-            [attr.placeholder]="'Write. A line of --- starts a new post.'"
-            [ngModel]="body()"
-            (ngModelChange)="onBodyInput($event)"
-            (paste)="onPaste($event)"
-            (focus)="rememberEditorSelection($event)"
-            (click)="rememberEditorSelection($event)"
-            (select)="rememberEditorSelection($event)"
-            (keyup)="rememberEditorSelection($event)"
-          ></textarea>
+          @if (boxed()) {
+            <!--
+              One box per post. More on screen than a --- line, and the only
+              layout where a post is a thing you can point at — which is what
+              giving one post its own poll or images needs.
+            -->
+            <div class="write-boxes" aria-label="Posts in this thread">
+              @for (box of boxes(); track $index; let i = $index) {
+                <div class="write-box">
+                  <div class="write-box-num muted small">{{ i + 1 }}</div>
+                  <textarea
+                    class="editor-box editor-box-small"
+                    spellcheck="true"
+                    [attr.aria-label]="'Post ' + (i + 1) + ' of ' + boxes().length"
+                    [attr.placeholder]="i === 0 ? 'Write.' : 'And then…'"
+                    [ngModel]="box"
+                    (ngModelChange)="setBoxText(i, $event)"
+                    (paste)="onPaste($event)"
+                  ></textarea>
+                  @if (boxes().length > 1) {
+                    <button
+                      class="btn btn-outline btn-sm"
+                      type="button"
+                      (click)="removeBox(i)"
+                      [attr.aria-label]="'Remove post ' + (i + 1)"
+                    >
+                      ✕
+                    </button>
+                  }
+                </div>
+              }
+              <button class="btn btn-outline btn-sm write-box-add" type="button" (click)="addBox()">
+                + Add {{ words().post }}
+              </button>
+            </div>
+          } @else {
+            <textarea
+              #editorBox
+              class="editor-box"
+              spellcheck="true"
+              aria-label="Write"
+              [attr.placeholder]="'Write. A line of --- starts a new post.'"
+              [ngModel]="body()"
+              (ngModelChange)="onBodyInput($event)"
+              (paste)="onPaste($event)"
+              (focus)="rememberEditorSelection($event)"
+              (click)="rememberEditorSelection($event)"
+              (select)="rememberEditorSelection($event)"
+              (keyup)="rememberEditorSelection($event)"
+            ></textarea>
+          }
 
           @if (media().length) {
             <div class="write-media" aria-label="Attached media">
               @for (item of media(); track item.media.id; let i = $index) {
                 <div class="write-media-item">
-                  @if (item.media.type === 'image') {
+                  @if (item.media.type === 'image' || item.media.type === 'gifv') {
                     <img
                       [src]="item.media.preview_url || item.media.url"
                       [alt]="item.description"
@@ -255,6 +292,15 @@
                 </div>
               }
             </div>
+            @if (altTextNote(); as note) {
+              <p
+                class="write-alt-note"
+                [class.advisory]="!altTextMissing()"
+                [attr.role]="altTextMissing() ? 'alert' : 'status'"
+              >
+                {{ altTextMissing() ? '⚠' : '💡' }} {{ note }}
+              </p>
+            }
           }
 
           @if (pollOpen()) {
@@ -401,7 +447,7 @@
             <div class="write-visibility" role="radiogroup" aria-label="Who can see this">
               @for (option of visibilities; track option) {
                 <button
-                  class="write-visibility-option"
+                  class="write-tool write-visibility-option"
                   type="button"
                   role="radio"
                   [class.active]="visibility() === option"
@@ -432,6 +478,41 @@
             </select>
           </div>
 
+          <!-- Same wording as the compact composer: a link costs 23 characters
+               whatever its length, so this offers tidiness, not budget. -->
+          @if (longLinks().length; as linkCount) {
+            <div class="link-note muted">
+              <span class="link-note-text">
+                {{ linkCount === 1 ? 'That link counts' : 'Those links count' }} as
+                {{ linkCount === 1 ? '23 characters' : linkCount * 23 + ' characters' }}, however
+                long {{ linkCount === 1 ? 'it is' : 'they are' }} — you have room.
+                @if (shortenerReady()) {
+                  <span
+                    >Shortening only makes {{ linkCount === 1 ? 'it' : 'them' }} easier to
+                    read.</span
+                  >
+                }
+              </span>
+              @if (shortenerReady()) {
+                <button
+                  class="btn btn-outline btn-sm"
+                  type="button"
+                  [disabled]="shortening()"
+                  (click)="shortenLinks()"
+                >
+                  {{ shortening() ? 'Shortening…' : 'Shorten with ' + shortenerName() }}
+                </button>
+              } @else {
+                <a class="link-note-setup" routerLink="/settings/connections/link-shortener">
+                  Set up a shortener
+                </a>
+              }
+            </div>
+            @if (shortenError(); as msg) {
+              <p class="write-warning" role="alert">{{ msg }}</p>
+            }
+          }
+
           @if (mediaNotice()) {
             <p class="write-warning" role="status">{{ mediaNotice() }}</p>
           }
@@ -441,6 +522,109 @@
           }
           @if (notice()) {
             <p class="write-notice" role="status">✓ {{ notice() }}</p>
+          }
+
+          <!--
+            Writing feedback, beside the writing.
+
+            This used to live only inside the publish wizard, which meant the
+            findings were visible exactly when the text was not editable: read
+            the note, cancel out, fix, reopen, re-send. For the AI proofreader
+            that also meant paying OpenRouter again on every round trip. The
+            hashtag and translation helpers were already in the toolbar; this
+            is the same idea for feedback.
+          -->
+          @if (qualityFindings().length || aiFindings().length || proofreadingRequest()) {
+            <section class="write-findings" aria-label="Writing feedback">
+              @if (qualityFindings().length || aiFindings().length) {
+                <ul class="write-finding-list">
+                  @for (finding of qualityFindings(); track finding.id) {
+                    <li class="finding" [class.warn]="finding.severity === 'warn'">
+                      <span class="finding-mark" aria-hidden="true">
+                        {{ finding.severity === 'warn' ? '⚠' : 'ℹ' }}
+                      </span>
+                      <span>
+                        {{ finding.message }}
+                        @if (finding.samples?.length) {
+                          <span class="finding-samples">
+                            @for (sample of finding.samples; track sample) {
+                              <code>{{ sample }}</code>
+                            }
+                          </span>
+                        }
+                      </span>
+                    </li>
+                  }
+                  @for (finding of aiFindings(); track finding.message) {
+                    <li class="finding ai-finding">
+                      <span class="finding-mark" aria-hidden="true">🤖</span>
+                      <span>{{ finding.message }}</span>
+                    </li>
+                  }
+                </ul>
+                <p class="muted small">All advisory — none of this stops you publishing.</p>
+              }
+
+              @if (proofreadingRequest(); as request) {
+                <div class="write-proofread">
+                  <button
+                    class="btn btn-outline btn-sm"
+                    type="button"
+                    [disabled]="aiProofreading() || !hasContent()"
+                    (click)="toggleProofreadConsent()"
+                  >
+                    @if (aiProofreading()) {
+                      Asking OpenRouter…
+                    } @else if (aiProofreadComplete()) {
+                      🤖 Proofread again
+                    } @else {
+                      🤖 Proofread with AI
+                    }
+                  </button>
+                  <span class="muted small">
+                    Sends your text to {{ request.connector }} and may use paid credits.
+                  </span>
+
+                  @if (proofreadConsentOpen()) {
+                    <div class="write-proofread-consent">
+                      <p class="small">
+                        <strong>Connector:</strong> {{ request.connector }}
+                        <br />
+                        <strong>Model:</strong> <code>{{ request.model }}</code>
+                      </p>
+                      <p class="small"><strong>Exact prompt that will be sent:</strong></p>
+                      <pre class="proofread-prompt">{{ request.prompt }}</pre>
+                      <button
+                        class="btn btn-sm"
+                        type="button"
+                        [disabled]="aiProofreading()"
+                        (click)="confirmAiProofreader()"
+                      >
+                        Send to OpenRouter
+                      </button>
+                      <button
+                        class="btn btn-outline btn-sm"
+                        type="button"
+                        (click)="proofreadConsentOpen.set(false)"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
+
+              @if (aiProofreading()) {
+                <p class="muted small" role="status">
+                  OpenRouter is asking the selected model for diagnostic notes…
+                </p>
+              } @else if (aiProofreadComplete() && !aiFindings().length) {
+                <p class="muted small" role="status">The model returned no diagnostic notes.</p>
+              }
+              @if (aiProofreadError(); as error) {
+                <p class="muted small" role="status">AI proofreader unavailable: {{ error }}</p>
+              }
+            </section>
           }
 
           <div class="editor-bar">
@@ -459,6 +643,35 @@
               </button>
             }
             <span class="bar-gap"></span>
+            <!-- Scheduling, without walking the wizard to reach it. The same
+                 signal the wizard's "when" step writes, so setting a time here
+                 and publishing are the same act. Mastodon holds the post
+                 server-side; nothing depends on this browser staying open. -->
+            <label class="write-schedule">
+              <span class="muted small">Publish at</span>
+              <input
+                type="datetime-local"
+                [ngModel]="wizardScheduleAt()"
+                (ngModelChange)="setWizardScheduleAt($event)"
+                name="editor-schedule"
+                [attr.aria-label]="'Schedule this ' + words().post"
+              />
+            </label>
+            @if (wizardScheduleAt()) {
+              <button
+                class="btn btn-outline btn-sm"
+                type="button"
+                (click)="setWizardScheduleAt('')"
+                aria-label="Clear the scheduled time and publish now"
+              >
+                Clear
+              </button>
+              @if (!canScheduleSelectedTarget()) {
+                <span class="muted small">
+                  Scheduling applies to a single Mastodon {{ words().post }}.
+                </span>
+              }
+            }
             <button
               class="btn btn-outline btn-sm"
               type="button"
@@ -480,11 +693,27 @@
                 @if (overLimitCount()) {
                   <span class="over">· {{ overLimitCount() }} over the limit</span>
                 }
+                <span class="bar-gap"></span>
+                <!-- Raw shows exactly what you typed and where it splits;
+                     rendered shows what a reader gets. Both are useful, and
+                     which one you want depends on what you are checking. -->
+                <button
+                  class="btn btn-outline btn-sm"
+                  type="button"
+                  [attr.aria-pressed]="renderedPreview()"
+                  (click)="renderedPreview.set(!renderedPreview())"
+                >
+                  {{ renderedPreview() ? 'Showing rendered' : 'Showing raw' }}
+                </button>
               </div>
-              @for (segment of segments(); track $index) {
+              @for (segment of segments(); track $index; let i = $index) {
                 <div class="segment" [class.over]="segment.overLimit">
-                  <div class="segment-num muted">{{ $index + 1 }}</div>
-                  <div class="segment-text">{{ segment.text }}</div>
+                  <div class="segment-num muted">{{ i + 1 }}</div>
+                  @if (renderedPreview()) {
+                    <div class="segment-text" [innerHTML]="previewHtml()[i]"></div>
+                  } @else {
+                    <div class="segment-text">{{ segment.text }}</div>
+                  }
                   <div class="segment-len muted" [class.over]="segment.overLimit">
                     {{ segment.length }}
                   </div>
@@ -859,46 +1088,10 @@
               <p class="muted">The built-in checks found nothing worth mentioning.</p>
             }
 
-            @if (proofreadingRequest(); as request) {
-              <section class="proofread-consent" aria-labelledby="proofread-consent-title">
-                <h4 id="proofread-consent-title">Optional AI proofreader</h4>
-                <p class="muted small">
-                  This is an OpenRouter connector feature. Nothing is sent until you confirm below,
-                  and sending it may consume paid OpenRouter credits.
-                </p>
-                <p class="small">
-                  <strong>Connector:</strong> {{ request.connector }}
-                  <br />
-                  <strong>Model:</strong> <code>{{ request.model }}</code>
-                </p>
-                <p class="small"><strong>Exact prompt that will be sent:</strong></p>
-                <pre class="proofread-prompt">{{ request.prompt }}</pre>
-                <button
-                  class="btn btn-outline"
-                  type="button"
-                  [disabled]="aiProofreading()"
-                  (click)="confirmAiProofreader()"
-                >
-                  @if (aiProofreading()) {
-                    Asking OpenRouter…
-                  } @else if (aiProofreadComplete()) {
-                    Send again
-                  } @else {
-                    Send to OpenRouter
-                  }
-                </button>
-              </section>
-            }
-            @if (aiProofreading()) {
-              <p class="muted small" role="status">
-                OpenRouter is asking the selected model for diagnostic notes…
-              </p>
-            } @else if (aiProofreadComplete() && !aiFindings().length) {
-              <p class="muted small" role="status">The model returned no diagnostic notes.</p>
-            }
-            @if (aiProofreadError(); as error) {
-              <p class="muted small" role="status">AI proofreader unavailable: {{ error }}</p>
-            }
+            <p class="muted small">
+              Proofreading happens in the editor, where you can still change the text. Close this
+              and use 🤖 Proofread with AI beside your writing.
+            </p>
           }
 
           @case ('when') {
@@ -959,6 +1152,16 @@
     [post]="body()"
     (applied)="useTranslation($event)"
     (closed)="translateOpen.set(false)"
+  />
+}
+
+@if (shortenerConsentPrompt(); as prompt) {
+  <app-proxy-consent-dialog
+    [shortener]="prompt.shortener"
+    [proxy]="prompt.proxy"
+    [carriesCredential]="prompt.carriesCredential"
+    (accepted)="acceptShortenerConsent()"
+    (cancelled)="declineShortenerConsent()"
   />
 }
 

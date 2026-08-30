@@ -577,3 +577,16 @@ textarea {
 .hugo-deploy-close:hover {
   color: var(--text);
 }
+
+/* Missing-description notice. Blocking by default; the advisory variant is the
+   same message when the user has not opted into the hard requirement, so it
+   reads as guidance rather than as an error they must clear. */
+.alt-required {
+  padding: 4px 0;
+  color: var(--warn, inherit);
+}
+
+.alt-required.advisory {
+  color: inherit;
+  opacity: 0.75;
+}

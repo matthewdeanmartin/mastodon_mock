@@ -18,6 +18,8 @@ import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
 import { VisibilityState, VISIBILITIES } from './visibility-state';
+import { altTextMessage, mediaTypeOf, undescribedIndexes } from './alt-text';
+import { LinkShortening } from './link-shortening';
 import { TagHelperDialog } from './tag-helper-dialog/tag-helper-dialog';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
@@ -37,14 +39,7 @@ import { prepareImageForBluesky } from '../providers/bluesky/bluesky-image';
 import { PasteHistory } from '../providers/paste/paste-history';
 import { PasteExpiry } from '../providers/paste/paste-provider';
 import { PasteProviderRegistry } from '../providers/paste/paste-provider-registry';
-import { ShortenerRegistry } from '../providers/shortener/shortener-registry';
-import { ShortenerSettings } from '../providers/shortener/shortener-settings';
-import { CorsProxy } from '../providers/cors-proxy/cors-proxy';
-import { CorsProxyEntry } from '../providers/cors-proxy/cors-proxy-catalog';
 import { ProxyConsentDialog } from '../providers/shortener/proxy-consent-dialog/proxy-consent-dialog';
-import { ShortenerProxyConsent } from '../providers/shortener/proxy-consent';
-import { ShortenerCatalogEntry, shortenerEntry } from '../providers/shortener/shortener-catalog';
-import { ProxyConsentRequired } from '../providers/shortener/shortener-transport';
 import { applyMinimalMarkdown } from '../markdown';
 import { Terminology } from '../terminology';
 import { longUrls, postLength } from './post-length';
@@ -322,7 +317,7 @@ function localMedia(file: File): MediaAttachment {
   const url = URL.createObjectURL(file);
   return {
     id: `local:${crypto.randomUUID()}`,
-    type: 'image',
+    type: mediaTypeOf(file),
     url,
     preview_url: url,
     description: null,
@@ -365,16 +360,13 @@ function dragHasFiles(event: DragEvent): boolean {
   ],
   templateUrl: './compose.html',
   styleUrl: './compose.css',
-  providers: [VisibilityState],
+  providers: [VisibilityState, LinkShortening],
 })
 export class Compose implements OnDestroy {
   private api = inject(Api);
   protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
-  private shorteners = inject(ShortenerRegistry);
-  private shortenerSettings = inject(ShortenerSettings);
-  private shortenerConsent = inject(ShortenerProxyConsent);
-  private corsProxy = inject(CorsProxy);
+  private linkShortening = inject(LinkShortening);
   private bskyApi = inject(BlueskyApi);
   protected bskySession = inject(BlueskySession);
   private drafts = inject(Drafts);
@@ -1007,25 +999,38 @@ export class Compose implements OnDestroy {
   protected longLinks = computed(() => longUrls(this.text()));
 
   /** Whether a shortener is connected and usable. */
-  protected shortenerReady = computed(() => this.shortenerSettings.usable());
+  protected shortenerReady = this.linkShortening.ready;
 
-  protected shortenerName = computed(() => this.shortenerSettings.chosen()?.label ?? '');
+  protected shortenerName = this.linkShortening.name;
 
-  protected shortening = signal(false);
-  protected shortenError = signal<string | null>(null);
-  protected readonly shortenerConsentPrompt = signal<{
-    shortener: ShortenerCatalogEntry;
-    proxy: CorsProxyEntry;
-    carriesCredential: boolean;
-  } | null>(null);
+  protected shortening = this.linkShortening.busy;
+  protected shortenError = this.linkShortening.error;
+  protected readonly shortenerConsentPrompt = this.linkShortening.consentPrompt;
 
   /** "Saved to drafts" flash after an explicit save. */
   protected draftSaved = signal(false);
   private draftSavedTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Opt-in accessibility gate: some attached image still lacks alt text. */
+  /** Attachments still lacking a description, by index. Shared rule, see alt-text.ts. */
+  protected undescribedMedia = computed(() => undescribedIndexes(this.media()));
+
+  /**
+   * The advisory line about missing descriptions, or null when there is nothing
+   * to say. Shown whether or not the user opted into the hard requirement —
+   * accessibility advice is worth giving even when it is not enforced.
+   */
+  protected altTextNote = computed(() =>
+    altTextMessage(this.undescribedMedia(), this.prefs.requireAltText()),
+  );
+
+  /**
+   * Whether missing descriptions should actually block sending.
+   *
+   * Only when the user asked for that friction in Settings. Without the opt-in
+   * the note above is advice and the send button stays live.
+   */
   protected altTextMissing = computed(
-    () => this.prefs.requireAltText() && this.media().some((m) => !m.description.trim()),
+    () => this.prefs.requireAltText() && this.undescribedMedia().length > 0,
   );
 
   protected canSubmit = computed(() => {
@@ -1218,71 +1223,20 @@ export class Compose implements OnDestroy {
    * the offsets of the ones not yet done.
    */
   protected async shortenLinks(): Promise<void> {
-    const targets = this.longLinks();
-    if (!targets.length || this.shortening()) {
-      return;
-    }
-    this.shortening.set(true);
-    this.shortenError.set(null);
-    try {
-      let text = this.text();
-      for (const target of [...targets].reverse()) {
-        const link = await firstValueFrom(this.shorteners.create({ destinationUrl: target.url }));
-        text = text.slice(0, target.start) + link.shortUrl + text.slice(target.end);
-      }
-      this.text.set(text);
-    } catch (error: unknown) {
-      this.diagnostics.error('Shortener', 'compose:error', error, {
-        provider: this.shortenerSettings.activeId(),
-        proxyConfigured: this.corsProxy.available(),
-      });
-      if (error instanceof ProxyConsentRequired) {
-        const shortener = shortenerEntry(error.shortener);
-        const proxy = this.corsProxy.entry();
-        if (!error.noProxyConfigured && shortener && proxy) {
-          this.shortenerConsentPrompt.set({
-            shortener,
-            proxy,
-            carriesCredential: error.carriesCredential,
-          });
-          return;
-        }
-        this.shortenError.set(
-          `${shortener?.label ?? 'The shortener'} could not be reached directly, and no CORS ` +
-            `proxy is ready. Set one up under Settings → Connections → CORS proxy, or retry later. ` +
-            `Your post is unchanged.`,
-        );
-        return;
-      }
-      this.shortenError.set(
-        error instanceof Error && error.message
-          ? error.message
-          : "Couldn't shorten that link. Your post is unchanged.",
-      );
-    } finally {
-      this.shortening.set(false);
+    const shortened = await this.linkShortening.shorten(this.text());
+    if (shortened !== null) {
+      this.text.set(shortened);
     }
   }
 
   protected async acceptShortenerConsent(): Promise<void> {
-    const prompt = this.shortenerConsentPrompt();
-    this.shortenerConsentPrompt.set(null);
-    if (!prompt) {
-      return;
+    if (this.linkShortening.acceptConsent()) {
+      await this.shortenLinks();
     }
-    this.shortenerConsent.grant(prompt.shortener.id, prompt.proxy.id);
-    await this.shortenLinks();
   }
 
   protected declineShortenerConsent(): void {
-    const prompt = this.shortenerConsentPrompt();
-    this.shortenerConsentPrompt.set(null);
-    if (prompt) {
-      this.shortenError.set(
-        `Not sent through ${prompt.proxy.label}. The direct attempt also failed. Retry later, or ` +
-          `choose a different CORS proxy in Settings. Your post is unchanged.`,
-      );
-    }
+    this.linkShortening.declineConsent();
   }
 
   // --- thread boxes ---

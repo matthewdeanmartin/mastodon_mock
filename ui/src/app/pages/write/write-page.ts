@@ -26,6 +26,9 @@ import { Draft, DraftMedia, DraftSnapshot, Drafts, draftHasContent } from '../..
 import { HumanTimePipe } from '../../human-time.pipe';
 import { MAX_POST_CHARS, PostTarget } from '../../compose/compose';
 import { VISIBILITIES, VisibilityState } from '../../compose/visibility-state';
+import { altTextMessage, mediaTypeOf, undescribedIndexes } from '../../compose/alt-text';
+import { LinkShortening } from '../../compose/link-shortening';
+import { ProxyConsentDialog } from '../../providers/shortener/proxy-consent-dialog/proxy-consent-dialog';
 import { EmojiPicker } from '../../emoji-picker/emoji-picker';
 import { CustomEmojis } from '../../custom-emojis';
 import { TagHelperDialog } from '../../compose/tag-helper-dialog/tag-helper-dialog';
@@ -65,6 +68,8 @@ import {
   insertSplitAt,
   isObviousSingleton,
   segmentsFor,
+  bodyToBoxes,
+  boxesToBody,
   splitModeHint,
   splitModeLabel,
   splitText,
@@ -129,10 +134,11 @@ interface PendingSwitch {
     EmojiPicker,
     TagHelperDialog,
     TranslateDialog,
+    ProxyConsentDialog,
   ],
   templateUrl: './write-page.html',
   styleUrl: './write-page.css',
-  providers: [VisibilityState],
+  providers: [VisibilityState, LinkShortening],
 })
 export class WritePage implements OnInit, OnDestroy {
   /** post/tweet/florp vocabulary, per the Blue setting. */
@@ -194,6 +200,18 @@ export class WritePage implements OnInit, OnDestroy {
    * the room for a real picker, so it gets one.
    */
   private visibilityState = inject(VisibilityState);
+
+  /**
+   * Link shortening, shared with the compact composer. The writing page is
+   * where long reference links actually get pasted, so leaving this out was
+   * the odder of the two omissions.
+   */
+  private linkShortening = inject(LinkShortening);
+  protected shortenerReady = this.linkShortening.ready;
+  protected shortenerName = this.linkShortening.name;
+  protected shortening = this.linkShortening.busy;
+  protected shortenError = this.linkShortening.error;
+  protected shortenerConsentPrompt = this.linkShortening.consentPrompt;
   protected visibility = this.visibilityState.value;
   protected readonly visibilities = VISIBILITIES;
   protected cwOpen = signal(false);
@@ -229,6 +247,13 @@ export class WritePage implements OnInit, OnDestroy {
   protected aiProofreading = signal(false);
   protected aiProofreadComplete = signal(false);
   protected aiProofreadError = signal<string | null>(null);
+
+  /**
+   * Whether the consent panel — connector, model, and the exact prompt — is
+   * expanded. Collapsed by default so the findings panel stays readable, but
+   * always the step before anything is sent: the disclosure is the consent.
+   */
+  protected proofreadConsentOpen = signal(false);
   protected proofreadingRequest = computed<ProofreadingRequestPreview | null>(() =>
     this.canUseAi() ? this.proofreader.preview(this.body()) : null,
   );
@@ -407,6 +432,50 @@ export class WritePage implements OnInit, OnDestroy {
     segmentsFor(this.body(), this.splitMode(), { limit: MAX_POST_CHARS }),
   );
 
+  /** True while the editor shows one box per post rather than one prose box. */
+  protected boxed = computed(() => this.splitMode() === 'boxes');
+
+  /**
+   * Whether the preview strip renders markdown or shows the raw text.
+   *
+   * Raw is the default because the strip's main job is showing *where the
+   * splits fall*, and rendering can disguise a stray `---` or a mis-split list.
+   */
+  protected renderedPreview = signal(false);
+
+  /**
+   * The body as editable boxes.
+   *
+   * Derived from the same stored string the `---` mode edits, so switching
+   * modes never rewrites the draft — see {@link SplitMode}. Empty boxes survive
+   * here (you have to be able to type into one you just added) and are dropped
+   * at publish time by the shared split.
+   */
+  protected boxes = computed(() => bodyToBoxes(this.body()));
+
+  protected setBoxText(index: number, value: string): void {
+    const next = [...this.boxes()];
+    if (index < 0 || index >= next.length) {
+      return;
+    }
+    next[index] = value;
+    this.body.set(boxesToBody(next));
+    this.dirty.set(true);
+    this.resetProofreading();
+  }
+
+  protected addBox(): void {
+    this.body.set(boxesToBody([...this.boxes(), '']));
+    this.dirty.set(true);
+  }
+
+  protected removeBox(index: number): void {
+    const next = this.boxes().filter((_, at) => at !== index);
+    this.body.set(boxesToBody(next.length ? next : ['']));
+    this.dirty.set(true);
+    this.resetProofreading();
+  }
+
   protected overLimitCount = computed(() => this.segments().filter((s) => s.overLimit).length);
 
   protected hasContent = computed(() => this.body().trim() !== '');
@@ -485,6 +554,45 @@ export class WritePage implements OnInit, OnDestroy {
       this.pollMultiple.set(false);
     }
     this.dirty.set(true);
+  }
+
+  /** Attachments still lacking a description, by index. Shared rule, see alt-text.ts. */
+  protected undescribedMedia = computed(() => undescribedIndexes(this.media()));
+
+  /**
+   * The advisory line about missing descriptions, shown in the editor whether
+   * or not the user opted into the hard requirement. The writing page has room
+   * to say this where the writing happens, rather than only at the gate.
+   */
+  protected altTextNote = computed(() =>
+    altTextMessage(this.undescribedMedia(), this.prefs.requireAltText()),
+  );
+
+  /** Whether missing descriptions should block publishing — only on request. */
+  protected altTextMissing = computed(
+    () => this.prefs.requireAltText() && this.undescribedMedia().length > 0,
+  );
+
+  /** The links long enough to be worth shortening, for the button's label. */
+  protected longLinks = computed(() => this.linkShortening.longLinks(this.body()));
+
+  protected async shortenLinks(): Promise<void> {
+    const shortened = await this.linkShortening.shorten(this.body());
+    if (shortened !== null) {
+      this.body.set(shortened);
+      this.dirty.set(true);
+      this.resetProofreading();
+    }
+  }
+
+  protected async acceptShortenerConsent(): Promise<void> {
+    if (this.linkShortening.acceptConsent()) {
+      await this.shortenLinks();
+    }
+  }
+
+  protected declineShortenerConsent(): void {
+    this.linkShortening.declineConsent();
   }
 
   protected setVisibility(value: string): void {
@@ -998,9 +1106,7 @@ export class WritePage implements OnInit, OnDestroy {
       limit: MAX_POST_CHARS,
       segments: this.segments().map((s) => s.text),
       vocab: this.prefs.pkmVocabulary(),
-      missingAltText: this.media().some(
-        (item) => item.media.type === 'image' && !item.description.trim(),
-      ),
+      missingAltText: this.undescribedMedia().length > 0,
       requireAltText: this.prefs.requireAltText(),
     }),
   );
@@ -1077,7 +1183,12 @@ export class WritePage implements OnInit, OnDestroy {
     this.wizardStep.set(step);
   }
 
+  protected toggleProofreadConsent(): void {
+    this.proofreadConsentOpen.update((open) => !open);
+  }
+
   private resetProofreading(): void {
+    this.proofreadConsentOpen.set(false);
     this.proofreadGeneration++;
     this.aiFindings.set([]);
     this.aiProofreading.set(false);
@@ -1192,11 +1303,10 @@ export class WritePage implements OnInit, OnDestroy {
       this.wizardError.set(incompatibility);
       return;
     }
-    if (
-      this.prefs.requireAltText() &&
-      this.media().some((item) => item.media.type === 'image' && !item.description.trim())
-    ) {
-      this.wizardError.set('Describe every attached image before publishing.');
+    if (this.altTextMissing()) {
+      this.wizardError.set(
+        altTextMessage(this.undescribedMedia(), true) ?? 'Describe every attachment first.',
+      );
       return;
     }
     if (this.pollOpen() && this.pollOptions().filter((option) => option.trim()).length < 2) {
@@ -1402,7 +1512,7 @@ function localDraftMedia(file: File): DraftMedia {
   return {
     media: {
       id: `local:${id}`,
-      type: file.type.split('/', 1)[0] || 'unknown',
+      type: mediaTypeOf(file),
       url,
       preview_url: url,
       description: null,

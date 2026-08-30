@@ -42,6 +42,8 @@ interface ComposeInternals {
   pollMultiple: WritableSignal<boolean>;
   pollExpiresIn: WritableSignal<number>;
   canSubmit: Signal<boolean>;
+  altTextNote: Signal<string | null>;
+  altTextMissing: Signal<boolean>;
   canAttachMedia: Signal<boolean>;
   canAddPoll: Signal<boolean>;
   countdown: Signal<number | null>;
@@ -125,6 +127,64 @@ describe('Compose', () => {
     fixture.detectChanges();
     return fixture;
   }
+
+  // ---------------------------------------------------------------- alt text
+
+  describe('alt text', () => {
+    function attach(f: ComponentFixture<Compose>, type: string, description = ''): void {
+      internals(f).media.set([
+        { media: { id: 'm1', type, description: null } as never, description },
+      ]);
+      f.detectChanges();
+    }
+
+    /**
+     * Advisory unless the user asked for the friction. Blocking a send on a
+     * setting nobody turned on is how a composer trains people to attach
+     * nothing rather than to describe what they attach.
+     */
+    it('advises without blocking when the requirement is off', () => {
+      TestBed.inject(ClientPrefs).requireAltText.set(false);
+      const f = setUp();
+      internals(f).text.set('a post with a picture');
+      attach(f, 'image');
+
+      expect(internals(f).altTextNote()).toContain('Screen readers will skip');
+      expect(internals(f).altTextMissing()).toBe(false);
+      expect(internals(f).canSubmit()).toBe(true);
+    });
+
+    it('blocks sending once the user opts into the requirement', () => {
+      TestBed.inject(ClientPrefs).requireAltText.set(true);
+      const f = setUp();
+      internals(f).text.set('a post with a picture');
+      attach(f, 'image');
+
+      expect(internals(f).altTextMissing()).toBe(true);
+      expect(internals(f).canSubmit()).toBe(false);
+    });
+
+    it('is satisfied by a description', () => {
+      TestBed.inject(ClientPrefs).requireAltText.set(true);
+      const f = setUp();
+      internals(f).text.set('a post with a picture');
+      attach(f, 'image', 'a photograph of a cat');
+
+      expect(internals(f).altTextNote()).toBeNull();
+      expect(internals(f).canSubmit()).toBe(true);
+    });
+
+    /** An upload the server could not place may never publish; nagging is noise. */
+    it('does not nag about an attachment the server could not place', () => {
+      TestBed.inject(ClientPrefs).requireAltText.set(true);
+      const f = setUp();
+      internals(f).text.set('a post with a mystery file');
+      attach(f, 'unknown');
+
+      expect(internals(f).altTextMissing()).toBe(false);
+      expect(internals(f).canSubmit()).toBe(true);
+    });
+  });
 
   // ---------------------------------------------------------------- canSubmit
 

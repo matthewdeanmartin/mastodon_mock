@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   autoSplit,
+  bodyToBoxes,
+  boxesToBody,
   insertSplitAt,
   isObviousSingleton,
   isSplitRule,
@@ -170,5 +172,47 @@ describe('insertSplitAt', () => {
   it('clamps a caret outside the body', () => {
     expect(insertSplitAt('body', 999).text).toBe('body\n\n---\n\n');
     expect(insertSplitAt('body', -5).text).toBe('\n\n---\n\nbody');
+  });
+});
+
+describe('boxes mode', () => {
+  const THREAD = 'first post\n\n---\n\nsecond post';
+
+  /**
+   * The whole reason `boxes` reuses `rule`'s storage: a thread written one way
+   * has to open correctly the other way, or the toggle silently rewrites drafts.
+   */
+  it('splits the same way the --- mode does', () => {
+    expect(splitText(THREAD, 'boxes', { limit: 500 })).toEqual(
+      splitText(THREAD, 'rule', { limit: 500 }),
+    );
+  });
+
+  it('round-trips a body through boxes and back unchanged', () => {
+    expect(boxesToBody(bodyToBoxes(THREAD))).toBe(THREAD);
+  });
+
+  it('treats a body with no marker as a single box', () => {
+    expect(bodyToBoxes('just the one')).toEqual(['just the one']);
+  });
+
+  it('gives an empty body one empty box to type into', () => {
+    expect(bodyToBoxes('')).toEqual(['']);
+  });
+
+  /**
+   * Unlike the publish-time split, editing keeps empty boxes: a box you just
+   * added with [+] has to stay on screen long enough to type into.
+   */
+  it('keeps an empty box while editing but drops it at publish time', () => {
+    const body = boxesToBody(['written', '']);
+    expect(bodyToBoxes(body)).toEqual(['written', '']);
+    expect(splitText(body, 'boxes', { limit: 500 })).toEqual(['written']);
+  });
+
+  it('trims each box rather than storing the padding around the marker', () => {
+    expect(boxesToBody(['  one  ', '  two  '])).toBe(
+      THREAD.replace('first post', 'one').replace('second post', 'two'),
+    );
   });
 });

@@ -15,10 +15,19 @@ import { DEFAULT_URL_WEIGHT, findUrls, postLength } from '../../compose/post-len
  *              manual behaviour, generalised.
  * - `auto`   — chunk continuous prose to fit the limit, preferring paragraph,
  *              then sentence, then word boundaries.
+ * - `boxes`  — one editor box per post, added with [+], the way the compact
+ *              composer has always worked. More on screen than a `---` line,
+ *              and the only mode where a post is a thing you can point at —
+ *              which is what per-post attachments and polls need.
+ *
+ * `boxes` shares its storage with `rule`: the body is still one string with
+ * `---` boundaries, so switching between the two is lossless and a draft saved
+ * in either opens correctly in the other. The difference is entirely in how the
+ * editor renders it.
  */
-export type SplitMode = 'rule' | 'demand' | 'auto';
+export type SplitMode = 'rule' | 'demand' | 'auto' | 'boxes';
 
-export const SPLIT_MODES: readonly SplitMode[] = ['rule', 'demand', 'auto'];
+export const SPLIT_MODES: readonly SplitMode[] = ['rule', 'demand', 'auto', 'boxes'];
 
 export const DEFAULT_SPLIT_MODE: SplitMode = 'rule';
 
@@ -191,6 +200,9 @@ export function splitText(text: string, mode: SplitMode, options: SplitOptions):
       const body = text.trim();
       return body ? [body] : [];
     }
+    // Same storage as `rule` — see {@link SplitMode}.
+    case 'boxes':
+      return splitOnRule(text);
   }
 }
 
@@ -233,6 +245,8 @@ export function splitModeLabel(mode: SplitMode): string {
       return 'Split on demand';
     case 'auto':
       return 'Autosplit';
+    case 'boxes':
+      return 'A box per post';
   }
 }
 
@@ -244,5 +258,39 @@ export function splitModeHint(mode: SplitMode): string {
       return 'One post, until you split it yourself.';
     case 'auto':
       return 'Broken up to fit, at paragraph or sentence breaks.';
+    case 'boxes':
+      return 'One box per post. Needed to give a post its own poll or images.';
   }
+}
+
+/**
+ * The body as a list of boxes, for the editor that renders one per post.
+ *
+ * Unlike {@link splitOnRule} this preserves empty boxes, because an empty box
+ * the user just added with [+] has to stay on screen long enough to type into.
+ * Publishing drops them again — {@link splitText} is what decides that.
+ */
+export function bodyToBoxes(text: string): string[] {
+  const boxes: string[] = [];
+  let current: string[] = [];
+  for (const line of text.split('\n')) {
+    if (isSplitRule(line)) {
+      boxes.push(current.join('\n').trim());
+      current = [];
+    } else {
+      current.push(line);
+    }
+  }
+  boxes.push(current.join('\n').trim());
+  return boxes.length ? boxes : [''];
+}
+
+/**
+ * Boxes back into one stored body.
+ *
+ * Empty trailing boxes are kept so the caret does not jump out of a box the
+ * user is about to type in; {@link splitOnRule} filters them at publish time.
+ */
+export function boxesToBody(boxes: readonly string[]): string {
+  return boxes.map((box) => box.trim()).join(`\n\n${SPLIT_RULE}\n\n`);
 }

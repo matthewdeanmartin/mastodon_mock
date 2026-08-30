@@ -190,9 +190,9 @@
         </div>
       }
     </div>
-    @if (altTextMissing()) {
-      <div class="alt-required muted small">
-        Alt text is required on every image before posting (Settings → Mockingbird Blue).
+    @if (altTextNote(); as note) {
+      <div class="alt-required muted small" [class.advisory]="!altTextMissing()" role="status">
+        {{ note }}
       </div>
     }
   }

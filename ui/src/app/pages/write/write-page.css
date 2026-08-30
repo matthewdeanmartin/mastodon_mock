@@ -62,8 +62,10 @@
 }
 
 /* Kept in the DOM rather than removed, so switching tabs doesn't tear down the
-   editor and lose an in-progress body. */
-.hidden-tab {
+   editor and lose an in-progress body. The pane toggles alongside it only exist
+   on narrow screens, where the panes collapse. */
+.hidden-tab,
+.pane-toggle {
   display: none;
 }
 
@@ -86,10 +88,6 @@
   font: inherit;
   padding: 12px 16px;
   cursor: pointer;
-}
-
-.note-row:hover {
-  background: var(--hover);
 }
 
 .note-badges {
@@ -181,11 +179,6 @@
   opacity: 0.85;
 }
 
-/* The pane toggles only exist on narrow screens, where the panes collapse. */
-.pane-toggle {
-  display: none;
-}
-
 /* --- drafts pane --- */
 
 .draft-chips {
@@ -208,10 +201,6 @@
   font: inherit;
   font-size: 0.82em;
   cursor: pointer;
-}
-
-.chip:hover:not(:disabled) {
-  background: var(--hover);
 }
 
 .chip.on {
@@ -241,10 +230,6 @@
   font: inherit;
   padding: 10px 12px;
   cursor: pointer;
-}
-
-.draft-row:hover {
-  background: var(--hover);
 }
 
 .draft-row.current {
@@ -399,7 +384,8 @@
 }
 
 .write-media-item,
-.write-poll-option {
+.write-poll-option,
+.wizard-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -473,7 +459,10 @@
   margin-bottom: 8px;
 }
 
-.over {
+/* The one warning red: over-limit counts, errors, and warn marks. */
+.over,
+.write-warning,
+.finding.warn .finding-mark {
   color: #e0245e;
 }
 
@@ -513,10 +502,6 @@
 .write-notice {
   margin: 8px 12px 0;
   font-size: 13px;
-}
-
-.write-warning {
-  color: #e0245e;
 }
 
 .center {
@@ -591,7 +576,8 @@
   max-width: 100%;
 }
 
-.dialog h3 {
+.dialog h3,
+.preview-body p {
   margin: 0 0 8px;
 }
 
@@ -661,12 +647,6 @@
   margin-bottom: 16px;
 }
 
-.wizard-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .wizard-targets {
   display: flex;
   flex-direction: column;
@@ -690,10 +670,6 @@
 .wizard-target:has(input:disabled) {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.wizard-target:hover {
-  background: var(--hover);
 }
 
 .wizard-preview {
@@ -724,10 +700,6 @@
   overflow-wrap: anywhere;
 }
 
-.preview-body p {
-  margin: 0 0 8px;
-}
-
 .preview-body p:last-child {
   margin-bottom: 0;
 }
@@ -746,10 +718,6 @@
   gap: 8px;
   font-size: 14px;
   line-height: 1.45;
-}
-
-.finding.warn .finding-mark {
-  color: #e0245e;
 }
 
 .finding-samples {
@@ -806,44 +774,139 @@
   padding: 16px;
 }
 
-/* The visibility picker. The compact composer uses a <select> because it has
-   no room; here every choice is visible and hoverable for its explanation. */
-.write-visibility {
+/* Visibility picker: a <select> in the cramped composer, every choice here. */
+.write-visibility,
+.write-schedule {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+}
+
+.write-visibility {
   gap: 2px;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 2px;
 }
 
+/* Differs from .write-tool only in shape: a word, not a square icon. */
 .write-visibility-option {
+  min-width: 0;
   min-height: 28px;
-  border: 1px solid transparent;
+  border-color: transparent;
   border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
   font-size: 0.85em;
   padding: 2px 8px;
   text-transform: capitalize;
 }
 
-.write-visibility-option:hover:not(:disabled) {
+.write-visibility-option:hover:not(:disabled),
+.write-visibility-option.active {
   background: var(--hover);
 }
 
 .write-visibility-option.active {
-  background: var(--hover);
   border-color: var(--accent);
 }
 
-.write-visibility-option:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+.write-visibility-locked,
+.link-note-setup {
+  white-space: nowrap;
 }
 
-.write-visibility-locked {
-  white-space: nowrap;
+/* Missing-description notice, beside the boxes where descriptions are typed.
+   Advisory unless the user opted in under Settings -> Writing. */
+.write-alt-note {
+  margin: 6px 12px 0;
+  font-size: 0.9em;
+  color: var(--warn, inherit);
+}
+
+.write-alt-note.advisory {
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* Writing feedback in the editor. Findings reuse the wizard's .finding rules. */
+.write-findings,
+.write-proofread-consent {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.write-findings {
+  margin: 10px 12px 0;
+}
+
+.write-finding-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.write-proofread {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.write-proofread-consent {
+  flex-basis: 100%;
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+/* One box per post. Numbers matter more here: with several boxes on screen,
+   "post 3 is over the limit" needs something to point at. */
+.write-boxes {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.write-box {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.write-box-num {
+  padding-top: 8px;
+  min-width: 1.5em;
+  text-align: right;
+}
+
+.editor-box-small {
+  min-height: 96px;
+  width: 100%;
+  margin: 0;
+}
+
+.write-box-add {
+  justify-self: start;
+  margin-left: calc(1.5em + 8px);
+}
+
+/* Link shortening note, mirroring the compact composer's .link-note. */
+.link-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 12px 0;
+  font-size: 0.85em;
+  line-height: 1.35;
+}
+
+.link-note-text {
+  flex: 1 1 220px;
 }

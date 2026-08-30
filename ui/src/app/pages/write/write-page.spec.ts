@@ -96,6 +96,19 @@ interface PageInternals {
   onPaste(event: ClipboardEvent): void;
   targetUnsupportedReason(target: PostTarget): string | null;
   confirmAiProofreader(): Promise<void>;
+  proofreadConsentOpen: WritableSignal<boolean>;
+  toggleProofreadConsent(): void;
+  altTextNote: Signal<string | null>;
+  altTextMissing: Signal<boolean>;
+  boxed: Signal<boolean>;
+  boxes: Signal<string[]>;
+  setBoxText(index: number, value: string): void;
+  addBox(): void;
+  removeBox(index: number): void;
+  renderedPreview: WritableSignal<boolean>;
+  longLinks: Signal<{ url: string; start: number; end: number }[]>;
+  shortenLinks(): Promise<void>;
+  wizardFinish(): Promise<void>;
   visibility: Signal<string>;
   visibilityLockReason: Signal<string | null>;
   setVisibility(value: string): void;
@@ -835,7 +848,9 @@ describe('WritePage', () => {
     });
     page.newDraft();
     page.onBodyInput('This is is repeated.');
-    page.publish();
+    // No wizard: the proofreader now lives beside the editor, so the text is
+    // still editable while the findings are on screen.
+    fixture.detectChanges();
 
     expect(run).not.toHaveBeenCalled();
     expect(page.proofreadingRequest()).toEqual({
@@ -843,10 +858,16 @@ describe('WritePage', () => {
       model: 'test/proofreader',
       prompt: 'Exact proofread prompt\nThis is is repeated.',
     });
+    // The offer is visible; the prompt itself is disclosed on request.
+    expect(fixture.nativeElement.textContent).toContain('Proofread with AI');
+    expect(fixture.nativeElement.textContent).not.toContain('Exact proofread prompt');
+
+    page.toggleProofreadConsent();
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Nothing is sent until you confirm');
+    expect(run).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('test/proofreader');
     expect(fixture.nativeElement.textContent).toContain('Exact proofread prompt');
+    expect(fixture.nativeElement.textContent).toContain('may use paid credits');
 
     await page.confirmAiProofreader();
 
@@ -1437,6 +1458,313 @@ describe('WritePage', () => {
       page.setWizardTarget('fedi');
 
       expect(page.visibility()).toBe('private');
+    });
+  });
+
+  // ------------------------------------------------------------- boxes layout
+
+  describe('a box per post', () => {
+    const RULE = String.fromCharCode(10, 10) + '---' + String.fromCharCode(10, 10);
+
+    function boxedPage(fixture: ComponentFixture<WritePage>): PageInternals {
+      const page = internals(fixture);
+      page.newDraft();
+      page.setSplitMode('boxes');
+      fixture.detectChanges();
+      return page;
+    }
+
+    it('renders one box per post once the mode is chosen', () => {
+      const fixture = setUp();
+      const page = boxedPage(fixture);
+      page.onBodyInput('first' + RULE + 'second');
+      fixture.detectChanges();
+
+      expect(page.boxed()).toBe(true);
+      expect(page.boxes()).toEqual(['first', 'second']);
+    });
+
+    /**
+     * The toggle must be lossless in both directions. `boxes` and `rule` share
+     * one stored string precisely so switching cannot rewrite a draft.
+     */
+    it('switches between layouts without changing the draft', () => {
+      const fixture = setUp();
+      const page = boxedPage(fixture);
+      page.onBodyInput('first' + RULE + 'second');
+      const stored = page.body();
+
+      page.setSplitMode('rule');
+      fixture.detectChanges();
+      expect(page.boxed()).toBe(false);
+      expect(page.body()).toBe(stored);
+
+      page.setSplitMode('boxes');
+      fixture.detectChanges();
+      expect(page.boxes()).toEqual(['first', 'second']);
+      expect(page.body()).toBe(stored);
+    });
+
+    it('adds a box that is empty and ready to type in', () => {
+      const fixture = setUp();
+      const page = boxedPage(fixture);
+      page.onBodyInput('only post');
+      page.addBox();
+
+      expect(page.boxes()).toEqual(['only post', '']);
+      // An empty box is not a post; the thread is still one post long.
+      expect(page.segments().map((segment) => segment.text)).toEqual(['only post']);
+    });
+
+    it('edits one box without disturbing its neighbours', () => {
+      const fixture = setUp();
+      const page = boxedPage(fixture);
+      page.onBodyInput('first' + RULE + 'second');
+      page.setBoxText(0, 'rewritten');
+
+      expect(page.boxes()).toEqual(['rewritten', 'second']);
+    });
+
+    it('removes a box and keeps the rest', () => {
+      const fixture = setUp();
+      const page = boxedPage(fixture);
+      page.onBodyInput('first' + RULE + 'second' + RULE + 'third');
+      page.removeBox(1);
+
+      expect(page.boxes()).toEqual(['first', 'third']);
+    });
+
+    it('never leaves the editor with no box at all', () => {
+      const fixture = setUp();
+      const page = boxedPage(fixture);
+      page.onBodyInput('only post');
+      page.removeBox(0);
+
+      expect(page.boxes()).toEqual(['']);
+    });
+
+    it('remembers the layout per draft, like the other split modes', () => {
+      const fixture = setUp();
+      const page = boxedPage(fixture);
+      page.onBodyInput('written in boxes');
+      page.save();
+      fixture.detectChanges();
+
+      const key = page.editing()?.key;
+      expect(key).toBeDefined();
+      expect(TestBed.inject(WriteWorkspace).splitMode(key as string)).toBe('boxes');
+    });
+  });
+
+  // ------------------------------------------------------- editor conveniences
+
+  describe('editor conveniences', () => {
+    it('shows the raw split by default and can render it instead', () => {
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      page.onBodyInput('**bold** writing');
+      fixture.detectChanges();
+
+      expect(page.renderedPreview()).toBe(false);
+      expect(fixture.nativeElement.textContent).toContain('**bold** writing');
+
+      page.renderedPreview.set(true);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.segment-text strong')).not.toBeNull();
+    });
+
+    it('notices a long link and offers to shorten it', () => {
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      page.onBodyInput('see https://example.com/' + 'p'.repeat(80));
+      fixture.detectChanges();
+
+      expect(page.longLinks()).toHaveLength(1);
+      expect(fixture.nativeElement.textContent).toContain('23 characters');
+    });
+
+    /**
+     * Scheduling without walking the wizard. The control writes the same signal
+     * the wizard's "when" step does, so a time set here is the time published.
+     */
+    it('schedules from the editor bar and clears again', () => {
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      page.onBodyInput('later, please');
+      page.setWizardScheduleAt('2126-01-01T09:00');
+      fixture.detectChanges();
+      expect(page.wizardScheduleAt()).toBe('2126-01-01T09:00');
+
+      page.setWizardScheduleAt('');
+      expect(page.wizardScheduleAt()).toBe('');
+    });
+  });
+
+  // ---------------------------------------------------------------- alt text
+
+  describe('alt text', () => {
+    function withImage(fixture: ComponentFixture<WritePage>, description = ''): void {
+      internals(fixture).media.set([
+        {
+          media: {
+            id: 'local:1',
+            type: 'image',
+            url: 'blob:x',
+            preview_url: 'blob:x',
+            description: null,
+          },
+          description,
+        },
+      ]);
+      fixture.detectChanges();
+    }
+
+    /**
+     * The user asked for the friction or they did not. Without the opt-in this
+     * is advice shown where the description is typed, and publishing stays
+     * available — a warning that blocks is a requirement wearing a disguise.
+     */
+    it('advises without blocking when the requirement is off', () => {
+      TestBed.inject(ClientPrefs).requireAltText.set(false);
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      withImage(fixture);
+
+      expect(page.altTextNote()).toContain('Screen readers will skip');
+      expect(page.altTextMissing()).toBe(false);
+      expect(fixture.nativeElement.textContent).toContain('Screen readers will skip');
+    });
+
+    it('blocks publishing once the user opts into the requirement', async () => {
+      TestBed.inject(ClientPrefs).requireAltText.set(true);
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      page.onBodyInput('a post with a picture');
+      withImage(fixture);
+
+      expect(page.altTextMissing()).toBe(true);
+      await page.wizardFinish();
+      expect(page.wizardError()).toContain('before publishing');
+    });
+
+    it('says nothing once every attachment is described', () => {
+      TestBed.inject(ClientPrefs).requireAltText.set(true);
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      withImage(fixture, 'a photograph of a cat');
+
+      expect(page.altTextNote()).toBeNull();
+      expect(page.altTextMissing()).toBe(false);
+    });
+
+    /**
+     * The writing page used to check `type === 'image'` while the compact
+     * composer checked every attachment, so the same video was nagged about in
+     * one surface and silently accepted in the other.
+     */
+    it('asks for a description on a video, not only on images', () => {
+      TestBed.inject(ClientPrefs).requireAltText.set(true);
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      page.media.set([
+        {
+          media: {
+            id: 'local:1',
+            type: 'video',
+            url: 'blob:x',
+            preview_url: 'blob:x',
+            description: null,
+          },
+          description: '',
+        },
+      ]);
+      fixture.detectChanges();
+
+      expect(page.altTextMissing()).toBe(true);
+    });
+  });
+
+  // ------------------------------------------------------- proofreader place
+
+  describe('the AI proofreader in the editor', () => {
+    function withProofreader(findings: ProofreadingFinding[]): ReturnType<typeof vi.fn> {
+      const run = vi.fn(async () => findings);
+      TestBed.overrideProvider(AiAvailability, { useValue: { enabled: signal(true) } });
+      TestBed.overrideProvider(OpenRouterSession, { useValue: { connected: signal(true) } });
+      TestBed.overrideProvider(Proofreader, {
+        useValue: {
+          run,
+          preview: () => ({
+            connector: 'OpenRouter' as const,
+            model: 'test/proofreader',
+            prompt: 'prompt',
+          }),
+        },
+      });
+      return run;
+    }
+
+    /**
+     * The point of the move. Findings that are only visible inside a modal are
+     * findings you cannot act on: the old flow was read, cancel, fix, reopen,
+     * and pay OpenRouter again for the next look.
+     */
+    it('keeps the text editable while findings are on screen', async () => {
+      withProofreader([{ message: 'Consider a shorter opening.' }]);
+      TestBed.inject(Auth).mode.set('anonymous');
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      page.onBodyInput('the original text');
+      await page.confirmAiProofreader();
+      fixture.detectChanges();
+
+      expect(page.aiFindings()).toHaveLength(1);
+      expect(page.wizardStep()).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('Consider a shorter opening.');
+
+      page.onBodyInput('the revised text');
+      expect(page.body()).toBe('the revised text');
+    });
+
+    /**
+     * Findings describe the text they were asked about. Leaving them on screen
+     * after an edit would attribute the model's notes to writing it never saw.
+     */
+    it('drops stale findings as soon as the text changes', async () => {
+      withProofreader([{ message: 'Consider a shorter opening.' }]);
+      TestBed.inject(Auth).mode.set('anonymous');
+      const page = internals(setUp());
+      page.newDraft();
+      page.onBodyInput('the original text');
+      await page.confirmAiProofreader();
+      expect(page.aiFindings()).toHaveLength(1);
+
+      page.onBodyInput('the original text, rewritten');
+
+      expect(page.aiFindings()).toEqual([]);
+      expect(page.aiProofreadComplete()).toBe(false);
+    });
+
+    it('sends nothing until the disclosed prompt is confirmed', () => {
+      const run = withProofreader([]);
+      TestBed.inject(Auth).mode.set('anonymous');
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.newDraft();
+      page.onBodyInput('unsent writing');
+      page.toggleProofreadConsent();
+      fixture.detectChanges();
+
+      expect(run).not.toHaveBeenCalled();
+      expect(page.proofreadConsentOpen()).toBe(true);
     });
   });
 });
