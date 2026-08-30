@@ -1,7 +1,25 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ClientPrefs } from '../client-prefs';
-import { FALLBACK_LOCALE, negotiateLocale, SUPPORTED_LOCALES, UiLocale } from './locale';
+import {
+  FALLBACK_LOCALE,
+  negotiateLocale,
+  SUPPORTED_LOCALES,
+  supportedLocales,
+  UiLocale,
+} from './locale';
+
+describe('supportedLocales', () => {
+  it('keeps in-progress locales off the production root', () => {
+    expect(supportedLocales('https://mawkingbird.com/')).toEqual(['en']);
+  });
+
+  it('offers in-progress locales on test and canary deployments', () => {
+    expect(supportedLocales('https://mawkingbird.com/test/')).toEqual(['en', 'de']);
+    expect(supportedLocales('https://mawkingbird.com/canary/')).toEqual(['en', 'de']);
+    expect(supportedLocales('https://example.github.io/mawkingbird/canary/')).toEqual(['en', 'de']);
+  });
+});
 
 /**
  * Replace `navigator.languages` for one test.

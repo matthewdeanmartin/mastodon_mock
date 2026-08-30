@@ -10,11 +10,14 @@ error messages. Not post content, not documentation.
 
 ## Before you start
 
-1. Read the work order: `ui/i18n-context/todo-<lang>.md` (generate with `make i18n-todo LANG=xx`).
+1. Read the work order: `ui/i18n-context/todo-<lang>.md` (generate with `make i18n-todo L=xx`).
    It contains every key you need, its English, and its context entry.
 2. Read the glossary below. **This is the part that matters.** Most bad UI translations are not
    grammar failures — they are a correct translation of the wrong sense of a word.
 3. Write into `ui/public/i18n/<lang>.json`, then run `make i18n` to verify.
+
+Run the `make` commands from `ui/`. The variable is deliberately `L`, not `LANG`:
+POSIX shells already reserve `LANG` for the process locale.
 
 ## Why the glossary exists
 
@@ -135,3 +138,8 @@ Reported but not fatal: incomplete coverage, `max` overflow, a value identical t
 
 Then **look at it** — force the locale in the footer language picker and walk the main surfaces.
 That is the only review that catches a button whose text no longer fits.
+
+To make the picker available while translating, add the locale to `IN_PROGRESS_LOCALES` in
+`ui/src/app/i18n/locale.ts`. It will appear on `/test/` and `/canary/`, with missing keys falling
+back to English. Move it to `PRODUCTION_LOCALES` only after the locale's work order is complete,
+`make i18n` and `make test` pass, and the visual walkthrough is done.

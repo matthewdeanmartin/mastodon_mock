@@ -31,17 +31,19 @@ seven more files exist and expensive after:
 
 For each locale:
 
-1. `make i18n-todo LANG=xx` — work file with keys, English, context, glossary.
-2. Translate via the `translate-ui` skill, in batches by area so the agent holds consistent
+1. `make i18n-todo L=xx` — work file with keys, English, context, glossary.
+2. Add `xx` to `SUPPORTED_LOCALES` on the translation branch so the footer picker and browser
+   negotiation can be exercised before release.
+3. Translate via the `translate-ui` skill, in batches by area so the agent holds consistent
    register and vocabulary across related strings. Do not translate 3000 keys in one pass;
    consistency degrades and nothing is reviewable.
-3. `make check-i18n` — placeholder parity, markup parity, plural categories, JSON validity,
+4. `make i18n` — placeholder parity, markup parity, plural categories, JSON validity,
    `max` overflow report.
-4. **Look at it.** Force the locale in the footer picker and walk the main surfaces: home, a post,
+5. **Look at it.** Force the locale in the footer picker and walk the main surfaces: home, a post,
    compose, settings, first-run, login, an error state. This is the only human review available,
    and it catches layout breakage that no checker can — overflowing buttons, wrapped nav, clipped
    labels.
-5. Fix what the walkthrough finds. Feed genuine traps back into the skill's per-language notes so
+6. Fix what the walkthrough finds. Feed genuine traps back into the skill's per-language notes so
    the next fifty languages inherit the lesson.
 
 ## Turning the picker on

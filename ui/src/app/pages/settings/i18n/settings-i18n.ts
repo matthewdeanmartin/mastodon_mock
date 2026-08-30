@@ -6,6 +6,7 @@ import { ClientPrefs } from '../../../client-prefs';
 import { LANG_NAMES, LangCode, POSTING_LANGUAGE_OPTIONS } from '../../../language-detect';
 import { KnownLanguages } from '../../../trend-language-filter';
 import { UiLocale } from '../../../i18n/locale';
+import { LocalePicker } from '../../../locale-picker/locale-picker';
 import {
   ENGINE_LABELS,
   TRANSLATION_ENGINES,
@@ -111,7 +112,7 @@ const PICKER_ORDER: LangCode[] = [
 // i18n settings.i18n.inferred.notSet: not set
 @Component({
   selector: 'app-settings-i18n',
-  imports: [FormsModule, TranslocoPipe],
+  imports: [FormsModule, TranslocoPipe, LocalePicker],
   templateUrl: './settings-i18n.html',
 })
 export class SettingsI18n implements OnInit {
@@ -128,7 +129,8 @@ export class SettingsI18n implements OnInit {
    * anyone it mattered to. Reads {@link UiLocale} now, so the "Inferred from"
    * list tells the truth.
    */
-  protected readonly uiLanguage = inject(UiLocale).active;
+  protected readonly uiLocale = inject(UiLocale);
+  protected readonly uiLanguage = this.uiLocale.active;
   /** The posting default language, once fetched (bare code) — an inferred signal. */
   protected readonly postingLang = signal('');
   protected readonly postingLanguageOptions = POSTING_LANGUAGE_OPTIONS;

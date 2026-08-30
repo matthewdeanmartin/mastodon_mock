@@ -4,6 +4,17 @@
 </div>
 
 <div class="spage-body">
+  @if (uiLocale.hasChoice) {
+    <div class="ssection">
+      <div class="srow">
+        <span class="slabel">{{ 'localePicker.label' | transloco }}</span>
+        <div class="scontrol">
+          <app-locale-picker />
+        </div>
+      </div>
+    </div>
+  }
+
   @if (!auth.isAnonymous) {
     <div class="ssection">
       <div class="srow">

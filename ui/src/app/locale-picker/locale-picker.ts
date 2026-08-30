@@ -24,7 +24,7 @@
  * own when `SUPPORTED_LOCALES` grows.
  */
 
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LOCALE_ENDONYMS, SupportedLocale, UiLocale } from '../i18n/locale';
 
@@ -41,7 +41,9 @@ const AUTO = 'auto';
     @if (locale.hasChoice) {
       <!-- The separator lives inside the guard so a hidden picker does not
            leave a stray "·" dangling in the footer's link row. -->
-      <span class="footer-separator" aria-hidden="true">·</span>
+      @if (footer()) {
+        <span class="footer-separator" aria-hidden="true">·</span>
+      }
       <label class="locale-picker">
         <span class="sr-only">{{ 'localePicker.label' | transloco }}</span>
         <select
@@ -80,6 +82,9 @@ const AUTO = 'auto';
   `,
 })
 export class LocalePicker {
+  /** Include the footer's dot separator when rendered in its link row. */
+  readonly footer = input(false);
+
   protected locale = inject(UiLocale);
 
   /** Every shipped locale, labelled in its own language. */

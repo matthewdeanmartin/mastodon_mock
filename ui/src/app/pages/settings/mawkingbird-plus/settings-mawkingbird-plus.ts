@@ -1,6 +1,7 @@
 import { Component, computed, inject, Injector, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { PlusSession } from '../../../providers/account/plus-session';
 import { authDebug } from '../../../providers/account/auth-debug';
 import { MawkingbirdSession } from '../../../providers/account/mawkingbird-session';
@@ -45,7 +46,15 @@ import { ArticleReadingTally } from '../../../providers/article/article-reading-
  */
 @Component({
   selector: 'app-settings-mawkingbird-plus',
-  imports: [DatePipe, DecimalPipe, NgTemplateOutlet, RouterLink, PlusWelcomeDialog, AdoptionDialog],
+  imports: [
+    DatePipe,
+    DecimalPipe,
+    NgTemplateOutlet,
+    RouterLink,
+    TranslocoPipe,
+    PlusWelcomeDialog,
+    AdoptionDialog,
+  ],
   templateUrl: './settings-mawkingbird-plus.html',
   styleUrl: './settings-mawkingbird-plus.css',
 })

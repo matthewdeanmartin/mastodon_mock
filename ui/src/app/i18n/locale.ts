@@ -27,6 +27,7 @@
 import { computed, effect, inject, Injectable, Signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { ClientPrefs } from '../client-prefs';
+import { isCanaryBuild, isTestBuild } from '../build-flavor';
 
 /**
  * Locales this build ships a dictionary for.
@@ -35,9 +36,30 @@ import { ClientPrefs } from '../client-prefs';
  * *only* code change a new language needs — the picker, the negotiation, and
  * the settings control all read from this list.
  */
-export const SUPPORTED_LOCALES = ['en'] as const;
+export const PRODUCTION_LOCALES = ['en'] as const;
+export const IN_PROGRESS_LOCALES = ['de'] as const;
 
-export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
+export type SupportedLocale =
+  | (typeof PRODUCTION_LOCALES)[number]
+  | (typeof IN_PROGRESS_LOCALES)[number];
+
+/**
+ * Locales exposed by a deployment.
+ *
+ * `/test/` and `/canary/` are review surfaces, so they deliberately offer
+ * dictionaries that are still falling back to English key by key. Root
+ * production only advertises locales we are ready to negotiate automatically
+ * for every matching visitor.
+ */
+export function supportedLocales(baseUri: string): readonly SupportedLocale[] {
+  return isTestBuild(baseUri) || isCanaryBuild(baseUri)
+    ? [...PRODUCTION_LOCALES, ...IN_PROGRESS_LOCALES]
+    : PRODUCTION_LOCALES;
+}
+
+export const SUPPORTED_LOCALES = supportedLocales(
+  typeof document === 'undefined' ? 'https://mawkingbird.com/' : document.baseURI,
+);
 
 /** The locale every other one falls back to, key by key. */
 export const FALLBACK_LOCALE: SupportedLocale = 'en';
@@ -52,7 +74,7 @@ export const FALLBACK_LOCALE: SupportedLocale = 'en';
  */
 export const LOCALE_ENDONYMS: Record<string, string> = {
   en: 'English',
-  de: 'Deutsch',
+  de: 'Deutsch (in Arbeit)',
   fr: 'Français',
   es: 'Español',
   sv: 'Svenska',

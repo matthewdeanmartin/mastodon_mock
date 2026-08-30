@@ -64,7 +64,7 @@ import { LocalePicker } from '../../locale-picker/locale-picker';
       >
         {{ 'footer.hotkeys' | transloco }}
       </button>
-      <app-locale-picker />
+      <app-locale-picker [footer]="true" />
       <p class="footer-note">{{ 'footer.end' | transloco }}</p>
       @if (build.builtAt) {
         <p class="build-info">
