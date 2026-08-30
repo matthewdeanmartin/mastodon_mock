@@ -1,5 +1,5 @@
 <div class="spage-head">
-  <h1>Mawkingbird Plus</h1>
+  <h1>{{ 'settings.plus.title' | transloco }}</h1>
   <!--
     The pitch is for people who are not supporters yet. Rendering it
     unconditionally told a paying subscriber their account was free, directly
@@ -8,24 +8,23 @@
   -->
   @if (!plus.isSupporter()) {
     <p>
-      A free Mawkingbird account. It is optional and always will be — feeds, posting and the CORS
-      proxy all work signed out, exactly as they do today.
+      {{ 'settings.plus.intro.free' | transloco }}
     </p>
   } @else {
-    <p>Thank you for supporting Mawkingbird. Here is what your subscription is doing.</p>
+    <p>{{ 'settings.plus.intro.supporter' | transloco }}</p>
   }
 </div>
 
 <div class="spage-body">
   @if (!session.ready()) {
-    <p class="muted" role="status">Checking your account…</p>
+    <p class="muted" role="status">{{ 'settings.plus.checkingAccount' | transloco }}</p>
   } @else if (session.user(); as user) {
     @if (checkoutOutcome() === 'success') {
       <p class="connection-ok" role="status">
-        Thank you for supporting Mawkingbird. Your account is set up.
+        {{ 'settings.plus.checkout.thanks' | transloco }}
       </p>
     } @else if (checkoutOutcome() === 'cancel') {
-      <p class="muted" role="status">Checkout cancelled. Nothing was charged.</p>
+      <p class="muted" role="status">{{ 'settings.plus.checkout.cancelled' | transloco }}</p>
     }
 
     <!--
@@ -35,21 +34,21 @@
       was split across the page with a feature list in between.
     -->
     <section class="plus-identity">
-      <h2>Your account</h2>
+      <h2>{{ 'settings.plus.account.title' | transloco }}</h2>
       <dl>
-        <dt>Sign-in</dt>
-        <dd>{{ user.auth === 'email' ? 'Confirmed email address' : 'Full account' }}</dd>
-        <dt>Plan</dt>
+        <dt>{{ 'settings.plus.account.signIn' | transloco }}</dt>
+        <dd>{{ user.auth === 'email' ? ('settings.plus.account.auth.email' | transloco) : ('settings.plus.account.auth.full' | transloco) }}</dd>
+        <dt>{{ 'settings.plus.account.plan' | transloco }}</dt>
         <dd>
-          {{ plus.isSupporter() ? 'Mawkingbird Plus' : 'Free' }}
+          {{ plus.isSupporter() ? ('settings.plus.account.plan.plus' | transloco) : ('settings.plus.account.plan.free' | transloco) }}
           @if (plus.isSupporter() && plus.subscription(); as subscription) {
             @if (subscription.cancelAtPeriodEnd) {
               <span class="muted small">
-                — cancelled, yours until {{ subscription.renewsAt | date: 'longDate' }}
+                {{ 'settings.plus.account.cancelledUntil' | transloco }} {{ subscription.renewsAt | date: 'longDate' }}
               </span>
             } @else {
               <span class="muted small">
-                — renews {{ subscription.renewsAt | date: 'longDate' }}
+                {{ 'settings.plus.account.renews' | transloco }} {{ subscription.renewsAt | date: 'longDate' }}
               </span>
             }
           }
@@ -57,15 +56,13 @@
       </dl>
       @if (plus.isSupporter()) {
         <p class="muted small">
-          Manage or cancel your subscription from the receipt email Stripe sent you. Cancelling
-          stops the renewal; you keep Plus for the rest of the year you paid for.
+          {{ 'settings.plus.account.manageNote' | transloco }}
         </p>
       }
       <p class="muted small">
-        Signing out here stops new sessions immediately. A token already issued to this browser
-        stays valid until it expires, so close other tabs if you are on a shared machine.
+        {{ 'settings.plus.account.signOutNote' | transloco }}
       </p>
-      <button class="btn btn-outline" type="button" (click)="signOut()">Sign out</button>
+      <button class="btn btn-outline" type="button" (click)="signOut()">{{ 'settings.plus.account.signOut' | transloco }}</button>
     </section>
 
     <ng-template #vaultPanel>
@@ -73,10 +70,9 @@
         <section class="plus-vault" aria-labelledby="plus-vault-heading">
           <div class="plus-vault-title">
             <div>
-              <h2 id="plus-vault-heading">Encrypted connection keys</h2>
+              <h2 id="plus-vault-heading">{{ 'settings.plus.vault.title' | transloco }}</h2>
               <p class="muted small">
-                Test deployment. Mawkingbird stores only ciphertext; your passphrase and decrypted
-                keys stay in this browser.
+                {{ 'settings.plus.vault.testNote' | transloco }}
               </p>
             </div>
             <label class="plus-vault-toggle">
@@ -86,55 +82,55 @@
                 [disabled]="!plus.isSupporter() || vaultBusy()"
                 (change)="setVaultEnabled($any($event.target).checked)"
               />
-              <span>{{ vaultPreference.enabled() ? 'On' : 'Off' }}</span>
+              <span>{{ vaultPreference.enabled() ? 'On' : ('settings.plus.vault.off' | transloco) }}</span>
             </label>
           </div>
 
-          <h3>Why it is or is not working</h3>
+          <h3>{{ 'settings.plus.vault.whyTitle' | transloco }}</h3>
           <dl class="plus-vault-diagnostics">
-            <dt>Deployment</dt>
-            <dd class="connection-ok">Test rollout enabled</dd>
-            <dt>Plus entitlement</dt>
+            <dt>{{ 'settings.plus.vault.deployment' | transloco }}</dt>
+            <dd class="connection-ok">{{ 'settings.plus.vault.rolloutEnabled' | transloco }}</dd>
+            <dt>{{ 'settings.plus.vault.entitlement' | transloco }}</dt>
             <dd
               [class.connection-ok]="plus.isSupporter()"
               [class.config-error]="!plus.isSupporter()"
             >
-              {{ plus.isSupporter() ? 'Recognized' : 'Not recognized — the switch stays disabled' }}
+              {{ plus.isSupporter() ? ('settings.plus.vault.recognized' | transloco) : ('settings.plus.vault.notRecognized' | transloco) }}
             </dd>
-            <dt>Sync switch</dt>
-            <dd>{{ vaultPreference.enabled() ? 'On' : 'Off on this browser' }}</dd>
-            <dt>Encrypted store</dt>
+            <dt>{{ 'settings.plus.vault.syncSwitch' | transloco }}</dt>
+            <dd>{{ vaultPreference.enabled() ? 'On' : ('settings.plus.vault.offHere' | transloco) }}</dd>
+            <dt>{{ 'settings.plus.vault.store' | transloco }}</dt>
             <dd>
               @switch (vault.state()) {
                 @case ('unknown') {
-                  Not checked yet
+                  {{ 'settings.plus.vault.state.unchecked' | transloco }}
                 }
                 @case ('absent') {
-                  Ready, but no encrypted store has been created
+                  {{ 'settings.plus.vault.state.ready' | transloco }}
                 }
                 @case ('locked') {
-                  Found and locked on this browser
+                  {{ 'settings.plus.vault.state.locked' | transloco }}
                 }
                 @case ('unlocked') {
-                  <span class="connection-ok">Open and syncing</span>
+                  <span class="connection-ok">{{ 'settings.plus.vault.state.open' | transloco }}</span>
                 }
                 @case ('unavailable') {
                   <span class="config-error">
                     @switch (vault.unavailableReason()) {
                       @case ('needs-plus') {
-                        The profile Worker did not recognize Plus
+                        {{ 'settings.plus.vault.error.noPlus' | transloco }}
                       }
                       @case ('needs-idp') {
-                        The Worker requires a stronger sign-in (unexpected on test)
+                        {{ 'settings.plus.vault.error.strongerSignIn' | transloco }}
                       }
                       @case ('not-a-tester') {
-                        The profile Worker did not recognize this account as a tester
+                        {{ 'settings.plus.vault.error.notTester' | transloco }}
                       }
                       @case ('offline') {
-                        The profile Worker or vault binding could not be reached
+                        {{ 'settings.plus.vault.error.unreachable' | transloco }}
                       }
                       @default {
-                        The profile Worker did not recognize this sign-in
+                        {{ 'settings.plus.vault.error.badSignIn' | transloco }}
                       }
                     }
                   </span>
@@ -142,46 +138,48 @@
               }
             </dd>
             @if (vault.meta(); as meta) {
-              <dt>Encrypted bytes</dt>
+              <dt>{{ 'settings.plus.vault.bytes' | transloco }}</dt>
               <dd>{{ formatBytes(meta.bytes) }}</dd>
-              <dt>Stored-copy expiry</dt>
+              <dt>{{ 'settings.plus.vault.expiry' | transloco }}</dt>
               <dd>
                 {{
-                  meta.expiresAt ? (meta.expiresAt | date: 'medium') : 'No expiry while subscribed'
+                  meta.expiresAt
+                    ? (meta.expiresAt | date: 'medium')
+                    : ('settings.plus.vault.noExpiry' | transloco)
                 }}
               </dd>
             }
           </dl>
 
-          <h3>What you are getting</h3>
+          <h3>{{ 'settings.plus.vault.gettingTitle' | transloco }}</h3>
           @if (vault.unlocked()) {
             <p class="plus-vault-benefit">
               <strong>{{ vault.count() }}</strong>
-              {{ vault.count() === 1 ? 'connection credential is' : 'connection credentials are' }}
-              encrypted and available to your other devices.
+              {{
+                (vault.count() === 1
+                  ? 'settings.plus.vault.credentials.one'
+                  : 'settings.plus.vault.credentials.other'
+                ) | transloco
+              }}
             </p>
             @if (vaultConnectors().length > 0) {
-              <p class="muted small">Stored for: {{ vaultConnectors().join(', ') }}.</p>
+              <p class="muted small">{{ 'settings.plus.vault.storedFor' | transloco }} {{ vaultConnectors().join(', ') }}.</p>
             } @else {
               <p class="muted small">
-                The store is empty. Connect a supported low-churn service, or sync keys already in
-                this browser.
+                {{ 'settings.plus.vault.empty' | transloco }}
               </p>
             }
           } @else if (vault.meta()) {
             <p class="muted small">
-              A stored copy exists, but its credential count and connector names are encrypted.
-              Unlock it to see them — the server genuinely cannot.
+              {{ 'settings.plus.vault.lockedNote' | transloco }}
             </p>
           } @else {
-            <p class="muted small">No connection credentials are stored yet.</p>
+            <p class="muted small">{{ 'settings.plus.vault.noneStored' | transloco }}</p>
           }
 
           @if (!plus.isSupporter()) {
             <p class="config-error" role="alert">
-              This test account is signed in, but its current token says Free. Refreshing the
-              account or fixing the test subscription should change “Plus entitlement” above to
-              Recognized.
+              {{ 'settings.plus.vault.tokenFreeNote' | transloco }}
             </p>
           } @else if (vaultPreference.enabled()) {
             @switch (vault.state()) {
@@ -192,7 +190,7 @@
                   [disabled]="vaultBusy()"
                   (click)="refreshVault()"
                 >
-                  {{ vaultBusy() ? 'Checking…' : 'Check test vault' }}
+                  {{ vaultBusy() ? ('settings.plus.checking' | transloco) : ('settings.plus.vault.checkTest' | transloco) }}
                 </button>
               }
               @case ('unavailable') {
@@ -202,12 +200,12 @@
                   [disabled]="vaultBusy()"
                   (click)="refreshVault()"
                 >
-                  {{ vaultBusy() ? 'Checking…' : 'Retry diagnostics' }}
+                  {{ vaultBusy() ? ('settings.plus.checking' | transloco) : ('settings.plus.vault.retryDiagnostics' | transloco) }}
                 </button>
               }
               @case ('absent') {
                 <form class="plus-vault-form" (submit)="$event.preventDefault(); createVault()">
-                  <label for="vault-new-passphrase">New vault passphrase</label>
+                  <label for="vault-new-passphrase">{{ 'settings.plus.vault.newPassphrase' | transloco }}</label>
                   <input
                     id="vault-new-passphrase"
                     type="password"
@@ -216,7 +214,7 @@
                     [value]="vaultPassphrase()"
                     (input)="vaultPassphrase.set($any($event.target).value)"
                   />
-                  <label for="vault-new-passphrase-again">Repeat passphrase</label>
+                  <label for="vault-new-passphrase-again">{{ 'settings.plus.vault.repeatPassphrase' | transloco }}</label>
                   <input
                     id="vault-new-passphrase-again"
                     type="password"
@@ -226,13 +224,13 @@
                     (input)="vaultPassphraseAgain.set($any($event.target).value)"
                   />
                   <button class="btn" type="submit" [disabled]="vaultBusy()">
-                    {{ vaultBusy() ? 'Creating…' : 'Create encrypted store' }}
+                    {{ vaultBusy() ? ('settings.plus.vault.creating' | transloco) : ('settings.plus.vault.create' | transloco) }}
                   </button>
                 </form>
               }
               @case ('locked') {
                 <form class="plus-vault-form" (submit)="$event.preventDefault(); unlockVault()">
-                  <label for="vault-passphrase">Vault passphrase</label>
+                  <label for="vault-passphrase">{{ 'settings.plus.vault.passphrase' | transloco }}</label>
                   <input
                     id="vault-passphrase"
                     type="password"
@@ -242,7 +240,7 @@
                     (input)="vaultPassphrase.set($any($event.target).value)"
                   />
                   <button class="btn" type="submit" [disabled]="vaultBusy()">
-                    {{ vaultBusy() ? 'Unlocking…' : 'Unlock on this browser' }}
+                    {{ vaultBusy() ? ('settings.plus.vault.unlocking' | transloco) : ('settings.plus.vault.unlock' | transloco) }}
                   </button>
                 </form>
               }
@@ -265,11 +263,10 @@
                       [disabled]="vaultBusy()"
                       (click)="syncExistingVaultKeys()"
                     >
-                      Copy keys to my other devices
+                      {{ 'settings.plus.vault.copyKeys' | transloco }}
                     </button>
                     <p class="muted small">
-                      Sends any connections saved only in this browser up, and brings down any saved
-                      only on your other devices. Nothing is overwritten.
+                      {{ 'settings.plus.vault.copyKeys.hint' | transloco }}
                     </p>
                   </div>
                   <div class="plus-vault-action">
@@ -279,18 +276,16 @@
                       [disabled]="vaultBusy()"
                       (click)="lockVault()"
                     >
-                      Close on this browser
+                      {{ 'settings.plus.vault.close' | transloco }}
                     </button>
                     <p class="muted small">
-                      Forgets your passphrase here until you type it again. Your connections keep
-                      working; nothing is deleted and your other devices are unaffected. Worth doing
-                      on a shared computer.
+                      {{ 'settings.plus.vault.close.hint' | transloco }}
                     </p>
                   </div>
                 </div>
 
                 <label class="plus-vault-policy" for="vault-policy"
-                  >Delete the encrypted stored copy</label
+                  >{{ 'settings.plus.vault.delete' | transloco }}</label
                 >
                 <select
                   id="vault-policy"
@@ -298,18 +293,18 @@
                   [value]="vaultPolicyValue()"
                   (change)="setVaultPolicy($any($event.target).value)"
                 >
-                  <option value="idle-90">After 90 days without use</option>
-                  <option value="idle-365">After 365 days without use</option>
-                  <option value="absolute-90">90 days after it was created</option>
-                  <option value="absolute-365">365 days after it was created</option>
-                  <option value="never">Never while Plus remains active</option>
+                  <option value="idle-90">{{ 'settings.plus.vault.policy.idle90' | transloco }}</option>
+                  <option value="idle-365">{{ 'settings.plus.vault.policy.idle365' | transloco }}</option>
+                  <option value="absolute-90">{{ 'settings.plus.vault.policy.age90' | transloco }}</option>
+                  <option value="absolute-365">{{ 'settings.plus.vault.policy.age365' | transloco }}</option>
+                  <option value="never">{{ 'settings.plus.vault.policy.never' | transloco }}</option>
                 </select>
 
                 <form
                   class="plus-vault-form"
                   (submit)="$event.preventDefault(); changeVaultPassphrase()"
                 >
-                  <label for="vault-next-passphrase">Change passphrase</label>
+                  <label for="vault-next-passphrase">{{ 'settings.plus.vault.changePassphrase' | transloco }}</label>
                   <input
                     id="vault-next-passphrase"
                     type="password"
@@ -319,7 +314,7 @@
                     (input)="vaultNextPassphrase.set($any($event.target).value)"
                   />
                   <button class="btn btn-outline" type="submit" [disabled]="vaultBusy()">
-                    Change passphrase
+                    {{ 'settings.plus.vault.changePassphrase' | transloco }}
                   </button>
                 </form>
 
@@ -331,8 +326,8 @@
                 >
                   {{
                     vaultDeleteArmed()
-                      ? 'Confirm: delete encrypted stored copy'
-                      : 'Delete encrypted stored copy'
+                      ? ('settings.plus.vault.deleteConfirm' | transloco)
+                      : ('settings.plus.vault.deleteAction' | transloco)
                   }}
                 </button>
               }
@@ -354,10 +349,9 @@
         disagreeing about the same switches.
       -->
       <section class="plus-features">
-        <h2>What's switched on</h2>
+        <h2>{{ 'settings.plus.features.title' | transloco }}</h2>
         <p class="muted small">
-          Turn any of these off and back on whenever you like. Turning one off stops it syncing —
-          nothing stored on your account is deleted.
+          {{ 'settings.plus.features.intro' | transloco }}
         </p>
         <ul class="plus-feature-list">
           @for (row of featureRows(); track row.feature) {
@@ -393,51 +387,48 @@
         question nobody is asking most of the time.
       -->
       <section class="plus-diagnostics">
-        <h2>Diagnostics</h2>
+        <h2>{{ 'settings.plus.diagnostics.title' | transloco }}</h2>
 
-        <h3>What is stored</h3>
+        <h3>{{ 'settings.plus.diagnostics.whatStored' | transloco }}</h3>
         @if (diagnostics.state() === 'idle') {
           <p class="muted small">
-            See everything your Mawkingbird Plus account stores, including collections kept
-            separately for each Mastodon account. Nothing is changed by looking.
+            {{ 'settings.plus.diagnostics.intro' | transloco }}
           </p>
-          <button class="btn btn-outline" type="button" (click)="loadDiagnostics()">Check</button>
+          <button class="btn btn-outline" type="button" (click)="loadDiagnostics()">{{ 'settings.plus.diagnostics.check' | transloco }}</button>
         } @else if (diagnostics.state() === 'loading') {
-          <p class="muted" role="status">Reading your account…</p>
+          <p class="muted" role="status">{{ 'settings.plus.diagnostics.reading' | transloco }}</p>
         } @else if (diagnostics.state() === 'failed') {
           <p class="config-error" role="alert">{{ diagnostics.error() }}</p>
           <button class="btn btn-outline" type="button" (click)="loadDiagnostics()">
-            Try again
+            {{ 'settings.plus.diagnostics.retry' | transloco }}
           </button>
         } @else {
           <p>
-            <strong>Mawkingbird Plus is one account.</strong> Settings are shared across it. Saved
-            collections stay separated by Mastodon account so an alt never receives your main
-            account's trust decisions, feeds or lists.
+            <strong>{{ 'settings.plus.diagnostics.oneAccount' | transloco }}</strong> {{ 'settings.plus.diagnostics.oneAccount.body' | transloco }}
           </p>
 
-          <h4>Shared settings</h4>
+          <h4>{{ 'settings.plus.diagnostics.sharedSettings' | transloco }}</h4>
           <table class="plus-diag-table">
             <thead>
               <tr>
-                <th scope="col">Data</th>
-                <th scope="col">This browser</th>
-                <th scope="col">Mawkingbird Plus</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.data' | transloco }}</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.thisBrowser' | transloco }}</th>
+                <th scope="col">{{ 'settings.plus.title' | transloco }}</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <th scope="row">Settings</th>
+                <th scope="row">{{ 'settings.plus.diagnostics.settings' | transloco }}</th>
                 <td>
-                  {{ diagnostics.settings().localKeys }} keys ({{
+                  {{ diagnostics.settings().localKeys }} {{ 'settings.plus.diagnostics.keysOpen' | transloco }}{{
                     formatBytes(diagnostics.settings().localBytes)
                   }})
                 </td>
                 <td>
                   @if (diagnostics.settings().remoteBytes === null) {
-                    <span class="muted">Nothing stored</span>
+                    <span class="muted">{{ 'settings.plus.diagnostics.nothingStored' | transloco }}</span>
                   } @else {
-                    {{ formatBytes(diagnostics.settings().remoteBytes ?? 0) }}, revision
+                    {{ formatBytes(diagnostics.settings().remoteBytes ?? 0) }}{{ 'settings.plus.diagnostics.revision' | transloco }}
                     {{ diagnostics.settings().remoteRevision }}
                   }
                 </td>
@@ -445,23 +436,26 @@
             </tbody>
           </table>
 
-          <h4>Saved collections by account</h4>
+          <h4>{{ 'settings.plus.diagnostics.byAccount' | transloco }}</h4>
           @if (diagnostics.storedAccountCount() === 0) {
-            <p class="muted small">No Mastodon account has saved collections to Plus yet.</p>
+            <p class="muted small">{{ 'settings.plus.diagnostics.noneSaved' | transloco }}</p>
           } @else {
             <p class="muted small">
-              Plus currently holds saved collections for
-              {{ diagnostics.storedAccountCount() }}
-              {{ diagnostics.storedAccountCount() === 1 ? 'account' : 'accounts' }}.
+              {{
+                (diagnostics.storedAccountCount() === 1
+                  ? 'settings.plus.diagnostics.storedAccounts.one'
+                  : 'settings.plus.diagnostics.storedAccounts.other'
+                ) | transloco: { count: diagnostics.storedAccountCount() }
+              }}
             </p>
           }
           <table class="plus-diag-table">
             <thead>
               <tr>
-                <th scope="col">Mastodon account</th>
-                <th scope="col">Trusted</th>
-                <th scope="col">RSS feeds</th>
-                <th scope="col">Lists</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.mastodonAccount' | transloco }}</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.trusted' | transloco }}</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.rssFeeds' | transloco }}</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.lists' | transloco }}</th>
               </tr>
             </thead>
             <tbody>
@@ -470,10 +464,10 @@
                   <th scope="row">
                     {{ account.label }}
                     @if (account.active) {
-                      <span class="muted small">(current)</span>
+                      <span class="muted small">{{ 'settings.plus.diagnostics.current' | transloco }}</span>
                     }
                     @if (!account.stored) {
-                      <br /><span class="muted small">Nothing saved from this account yet</span>
+                      <br /><span class="muted small">{{ 'settings.plus.diagnostics.noneFromAccount' | transloco }}</span>
                     }
                   </th>
                   <td>{{ account.trust }}</td>
@@ -484,17 +478,16 @@
             </tbody>
           </table>
 
-          <h4>Current account comparison</h4>
+          <h4>{{ 'settings.plus.diagnostics.comparison' | transloco }}</h4>
           <p class="muted small">
-            Sync now affects {{ diagnostics.activeAccountLabel() }}. Collections saved for your
-            other Mastodon accounts remain separate and unchanged.
+            {{ 'settings.plus.diagnostics.syncAffects' | transloco }} {{ diagnostics.activeAccountLabel() }}{{ 'settings.plus.diagnostics.syncAffects.after' | transloco }}
           </p>
           <table class="plus-diag-table">
             <thead>
               <tr>
-                <th scope="col">Data</th>
-                <th scope="col">This browser</th>
-                <th scope="col">Saved for {{ diagnostics.activeAccountLabel() }}</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.data' | transloco }}</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.thisBrowser' | transloco }}</th>
+                <th scope="col">{{ 'settings.plus.diagnostics.savedFor' | transloco }} {{ diagnostics.activeAccountLabel() }}</th>
               </tr>
             </thead>
             <tbody>
@@ -509,7 +502,7 @@
                       @if (row.error; as reason) {
                         <span class="config-error small">{{ reason }}</span>
                       } @else {
-                        <span class="muted">Could not read</span>
+                        <span class="muted">{{ 'settings.plus.diagnostics.couldNotRead' | transloco }}</span>
                       }
                     } @else {
                       {{ row.remote }}
@@ -521,11 +514,11 @@
           </table>
 
           @if (diagnostics.settings().remoteUpdatedAt; as updated) {
-            <p class="muted small">Account last updated {{ updated | date: 'medium' }}.</p>
+            <p class="muted small">{{ 'settings.plus.diagnostics.lastUpdated' | transloco }} {{ updated | date: 'medium' }}.</p>
           }
           @if (diagnostics.quota(); as quota) {
             <p class="muted small">
-              Using {{ formatBytes(quota.used) }} of {{ formatBytes(quota.limit) }}.
+              {{ 'settings.plus.diagnostics.using' | transloco }} {{ formatBytes(quota.used) }} {{ 'settings.plus.diagnostics.of' | transloco }} {{ formatBytes(quota.limit) }}.
             </p>
           }
 
@@ -563,10 +556,10 @@
               "
               (click)="syncNow()"
             >
-              {{ syncing() ? 'Syncing…' : 'Sync now' }}
+              {{ syncing() ? ('settings.plus.diagnostics.syncing' | transloco) : ('settings.plus.diagnostics.syncNow' | transloco) }}
             </button>
           } @else {
-            <p class="muted small" role="status">Everything matches.</p>
+            <p class="muted small" role="status">{{ 'settings.plus.diagnostics.matches' | transloco }}</p>
           }
           @if (syncMessage(); as message) {
             <p class="muted small" role="status">{{ message }}</p>
@@ -595,64 +588,60 @@
               <th scope="row">
                 Articles you've read in Mawkingbird
                 @if (tally.localOnly()) {
-                  <span class="muted small">— counted on this browser</span>
+                  <span class="muted small">{{ 'settings.plus.usage.countedHere' | transloco }}</span>
                 } @else if (tally.since(); as since) {
-                  <span class="muted small">— since {{ since | date: 'longDate' }}</span>
+                  <span class="muted small">{{ 'settings.plus.usage.since' | transloco }} {{ since | date: 'longDate' }}</span>
                 }
               </th>
               <td>{{ tally.total() | number }}</td>
             </tr>
             <tr>
               <th scope="row">
-                Of those, opened today
-                <span class="muted small">— resets at midnight</span>
+                {{ 'settings.plus.usage.openedToday' | transloco }}
+                <span class="muted small">{{ 'settings.plus.usage.resetsMidnight' | transloco }}</span>
               </th>
               <td>{{ articleQuota.plusFetches() + articleQuota.freeFetches() | number }}</td>
             </tr>
             <tr>
-              <th scope="row">Your daily reading limit</th>
+              <th scope="row">{{ 'settings.plus.usage.dailyLimit' | transloco }}</th>
               <!-- Full stop. A subscriber has no limit, so there is no number
                    here to qualify, and nothing in parentheses to misread. -->
-              <td>None</td>
+              <td>{{ 'settings.plus.usage.none' | transloco }}</td>
             </tr>
             @if (proxyUsage().accountTotal; as total) {
               <tr>
-                <th scope="row">Times we fetched something for you, all devices</th>
+                <th scope="row">{{ 'settings.plus.usage.fetchedAll' | transloco }}</th>
                 <!-- Reported by the proxy on traffic that was happening anyway,
                      so knowing it costs no extra request. -->
                 <td>{{ total | number }}</td>
               </tr>
             }
             <tr>
-              <th scope="row">Times we fetched something for you, this browser</th>
+              <th scope="row">{{ 'settings.plus.usage.fetchedHere' | transloco }}</th>
               <td>{{ proxyUsage().requests | number }}</td>
             </tr>
             @for (row of diagnostics.collectionRows(); track row.collection) {
               <tr>
-                <th scope="row">{{ row.label }} kept on your account</th>
+                <th scope="row">{{ row.label }} {{ 'settings.plus.usage.keptOnAccount' | transloco }}</th>
                 <td>{{ row.local | number }}</td>
               </tr>
             }
           </tbody>
         </table>
         @if (diagnostics.state() === 'idle') {
-          <p class="muted small">Check above to include what your account holds.</p>
+          <p class="muted small">{{ 'settings.plus.usage.checkAbove' | transloco }}</p>
         }
       </section>
     }
 
     @if (!plus.isSupporter()) {
       <section class="plus-offer">
-        <h2>Support Mawkingbird</h2>
+        <h2>{{ 'settings.plus.offer.title' | transloco }}</h2>
         <p>
-          <strong>${{ priceUsd }} a year.</strong> Mawkingbird itself stays free: every feed,
-          timeline, list and post works without an account, and nothing you have made is taken away
-          if you never subscribe or if you stop.
+          <strong>${{ priceUsd }} {{ 'settings.plus.offer.aYear' | transloco }}</strong> {{ 'settings.plus.offer.staysFree' | transloco }}
         </p>
         <p>
-          A subscription buys two things: articles open here instead of in another tab, and
-          everything you set up shows up on your other devices. The free column is what you keep
-          either way.
+          {{ 'settings.plus.offer.buysTwoThings' | transloco }}
         </p>
         <!--
           Rendered from PLUS_BENEFITS rather than written out, because the prose
@@ -664,9 +653,9 @@
         <table class="plus-benefits">
           <thead>
             <tr>
-              <th scope="col">What</th>
-              <th scope="col">Free</th>
-              <th scope="col">Plus</th>
+              <th scope="col">{{ 'settings.plus.offer.what' | transloco }}</th>
+              <th scope="col">{{ 'settings.plus.offer.free' | transloco }}</th>
+              <th scope="col">{{ 'settings.plus.offer.plus' | transloco }}</th>
             </tr>
           </thead>
           <tbody>
@@ -686,12 +675,10 @@
           full, for the reader who wants it.
         -->
         <p class="muted small">
-          <a routerLink="/plans">See exactly what free and Plus include</a> — every limit, and what
-          changes when you sign in.
+          <a routerLink="/plans">{{ 'settings.plus.offer.seeExactly' | transloco }}</a> {{ 'settings.plus.offer.seeExactly.after' | transloco }}
         </p>
         <p class="muted small">
-          More may follow; none of it is promised. Anything already stored on your account stays
-          readable and exportable whether or not you keep subscribing.
+          {{ 'settings.plus.offer.moreMayFollow' | transloco }}
         </p>
         <div class="plus-actions">
           <button
@@ -702,8 +689,8 @@
           >
             {{
               plus.startingCheckout()
-                ? 'Starting checkout…'
-                : 'Support Mawkingbird — $' + priceUsd + '/year'
+                ? ('settings.plus.checkout.starting' | transloco)
+                : ('settings.plus.checkout.cta' | transloco: { price: priceUsd })
             }}
           </button>
         </div>
@@ -716,8 +703,7 @@
           <p class="feed-error" role="alert">{{ message }}</p>
         }
         <p class="muted small">
-          Payment is handled by Stripe. This browser never sees your card details, and Mawkingbird
-          stores nothing beyond which account is a supporter and when the year ends.
+          {{ 'settings.plus.offer.stripeNote' | transloco }}
         </p>
       </section>
     }
@@ -733,7 +719,7 @@
     }
   } @else {
     <section class="plus-signin">
-      <h2>Not signed in</h2>
+      <h2>{{ 'settings.plus.signin.title' | transloco }}</h2>
       <!--
         This paragraph used to say signing in "mainly raises your proxy rate
         limit" and that the rest was for "later". Both were false at the time it
@@ -741,10 +727,8 @@
         per account and already refused writes without one.
       -->
       <p>
-        Signing in is optional — Mawkingbird works without an account. What it adds is somewhere to
-        keep what you set up, so it is waiting for you on your phone and your other computers
-        instead of only here. Everything already in this browser stays here either way.
-        <a routerLink="/plans">See what free and Plus each include.</a>
+        {{ 'settings.plus.signin.intro' | transloco }}
+        <a routerLink="/plans">{{ 'settings.plus.signin.seeInclude' | transloco }}</a>
       </p>
 
       @if (linkSent()) {
@@ -755,8 +739,7 @@
           enumeration answer the endpoint refuses to give.
         -->
         <p class="connection-ok" role="status">
-          If that address can receive mail, a sign-in link is on its way. It expires in 15 minutes
-          and can only be used once.
+          {{ 'settings.plus.signin.linkSent' | transloco }}
         </p>
       } @else {
         <!--
@@ -768,7 +751,7 @@
           <p class="feed-error" role="alert">{{ message }}</p>
         }
         <form class="plus-signin-form" (submit)="$event.preventDefault(); sendLink()">
-          <label for="plus-email">Email address</label>
+          <label for="plus-email">{{ 'settings.plus.signin.emailLabel' | transloco }}</label>
           <input
             id="plus-email"
             type="email"
@@ -778,15 +761,13 @@
             (input)="email.set($any($event.target).value)"
           />
           <button class="btn" type="submit" [disabled]="session.sendingLink()">
-            {{ session.sendingLink() ? 'Sending…' : 'Email me a sign-in link' }}
+            {{ session.sendingLink() ? ('settings.plus.signin.sending' | transloco) : ('settings.plus.signin.sendLink' | transloco) }}
           </button>
         </form>
       }
 
       <p class="muted small">
-        There is no password. Mawkingbird sends a one-time link instead, so there is nothing to
-        remember and nothing for us to lose. Your address is used to identify the account and to
-        send that link — nothing else.
+        {{ 'settings.plus.signin.noPassword' | transloco }}
       </p>
     </section>
   }

@@ -1,8 +1,7 @@
 <div class="spage-head">
-  <h1>Import/Export Friends & Tags</h1>
+  <h1>{{ 'settings.importExport.title' | transloco }}</h1>
   <p>
-    Move your friends and followed hashtags between accounts with portable CSV files, and find the
-    people you already follow on your other network.
+    {{ 'settings.importExport.intro' | transloco }}
   </p>
 </div>
 
@@ -19,9 +18,11 @@
   -->
   @if (isAnonymous) {
     <p class="muted small anonymous-scope-note" role="status">
-      You're not signed in, so anyone you follow here is saved <strong>in this browser</strong>.
-      They won't appear on another device, and they'll be lost if you clear your browser data.
-      <a routerLink="/login">Sign in</a> if you want your follows kept on a server account.
+      {{ 'settings.importExport.anon.a' | transloco }}
+      <strong>{{ 'settings.importExport.anon.here' | transloco }}</strong
+      >{{ 'settings.importExport.anon.b' | transloco }}
+      <a routerLink="/login">{{ 'settings.importExport.anon.signIn' | transloco }}</a>
+      {{ 'settings.importExport.anon.c' | transloco }}
     </p>
   }
 
@@ -31,21 +32,20 @@
   <a class="invite-callout" routerLink="/invites">
     <span class="invite-callout-emoji" aria-hidden="true">📣</span>
     <span class="invite-callout-body">
-      <strong>Can’t find someone? Invite them.</strong>
+      <strong>{{ 'settings.importExport.invite.title' | transloco }}</strong>
       <span class="muted small">
-        Prewritten posts for Twitter and Bluesky that ask your friends to come over — or just to
-        visit with no account at all.
+        {{ 'settings.importExport.invite.body' | transloco }}
       </span>
     </span>
     <span class="invite-callout-arrow" aria-hidden="true">→</span>
   </a>
 
   <section id="import-friends" class="friend-section">
-    <h2>Import Friends</h2>
+    <h2>{{ 'settings.importExport.friends.importTitle' | transloco }}</h2>
     <p class="muted small">
-      Paste <code>&#64;user&#64;host</code> handles or profile URLs, one per line, or upload a
-      Mastodon <code>following_accounts.csv</code>. Each account is looked up and followed one at a
-      time.
+      {{ 'settings.importExport.friends.paste.a' | transloco }} <code>&#64;user&#64;host</code>
+      {{ 'settings.importExport.friends.paste.b' | transloco }} <code>following_accounts.csv</code
+      >{{ 'settings.importExport.friends.paste.c' | transloco }}
     </p>
     <textarea
       rows="6"
@@ -56,7 +56,7 @@
     ></textarea>
     <div class="import-actions">
       <label class="btn btn-outline file-btn">
-        Upload CSV…
+        {{ 'settings.importExport.friends.uploadCsv' | transloco }}
         <input type="file" accept=".csv,.txt" (change)="onFriendFile($event)" hidden />
       </label>
       <button
@@ -65,23 +65,27 @@
         [disabled]="!pasted().trim() || importer.running()"
         (click)="previewFriends()"
       >
-        Preview
+        {{ 'settings.importExport.preview' | transloco }}
       </button>
       @if (importer.rows().length && !importer.running()) {
         <button type="button" class="btn" (click)="startImport()">
-          Follow all ({{ importer.rows().length }})
+          {{ 'settings.importExport.followAllOpen' | transloco }}{{ importer.rows().length }})
         </button>
       }
       @if (importer.running()) {
-        <button type="button" class="btn btn-outline" (click)="importer.stop()">Stop</button>
+        <button type="button" class="btn btn-outline" (click)="importer.stop()">
+          {{ 'settings.importExport.stop' | transloco }}
+        </button>
       }
       @if (pasted() || importer.rows().length) {
-        <button type="button" class="link" (click)="clearImport()">clear</button>
+        <button type="button" class="link" (click)="clearImport()">
+          {{ 'settings.importExport.clear' | transloco }}
+        </button>
       }
     </div>
     @if (fileName(); as name) {
       <p class="muted small">
-        Loaded <code>{{ name }}</code>
+        {{ 'settings.importExport.loaded' | transloco }} <code>{{ name }}</code>
       </p>
     }
     @if (parseNote(); as note) {
@@ -102,8 +106,9 @@
           ></div>
         </div>
         <p class="muted small">
-          {{ doneCount() }} / {{ importer.rows().length }} processed ·
-          {{ followedCount() }} followed
+          {{ doneCount() }} / {{ importer.rows().length }}
+          {{ 'settings.importExport.progress.processed' | transloco }} {{ followedCount() }}
+          {{ 'settings.importExport.progress.followed' | transloco }}
         </p>
       }
       <ul class="import-rows">
@@ -136,7 +141,7 @@
     to the same cap the rest of the app enforces.
   -->
   <section id="import-tags" class="friend-section">
-    <h2>Import hashtags</h2>
+    <h2>{{ 'settings.importExport.tags.importTitle' | transloco }}</h2>
     <p class="muted small">
       Paste hashtags, one per line or separated by commas — with or without the
       <code>#</code>. Tag page URLs like <code>https://mastodon.social/tags/caturday</code> work
@@ -148,7 +153,7 @@
       (ngModelChange)="pastedTags.set($event)"
       placeholder="#photography&#10;#baking&#10;caturday, foss&#10;…"
       [disabled]="tagImporter.running()"
-      aria-label="Hashtags to follow"
+      [aria-label]="'settings.importExport.tags.textareaLabel' | transloco"
     ></textarea>
     <div class="import-actions">
       <label class="btn btn-outline file-btn">
@@ -169,10 +174,14 @@
         </button>
       }
       @if (tagImporter.running()) {
-        <button type="button" class="btn btn-outline" (click)="tagImporter.stop()">Stop</button>
+        <button type="button" class="btn btn-outline" (click)="tagImporter.stop()">
+          {{ 'settings.importExport.stop' | transloco }}
+        </button>
       }
       @if (pastedTags() || tagImporter.rows().length) {
-        <button type="button" class="link" (click)="clearTagImport()">clear</button>
+        <button type="button" class="link" (click)="clearTagImport()">
+          {{ 'settings.importExport.clear' | transloco }}
+        </button>
       }
     </div>
     @if (tagFileName(); as name) {
@@ -220,7 +229,9 @@
       </ul>
     }
     <p class="muted small">
-      <a routerLink="/feeds" [queryParams]="{ section: 'tags' }">See every hashtag you follow →</a>
+      <a routerLink="/feeds" [queryParams]="{ section: 'tags' }">{{
+        'settings.importExport.tags.seeAll' | transloco
+      }}</a>
     </p>
   </section>
 
@@ -234,14 +245,14 @@
     fills the box above so you still press Follow yourself.
   -->
   <section id="suggest-tags" class="friend-section">
-    <h2>Suggest hashtags from what you already read</h2>
+    <h2>{{ 'settings.importExport.suggest.title' | transloco }}</h2>
     <p class="muted small">
-      Reads about {{ tagSampleSize }} of your posts or favourites and counts the hashtags in them.
-      Nothing is followed until you send the results to the box above.
+      {{ 'settings.importExport.suggest.reads.a' | transloco }} {{ tagSampleSize }}
+      {{ 'settings.importExport.suggest.reads.b' | transloco }}
     </p>
     <div class="import-actions">
       <label class="btn btn-outline file-btn">
-        From a Twitter archive…
+        {{ 'settings.importExport.suggest.fromArchive' | transloco }}
         <input type="file" accept=".js" multiple (change)="onTagArchive($event)" hidden />
       </label>
       @if (bsky.linked()) {
@@ -251,7 +262,7 @@
           [disabled]="tagSources.loading()"
           (click)="suggestTagsFromBluesky()"
         >
-          From my Bluesky posts
+          {{ 'settings.importExport.suggest.fromBluesky' | transloco }}
         </button>
       }
       @if (!isAnonymous) {
@@ -261,23 +272,24 @@
           [disabled]="tagSources.loading()"
           (click)="suggestTagsFromFavourites()"
         >
-          From posts I've favourited
+          {{ 'settings.importExport.suggest.fromFavourites' | transloco }}
         </button>
       }
     </div>
     @if (tagArchiveReading() || tagSources.loading()) {
-      <p class="muted small" role="status">Reading…</p>
+      <p class="muted small" role="status">{{ 'settings.importExport.reading' | transloco }}</p>
     }
     @if (tagSources.error(); as error) {
       <p class="export-error" role="alert">{{ error }}</p>
     }
     @if (tagSources.suggestions().length) {
       <p class="muted small">
-        {{ tagSources.suggestions().length }} hashtag{{
-          tagSources.suggestions().length === 1 ? '' : 's'
+        {{
+          (tagSources.suggestions().length === 1
+            ? 'settings.importExport.suggest.summary.one'
+            : 'settings.importExport.suggest.summary.other'
+          ) | transloco: { tags: tagSources.suggestions().length, posts: tagSources.sampled() }
         }}
-        found across {{ tagSources.sampled() }} post{{ tagSources.sampled() === 1 ? '' : 's' }}. The
-        most-used are ticked.
       </p>
       <ul class="suggest-tags">
         @for (row of tagSources.suggestions(); track row.tag) {
@@ -290,7 +302,12 @@
               />
               <span>#{{ row.tag }}</span>
               <span class="muted small">
-                {{ row.count }} post{{ row.count === 1 ? '' : 's' }}
+                {{
+                  (row.count === 1
+                    ? 'settings.importExport.suggest.posts.one'
+                    : 'settings.importExport.suggest.posts.other'
+                  ) | transloco: { count: row.count }
+                }}
               </span>
             </label>
           </li>
@@ -303,24 +320,25 @@
           [disabled]="!tagSources.selectedTags().length"
           (click)="useSuggestedTags()"
         >
-          Send {{ tagSources.selectedTags().length }} to the box above
+          {{ 'settings.importExport.suggest.send.a' | transloco }}
+          {{ tagSources.selectedTags().length }}
+          {{ 'settings.importExport.suggest.send.b' | transloco }}
         </button>
         <button type="button" class="link" (click)="tagSources.setAllSelected(true)">
-          select all
+          {{ 'settings.importExport.selectAll' | transloco }}
         </button>
         <button type="button" class="link" (click)="tagSources.setAllSelected(false)">
-          select none
+          {{ 'settings.importExport.selectNone' | transloco }}
         </button>
       </div>
     }
   </section>
 
   <section class="friend-section">
-    <h2>Export hashtags</h2>
+    <h2>{{ 'settings.importExport.tags.exportTitle' | transloco }}</h2>
     <p class="muted small">
-      Download the hashtags you follow as a <code>followed_tags.csv</code> you can import above on
-      another account. Mastodon's own account archive leaves followed tags out, so this file is the
-      only way to carry them across.
+      {{ 'settings.importExport.tags.exportBody.a' | transloco }} <code>followed_tags.csv</code>
+      {{ 'settings.importExport.tags.exportBody.b' | transloco }}
     </p>
     <button
       type="button"
@@ -328,7 +346,11 @@
       [disabled]="exportingTags()"
       (click)="exportTags()"
     >
-      {{ exportingTags() ? 'Exporting ' + tagExportCount() + '…' : 'Export all hashtags' }}
+      {{
+        exportingTags()
+          ? ('settings.importExport.tags.exporting' | transloco: { count: tagExportCount() })
+          : ('settings.importExport.tags.exportAll' | transloco)
+      }}
     </button>
     @if (tagExportError(); as error) {
       <p class="export-error" role="alert">{{ error }}</p>
@@ -340,20 +362,21 @@
        section below branches on identity and therefore stays open. -->
   @if (!isAnonymous) {
     <section id="twitter-archive" class="friend-section">
-      <h2>Extract contacts from Twitter/Twitter</h2>
+      <h2>{{ 'settings.importExport.twitter.title' | transloco }}</h2>
       <p class="muted small">
         Choose your unzipped archive folder. Mawkingbird reads only <code>following.js</code>,
         <code>tweets.js</code>, and <code>deleted-tweets.js</code> in your browser; nothing is
         uploaded. You can also select those files directly from the archive's <code>data</code>
-        folder.
+        {{ 'settings.importExport.twitter.folder' | transloco }}
       </p>
       <p class="muted small">
-        The ones you don’t find here haven’t joined yet —
-        <a routerLink="/invites">invite them from Twitter</a>.
+        {{ 'settings.importExport.twitter.notJoined' | transloco }}
+        <a routerLink="/invites">{{ 'settings.importExport.twitter.inviteLink' | transloco }}</a
+        >.
       </p>
       <div class="import-actions">
         <label class="btn btn-outline file-btn">
-          Choose unzipped archive…
+          {{ 'settings.importExport.twitter.chooseArchive' | transloco }}
           <input
             type="file"
             accept=".js"
@@ -365,7 +388,7 @@
           />
         </label>
         <label class="btn btn-outline file-btn">
-          Choose data files…
+          {{ 'settings.importExport.twitter.chooseFiles' | transloco }}
           <input
             type="file"
             accept=".js"
@@ -377,56 +400,69 @@
         </label>
         @if (twitterArchive(); as archive) {
           <button type="button" class="btn" (click)="downloadTwitterArchive()">
-            Download contacts CSV
+            {{ 'settings.importExport.twitter.downloadCsv' | transloco }}
           </button>
-          <button type="button" class="link" (click)="clearTwitterArchive()">clear</button>
+          <button type="button" class="link" (click)="clearTwitterArchive()">
+            {{ 'settings.importExport.clear' | transloco }}
+          </button>
         }
       </div>
 
       @if (twitterArchiveReading()) {
-        <p class="muted small" aria-live="polite">Reading the archive locally…</p>
+        <p class="muted small" aria-live="polite">
+          {{ 'settings.importExport.twitter.readingLocally' | transloco }}
+        </p>
       }
       @if (twitterArchiveError(); as error) {
         <p class="export-error" role="alert">{{ error }}</p>
       }
       @if (twitterArchive(); as archive) {
         <div class="contact-summary twitter-summary" aria-live="polite">
-          <strong>{{ archive.people.length }} unique Twitter accounts ready to export</strong>
+          <strong
+            >{{ archive.people.length }}
+            {{ 'settings.importExport.twitter.readyToExport' | transloco }}</strong
+          >
           <span class="muted small">
-            {{ archive.currentFollowingCount }} currently followed ·
-            {{ archive.currentFollowingWithHandleCount }} of those have a handle recovered from your
-            tweets
+            {{ archive.currentFollowingCount }}
+            {{ 'settings.importExport.twitter.currentlyFollowed' | transloco }}
+            {{ archive.currentFollowingWithHandleCount }}
+            {{ 'settings.importExport.twitter.handleRecovered' | transloco }}
           </span>
           <span class="muted small">
-            {{ archive.repliedPeopleCount }} people replied to in {{ archive.replyCount }} replies ·
-            {{ archive.mentionedPeopleCount }} people seen in {{ archive.mentionCount }} mentions
+            {{ archive.repliedPeopleCount }}
+            {{ 'settings.importExport.twitter.repliedTo' | transloco }} {{ archive.replyCount }}
+            {{ 'settings.importExport.twitter.replies' | transloco }}
+            {{ archive.mentionedPeopleCount }}
+            {{ 'settings.importExport.twitter.seenIn' | transloco }} {{ archive.mentionCount }}
+            {{ 'settings.importExport.twitter.mentions' | transloco }}
           </span>
           <span class="muted small">
-            Read {{ archive.files.join(', ') }}. The CSV keeps numeric Twitter IDs even when Twitter
-            omitted the handle.
+            {{ 'settings.importExport.twitter.read' | transloco }} {{ archive.files.join(', ')
+            }}{{ 'settings.importExport.twitter.readNote' | transloco }}
           </span>
         </div>
         @if (!archive.files.includes('following.js')) {
           <p class="muted small archive-note">
-            No <code>following.js</code> was selected, so this export contains interactions only.
+            {{ 'settings.importExport.twitter.missing.a' | transloco }} <code>following.js</code>
+            {{ 'settings.importExport.twitter.missing.following' | transloco }}
           </p>
         }
         @if (!archive.files.includes('tweets.js')) {
           <p class="muted small archive-note">
-            No <code>tweets.js</code> was selected. Add it to recover reply/mention history and
-            handles for some followed IDs.
+            {{ 'settings.importExport.twitter.missing.a' | transloco }} <code>tweets.js</code>
+            {{ 'settings.importExport.twitter.missing.tweets' | transloco }}
           </p>
         }
 
         <fieldset class="twitter-filters">
-          <legend>Hide candidates that are…</legend>
+          <legend>{{ 'settings.importExport.twitter.hideTitle' | transloco }}</legend>
           <label>
             <input
               type="checkbox"
               [ngModel]="hideTwitterInactive()"
               (ngModelChange)="hideTwitterInactive.set($event)"
             />
-            Inactive (&lt;10 combined posts, following, and followers)
+            {{ 'settings.importExport.twitter.hide.inactive' | transloco }}
           </label>
           <label>
             <input
@@ -434,7 +470,7 @@
               [ngModel]="hideTwitterIncomplete()"
               (ngModelChange)="hideTwitterIncomplete.set($event)"
             />
-            Missing a bio or avatar
+            {{ 'settings.importExport.twitter.hide.incomplete' | transloco }}
           </label>
           <label>
             <input
@@ -442,7 +478,7 @@
               [ngModel]="hideTwitterBots()"
               (ngModelChange)="hideTwitterBots.set($event)"
             />
-            Bots or mirrors
+            {{ 'settings.importExport.twitter.hide.bots' | transloco }}
           </label>
           <label>
             <input
@@ -450,13 +486,13 @@
               [ngModel]="hideTwitterStale()"
               (ngModelChange)="hideTwitterStale.set($event)"
             />
-            No posts, or last activity over a year ago (when known)
+            {{ 'settings.importExport.twitter.hide.stale' | transloco }}
           </label>
         </fieldset>
 
         <div class="contact-controls twitter-search-controls">
           <label class="call-limit">
-            Stop after
+            {{ 'settings.importExport.stopAfter' | transloco }}
             <input
               type="number"
               min="1"
@@ -465,7 +501,7 @@
               (ngModelChange)="setTwitterCallLimit($event)"
               [disabled]="twitterDiscovery.running()"
             />
-            Mastodon API calls
+            {{ 'settings.importExport.mastodonApiCalls' | transloco }}
           </label>
           @if (twitterDiscovery.rows().length && !twitterDiscovery.running()) {
             <button
@@ -476,12 +512,16 @@
                 twitterDiscovery.callCount() >= twitterCallLimit() || !twitterPendingCount()
               "
             >
-              {{ twitterDiscovery.callCount() ? 'Continue searching' : 'Find Mastodon accounts' }}
+              {{
+                twitterDiscovery.callCount()
+                  ? ('settings.importExport.continueSearching' | transloco)
+                  : ('settings.importExport.findMastodonAccounts' | transloco)
+              }}
             </button>
           }
           @if (twitterDiscovery.running()) {
             <button type="button" class="btn btn-outline" (click)="twitterDiscovery.stop()">
-              Stop
+              {{ 'settings.importExport.stop' | transloco }}
             </button>
           }
           @if (twitterDiscovery.rows().length) {
@@ -491,7 +531,11 @@
               [attr.aria-pressed]="hideTwitterFollowed()"
               (click)="hideTwitterFollowed.set(!hideTwitterFollowed())"
             >
-              {{ hideTwitterFollowed() ? 'Show already followed' : 'Hide already followed' }}
+              {{
+                hideTwitterFollowed()
+                  ? ('settings.importExport.showAlreadyFollowed' | transloco)
+                  : ('settings.importExport.hideAlreadyFollowed' | transloco)
+              }}
             </button>
           }
         </div>
@@ -499,20 +543,24 @@
         @if (twitterDiscovery.rows().length) {
           <div class="contact-summary" aria-live="polite">
             <strong>
-              {{ twitterDiscovery.rows().length }} Twitter handles ready to search ·
+              {{ twitterDiscovery.rows().length }}
+              {{ 'settings.importExport.twitter.readyToSearch' | transloco }}
               @if (twitterFiltersActive()) {
-                {{ twitterVisibleMatchCount() }} of {{ twitterFoundCount() }} Mastodon candidates
-                shown
+                {{ twitterVisibleMatchCount() }} {{ 'settings.importExport.of' | transloco }}
+                {{ twitterFoundCount() }}
+                {{ 'settings.importExport.twitter.candidatesShown' | transloco }}
               } @else {
-                {{ twitterFoundCount() }} Mastodon candidate{{
-                  twitterFoundCount() === 1 ? '' : 's'
+                {{
+                  (twitterFoundCount() === 1
+                    ? 'settings.importExport.twitter.candidates.one'
+                    : 'settings.importExport.twitter.candidates.other'
+                  ) | transloco: { count: twitterFoundCount() }
                 }}
               }
             </strong>
             <span class="muted small">
-              {{ twitterDiscovery.callCount() }} / {{ twitterCallLimit() }} username-search calls
-              used. Same-handle accounts are likely matches, not confirmed identities; a matching
-              display name or profile link back to Twitter is shown as extra evidence.
+              {{ twitterDiscovery.callCount() }} / {{ twitterCallLimit() }}
+              {{ 'settings.importExport.twitter.searchNote' | transloco }}
             </span>
           </div>
           <div
@@ -551,13 +599,19 @@
                 </div>
                 <div class="twitter-evidence muted small">
                   @if (row.person.currently_following) {
-                    <span>currently followed</span>
+                    <span>{{ 'settings.importExport.legend.currentlyFollowed' | transloco }}</span>
                   }
                   @if (row.person.reply_count) {
-                    <span>{{ row.person.reply_count }} replies</span>
+                    <span
+                      >{{ row.person.reply_count }}
+                      {{ 'settings.importExport.legend.replies' | transloco }}</span
+                    >
                   }
                   @if (row.person.mention_count) {
-                    <span>{{ row.person.mention_count }} mentions</span>
+                    <span
+                      >{{ row.person.mention_count }}
+                      {{ 'settings.importExport.twitter.mentions' | transloco }}</span
+                    >
                   }
                 </div>
                 @if (row.error) {
@@ -580,12 +634,17 @@
                               {{ match.confidence }}
                             </span>
                             @if (match.account.locked) {
-                              <span class="github-account-badge" title="Requires follow approval">
-                                🔒 approval required
+                              <span
+                                class="github-account-badge"
+                                [title]="'settings.importExport.account.approvalTitle' | transloco"
+                              >
+                                {{ 'settings.importExport.account.approvalBadge' | transloco }}
                               </span>
                             }
                             @if (match.account.bot) {
-                              <span class="github-account-badge">BOT</span>
+                              <span class="github-account-badge">{{
+                                'settings.importExport.account.bot' | transloco
+                              }}</span>
                             }
                             <span class="muted small">{{ match.signals.join(' · ') }}</span>
                             @if (match.account.note) {
@@ -597,23 +656,27 @@
                             <div class="github-account-stats muted small">
                               <span
                                 ><strong>{{ match.account.statuses_count || 0 }}</strong>
-                                posts</span
+                                {{ 'settings.importExport.account.posts' | transloco }}</span
                               >
                               <span
                                 ><strong>{{ match.account.following_count || 0 }}</strong>
-                                following</span
+                                {{ 'settings.importExport.account.following' | transloco }}</span
                               >
                               <span
                                 ><strong>{{ match.account.followers_count || 0 }}</strong>
-                                followers</span
+                                {{ 'settings.importExport.account.followers' | transloco }}</span
                               >
                               @if (match.account.last_status_at) {
                                 <span
-                                  >last active
+                                  >{{ 'settings.importExport.account.lastActive' | transloco }}
                                   <strong>{{ match.account.last_status_at }}</strong></span
                                 >
                               } @else if (match.account.last_status_at === null) {
-                                <span><strong>never posted</strong></span>
+                                <span
+                                  ><strong>{{
+                                    'settings.importExport.account.neverPosted' | transloco
+                                  }}</strong></span
+                                >
                               }
                             </div>
                           </div>
@@ -630,17 +693,17 @@
                             >
                               {{
                                 twitterDiscovery.followBusy().has(match.account.id)
-                                  ? 'Following…'
+                                  ? ('settings.importExport.followingBusy' | transloco)
                                   : relationship.following
-                                    ? 'Following'
+                                    ? ('settings.importExport.following' | transloco)
                                     : relationship.requested
-                                      ? 'Requested'
-                                      : 'Follow'
+                                      ? ('settings.importExport.requested' | transloco)
+                                      : ('settings.importExport.follow' | transloco)
                               }}
                             </button>
                           } @else {
                             <button type="button" class="btn btn-outline btn-sm" disabled>
-                              Checking…
+                              {{ 'settings.importExport.checking' | transloco }}
                             </button>
                           }
                         </li>
@@ -665,18 +728,16 @@
   <!-- Also account-only: same `api.follow` reason as the archive above. -->
   @if (github.connected() && !isAnonymous) {
     <section id="github-friends" class="friend-section contact-section">
-      <h2>Find GitHub friends on Mastodon</h2>
+      <h2>{{ 'settings.importExport.github.title' | transloco }}</h2>
       <p class="muted small">
-        Use either or both GitHub sources. Exact handles are resolved through your Mastodon server
-        so results open inside Mockingbird and show your follow status.
+        {{ 'settings.importExport.github.intro' | transloco }}
       </p>
       <div class="github-sources">
         <div class="github-source">
           <div>
-            <h3>People you follow on GitHub</h3>
+            <h3>{{ 'settings.importExport.github.follows.title' | transloco }}</h3>
             <p class="muted small">
-              The shorter, higher-confidence list. Direct profile links are matched first; remaining
-              profiles can be searched once by GitHub username.
+              {{ 'settings.importExport.github.follows.body' | transloco }}
             </p>
           </div>
           <button
@@ -691,19 +752,18 @@
           >
             {{
               githubDiscovery.loading()
-                ? 'Loading GitHub follows…'
+                ? ('settings.importExport.github.loadingFollows' | transloco)
                 : githubFollowingProfileCount()
-                  ? 'Reload GitHub follows'
-                  : 'Get matches via GitHub friends'
+                  ? ('settings.importExport.github.reloadFollows' | transloco)
+                  : ('settings.importExport.github.matchViaFriends' | transloco)
             }}
           </button>
         </div>
         <div class="github-source">
           <div>
-            <h3>Owners of repositories you starred</h3>
+            <h3>{{ 'settings.importExport.github.starred.title' | transloco }}</h3>
             <p class="muted small">
-              The longer, lower-confidence list. Checks each unique repository owner for a direct
-              Mastodon profile link. Contributors and stargazers are never loaded.
+              {{ 'settings.importExport.github.starred.body' | transloco }}
             </p>
           </div>
           <button
@@ -719,17 +779,17 @@
           >
             {{
               githubDiscovery.loadingStarredOwners()
-                ? 'Checking starred repo owners…'
+                ? ('settings.importExport.github.checkingStarred' | transloco)
                 : githubDiscovery.starredOwnersLoaded()
-                  ? 'GitHub stars checked'
-                  : 'Get matches via GitHub stars'
+                  ? ('settings.importExport.github.starsChecked' | transloco)
+                  : ('settings.importExport.github.matchViaStars' | transloco)
             }}
           </button>
         </div>
       </div>
       <div class="contact-controls github-result-controls">
         <label class="call-limit">
-          Stop after
+          {{ 'settings.importExport.stopAfter' | transloco }}
           <input
             type="number"
             min="1"
@@ -738,7 +798,7 @@
             (ngModelChange)="setGitHubCallLimit($event)"
             [disabled]="githubDiscovery.running()"
           />
-          Mastodon API calls
+          {{ 'settings.importExport.mastodonApiCalls' | transloco }}
         </label>
         @if (githubDiscovery.rows().length && !githubDiscovery.running()) {
           <button
@@ -747,12 +807,16 @@
             (click)="startGitHubSearch()"
             [disabled]="githubDiscovery.callCount() >= githubCallLimit() || !githubPendingCount()"
           >
-            {{ githubDiscovery.callCount() ? 'Continue searching' : 'Find Mastodon accounts' }}
+            {{
+              githubDiscovery.callCount()
+                ? ('settings.importExport.continueSearching' | transloco)
+                : ('settings.importExport.findMastodonAccounts' | transloco)
+            }}
           </button>
         }
         @if (githubDiscovery.running()) {
           <button type="button" class="btn btn-outline" (click)="githubDiscovery.stop()">
-            Stop
+            {{ 'settings.importExport.stop' | transloco }}
           </button>
         }
         @if (githubDiscovery.rows().length) {
@@ -762,9 +826,15 @@
             [attr.aria-pressed]="hideGithubFollowed()"
             (click)="hideGithubFollowed.set(!hideGithubFollowed())"
           >
-            {{ hideGithubFollowed() ? 'Show already followed' : 'Hide already followed' }}
+            {{
+              hideGithubFollowed()
+                ? ('settings.importExport.showAlreadyFollowed' | transloco)
+                : ('settings.importExport.hideAlreadyFollowed' | transloco)
+            }}
           </button>
-          <button type="button" class="link" (click)="githubDiscovery.reset()">clear</button>
+          <button type="button" class="link" (click)="githubDiscovery.reset()">
+            {{ 'settings.importExport.clear' | transloco }}
+          </button>
         }
       </div>
 
@@ -775,27 +845,54 @@
       @if (githubDiscovery.rows().length) {
         <div class="contact-summary" aria-live="polite">
           <strong>
-            {{ githubFollowingProfileCount() }} GitHub friend{{
-              githubFollowingProfileCount() === 1 ? '' : 's'
+            {{
+              (githubFollowingProfileCount() === 1
+                ? 'settings.importExport.github.friends.one'
+                : 'settings.importExport.github.friends.other'
+              ) | transloco: { count: githubFollowingProfileCount() }
             }}
-            · {{ githubStarredMatchCount() }} starred-owner match{{
-              githubStarredMatchCount() === 1 ? '' : 'es'
+            ·
+            {{
+              (githubStarredMatchCount() === 1
+                ? 'settings.importExport.github.starredMatches.one'
+                : 'settings.importExport.github.starredMatches.other'
+              ) | transloco: { count: githubStarredMatchCount() }
             }}
-            · {{ githubFoundCount() }} Mastodon match{{ githubFoundCount() === 1 ? '' : 'es' }}
+            ·
+            {{
+              (githubFoundCount() === 1
+                ? 'settings.importExport.github.mastodonMatches.one'
+                : 'settings.importExport.github.mastodonMatches.other'
+              ) | transloco: { count: githubFoundCount() }
+            }}
           </strong>
           <span class="muted small">
-            {{ githubLinkedCount() }} matched directly from GitHub profile links. Loaded in
-            {{ githubDiscovery.githubPageCount() }} GitHub GraphQL request{{
-              githubDiscovery.githubPageCount() === 1 ? '' : 's'
+            {{
+              'settings.importExport.github.linkedSummary'
+                | transloco: { count: githubLinkedCount() }
             }}
-            and resolved {{ githubDiscovery.linkedLookupCount() }} exact linked profile{{
-              githubDiscovery.linkedLookupCount() === 1 ? '' : 's'
+            {{
+              (githubDiscovery.githubPageCount() === 1
+                ? 'settings.importExport.github.requests.one'
+                : 'settings.importExport.github.requests.other'
+              ) | transloco: { count: githubDiscovery.githubPageCount() }
             }}
-            through your server. {{ githubDiscovery.callCount() }} / {{ githubCallLimit() }}
-            username-search calls used.
+            {{
+              (githubDiscovery.linkedLookupCount() === 1
+                ? 'settings.importExport.github.resolved.one'
+                : 'settings.importExport.github.resolved.other'
+              ) | transloco: { count: githubDiscovery.linkedLookupCount() }
+            }}
+            {{
+              'settings.importExport.github.callsUsed'
+                | transloco: { used: githubDiscovery.callCount(), limit: githubCallLimit() }
+            }}
             @if (githubDiscovery.starredPageCount()) {
-              Checked {{ githubDiscovery.starredRepositoryCount() }} starred repositories and
-              {{ githubDiscovery.starredOwnerCount() }} unique owners; contributors were not loaded.
+              {{ 'settings.importExport.github.checked.a' | transloco }}
+              {{ githubDiscovery.starredRepositoryCount() }}
+              {{ 'settings.importExport.github.checked.b' | transloco }}
+              {{ githubDiscovery.starredOwnerCount() }}
+              {{ 'settings.importExport.github.checked.c' | transloco }}
             }
           </span>
         </div>
@@ -835,7 +932,9 @@
                 </div>
                 @if (row.starredRepositories?.length) {
                   <div class="github-repositories small">
-                    <span class="muted">You starred:</span>
+                    <span class="muted">{{
+                      'settings.importExport.github.youStarred' | transloco
+                    }}</span>
                     @for (
                       repository of row.starredRepositories?.slice(0, 5);
                       track repository.url
@@ -851,7 +950,8 @@
                     }
                     @if ((row.starredRepositories?.length || 0) > 5) {
                       <span class="muted">
-                        +{{ (row.starredRepositories?.length || 0) - 5 }} more
+                        +{{ (row.starredRepositories?.length || 0) - 5 }}
+                        {{ 'settings.importExport.more' | transloco }}
                       </span>
                     }
                   </div>
@@ -879,12 +979,17 @@
                               {{ match.confidence }}
                             </span>
                             @if (match.account.locked) {
-                              <span class="github-account-badge" title="Requires follow approval">
-                                🔒 approval required
+                              <span
+                                class="github-account-badge"
+                                [title]="'settings.importExport.account.approvalTitle' | transloco"
+                              >
+                                {{ 'settings.importExport.account.approvalBadge' | transloco }}
                               </span>
                             }
                             @if (match.account.bot) {
-                              <span class="github-account-badge">BOT</span>
+                              <span class="github-account-badge">{{
+                                'settings.importExport.account.bot' | transloco
+                              }}</span>
                             }
                             <span class="muted small">{{ match.signals.join(' · ') }}</span>
                             @if (match.account.note) {
@@ -896,15 +1001,15 @@
                             <div class="github-account-stats muted small">
                               <span
                                 ><strong>{{ match.account.statuses_count || 0 }}</strong>
-                                posts</span
+                                {{ 'settings.importExport.account.posts' | transloco }}</span
                               >
                               <span
                                 ><strong>{{ match.account.following_count || 0 }}</strong>
-                                following</span
+                                {{ 'settings.importExport.account.following' | transloco }}</span
                               >
                               <span
                                 ><strong>{{ match.account.followers_count || 0 }}</strong>
-                                followers</span
+                                {{ 'settings.importExport.account.followers' | transloco }}</span
                               >
                             </div>
                           </div>
@@ -921,17 +1026,17 @@
                             >
                               {{
                                 githubDiscovery.followBusy().has(match.account.id)
-                                  ? 'Following…'
+                                  ? ('settings.importExport.followingBusy' | transloco)
                                   : relationship.following
-                                    ? 'Following'
+                                    ? ('settings.importExport.following' | transloco)
                                     : relationship.requested
-                                      ? 'Requested'
-                                      : 'Follow'
+                                      ? ('settings.importExport.requested' | transloco)
+                                      : ('settings.importExport.follow' | transloco)
                               }}
                             </button>
                           } @else {
                             <button type="button" class="btn btn-outline btn-sm" disabled>
-                              Checking…
+                              {{ 'settings.importExport.checking' | transloco }}
                             </button>
                           }
                         </li>
@@ -951,10 +1056,11 @@
   }
 
   <section class="friend-section">
-    <h2>Export Friends</h2>
+    <h2>{{ 'settings.importExport.friends.exportTitle' | transloco }}</h2>
     <p class="muted small">
-      Fetch every account you follow and download a Mastodon-compatible
-      <code>following_accounts.csv</code> that can be imported above or by another Mastodon server.
+      {{ 'settings.importExport.friends.exportBody.a' | transloco }}
+      <code>following_accounts.csv</code>
+      {{ 'settings.importExport.friends.exportBody.b' | transloco }}
     </p>
     <button
       type="button"
@@ -962,7 +1068,11 @@
       [disabled]="exportingFriends()"
       (click)="exportFriends()"
     >
-      {{ exportingFriends() ? 'Exporting ' + exportCount() + '…' : 'Export all friends' }}
+      {{
+        exportingFriends()
+          ? ('settings.importExport.friends.exporting' | transloco: { count: exportCount() })
+          : ('settings.importExport.friends.exportAll' | transloco)
+      }}
     </button>
     @if (exportError(); as error) {
       <p class="export-error" role="alert">{{ error }}</p>
@@ -977,46 +1087,54 @@
        `api.follow`. Nothing here is meaningful without credentials. -->
   @if (!isAnonymous) {
     <section id="bridge-finder" class="friend-section bridge-section">
-      <h2>Find the same people on your other network</h2>
+      <h2>{{ 'settings.importExport.bridge.title' | transloco }}</h2>
       <p class="muted small">
-        You keep two follow lists that were built at different times. This finds the overlap: who
-        you already follow on one network, and can now follow on the other.
+        {{ 'settings.importExport.bridge.intro' | transloco }}
       </p>
 
       @if (!bridgeReady()) {
         <div class="bridge-gate">
           <p>
-            <strong>This needs both accounts connected.</strong>
+            <strong>{{ 'settings.importExport.bridge.needsBoth' | transloco }}</strong>
           </p>
           <ul class="bridge-gate-list">
             <li [class.bridge-have]="hasMastodon()">
               <span aria-hidden="true">{{ hasMastodon() ? '✓' : '○' }}</span>
-              Mastodon —
+              {{ 'settings.importExport.bridge.mastodon' | transloco }}
               @if (hasMastodon()) {
-                connected
+                {{ 'settings.importExport.bridge.connected' | transloco }}
               } @else {
-                <a routerLink="/settings/connections">sign in to a Mastodon account</a>
+                <a routerLink="/settings/connections">{{
+                  'settings.importExport.bridge.signInMastodon' | transloco
+                }}</a>
               }
             </li>
             <li [class.bridge-have]="hasBluesky()">
               <span aria-hidden="true">{{ hasBluesky() ? '✓' : '○' }}</span>
-              Bluesky —
+              {{ 'settings.importExport.bridge.bluesky' | transloco }}
               @if (hasBluesky()) {
-                connected
+                {{ 'settings.importExport.bridge.connected' | transloco }}
               } @else {
-                <a routerLink="/settings/connections/bluesky">connect Bluesky</a>
+                <a routerLink="/settings/connections/bluesky">{{
+                  'settings.importExport.bridge.connectBluesky' | transloco
+                }}</a>
               }
             </li>
           </ul>
           <p class="muted small">
-            Reading a server anonymously can show you public posts, but it cannot tell us who
-            <em>you</em> follow — so both sides need real credentials.
+            {{ 'settings.importExport.bridge.anon.a' | transloco }}
+            <em>{{ 'settings.importExport.bridge.anon.you' | transloco }}</em>
+            {{ 'settings.importExport.bridge.anon.b' | transloco }}
           </p>
         </div>
       }
 
       <fieldset class="bridge-body" [disabled]="!bridgeReady()">
-        <div class="bridge-direction" role="group" aria-label="Search direction">
+        <div
+          class="bridge-direction"
+          role="group"
+          [aria-label]="'settings.importExport.bridge.directionLabel' | transloco"
+        >
           <button
             type="button"
             class="btn btn-outline"
@@ -1024,7 +1142,7 @@
             [attr.aria-pressed]="bridgeSource() === 'mastodon'"
             (click)="setBridgeDirection('mastodon')"
           >
-            Mastodon → Bluesky
+            {{ 'settings.importExport.bridge.mastodonToBluesky' | transloco }}
           </button>
           <button
             type="button"
@@ -1033,7 +1151,7 @@
             [attr.aria-pressed]="bridgeSource() === 'bluesky'"
             (click)="setBridgeDirection('bluesky')"
           >
-            Bluesky → Mastodon
+            {{ 'settings.importExport.bridge.blueskyToMastodon' | transloco }}
           </button>
         </div>
 
@@ -1044,10 +1162,16 @@
             [disabled]="bridge.loading() || bridge.running()"
             (click)="loadBridge()"
           >
-            {{ bridge.loading() ? 'Reading your follows…' : 'Read my follows (free)' }}
+            {{
+              bridge.loading()
+                ? ('settings.importExport.bridge.readingFollows' | transloco)
+                : ('settings.importExport.bridge.readFollows' | transloco)
+            }}
           </button>
           @if (bridge.rows().length) {
-            <button type="button" class="link" (click)="bridge.reset()">clear</button>
+            <button type="button" class="link" (click)="bridge.reset()">
+              {{ 'settings.importExport.clear' | transloco }}
+            </button>
           }
         </div>
 
@@ -1059,21 +1183,31 @@
           <!-- The free pass is the headline: these matches cost no searches at all,
              because the people wrote their other handle in a bio we already had. -->
           <p class="bridge-summary">
-            Read <strong>{{ bridge.rows().length }}</strong> follows over
-            {{ bridge.sourcePageCount() }} page{{ bridge.sourcePageCount() === 1 ? '' : 's' }} and
-            found <strong>{{ bridge.freeMatchCount() }}</strong> from bios alone — no searches
-            spent.
+            <span
+              [innerHTML]="
+                (bridge.sourcePageCount() === 1
+                  ? 'settings.importExport.bridge.summary.one'
+                  : 'settings.importExport.bridge.summary.other'
+                )
+                  | transloco
+                    : {
+                        follows: bridge.rows().length,
+                        pages: bridge.sourcePageCount(),
+                        found: bridge.freeMatchCount(),
+                      }
+              "
+            ></span>
           </p>
 
           @if (bridgePendingCount()) {
             <div class="bridge-scan">
               <p class="muted small">
-                {{ bridgePendingCount() }} didn’t name their other account. Searching for them costs
-                one request each, so it’s opt-in and capped.
+                {{ bridgePendingCount() }}
+                {{ 'settings.importExport.bridge.pendingNote' | transloco }}
               </p>
               <div class="import-actions">
                 <label class="bridge-budget">
-                  Search up to
+                  {{ 'settings.importExport.bridge.searchUpTo' | transloco }}
                   <select
                     [ngModel]="bridgeBudget()"
                     (ngModelChange)="bridgeBudget.set(+$event)"
@@ -1083,9 +1217,12 @@
                     <option [ngValue]="25">25</option>
                     <option [ngValue]="50">50</option>
                     <option [ngValue]="200">200</option>
-                    <option [ngValue]="bridgePendingCount()">all {{ bridgePendingCount() }}</option>
+                    <option [ngValue]="bridgePendingCount()">
+                      {{ 'settings.importExport.bridge.all' | transloco }}
+                      {{ bridgePendingCount() }}
+                    </option>
                   </select>
-                  people
+                  {{ 'settings.importExport.bridge.people' | transloco }}
                 </label>
                 @if (!bridge.running()) {
                   <button
@@ -1093,14 +1230,17 @@
                     class="btn btn-outline"
                     (click)="bridge.scan(bridgeBudget())"
                   >
-                    Search
+                    {{ 'settings.importExport.bridge.search' | transloco }}
                   </button>
                 } @else {
                   <button type="button" class="btn btn-outline" (click)="bridge.stop()">
-                    Stop
+                    {{ 'settings.importExport.stop' | transloco }}
                   </button>
                 }
-                <span class="muted small">{{ bridge.callCount() }} searches used</span>
+                <span class="muted small"
+                  >{{ bridge.callCount() }}
+                  {{ 'settings.importExport.bridge.searchesUsed' | transloco }}</span
+                >
               </div>
             </div>
           }
@@ -1120,7 +1260,9 @@
                     @for (match of row.matches; track match.account.id) {
                       <li class="bridge-match" [class]="'confidence-' + match.confidence">
                         @if (bridge.isFollowing(match.account)) {
-                          <span class="bridge-followed muted small">Already following</span>
+                          <span class="bridge-followed muted small">{{
+                            'settings.importExport.alreadyFollowing' | transloco
+                          }}</span>
                         } @else {
                           <label class="bridge-check">
                             <input
@@ -1128,7 +1270,10 @@
                               [checked]="bridgeSelected().has(match.account.id)"
                               (change)="toggleBridgeMatch(match.account.id)"
                             />
-                            <span class="sr-only">Follow {{ match.account.acct }}</span>
+                            <span class="sr-only"
+                              >{{ 'settings.importExport.follow' | transloco }}
+                              {{ match.account.acct }}</span
+                            >
                           </label>
                         }
                         <a class="bridge-match-name" [routerLink]="['/accounts', match.account.id]">
@@ -1158,14 +1303,15 @@
               >
                 {{
                   bridgeFollowing()
-                    ? 'Following…'
-                    : 'Follow selected (' + bridgeFollowTargets().length + ')'
+                    ? ('settings.importExport.bridge.following' | transloco)
+                    : ('settings.importExport.bridge.followSelected'
+                      | transloco: { count: bridgeFollowTargets().length })
                 }}
               </button>
             </div>
           } @else if (!bridge.loading()) {
             <p class="muted small">
-              No matches yet. Nobody you follow named their other account in their bio.
+              {{ 'settings.importExport.bridge.noMatches' | transloco }}
             </p>
           }
         }
@@ -1177,11 +1323,9 @@
        reader sent from the hub should not have to scroll past four other
        importers to reach the one they were promised. -->
   <section id="contacts" class="friend-section contact-section">
-    <h2>Find contacts on Mastodon</h2>
+    <h2>{{ 'settings.importExport.contacts.title' | transloco }}</h2>
     <p class="muted small">
-      Look for the people in your contacts through your home server. Your contacts stay in this
-      browser; only derived search terms are sent to your server. Nobody is followed automatically.
-      Names, usernames, domains, and profile links are clues—not proof of identity.
+      {{ 'settings.importExport.contacts.intro' | transloco }}
     </p>
     <!--
       Only where it can work. The Contact Picker API is Chrome-on-Android only,
@@ -1191,8 +1335,7 @@
     -->
     @if (canPickContacts) {
       <p class="muted small">
-        On this phone you can pick contacts directly — no export, no file. Your browser shows the
-        picker and this page only ever sees the people you tap.
+        {{ 'settings.importExport.contacts.pickerNote' | transloco }}
       </p>
     }
     <div class="contact-controls">
@@ -1203,11 +1346,11 @@
           (click)="pickPhoneContacts()"
           [disabled]="contactDiscovery.running()"
         >
-          Pick from my contacts…
+          {{ 'settings.importExport.contacts.pick' | transloco }}
         </button>
       }
       <label class="btn btn-outline file-btn">
-        Choose contacts CSV…
+        {{ 'settings.importExport.contacts.chooseCsv' | transloco }}
         <input
           type="file"
           accept=".csv,text/csv"
@@ -1217,7 +1360,7 @@
         />
       </label>
       <label class="call-limit">
-        Stop after
+        {{ 'settings.importExport.stopAfter' | transloco }}
         <input
           type="number"
           min="1"
@@ -1226,7 +1369,7 @@
           (ngModelChange)="setContactCallLimit($event)"
           [disabled]="contactDiscovery.running()"
         />
-        API calls
+        {{ 'settings.importExport.apiCalls' | transloco }}
       </label>
       @if (contactDiscovery.rows().length && !contactDiscovery.running()) {
         <button
@@ -1235,16 +1378,22 @@
           (click)="startContactSearch()"
           [disabled]="contactDiscovery.callCount() >= contactCallLimit()"
         >
-          {{ contactDiscovery.callCount() ? 'Continue searching' : 'Start searching' }}
+          {{
+            contactDiscovery.callCount()
+              ? ('settings.importExport.continueSearching' | transloco)
+              : ('settings.importExport.startSearching' | transloco)
+          }}
         </button>
       }
       @if (contactDiscovery.running()) {
         <button type="button" class="btn btn-outline" (click)="contactDiscovery.stop()">
-          Stop
+          {{ 'settings.importExport.stop' | transloco }}
         </button>
       }
       @if (contactDiscovery.parseResult()) {
-        <button type="button" class="link" (click)="clearContactSearch()">clear</button>
+        <button type="button" class="link" (click)="clearContactSearch()">
+          {{ 'settings.importExport.clear' | transloco }}
+        </button>
       }
     </div>
 
@@ -1254,21 +1403,25 @@
 
     @if (contactDiscovery.parseResult(); as parsed) {
       <div class="contact-summary" aria-live="polite">
-        <strong>{{ parsed.contacts.length }} contacts ready to search</strong>
+        <strong
+          >{{ parsed.contacts.length }}
+          {{ 'settings.importExport.contacts.readyToSearch' | transloco }}</strong
+        >
         <span class="muted small">
-          {{ parsed.skipped }} skipped because they had no full person name or Mastodon handle. Up
-          to {{ parsed.contacts.length * 2 }} calls total; this run stops at
-          {{ contactCallLimit() }}.
+          {{ parsed.skipped }} {{ 'settings.importExport.contacts.skipped.a' | transloco }}
+          {{ parsed.contacts.length * 2 }}
+          {{ 'settings.importExport.contacts.skipped.b' | transloco }} {{ contactCallLimit() }}.
         </span>
         @if (contactFileName(); as name) {
           <span class="muted small"
-            >Loaded <code>{{ name }}</code> only in this browser.</span
+            >{{ 'settings.importExport.loaded' | transloco }} <code>{{ name }}</code>
+            {{ 'settings.importExport.contacts.loadedNote' | transloco }}</span
           >
         } @else {
           <!-- The picked-contacts case. Says where they came from and, more
                importantly, that they are not being kept. -->
           <span class="muted small">
-            Picked from your contacts. Nothing was saved — closing this page forgets them.
+            {{ 'settings.importExport.contacts.pickedNote' | transloco }}
           </span>
         }
       </div>
@@ -1288,7 +1441,8 @@
         ></div>
       </div>
       <p class="muted small">
-        {{ contactDiscovery.callCount() }} / {{ contactCallLimit() }} API calls used
+        {{ contactDiscovery.callCount() }} / {{ contactCallLimit() }}
+        {{ 'settings.importExport.contacts.callsUsed' | transloco }}
       </p>
       <ol class="contact-rows">
         @for (row of contactDiscovery.rows(); track row.contact.id) {
@@ -1319,8 +1473,13 @@
                           <span class="muted"> &#64;{{ match.account.acct }}</span>
                         </a>
                         <span class="confidence" [class]="'confidence-' + match.confidence">
-                          {{ match.confidence }} · {{ match.signals.length }} matching
-                          {{ match.signals.length === 1 ? 'clue' : 'clues' }}
+                          {{ match.confidence }} ·
+                          {{
+                            (match.signals.length === 1
+                              ? 'settings.importExport.contacts.clues.one'
+                              : 'settings.importExport.contacts.clues.other'
+                            ) | transloco: { count: match.signals.length }
+                          }}
                         </span>
                         <span class="muted small">{{ match.signals.join(' · ') }}</span>
                         @if (contactDiscovery.followErrors().get(match.account.id); as failure) {
@@ -1349,11 +1508,11 @@
                         (click)="contactDiscovery.follow(match.account)"
                       >
                         @if (contactDiscovery.followed().has(match.account.id)) {
-                          Following
+                          {{ 'settings.importExport.following' | transloco }}
                         } @else if (contactDiscovery.followBusy().has(match.account.id)) {
-                          Following…
+                          {{ 'settings.importExport.followingBusy' | transloco }}
                         } @else {
-                          Follow
+                          {{ 'settings.importExport.follow' | transloco }}
                         }
                       </button>
                     </li>
@@ -1366,7 +1525,10 @@
       </ol>
       @if (!contactDiscovery.running() && contactMisses().length) {
         <div class="contact-misses">
-          <strong>{{ contactMisses().length }} searched contacts had no candidate match:</strong>
+          <strong
+            >{{ contactMisses().length }}
+            {{ 'settings.importExport.contacts.noCandidate' | transloco }}</strong
+          >
           <span class="muted small">{{ contactMisses().join(', ') }}</span>
         </div>
       }
@@ -1375,28 +1537,28 @@
 
   @if (mockTooling) {
     <div class="ssection">
-      <h2 class="server-tools-title">Mock server data</h2>
+      <h2 class="server-tools-title">{{ 'settings.importExport.mock.title' | transloco }}</h2>
       <div class="srow">
-        <span class="slabel">Follows</span>
+        <span class="slabel">{{ 'settings.importExport.mock.follows' | transloco }}</span>
         <div class="scontrol">
           <button type="button" class="btn btn-outline btn-sm" (click)="download('following')">
-            Download CSV
+            {{ 'settings.importExport.mock.downloadCsv' | transloco }}
           </button>
         </div>
       </div>
       <div class="srow">
-        <span class="slabel">Mutes</span>
+        <span class="slabel">{{ 'settings.importExport.mock.mutes' | transloco }}</span>
         <div class="scontrol">
           <button type="button" class="btn btn-outline btn-sm" (click)="download('mutes')">
-            Download CSV
+            {{ 'settings.importExport.mock.downloadCsv' | transloco }}
           </button>
         </div>
       </div>
       <div class="srow">
-        <span class="slabel">Blocks</span>
+        <span class="slabel">{{ 'settings.importExport.mock.blocks' | transloco }}</span>
         <div class="scontrol">
           <button type="button" class="btn btn-outline btn-sm" (click)="download('blocks')">
-            Download CSV
+            {{ 'settings.importExport.mock.downloadCsv' | transloco }}
           </button>
         </div>
       </div>
@@ -1404,32 +1566,36 @@
 
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Import type</span>
+        <span class="slabel">{{ 'settings.importExport.mock.importType' | transloco }}</span>
         <div class="scontrol">
           <select
             [ngModel]="importKind()"
             (ngModelChange)="importKind.set($event)"
             name="import_kind"
           >
-            <option value="following">Following list</option>
-            <option value="mutes">Muting list</option>
-            <option value="blocks">Blocking list</option>
+            <option value="following">
+              {{ 'settings.importExport.mock.followingList' | transloco }}
+            </option>
+            <option value="mutes">{{ 'settings.importExport.mock.mutingList' | transloco }}</option>
+            <option value="blocks">
+              {{ 'settings.importExport.mock.blockingList' | transloco }}
+            </option>
           </select>
         </div>
       </div>
 
       <div class="srow">
-        <span class="slabel">Data</span>
+        <span class="slabel">{{ 'settings.importExport.mock.data' | transloco }}</span>
         <div class="scontrol">
           <input type="file" accept=".csv" (change)="onServerFile($event)" />
           <textarea
             rows="4"
-            placeholder="…or paste CSV here"
+            [placeholder]="'settings.importExport.mock.pastePlaceholder' | transloco"
             [ngModel]="csvText()"
             (ngModelChange)="csvText.set($event)"
             name="csv_text"
           ></textarea>
-          <span class="hint">One handle per line, e.g. user&#64;example.com.</span>
+          <span class="hint">{{ 'settings.importExport.mock.handleHint' | transloco }}</span>
         </div>
       </div>
 
@@ -1437,13 +1603,17 @@
         <span class="slabel"></span>
         <div class="scontrol">
           <button type="button" class="btn" (click)="upload()" [disabled]="uploading()">
-            {{ uploading() ? 'Uploading…' : 'Upload' }}
+            {{
+              uploading()
+                ? ('settings.importExport.mock.uploading' | transloco)
+                : ('settings.importExport.mock.upload' | transloco)
+            }}
           </button>
           @if (report(); as r) {
             <span class="hint">
-              Imported {{ r.imported }}.
+              {{ 'settings.importExport.mock.imported' | transloco }} {{ r.imported }}.
               @if (r.skipped.length) {
-                Skipped: {{ r.skipped.join(', ') }}
+                {{ 'settings.importExport.mock.skipped' | transloco }} {{ r.skipped.join(', ') }}
               }
             </span>
           }

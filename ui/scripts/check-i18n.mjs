@@ -51,7 +51,37 @@ const CONTEXT_PATH = join(ROOT, 'i18n-context', 'en.context.json');
  * Grows one sprint at a time. See the header for why this is an allowlist today
  * and becomes a denylist in ui-i18n-5.
  */
-const MIGRATED = ['shell/app-footer', 'locale-picker', 'pages/settings/anonymous', 'pages/settings/development', 'pages/settings/follows', 'pages/settings/appearance', 'pages/settings/invites', 'pages/settings/accounts', 'pages/settings/notifications', 'pages/settings/deletion', 'pages/settings/spotlight', 'pages/settings/account', 'pages/settings/storage', 'pages/settings/profile', 'pages/settings/server', 'pages/settings/privacy', 'pages/settings/content', 'pages/settings/filters', 'pages/settings/account-list', 'pages/settings/feature-flags', 'pages/settings/bulk-actions', 'bulk-actions-dialog', 'bulk-progress', 'pages/settings/rss', 'pages/settings/config', 'pages/settings/i18n', 'pages/settings/writing', 'pages/settings/blue'];
+const MIGRATED = [
+  'shell/app-footer',
+  'locale-picker',
+  'pages/settings/anonymous',
+  'pages/settings/development',
+  'pages/settings/follows',
+  'pages/settings/appearance',
+  'pages/settings/invites',
+  'pages/settings/accounts',
+  'pages/settings/notifications',
+  'pages/settings/deletion',
+  'pages/settings/spotlight',
+  'pages/settings/account',
+  'pages/settings/storage',
+  'pages/settings/profile',
+  'pages/settings/server',
+  'pages/settings/privacy',
+  'pages/settings/content',
+  'pages/settings/filters',
+  'pages/settings/account-list',
+  'pages/settings/feature-flags',
+  'pages/settings/bulk-actions',
+  'bulk-actions-dialog',
+  'bulk-progress',
+  'pages/settings/rss',
+  'pages/settings/config',
+  'pages/settings/i18n',
+  'pages/settings/writing',
+  'pages/settings/blue',
+  'pages/settings/import-export',
+];
 
 /**
  * Lines exempted from the hardcoded-text rule.
@@ -75,6 +105,16 @@ const ALLOWED = [
     file: 'pages/settings/account-list/settings-account-list.html',
     contains: '<code>&#64;someone&#64;example.social</code>',
     why: 'A literal handle shown as a code sample; it is syntax, not prose.',
+  },
+  {
+    file: 'pages/settings/import-export/settings-import-export.html',
+    contains: 'placeholder="@Gargron@mastodon.social',
+    why: 'Example handles and URLs showing the accepted input format, not prose.',
+  },
+  {
+    file: 'pages/settings/import-export/settings-import-export.html',
+    contains: 'placeholder="#photography',
+    why: 'Example hashtags showing the accepted input format, not prose.',
   },
 ];
 

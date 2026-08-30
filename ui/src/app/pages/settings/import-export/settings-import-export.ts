@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
@@ -64,9 +65,201 @@ function saveCsv(csv: string, filename: string): void {
 }
 
 /** Client-side friend import/export, plus mock-server graph tools in mock builds. */
+// i18n settings.importExport.account.approvalBadge: 🔒 approval required
+// i18n settings.importExport.account.approvalTitle: Requires follow approval
+// i18n settings.importExport.account.bot: BOT
+// i18n settings.importExport.account.followers: followers
+// i18n settings.importExport.account.following: following
+// i18n settings.importExport.account.lastActive: last active
+// i18n settings.importExport.account.neverPosted: never posted
+// i18n settings.importExport.account.posts: posts
+// i18n settings.importExport.alreadyFollowing: Already following
+// i18n settings.importExport.anon.a: You're not signed in, so anyone you follow here is saved
+// i18n settings.importExport.anon.b: . They won't appear on another device, and they'll be lost if you clear your browser data.
+// i18n settings.importExport.anon.c: if you want your follows kept on a server account.
+// i18n settings.importExport.anon.here: in this browser
+// i18n settings.importExport.anon.signIn: Sign in
+// i18n settings.importExport.apiCalls: API calls
+// i18n settings.importExport.bridge.all: all
+// i18n settings.importExport.bridge.anon.a: Reading a server anonymously can show you public posts, but it cannot tell us who
+// i18n settings.importExport.bridge.anon.b: follow — so both sides need real credentials.
+// i18n settings.importExport.bridge.anon.you: you
+// i18n settings.importExport.bridge.bluesky: Bluesky —
+// i18n settings.importExport.bridge.blueskyToMastodon: Bluesky → Mastodon
+// i18n settings.importExport.bridge.connectBluesky: connect Bluesky
+// i18n settings.importExport.bridge.connected: connected
+// i18n settings.importExport.bridge.directionLabel: Search direction
+// i18n settings.importExport.bridge.followSelected: Follow selected ({{count}})
+// i18n settings.importExport.bridge.intro: You keep two follow lists that were built at different times. This finds the overlap: who you already follow on one network, and can now follow on the other.
+// i18n settings.importExport.bridge.mastodon: Mastodon —
+// i18n settings.importExport.bridge.mastodonToBluesky: Mastodon → Bluesky
+// i18n settings.importExport.bridge.needsBoth: This needs both accounts connected.
+// i18n settings.importExport.bridge.noMatches: No matches yet. Nobody you follow named their other account in their bio.
+// i18n settings.importExport.bridge.pendingNote: didn’t name their other account. Searching for them costs one request each, so it’s opt-in and capped.
+// i18n settings.importExport.bridge.people: people
+// i18n settings.importExport.bridge.readFollows: Read my follows (free)
+// i18n settings.importExport.bridge.readingFollows: Reading your follows…
+// i18n settings.importExport.bridge.search: Search
+// i18n settings.importExport.bridge.searchUpTo: Search up to
+// i18n settings.importExport.bridge.searchesUsed: searches used
+// i18n settings.importExport.bridge.signInMastodon: sign in to a Mastodon account
+// i18n settings.importExport.bridge.summary.one: Read <strong>{{follows}}</strong> follows over {{pages}} page and found <strong>{{found}}</strong> from bios alone — no searches spent.
+// i18n settings.importExport.bridge.summary.other: Read <strong>{{follows}}</strong> follows over {{pages}} pages and found <strong>{{found}}</strong> from bios alone — no searches spent.
+// i18n settings.importExport.bridge.title: Find the same people on your other network
+// i18n settings.importExport.checking: Checking…
+// i18n settings.importExport.clear: clear
+// i18n settings.importExport.contacts.callsUsed: API calls used
+// i18n settings.importExport.contacts.chooseCsv: Choose contacts CSV…
+// i18n settings.importExport.contacts.clues.one: {{count}} matching clue
+// i18n settings.importExport.contacts.clues.other: {{count}} matching clues
+// i18n settings.importExport.contacts.intro: Look for the people in your contacts through your home server. Your contacts stay in this browser; only derived search terms are sent to your server. Nobody is followed automatically. Names, usernames, domains, and profile links are clues—not proof of identity.
+// i18n settings.importExport.contacts.loadedNote: only in this browser.
+// i18n settings.importExport.contacts.noCandidate: searched contacts had no candidate match:
+// i18n settings.importExport.contacts.pick: Pick from my contacts…
+// i18n settings.importExport.contacts.pickedNote: Picked from your contacts. Nothing was saved — closing this page forgets them.
+// i18n settings.importExport.contacts.pickerNote: On this phone you can pick contacts directly — no export, no file. Your browser shows the picker and this page only ever sees the people you tap.
+// i18n settings.importExport.contacts.readyToSearch: contacts ready to search
+// i18n settings.importExport.contacts.skipped.a: skipped because they had no full person name or Mastodon handle. Up to
+// i18n settings.importExport.contacts.skipped.b: calls total; this run stops at
+// i18n settings.importExport.contacts.title: Find contacts on Mastodon
+// i18n settings.importExport.continueSearching: Continue searching
+// i18n settings.importExport.findMastodonAccounts: Find Mastodon accounts
+// i18n settings.importExport.follow: Follow
+// i18n settings.importExport.followAllOpen: Follow all (
+// i18n settings.importExport.following: Following
+// i18n settings.importExport.followingBusy: Following…
+// i18n settings.importExport.friends.exportAll: Export all friends
+// i18n settings.importExport.friends.exportBody.a: Fetch every account you follow and download a Mastodon-compatible
+// i18n settings.importExport.friends.exportBody.b: that can be imported above or by another Mastodon server.
+// i18n settings.importExport.friends.exportTitle: Export Friends
+// i18n settings.importExport.friends.exporting: Exporting {{count}}…
+// i18n settings.importExport.friends.importTitle: Import Friends
+// i18n settings.importExport.friends.paste.a: Paste
+// i18n settings.importExport.friends.paste.b: handles or profile URLs, one per line, or upload a Mastodon
+// i18n settings.importExport.friends.paste.c: . Each account is looked up and followed one at a time.
+// i18n settings.importExport.friends.uploadCsv: Upload CSV…
+// i18n settings.importExport.github.callsUsed: {{used}} / {{limit}} username-search calls used.
+// i18n settings.importExport.github.checked.a: Checked
+// i18n settings.importExport.github.checked.b: starred repositories and
+// i18n settings.importExport.github.checked.c: unique owners; contributors were not loaded.
+// i18n settings.importExport.github.checkingStarred: Checking starred repo owners…
+// i18n settings.importExport.github.follows.body: The shorter, higher-confidence list. Direct profile links are matched first; remaining profiles can be searched once by GitHub username.
+// i18n settings.importExport.github.follows.title: People you follow on GitHub
+// i18n settings.importExport.github.friends.one: {{count}} GitHub friend
+// i18n settings.importExport.github.friends.other: {{count}} GitHub friends
+// i18n settings.importExport.github.intro: Use either or both GitHub sources. Exact handles are resolved through your Mastodon server so results open inside Mockingbird and show your follow status.
+// i18n settings.importExport.github.linkedSummary: {{count}} matched directly from GitHub profile links. Loaded in
+// i18n settings.importExport.github.loadingFollows: Loading GitHub follows…
+// i18n settings.importExport.github.mastodonMatches.one: {{count}} Mastodon match
+// i18n settings.importExport.github.mastodonMatches.other: {{count}} Mastodon matches
+// i18n settings.importExport.github.matchViaFriends: Get matches via GitHub friends
+// i18n settings.importExport.github.matchViaStars: Get matches via GitHub stars
+// i18n settings.importExport.github.reloadFollows: Reload GitHub follows
+// i18n settings.importExport.github.requests.one: {{count}} GitHub GraphQL request
+// i18n settings.importExport.github.requests.other: {{count}} GitHub GraphQL requests
+// i18n settings.importExport.github.resolved.one: and resolved {{count}} exact linked profile through your server.
+// i18n settings.importExport.github.resolved.other: and resolved {{count}} exact linked profiles through your server.
+// i18n settings.importExport.github.starred.body: The longer, lower-confidence list. Checks each unique repository owner for a direct Mastodon profile link. Contributors and stargazers are never loaded.
+// i18n settings.importExport.github.starred.title: Owners of repositories you starred
+// i18n settings.importExport.github.starredMatches.one: {{count}} starred-owner match
+// i18n settings.importExport.github.starredMatches.other: {{count}} starred-owner matches
+// i18n settings.importExport.github.starsChecked: GitHub stars checked
+// i18n settings.importExport.github.title: Find GitHub friends on Mastodon
+// i18n settings.importExport.github.youStarred: You starred:
+// i18n settings.importExport.hideAlreadyFollowed: Hide already followed
+// i18n settings.importExport.intro: Move your friends and followed hashtags between accounts with portable CSV files, and find the people you already follow on your other network.
+// i18n settings.importExport.invite.body: Prewritten posts for Twitter and Bluesky that ask your friends to come over — or just to visit with no account at all.
+// i18n settings.importExport.invite.title: Can’t find someone? Invite them.
+// i18n settings.importExport.legend.currentlyFollowed: currently followed
+// i18n settings.importExport.legend.replies: replies
+// i18n settings.importExport.loaded: Loaded
+// i18n settings.importExport.mastodonApiCalls: Mastodon API calls
+// i18n settings.importExport.mock.blockingList: Blocking list
+// i18n settings.importExport.mock.blocks: Blocks
+// i18n settings.importExport.mock.data: Data
+// i18n settings.importExport.mock.downloadCsv: Download CSV
+// i18n settings.importExport.mock.followingList: Following list
+// i18n settings.importExport.mock.follows: Follows
+// i18n settings.importExport.mock.handleHint: One handle per line, e.g. user&#64;example.com.
+// i18n settings.importExport.mock.importType: Import type
+// i18n settings.importExport.mock.imported: Imported
+// i18n settings.importExport.mock.mutes: Mutes
+// i18n settings.importExport.mock.mutingList: Muting list
+// i18n settings.importExport.mock.pastePlaceholder: …or paste CSV here
+// i18n settings.importExport.mock.skipped: Skipped:
+// i18n settings.importExport.mock.title: Mock server data
+// i18n settings.importExport.mock.upload: Upload
+// i18n settings.importExport.mock.uploading: Uploading…
+// i18n settings.importExport.more: more
+// i18n settings.importExport.of: of
+// i18n settings.importExport.preview: Preview
+// i18n settings.importExport.progress.followed: followed
+// i18n settings.importExport.progress.processed: processed ·
+// i18n settings.importExport.reading: Reading…
+// i18n settings.importExport.requested: Requested
+// i18n settings.importExport.selectAll: select all
+// i18n settings.importExport.selectNone: select none
+// i18n settings.importExport.showAlreadyFollowed: Show already followed
+// i18n settings.importExport.startSearching: Start searching
+// i18n settings.importExport.stop: Stop
+// i18n settings.importExport.stopAfter: Stop after
+// i18n settings.importExport.suggest.fromArchive: From a Twitter archive…
+// i18n settings.importExport.suggest.fromBluesky: From my Bluesky posts
+// i18n settings.importExport.suggest.fromFavourites: From posts I've favourited
+// i18n settings.importExport.suggest.posts.one: {{count}} post
+// i18n settings.importExport.suggest.posts.other: {{count}} posts
+// i18n settings.importExport.suggest.reads.a: Reads about
+// i18n settings.importExport.suggest.reads.b: of your posts or favourites and counts the hashtags in them. Nothing is followed until you send the results to the box above.
+// i18n settings.importExport.suggest.send.a: Send
+// i18n settings.importExport.suggest.send.b: to the box above
+// i18n settings.importExport.suggest.summary.one: {{tags}} hashtag found across {{posts}} posts. The most-used are ticked.
+// i18n settings.importExport.suggest.summary.other: {{tags}} hashtags found across {{posts}} posts. The most-used are ticked.
+// i18n settings.importExport.suggest.title: Suggest hashtags from what you already read
+// i18n settings.importExport.tags.exportAll: Export all hashtags
+// i18n settings.importExport.tags.exportBody.a: Download the hashtags you follow as a
+// i18n settings.importExport.tags.exportBody.b: you can import above on another account. Mastodon's own account archive leaves followed tags out, so this file is the only way to carry them across.
+// i18n settings.importExport.tags.exportTitle: Export hashtags
+// i18n settings.importExport.tags.exporting: Exporting {{count}}…
+// i18n settings.importExport.tags.textareaLabel: Hashtags to follow
+// i18n settings.importExport.title: Import/Export Friends & Tags
+// i18n settings.importExport.twitter.candidates.one: {{count}} Mastodon candidate
+// i18n settings.importExport.twitter.candidates.other: {{count}} Mastodon candidates
+// i18n settings.importExport.twitter.candidatesShown: Mastodon candidates shown
+// i18n settings.importExport.twitter.chooseArchive: Choose unzipped archive…
+// i18n settings.importExport.twitter.chooseFiles: Choose data files…
+// i18n settings.importExport.twitter.currentlyFollowed: currently followed ·
+// i18n settings.importExport.twitter.downloadCsv: Download contacts CSV
+// i18n settings.importExport.twitter.folder: folder.
+// i18n settings.importExport.twitter.handleRecovered: of those have a handle recovered from your tweets
+// i18n settings.importExport.twitter.hide.bots: Bots or mirrors
+// i18n settings.importExport.twitter.hide.inactive: Inactive (&lt;10 combined posts, following, and followers)
+// i18n settings.importExport.twitter.hide.incomplete: Missing a bio or avatar
+// i18n settings.importExport.twitter.hide.stale: No posts, or last activity over a year ago (when known)
+// i18n settings.importExport.twitter.hideTitle: Hide candidates that are…
+// i18n settings.importExport.twitter.inviteLink: invite them from Twitter
+// i18n settings.importExport.twitter.mentions: mentions
+// i18n settings.importExport.twitter.missing.a: No
+// i18n settings.importExport.twitter.missing.following: was selected, so this export contains interactions only.
+// i18n settings.importExport.twitter.missing.tweets: was selected. Add it to recover reply/mention history and handles for some followed IDs.
+// i18n settings.importExport.twitter.notJoined: The ones you don’t find here haven’t joined yet —
+// i18n settings.importExport.twitter.read: Read
+// i18n settings.importExport.twitter.readNote: . The CSV keeps numeric Twitter IDs even when Twitter omitted the handle.
+// i18n settings.importExport.twitter.readingLocally: Reading the archive locally…
+// i18n settings.importExport.twitter.readyToExport: unique Twitter accounts ready to export
+// i18n settings.importExport.twitter.readyToSearch: Twitter handles ready to search ·
+// i18n settings.importExport.twitter.repliedTo: people replied to in
+// i18n settings.importExport.twitter.replies: replies ·
+// i18n settings.importExport.twitter.searchNote: username-search calls used. Same-handle accounts are likely matches, not confirmed identities; a matching display name or profile link back to Twitter is shown as extra evidence.
+// i18n settings.importExport.twitter.seenIn: people seen in
+
+// i18n settings.importExport.bridge.following: Following…
+// i18n settings.importExport.tags.importTitle: Import hashtags
+// i18n settings.importExport.tags.seeAll: See every hashtag you follow →
+// i18n settings.importExport.twitter.title: Extract contacts from Twitter/Twitter
+
 @Component({
   selector: 'app-settings-import-export',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TranslocoPipe],
   templateUrl: './settings-import-export.html',
   styleUrl: './settings-import-export.css',
 })
