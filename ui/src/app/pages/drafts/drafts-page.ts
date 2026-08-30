@@ -49,6 +49,20 @@ interface PendingPark {
 }
 
 /**
+ * An in-flight "unpark": a parked post on its way back to being an editable
+ * local draft.
+ *
+ * Unlike every other conversion on this page, this one *does* remove the
+ * original — that is the whole point, and why it asks first. A parked post is a
+ * draft the server is holding; bringing it back to the browser has to cancel
+ * the server's copy or the same writing exists twice, one of which publishes
+ * itself on a date the user has stopped thinking about.
+ */
+interface PendingUnpark {
+  item: DraftItem;
+}
+
+/**
  * Where the park dialog starts: far enough out that {@link isParkedSchedule}
  * files it under drafts rather than pending posts. Editable in the dialog — and
  * if the server refuses a date this far away, that surfaces as an ordinary
@@ -136,6 +150,7 @@ export class DraftsPage implements OnInit {
   protected pendingCancel = signal<ScheduledStatus | null>(null);
   protected pendingPaste = signal<PendingPaste | null>(null);
   protected pendingPark = signal<PendingPark | null>(null);
+  protected pendingUnpark = signal<PendingUnpark | null>(null);
   /** Set when a removal fails server-side; the row stays put. */
   protected removeError = signal<string | null>(null);
   /** Set when a conversion fails. The source is always still there. */
@@ -251,6 +266,58 @@ export class DraftsPage implements OnInit {
   protected askConvertToSchedule(item: DraftItem): void {
     this.actionError.set(null);
     this.pendingPark.set({ item, at: defaultParkDate() });
+  }
+
+  /** Ask before bringing a parked post back as an editable local draft. */
+  protected askUnpark(item: DraftItem): void {
+    this.actionError.set(null);
+    this.pendingUnpark.set({ item });
+  }
+
+  protected cancelUnpark(): void {
+    this.pendingUnpark.set(null);
+  }
+
+  /**
+   * Bring a parked post back to the browser as an ordinary draft.
+   *
+   * Save first, cancel second, and only forget the row once the server has
+   * agreed. Ordered that way on purpose: if the cancel fails the user still has
+   * their writing as a local draft and sees an error, which is recoverable. The
+   * other order risks cancelling the server's copy and then failing to save,
+   * which loses the post outright.
+   *
+   * The duplicate that exists between those two steps is deliberate and the
+   * safe side of the trade.
+   */
+  protected confirmUnpark(): void {
+    const pending = this.pendingUnpark();
+    if (!pending) {
+      return;
+    }
+    const { item } = pending;
+    this.busy.set(true);
+    this.actionError.set(null);
+    const draftId = this.drafts.save(toSnapshot(item.source, this.prefs.defaultVisibility()));
+    this.api.cancelScheduledStatus(item.id).subscribe({
+      next: () => {
+        this.sources.forgetScheduled(item.id);
+        this.busy.set(false);
+        this.pendingUnpark.set(null);
+        this.flash('Unparked. It is a local draft now, and the server will not publish it.');
+      },
+      error: () => {
+        this.busy.set(false);
+        this.pendingUnpark.set(null);
+        // The draft is already saved, so say so rather than implying the
+        // writing was lost along with the failed cancellation.
+        this.actionError.set(
+          'Saved as a local draft, but the parked post could not be cancelled on the server — ' +
+            'it is still scheduled. Try removing it from the list below.',
+        );
+        void draftId;
+      },
+    });
   }
 
   /** How to refer to a kind in dialog copy ("your private note stays where it is"). */

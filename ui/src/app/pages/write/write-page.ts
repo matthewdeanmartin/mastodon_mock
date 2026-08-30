@@ -137,7 +137,7 @@ interface PendingSwitch {
     ProxyConsentDialog,
   ],
   templateUrl: './write-page.html',
-  styleUrl: './write-page.css',
+  styleUrls: ['./write-workspace.css', './write-editor.css', './write-overlays.css'],
   providers: [VisibilityState, LinkShortening],
 })
 export class WritePage implements OnInit, OnDestroy {
