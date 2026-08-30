@@ -1,22 +1,20 @@
 <div class="spage-head">
-  <h1>Bulk moderation</h1>
+  <h1>{{ 'settings.bulk.title' | transloco }}</h1>
   <p>
-    Changes applied to everyone at once. Mastodon has no bulk API for any of these, so each one is
-    applied account by account — a big list takes a while, and the server may pause us along the
-    way. You can leave this page while a job runs; it keeps going.
+    {{ 'settings.bulk.intro' | transloco }}
   </p>
 </div>
 
 <div class="bulk-body">
   <app-bulk-progress />
 
-  <h2 class="group-head">Everyone you follow, mute or block</h2>
+  <h2 class="group-head">{{ 'settings.bulk.groupAccounts' | transloco }}</h2>
   <div class="bulk-cards">
     @for (action of accountActions; track action.id) {
       <div class="bulk-card" [class.danger]="action.danger">
         <div class="bulk-card-text">
-          <h3>{{ action.label }}</h3>
-          <p class="muted small">{{ action.blurb }}</p>
+          <h3>{{ action.labelKey | transloco }}</h3>
+          <p class="muted small">{{ action.blurbKey | transloco }}</p>
         </div>
         <button
           class="btn btn-outline btn-sm"
@@ -35,18 +33,18 @@
     }
   </div>
 
-  <h2 class="group-head">One of your lists</h2>
+  <h2 class="group-head">{{ 'settings.bulk.groupLists' | transloco }}</h2>
   @if (listsLoading()) {
-    <p class="muted small">Loading your lists…</p>
+    <p class="muted small">{{ 'settings.bulk.loadingLists' | transloco }}</p>
   } @else if (!lists().length) {
     <p class="muted small">
-      You have no lists yet. Make one from the Feeds menu and these actions will apply to it.
+      {{ 'settings.bulk.noLists' | transloco }}
     </p>
   } @else {
     <!-- One picker for both list actions: repeating it per card would imply
          they could run against different lists at the same time. -->
     <div class="list-picker">
-      <label for="bulk-list">Apply to list</label>
+      <label for="bulk-list">{{ 'settings.bulk.applyToList' | transloco }}</label>
       <select
         id="bulk-list"
         [value]="selectedListId()"
@@ -63,8 +61,8 @@
       @for (action of listActions; track action.id) {
         <div class="bulk-card" [class.danger]="action.danger">
           <div class="bulk-card-text">
-            <h3>{{ action.label }}</h3>
-            <p class="muted small">{{ action.blurb }}</p>
+            <h3>{{ action.labelKey | transloco }}</h3>
+            <p class="muted small">{{ action.blurbKey | transloco }}</p>
           </div>
           <button
             class="btn btn-outline btn-sm"
@@ -74,9 +72,9 @@
             (click)="ask(action.id)"
           >
             @if (running() && activeAction() === action.id) {
-              Running…
+              {{ 'common.running' | transloco }}
             } @else {
-              Review…
+              {{ 'settings.bulk.review' | transloco }}
             }
           </button>
         </div>
@@ -85,8 +83,7 @@
   }
 
   <p class="muted small footnote">
-    Every one of these asks for confirmation first, and tells you exactly how many accounts it would
-    touch before you agree to it.
+    {{ 'settings.bulk.footnote' | transloco }}
   </p>
 </div>
 

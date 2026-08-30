@@ -51,7 +51,7 @@ const CONTEXT_PATH = join(ROOT, 'i18n-context', 'en.context.json');
  * Grows one sprint at a time. See the header for why this is an allowlist today
  * and becomes a denylist in ui-i18n-5.
  */
-const MIGRATED = ['shell/app-footer', 'locale-picker', 'pages/settings/anonymous', 'pages/settings/development', 'pages/settings/follows', 'pages/settings/appearance', 'pages/settings/invites', 'pages/settings/accounts', 'pages/settings/notifications', 'pages/settings/deletion', 'pages/settings/spotlight', 'pages/settings/account', 'pages/settings/storage', 'pages/settings/profile', 'pages/settings/server', 'pages/settings/privacy', 'pages/settings/content', 'pages/settings/filters', 'pages/settings/account-list'];
+const MIGRATED = ['shell/app-footer', 'locale-picker', 'pages/settings/anonymous', 'pages/settings/development', 'pages/settings/follows', 'pages/settings/appearance', 'pages/settings/invites', 'pages/settings/accounts', 'pages/settings/notifications', 'pages/settings/deletion', 'pages/settings/spotlight', 'pages/settings/account', 'pages/settings/storage', 'pages/settings/profile', 'pages/settings/server', 'pages/settings/privacy', 'pages/settings/content', 'pages/settings/filters', 'pages/settings/account-list', 'pages/settings/feature-flags', 'pages/settings/bulk-actions', 'bulk-actions-dialog', 'bulk-progress', 'pages/settings/rss', 'pages/settings/config', 'pages/settings/i18n', 'pages/settings/writing', 'pages/settings/blue'];
 
 /**
  * Lines exempted from the hardcoded-text rule.
@@ -169,6 +169,12 @@ function hardcoded(line, isTemplate) {
   if (attrMatch && /[A-Za-z]{3,}/.test(attrMatch[1])) {
     return attrMatch[1].trim();
   }
+  // Text inside <code> is a sample, not prose: hashtag literals (`#TODO`),
+  // storage keys, handles, URLs. Translating any of them would break the thing
+  // being demonstrated.
+  if (/<code>/.test(line)) {
+    return null;
+  }
   // A text node between tags: `>Some words<`, with no binding or control flow.
   //
   // Only meaningful in markup. In TypeScript the same shape is just comparison
@@ -200,6 +206,35 @@ try {
   }
 }
 
+/**
+ * Line indices inside an `@if (terminologyAvailable())` block.
+ *
+ * Brace-counted rather than matched: the block contains nested control flow, so
+ * stopping at the first `}` would leave most of it unguarded.
+ */
+function guardedLines(text) {
+  const lines = text.split('\n');
+  const inside = new Set();
+  let depth = 0;
+  let open = false;
+  lines.forEach((line, index) => {
+    if (!open && line.includes('@if (terminologyAvailable())')) {
+      open = true;
+      depth = 0;
+    }
+    if (!open) {
+      return;
+    }
+    inside.add(index);
+    depth += (line.match(/\{/g) ?? []).length;
+    depth -= (line.match(/\}/g) ?? []).length;
+    if (depth <= 0 && line.includes('}')) {
+      open = false;
+    }
+  });
+  return inside;
+}
+
 const problems = [];
 const usedKeys = new Set();
 
@@ -211,7 +246,16 @@ for (const file of sources(APP_DIR)) {
   if (!isMigrated(file)) {
     continue;
   }
+  // Blocks guarded by `@if (terminologyAvailable())` render only under English
+  // by decree (sprint/ui-i18n-0-overview.md): the post/tweet/florp vocabulary is
+  // an English-only feature, so its picker is hidden rather than translated.
+  // Requiring keys there would mean translating options that exist to be English
+  // jokes, for readers who are never shown them.
+  const guarded = guardedLines(text);
   text.split('\n').forEach((line, index) => {
+    if (guarded.has(index)) {
+      return;
+    }
     const offender = hardcoded(line, file.endsWith('.html'));
     if (!offender) {
       return;
@@ -320,17 +364,26 @@ if (problems.length > 0) {
 
 // ---- Rule 3: coverage and advisories, reported and never fatal ----
 
-const total = Object.keys(en).length;
+// Keys marked `"translate": false` in the context file are never offered for
+// translation (see scripts/i18n-todo.mjs), so counting them against coverage
+// would permanently cap every locale below 100% for work nobody should do.
+const doNotTranslate = new Set(
+  Object.entries(context)
+    .filter(([, note]) => note && note.translate === false)
+    .map(([key]) => key),
+);
+const translatable = Object.keys(en).filter((key) => !doNotTranslate.has(key));
+const total = translatable.length;
 
 console.log(
-  `i18n OK — ${total} keys, ${MIGRATED.length} migrated ` +
+  `i18n OK — ${Object.keys(en).length} keys, ${MIGRATED.length} migrated ` +
     `director${MIGRATED.length === 1 ? 'y' : 'ies'}.`,
 );
 
 if (localeCodes.length > 0) {
   const coverage = localeCodes.map((code) => {
     const dict = loadLocale(code) ?? {};
-    const done = Object.keys(en).filter((key) => key in dict).length;
+    const done = translatable.filter((key) => key in dict).length;
     return `${code} ${Math.round((done / total) * 100)}%`;
   });
   // Never fatal: an incomplete locale falls back to English key by key, which is

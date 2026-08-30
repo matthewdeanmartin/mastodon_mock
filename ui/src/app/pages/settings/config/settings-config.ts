@@ -16,10 +16,85 @@ import {
   parsePortableConfig,
   PortableConfig,
 } from '../../../portable-config';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.config.title: Import/Export Config
+// i18n settings.config.intro: Move browser settings between devices or keep them synced from a URL.
+// i18n settings.config.sync: Mawkingbird Plus sync
+// i18n settings.config.sync.offer: Keep these settings on your Mawkingbird account so they follow you to your other browsers.
+// i18n settings.config.sync.thisBrowser: this browser's
+// i18n settings.config.sync.offer.hint.before: Turning this on uploads
+// i18n settings.config.sync.offer.hint.after: settings and makes them your profile. Your other browsers will take these settings the next time you use them, so it's worth a look first if this isn't the browser you set up on.
+// i18n settings.config.sync.turnOn: Turn on sync
+// i18n settings.config.sync.showUpload: Show what would be uploaded
+// i18n settings.config.sync.noThanks: No thanks
+// i18n settings.config.sync.wouldSave: This browser would save:
+// i18n settings.config.sync.remoteExists: Your account has settings synced from another browser.
+// i18n settings.config.sync.useRemote: Use them on this browser
+// i18n settings.config.sync.notHere: Not on this browser
+// i18n settings.config.sync.turningOn: Turning on…
+// i18n settings.config.sync.resume: Turn sync back on
+// i18n settings.config.sync.resume.hint: Your account's settings are taken first, so this browser matches your others. If this browser has changes your account doesn't, you'll be asked which to keep.
+// i18n settings.config.sync.syncing: Syncing…
+// i18n settings.config.sync.syncNow: Sync now
+// i18n settings.config.sync.stop: Stop syncing
+// i18n settings.config.sync.stop.hint: Stopping keeps everything as it is — nothing is deleted, and you can turn it back on.
+// i18n settings.config.sync.offNever: Not syncing on this browser.
+// i18n settings.config.sync.offSince: Not syncing on this browser — last saved {{when}}.
+// i18n settings.config.sync.onNothing: Syncing — nothing saved yet.
+// i18n settings.config.sync.onSince: Syncing — last saved {{when}}.
+// i18n settings.config.conflict.aria: Settings conflict
+// i18n settings.config.conflict: Your settings changed on another device, and this browser also has unsaved changes.
+// i18n settings.config.conflict.differ: These preferences differ:
+// i18n settings.config.conflict.useOther: Use the other device's
+// i18n settings.config.conflict.keepLocal: Keep this browser's
+// i18n settings.config.conflict.later: Decide later
+// i18n settings.config.change.add: Added
+// i18n settings.config.change.change: Changed
+// i18n settings.config.change.remove: Removed
+// i18n settings.config.readOnly: Settings are no longer being saved to your account, because storing them there is part of Mawkingbird Plus. Everything already stored stays readable and can be exported at any time.
+// i18n settings.config.savedFrom: Saved from this browser:
+// i18n settings.config.export: Export
+// i18n settings.config.includePrivate: Include potentially private settings
+// i18n settings.config.includePrivate.hint: Adds your home server, custom CORS proxy address, and branded link-shortener setup. Never includes credentials, account-scoped settings, follows, blocks or mutes, RSS or paste feeds, lists, bookmarks, saved searches, local moderation, activity history, drafts, or authored content.
+// i18n settings.config.previewJson: Preview JSON
+// i18n settings.config.downloadJson: Download JSON
+// i18n settings.config.copyJson: Copy JSON
+// i18n settings.config.previewPublish: Preview Pastepile publish
+// i18n settings.config.ok: ✓ {{message}}
+// i18n settings.config.export.hint: Every export is checked at runtime against the storage registry and the credentials currently stored in this browser. Pastepile publishing is anonymous and deliberately omits your Pastepile API key so its permanent-paste option remains available.
+// i18n settings.config.openPublished: Open published config
+// i18n settings.config.managePastes: Manage in My Pastes
+// i18n settings.config.publishPreview: Publish preview
+// i18n settings.config.exportPreview: Export preview
+// i18n settings.config.closeLower: close
+// i18n settings.config.jsonPreview.aria: Export JSON preview
+// i18n settings.config.publish.hint: This creates a permanent, unlisted Pastepile. Its edit password will be kept only in this browser and the paste will appear under My Pastes for later editing or deletion.
+// i18n settings.config.publishing: Publishing…
+// i18n settings.config.publishNow: Publish this preview
+// i18n settings.config.importFile: Import file
+// i18n settings.config.pastePlaceholder: …or paste Mockingbird config JSON here
+// i18n settings.config.previewPasted: Preview pasted config
+// i18n settings.config.remoteUrl: Remote URL
+// i18n settings.config.remoteUrlPlaceholder: https://example.com/mockingbird-config.json
+// i18n settings.config.checking: Checking…
+// i18n settings.config.checkNow: Check now
+// i18n settings.config.freq.manual: On demand only
+// i18n settings.config.freq.daily: Daily
+// i18n settings.config.freq.weekly: Weekly
+// i18n settings.config.saveSource: Save source
+// i18n settings.config.removeSource: remove
+// i18n settings.config.remote.hint: Automatic checks compare the remote file's SHA-256 hash and ignore local UI changes. A changed remote file prompts before import. Every remote response is immediately fetched again; a source that cannot return the same hash twice is limited to on-demand checks.
+// i18n settings.config.importPreview: Import preview
+// i18n settings.config.schemaLine: Schema {{schema}} · {{privacy}} profile · exported {{exported}}
+// i18n settings.config.privacy.private: potentially private
+// i18n settings.config.privacy.standard: standard
+// i18n settings.config.noChanges: No settings would change.
+// i18n settings.config.importReload: Import and reload
 @Component({
   selector: 'app-settings-config',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TranslocoPipe],
   templateUrl: './settings-config.html',
   styleUrl: './settings-config.css',
 })
@@ -102,6 +177,8 @@ export class SettingsConfig {
    * Deliberately says *when*, not just *whether*. "On" with no timestamp is the
    * shape of a feature that silently stopped working three weeks ago.
    */
+  private transloco = inject(TranslocoService);
+
   protected syncSummaryLine(): string {
     const record = this.profile.record();
     if (record.state !== 'on') {
@@ -109,30 +186,34 @@ export class SettingsConfig {
       // alone reads as a dead end, which is how this looked when the state had
       // no way out.
       return record.lastSyncedAt === undefined
-        ? 'Not syncing on this browser.'
-        : `Not syncing on this browser — last saved ${new Date(record.lastSyncedAt).toLocaleString()}.`;
+        ? this.transloco.translate<string>('settings.config.sync.offNever')
+        : this.transloco.translate<string>('settings.config.sync.offSince', {
+            when: new Date(record.lastSyncedAt).toLocaleString(),
+          });
     }
     const at = record.lastSyncedAt;
     if (at === undefined) {
-      return 'Syncing — nothing saved yet.';
+      return this.transloco.translate<string>('settings.config.sync.onNothing');
     }
-    return `Syncing — last saved ${new Date(at).toLocaleString()}.`;
+    return this.transloco.translate<string>('settings.config.sync.onSince', {
+      when: new Date(at).toLocaleString(),
+    });
   }
 
-  /** Translate an internal storage key into the preference it represents. */
-  protected configKeyLabel(key: string): string {
-    return CONFIG_KEY_LABELS[key] ?? 'Other browser preference';
+  /** Translation key naming the preference an internal storage key represents. */
+  protected configKeyLabelKey(key: string): string {
+    return CONFIG_KEY_LABELS[key] ?? 'settings.config.key.other';
   }
 
-  /** A config diff action written as a sentence fragment rather than an enum. */
-  protected configChangeLabel(action: ConfigChange['action']): string {
+  /** A config diff action as a translation key rather than an enum. */
+  protected configChangeKey(action: ConfigChange['action']): string {
     switch (action) {
       case 'add':
-        return 'Added';
+        return 'settings.config.change.add';
       case 'change':
-        return 'Changed';
+        return 'settings.config.change.change';
       case 'remove':
-        return 'Removed';
+        return 'settings.config.change.remove';
     }
   }
 
@@ -584,9 +665,15 @@ export class SettingsConfig {
    */
   private showUploaded(byCategory: Record<string, string[]>): void {
     const keys = [...new Set(Object.values(byCategory).flat())];
+    // Sorted by the *translated* name, so the list reads alphabetically in the
+    // reader's language rather than in English's order.
     const entries = keys
-      .map((key) => ({ key, label: this.configKeyLabel(key) }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+      .map((key) => ({ key: this.configKeyLabelKey(key) }))
+      .sort((a, b) =>
+        this.transloco
+          .translate<string>(a.key)
+          .localeCompare(this.transloco.translate<string>(b.key)),
+      );
     this.syncUploaded.set(entries.length ? entries : null);
   }
 
@@ -596,25 +683,53 @@ export class SettingsConfig {
 }
 
 interface SyncedPreference {
-  /** Retained only as a stable render identity; never shown. */
+  /**
+   * Translation key naming the preference, resolved in the template.
+   *
+   * Was a pair of `key` (render identity) and `label` (English). Now one field
+   * doing both: the translation key is stable enough to track by, and holding
+   * the English here would keep this list out of the translation pipeline —
+   * which matters because it is what the sync-conflict dialog shows when it asks
+   * which device's settings to keep.
+   */
   key: string;
-  label: string;
 }
 
-/** Human descriptions for every unscoped key portable config can contain. */
+/**
+ * Translation keys describing every unscoped key portable config can contain.
+ *
+ * Keys rather than English: this list is what the sync-conflict dialog shows
+ * when it asks which device's settings to keep, so a reader has to be able to
+ * read it to answer.
+ */
+// i18n settings.config.key.clientPrefs: Appearance, reading, composing, and accessibility preferences
+// i18n settings.config.key.houseAds: House-ad choices
+// i18n settings.config.key.featureFlags: Optional feature choices
+// i18n settings.config.key.anonymousPrefs: Anonymous-mode preferences
+// i18n settings.config.key.searchServer: Search-server choice
+// i18n settings.config.key.translationPref: Translation-service choice
+// i18n settings.config.key.translationUsage: Translation usage counters (counts only — never translated text)
+// i18n settings.config.key.vaultDevice: This browser’s display name
+// i18n settings.config.key.openrouterModel: AI model choice
+// i18n settings.config.key.openrouterPrompts: Custom AI prompt templates
+// i18n settings.config.key.plusFeatures: Mawkingbird Plus feature choices
+// i18n settings.config.key.homeServer: Home Mastodon server
+// i18n settings.config.key.corsProxy: Web access and proxy choice
+// i18n settings.config.key.shortener: Link-shortener choice
+// i18n settings.config.key.other: Other browser preference
 const CONFIG_KEY_LABELS: Readonly<Record<string, string>> = {
-  mockingbird_client_prefs: 'Appearance, reading, composing, and accessibility preferences',
-  mockingbird_house_ads: 'House-ad choices',
-  mockingbird_feature_flags: 'Optional feature choices',
-  mockingbird_anonymous_preferences: 'Anonymous-mode preferences',
-  mockingbird_search_server_v1: 'Search-server choice',
-  mockingbird_translation_preference: 'Translation-service choice',
-  mockingbird_translation_usage: 'Translation usage counters (counts only — never translated text)',
-  mockingbird_vault_device: 'This browser’s display name',
-  mockingbird_openrouter_model: 'AI model choice',
-  mockingbird_openrouter_prompts: 'Custom AI prompt templates',
-  mockingbird_plus_features: 'Mawkingbird Plus feature choices',
-  mastodon_mock_server: 'Home Mastodon server',
-  mockingbird_cors_proxy: 'Web access and proxy choice',
-  mockingbird_shortener: 'Link-shortener choice',
+  mockingbird_client_prefs: 'settings.config.key.clientPrefs',
+  mockingbird_house_ads: 'settings.config.key.houseAds',
+  mockingbird_feature_flags: 'settings.config.key.featureFlags',
+  mockingbird_anonymous_preferences: 'settings.config.key.anonymousPrefs',
+  mockingbird_search_server_v1: 'settings.config.key.searchServer',
+  mockingbird_translation_preference: 'settings.config.key.translationPref',
+  mockingbird_translation_usage: 'settings.config.key.translationUsage',
+  mockingbird_vault_device: 'settings.config.key.vaultDevice',
+  mockingbird_openrouter_model: 'settings.config.key.openrouterModel',
+  mockingbird_openrouter_prompts: 'settings.config.key.openrouterPrompts',
+  mockingbird_plus_features: 'settings.config.key.plusFeatures',
+  mastodon_mock_server: 'settings.config.key.homeServer',
+  mockingbird_cors_proxy: 'settings.config.key.corsProxy',
+  mockingbird_shortener: 'settings.config.key.shortener',
 };

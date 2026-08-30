@@ -33,38 +33,40 @@
       <p class="muted">
         @if (planning(); as progress) {
           {{
-            progress.stage === 'reading'
-              ? 'Reading your accounts…'
-              : 'Checking which ones need changing…'
+            (progress.stage === 'reading' ? 'bulk.plan.reading' : 'bulk.plan.checking') | transloco
           }}
         } @else {
-          Checking how many accounts this affects…
+          {{ 'bulk.plan.counting' | transloco }}
         }
       </p>
       @if (planning(); as progress) {
         <p class="plan-progress small muted" role="status" aria-live="polite">
-          {{ progress.accounts.toLocaleString() }}
-          {{ progress.accounts === 1 ? 'account' : 'accounts' }} read ·
-          {{ progress.apiCalls.toLocaleString() }}
-          {{ progress.apiCalls === 1 ? 'request' : 'requests' }}
+          {{
+            (progress.accounts === 1 ? 'bulk.plan.readOne' : 'bulk.plan.readOther')
+              | transloco: { count: progress.accounts.toLocaleString() }
+          }}
+          ·
+          {{
+            (progress.apiCalls === 1 ? 'bulk.plan.requestOne' : 'bulk.plan.requestOther')
+              | transloco: { count: progress.apiCalls.toLocaleString() }
+          }}
         </p>
       }
     } @else if (planCancelled()) {
-      <p class="bulk-summary">Stopped counting. Nothing has been changed.</p>
+      <p class="bulk-summary">{{ 'bulk.stopped' | transloco }}</p>
       <p class="muted small">
-        No accounts were touched — this only ever read your list. Count again to see what this
-        action would do.
+        {{ 'bulk.stopped.hint' | transloco }}
       </p>
     } @else if (preview()?.error; as error) {
-      <p class="bulk-error">Couldn’t check what this would do: {{ error }}</p>
-      <p class="muted small">Nothing has been changed.</p>
+      <p class="bulk-error">{{ 'bulk.checkFailed' | transloco: { error: error } }}</p>
+      <p class="muted small">{{ 'bulk.nothingChanged' | transloco }}</p>
     } @else {
       <p class="bulk-summary">{{ summary() }}</p>
 
       @if (!noWork()) {
         <ul class="bulk-effects">
-          @for (effect of spec().effects; track effect) {
-            <li>{{ effect }}</li>
+          @for (effect of spec().effectKeys; track effect) {
+            <li>{{ effect | transloco }}</li>
           }
         </ul>
 
@@ -72,12 +74,14 @@
           <div class="bulk-backup">
             @if (backup(); as saved) {
               <p class="small backup-done">
-                Saved a copy of {{ saved.count.toLocaleString() }}
-                {{ saved.count === 1 ? 'account' : 'accounts' }} to your downloads.
+                {{
+                  (saved.count === 1 ? 'bulk.backup.savedOne' : 'bulk.backup.savedOther')
+                    | transloco: { count: saved.count.toLocaleString() }
+                }}
               </p>
             } @else {
               <p class="small muted">
-                Download the list first and you can put it back later with Import/Export.
+                {{ 'bulk.backup.hint' | transloco }}
               </p>
               <button
                 class="btn btn-outline btn-sm"
@@ -85,7 +89,7 @@
                 [disabled]="backupBusy()"
                 (click)="downloadBackup()"
               >
-                {{ backupBusy() ? 'Preparing…' : 'Download this list first' }}
+                {{ (backupBusy() ? 'bulk.backup.preparing' : 'bulk.backup.download') | transloco }}
               </button>
             }
             @if (backupError()) {
@@ -105,15 +109,25 @@
           Stop counting
         </button>
       } @else if (planCancelled()) {
-        <button class="btn btn-outline" type="button" (click)="cancelled.emit()">Close</button>
-        <button class="btn" type="button" (click)="load()">Count again</button>
+        <button class="btn btn-outline" type="button" (click)="cancelled.emit()">
+          {{ 'common.close' | transloco }}
+        </button>
+        <button class="btn" type="button" (click)="load()">
+          {{ 'bulk.countAgain' | transloco }}
+        </button>
       } @else if (noWork() || preview()?.error) {
-        <button class="btn" type="button" (click)="cancelled.emit()">Close</button>
+        <button class="btn" type="button" (click)="cancelled.emit()">
+          {{ 'common.close' | transloco }}
+        </button>
         @if (preview()?.error) {
-          <button class="btn btn-outline" type="button" (click)="load()">Try again</button>
+          <button class="btn btn-outline" type="button" (click)="load()">
+            {{ 'bulk.tryAgain' | transloco }}
+          </button>
         }
       } @else {
-        <button class="btn btn-outline" type="button" (click)="cancelled.emit()">Cancel</button>
+        <button class="btn btn-outline" type="button" (click)="cancelled.emit()">
+          {{ 'common.cancel' | transloco }}
+        </button>
         <button
           class="btn"
           [class.btn-danger]="spec().danger"
@@ -121,7 +135,7 @@
           [disabled]="loading()"
           (click)="confirmed.emit()"
         >
-          {{ spec().confirmLabel }}
+          {{ spec().confirmLabelKey | transloco }}
         </button>
       }
     </div>

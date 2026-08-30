@@ -10,6 +10,7 @@ import {
 import { BulkActionsDialog } from '../../../bulk-actions-dialog/bulk-actions-dialog';
 import { BulkProgress } from '../../../bulk-progress/bulk-progress';
 import { UserList } from '../../../models';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
  * Settings → Bulk actions: the whole-account operations, each behind a dialog
@@ -24,9 +25,19 @@ import { UserList } from '../../../models';
  * thing is most likely to want them; this tab is where you go when you already
  * know what you want to do.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.bulk.title: Bulk moderation
+// i18n settings.bulk.intro: Changes applied to everyone at once. Mastodon has no bulk API for any of these, so each one is applied account by account — a big list takes a while, and the server may pause us along the way. You can leave this page while a job runs; it keeps going.
+// i18n settings.bulk.groupAccounts: Everyone you follow, mute or block
+// i18n settings.bulk.groupLists: One of your lists
+// i18n settings.bulk.loadingLists: Loading your lists…
+// i18n settings.bulk.noLists: You have no lists yet. Make one from the Feeds menu and these actions will apply to it.
+// i18n settings.bulk.applyToList: Apply to list
+// i18n settings.bulk.review: Review…
+// i18n settings.bulk.footnote: Every one of these asks for confirmation first, and tells you exactly how many accounts it would touch before you agree to it.
 @Component({
   selector: 'app-settings-bulk-actions',
-  imports: [BulkActionsDialog, BulkProgress],
+  imports: [BulkActionsDialog, BulkProgress, TranslocoPipe],
   templateUrl: './settings-bulk-actions.html',
   styleUrl: './settings-bulk-actions.css',
 })

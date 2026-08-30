@@ -1,5 +1,6 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { BulkActions, bulkAction, formatEta } from '../bulk-actions';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
 /**
  * Live status of the running (or just-finished) bulk job: percentage, counts,
@@ -11,9 +12,13 @@ import { BulkActions, bulkAction, formatEta } from '../bulk-actions';
  * page you are on shows the same truth. The job outlives this component; moving
  * between those pages destroys and recreates the panel without touching the run.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n bulk.stop: Stop
+// i18n bulk.dismiss: Dismiss
+// i18n bulk.rateLimited: Rate limited — resuming in {{secs}}s
 @Component({
   selector: 'app-bulk-progress',
-  imports: [],
+  imports: [TranslocoPipe],
   templateUrl: './bulk-progress.html',
   styleUrl: './bulk-progress.css',
 })
@@ -33,9 +38,17 @@ export class BulkProgress {
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
   }
 
+  private transloco = inject(TranslocoService);
+
   protected readonly spec = computed(() => {
     const job = this.job();
     return job ? bulkAction(job.action) : null;
+  });
+
+  /** The unit noun ("friends", "muted accounts"), already translated. */
+  protected readonly unitLabel = computed(() => {
+    const key = this.spec()?.unitKey;
+    return key ? this.transloco.translate<string>(key) : '';
   });
 
   /** Whole percent for the label and the bar width; null while indeterminate. */

@@ -984,7 +984,7 @@
       (keyup)="$event.stopPropagation()"
     >
       <p class="wizard-step muted small">Step {{ wizardPosition() }} of {{ wizardTotal() }}</p>
-      <h3 id="wizard-title" tabindex="-1">{{ stepTitle(step) }}</h3>
+      <h3 id="wizard-title" tabindex="-1">{{ stepTitleKey(step) | transloco }}</h3>
 
       <div class="wizard-body">
         @switch (step) {

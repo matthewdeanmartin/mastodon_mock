@@ -2,7 +2,7 @@
   <section class="bulk-progress" [class.is-paused]="j.phase === 'paused'">
     <div class="bp-head">
       <div>
-        <strong>{{ spec()?.label }}</strong>
+        <strong>{{ spec()?.labelKey ?? '' | transloco }}</strong>
         @if (j.targetLabel) {
           <span class="bp-target muted">· {{ j.targetLabel }}</span>
         }
@@ -10,9 +10,13 @@
       </div>
       <div class="bp-actions">
         @if (canCancel()) {
-          <button class="btn btn-outline btn-sm" type="button" (click)="cancel()">Stop</button>
+          <button class="btn btn-outline btn-sm" type="button" (click)="cancel()">
+            {{ 'bulk.stop' | transloco }}
+          </button>
         } @else {
-          <button class="btn btn-outline btn-sm" type="button" (click)="dismiss()">Dismiss</button>
+          <button class="btn btn-outline btn-sm" type="button" (click)="dismiss()">
+            {{ 'bulk.dismiss' | transloco }}
+          </button>
         }
       </div>
     </div>
@@ -40,10 +44,10 @@
         @if (j.total !== null) {
           <span> / {{ j.total.toLocaleString() }}</span>
         }
-        {{ spec()?.unit }} processed
+        {{ 'bulk.processed' | transloco: { unit: unitLabel() } }}
       </span>
       @if (pauseSeconds(); as secs) {
-        <span class="bp-paused">Rate limited — resuming in {{ secs }}s</span>
+        <span class="bp-paused">{{ 'bulk.rateLimited' | transloco: { secs: secs } }}</span>
       } @else if (eta(); as remaining) {
         <span class="muted">{{ remaining }} left</span>
       }

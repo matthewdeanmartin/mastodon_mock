@@ -1,30 +1,28 @@
 <div class="spage-head">
-  <h1>📡 RSS feeds</h1>
+  <h1>{{ 'settings.rss.title' | transloco }}</h1>
   <p>
-    Any RSS or Atom feed becomes posts in your home feed, read-only, with an "Open original" link.
-    No account, no credential — a feed URL is all it takes.
+    {{ 'settings.rss.intro' | transloco }}
   </p>
   <p class="muted">
-    Mockingbird has no server, so a feed only works if its site allows browser (CORS) access. Plenty
-    don't. You'll know right away when you add one, because adding it fetches it.
+    {{ 'settings.rss.cors' | transloco }}
   </p>
   <p class="muted small">
-    {{ subs.feeds().length }} of {{ subs.limit() }} feeds saved in this browser.
+    {{ 'settings.rss.saved' | transloco: { count: subs.feeds().length, limit: subs.limit() } }}
   </p>
 </div>
 
 <div class="spage-body">
   <p class="proxy-summary muted small">
     @if (proxyLabel(); as label) {
-      Feeds that block browser access can be routed through <strong>{{ label }}</strong
-      >, per feed, below.
+      {{ 'settings.rss.proxy.before' | transloco }} <strong>{{ label }}</strong
+      >{{ 'settings.rss.proxy.after' | transloco }}
     } @else if (proxyIncomplete()) {
-      Your CORS proxy is selected but not finished — it still needs a key or a valid address.
+      {{ 'settings.rss.proxy.incomplete' | transloco }}
     } @else {
-      No CORS proxy is set up. Without one, feeds that block browser access can't be read at all.
+      {{ 'settings.rss.proxy.none' | transloco }}
     }
     <a [routerLink]="['/settings/connections/cors-proxy']">
-      {{ proxyLabel() ? 'Change' : 'Set one up' }}
+      {{ (proxyLabel() ? 'settings.rss.proxy.change' : 'settings.rss.proxy.setUp') | transloco }}
     </a>
   </p>
 
@@ -36,19 +34,19 @@
         (change)="setScrollMarksRead($event)"
         name="rssScrollMarksRead"
       />
-      <span>Mark items read as I scroll past them</span>
+      <span>{{ 'settings.rss.scrollRead' | transloco }}</span>
     </label>
     <p class="muted small">
-      Off by default. Opening an item always marks it read regardless of this setting; this only
-      covers items you scrolled past without opening, and waits until one has been on screen for a
-      moment so a fast scroll to the bottom does not mark everything on the way.
+      {{ 'settings.rss.scrollRead.hint' | transloco }}
     </p>
     @if (readState.readCount() || readState.starredCount()) {
       <p class="muted small">
-        {{ readState.readCount() }} item{{ readState.readCount() === 1 ? '' : 's' }} marked read,
-        {{ readState.starredCount() }} starred.
+        {{
+          (readState.readCount() === 1 ? 'settings.rss.readOne' : 'settings.rss.readOther')
+            | transloco: { count: readState.readCount(), starred: readState.starredCount() }
+        }}
         <button class="btn btn-outline btn-sm" type="button" (click)="clearReadState()">
-          Clear reading history
+          {{ 'settings.rss.clearHistory' | transloco }}
         </button>
       </p>
     }
@@ -56,7 +54,7 @@
 
   <div class="cache-controls">
     <label class="cache-ttl">
-      <span>Reuse a fetched feed for</span>
+      <span>{{ 'settings.rss.reuseFor' | transloco }}</span>
       <!-- Plain string values rather than [ngValue]: the stored preference is a
          number, but a string-valued <option> is what both the DOM and anyone
          scripting this page expect. setTtl coerces. -->
@@ -66,21 +64,18 @@
         name="rssCacheTtl"
       >
         @for (option of ttlOptions; track option.hours) {
-          <option [value]="option.hours.toString()">{{ option.label }}</option>
+          <option [value]="option.hours.toString()">{{ option.key | transloco }}</option>
         }
       </select>
     </label>
     <p class="muted small">
-      Feeds are re-read by every view that shows them. Without a cache that is a request per visit —
-      enough to exhaust a free CORS proxy's rate limit just by reading. Cached feeds are kept in
-      this browser's IndexedDB, which has room for feeds far too large for ordinary settings
-      storage.
+      {{ 'settings.rss.cache.hint' | transloco }}
     </p>
     @if (cacheSummary(); as summary) {
       <p class="cache-summary muted small">
         {{ summary }}
         <button class="btn btn-outline btn-sm" type="button" (click)="clearCache()">
-          Clear cache
+          {{ 'settings.rss.clearCache' | transloco }}
         </button>
       </p>
     }
@@ -90,13 +85,13 @@
     <input
       type="url"
       name="feedUrl"
-      placeholder="https://example.com/feed.xml"
+      [attr.placeholder]="'settings.rss.feedUrlPlaceholder' | transloco"
       [ngModel]="feedUrl()"
       (ngModelChange)="feedUrl.set($event)"
       [disabled]="adding()"
     />
     <button class="btn" type="submit" [disabled]="!feedUrl().trim() || adding()">
-      {{ adding() ? 'Checking…' : 'Add feed' }}
+      {{ (adding() ? 'settings.rss.checking' : 'settings.rss.addFeed') | transloco }}
     </button>
   </form>
   @if (error(); as msg) {
@@ -105,22 +100,20 @@
   @if (retryable()) {
     <p class="retry-line">
       <button class="btn btn-outline btn-sm" type="button" (click)="retryViaProxy()">
-        Try again via {{ proxyLabel() }}
+        {{ 'settings.rss.retryVia' | transloco: { proxy: proxyLabel() } }}
       </button>
-      <span class="muted small"> The proxy will see this feed's address and its contents. </span>
+      <span class="muted small">{{ 'settings.rss.proxyWarning' | transloco }}</span>
     </p>
   }
 
   <section class="opml">
-    <h2>📄 Import &amp; export (OPML)</h2>
+    <h2>{{ 'settings.rss.opml' | transloco }}</h2>
     <p class="muted small">
-      OPML is the subscription-list format every feed reader speaks. Export yours to move it
-      somewhere else, or import a file from a reader you are leaving. Folders in an imported file
-      are flattened — Mawkingbird has no folders yet.
+      {{ 'settings.rss.opml.hint' | transloco }}
     </p>
 
     <label class="feed-limit">
-      <span>Maximum feeds</span>
+      <span>{{ 'settings.rss.maxFeeds' | transloco }}</span>
       <input
         type="number"
         name="feedLimit"
@@ -130,13 +123,12 @@
         (ngModelChange)="limitDraft.set($event)"
         (blur)="setLimit()"
       />
-      <button class="btn btn-outline btn-sm" type="button" (click)="setLimit()">Save</button>
+      <button class="btn btn-outline btn-sm" type="button" (click)="setLimit()">
+        {{ 'settings.rss.save' | transloco }}
+      </button>
     </label>
     <p class="muted small">
-      We suggest no more than {{ recommendedLimit }}. Every feed is re-read by every view that shows
-      them, so a long list opens slower and uses more of a free CORS proxy's quota — but it is your
-      reading list, so set it where you want it. Lowering this never deletes a feed you already
-      have.
+      {{ 'settings.rss.maxFeeds.hint' | transloco: { recommended: recommendedLimit } }}
     </p>
 
     <div class="opml-actions">
@@ -146,10 +138,10 @@
         (click)="exportOpml()"
         [disabled]="!subs.feeds().length"
       >
-        Export OPML
+        {{ 'settings.rss.exportOpml' | transloco }}
       </button>
       <label class="btn btn-outline opml-import" [class.disabled]="importProgress()">
-        {{ importProgress() ? 'Importing…' : 'Import OPML' }}
+        {{ (importProgress() ? 'settings.rss.importing' : 'settings.rss.importOpml') | transloco }}
         <input
           type="file"
           accept=".opml,.xml,text/xml,application/xml"
@@ -161,8 +153,10 @@
 
     @if (importProgress(); as progress) {
       <p class="muted small">
-        Checking feed {{ progress.done + 1 }} of {{ progress.total }} — each one is fetched to prove
-        this browser can actually read it.
+        {{
+          'settings.rss.import.progress'
+            | transloco: { done: progress.done + 1, total: progress.total }
+        }}
       </p>
     }
 
@@ -174,31 +168,42 @@
     @if (importReport(); as report) {
       <div class="import-report">
         <p>
-          <strong>Added {{ report.added }} of {{ report.total }} feeds.</strong>
+          <strong>{{
+            'settings.rss.import.added' | transloco: { added: report.added, total: report.total }
+          }}</strong>
         </p>
         <ul class="muted small">
           @if (report.alreadySubscribed) {
-            <li>{{ report.alreadySubscribed }} were already in your list.</li>
+            <li>
+              {{ 'settings.rss.import.already' | transloco: { count: report.alreadySubscribed } }}
+            </li>
           }
           @if (report.skippedForLimit) {
             <li>
-              {{ report.skippedForLimit }} went past your limit of {{ subs.limit() }}. Raise it
-              above and import the same file again to pick up the rest.
+              {{
+                'settings.rss.import.overLimit'
+                  | transloco: { count: report.skippedForLimit, limit: subs.limit() }
+              }}
             </li>
           }
           @if (report.failed.length) {
             <li>
-              {{ report.failed.length }} could not be read
+              {{ 'settings.rss.import.failed' | transloco: { count: report.failed.length } }}
               @if (!proxyLabel()) {
-                — usually this is CORS, which a
-                <a [routerLink]="['/settings/connections/cors-proxy']">CORS proxy</a> can fix.
+                {{ 'settings.rss.import.corsHint.before' | transloco }}
+                <a [routerLink]="['/settings/connections/cors-proxy']">{{
+                  'settings.rss.import.corsHint.link' | transloco
+                }}</a
+                >{{ 'settings.rss.import.corsHint.after' | transloco }}
               }
             </li>
           }
         </ul>
         @if (report.failed.length) {
           <details class="failed-feeds">
-            <summary class="muted small">Which ones failed</summary>
+            <summary class="muted small">
+              {{ 'settings.rss.import.whichFailed' | transloco }}
+            </summary>
             <ul class="muted small">
               @for (failure of report.failed; track failure.url) {
                 <li>
@@ -223,7 +228,9 @@
               <span class="name">
                 {{ f.title || f.url }}
                 @if (f.useProxy) {
-                  <span class="proxy-badge" title="Fetched through your CORS proxy">via proxy</span>
+                  <span class="proxy-badge" [title]="'settings.rss.viaProxy.title' | transloco">{{
+                    'settings.rss.viaProxy' | transloco
+                  }}</span>
                 }
               </span>
               <span class="muted small">{{ f.url }}</span>
@@ -231,9 +238,12 @@
           </label>
           <span class="feed-actions">
             @if (proxyLabel()) {
-              <label class="proxy-switch muted small" [title]="'Fetch through ' + proxyLabel()">
+              <label
+                class="proxy-switch muted small"
+                [title]="'settings.rss.fetchThrough' | transloco: { proxy: proxyLabel() }"
+              >
                 <input type="checkbox" [checked]="f.useProxy === true" (change)="toggleProxy(f)" />
-                <span>Proxy</span>
+                <span>{{ 'settings.rss.proxy' | transloco }}</span>
               </label>
             }
             <!-- The way into the feed's profile page. Without this, a subscribed
@@ -242,8 +252,8 @@
             <a
               class="btn btn-outline btn-sm"
               [routerLink]="['/accounts', 'rss:' + f.url]"
-              title="Open this feed's page"
-              >Open</a
+              [title]="'settings.rss.open.title' | transloco"
+              >{{ 'settings.rss.open' | transloco }}</a
             >
             <!-- Bypasses the cache for this one feed. Without it a cached feed
                cannot be updated before its TTL expires, which matters when you
@@ -252,16 +262,21 @@
               class="btn btn-outline btn-sm"
               [disabled]="refreshing() === f.url"
               (click)="refresh(f)"
-              title="Fetch this feed again now"
+              [title]="'settings.rss.refresh.title' | transloco"
             >
-              {{ refreshing() === f.url ? 'Refreshing…' : 'Refresh' }}
+              {{
+                (refreshing() === f.url ? 'settings.rss.refreshing' : 'settings.rss.refresh')
+                  | transloco
+              }}
             </button>
-            <button class="btn btn-outline btn-sm" (click)="remove(f)">Remove</button>
+            <button class="btn btn-outline btn-sm" (click)="remove(f)">
+              {{ 'settings.rss.remove' | transloco }}
+            </button>
           </span>
         </li>
       }
     </ul>
   } @else {
-    <p class="muted">No feeds yet.</p>
+    <p class="muted">{{ 'settings.rss.noFeeds' | transloco }}</p>
   }
 </div>

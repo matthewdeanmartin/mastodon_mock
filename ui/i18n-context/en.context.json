@@ -15,24 +15,33 @@
     },
     "coverage": "Deliberately NOT required to be complete. Most keys (Cancel, Save, Settings) are unambiguous, and demanding an entry for each would be make-work that trains everyone to write 'the save button' to silence a gate. The one rule worth enforcing: a key whose English contains a glossary term must have an entry."
   },
-
   "footer.rules": {
     "desc": "Link to the server's own rules and terms-of-service page. {{host}} is a domain name like 'mastodon.social'.",
     "surface": "footer link",
-    "placeholders": { "host": "A server domain name, or the word Server when unknown." },
-    "glossary": ["instance"],
-    "dnt": ["{{host}}"]
+    "placeholders": {
+      "host": "A server domain name, or the word Server when unknown."
+    },
+    "glossary": [
+      "instance"
+    ],
+    "dnt": [
+      "{{host}}"
+    ]
   },
   "footer.server": {
     "desc": "Stands in for the server's domain name when we don't know it yet. Reads as '<Server> rules & terms'.",
     "surface": "footer link, substituted into footer.rules",
-    "glossary": ["instance"],
+    "glossary": [
+      "instance"
+    ],
     "pos": "noun"
   },
   "footer.source": {
     "desc": "Link to this app's source code on GitHub. 'Mockingbird' is the product name.",
     "surface": "footer link",
-    "dnt": ["Mockingbird"]
+    "dnt": [
+      "Mockingbird"
+    ]
   },
   "footer.reportBug": {
     "desc": "Opens a dialog for reporting a problem with the app.",
@@ -48,7 +57,9 @@
     "desc": "Link to a deliberately silly error page. A joke referencing early Twitter's overload mascot — a whale lifted by birds. Keep the joke or find the local equivalent; a literal 'whale that failed' is wrong.",
     "surface": "footer link",
     "tone": "playful",
-    "glossary": ["fail whale"],
+    "glossary": [
+      "fail whale"
+    ],
     "max": 16
   },
   "footer.hotkeys": {
@@ -56,12 +67,16 @@
     "surface": "footer link-styled button",
     "tone": "playful",
     "max": 18,
-    "dnt": ["?"]
+    "dnt": [
+      "?"
+    ]
   },
   "footer.hotkeys.title": {
     "desc": "Tooltip for the shortcuts button. '?' is the keyboard key.",
     "surface": "title attribute",
-    "dnt": ["?"]
+    "dnt": [
+      "?"
+    ]
   },
   "footer.end": {
     "desc": "Reassurance at the bottom of a feed. The joke: this app's feeds are finite and end, unlike an infinite scroll, and stopping is fine. Render the reassurance, not the words.",
@@ -71,23 +86,61 @@
   "footer.builtAt": {
     "desc": "When this build was produced. {{date}} is a preformatted UTC timestamp; 'UTC' is a technical abbreviation.",
     "surface": "small footer metadata line",
-    "placeholders": { "date": "Preformatted timestamp, already localized. Never translate or reformat." },
-    "dnt": ["{{date}}", "UTC"]
+    "placeholders": {
+      "date": "Preformatted timestamp, already localized. Never translate or reformat."
+    },
+    "dnt": [
+      "{{date}}",
+      "UTC"
+    ]
   },
   "footer.buildLog": {
     "desc": "Link to this build's CI run log. Lowercase on purpose — it sits mid-sentence.",
     "surface": "footer metadata link",
     "max": 14
   },
-
   "localePicker.label": {
     "desc": "Accessible name for the control that changes the language of the app's interface. Not the language of posts — that is a separate setting.",
     "surface": "screen-reader label and aria-label on a select",
-    "glossary": ["interface language"]
+    "glossary": [
+      "interface language"
+    ]
   },
   "localePicker.auto": {
     "desc": "The option meaning 'follow whatever language my browser asks for', as opposed to forcing one. Selecting it clears the stored choice.",
     "surface": "first option in a language select",
     "max": 24
+  },
+  "flags.proxyAllorigins.label": {
+    "desc": "The four public CORS proxies are on the chopping block (2026-08-30) — they each failed often enough that they default to off. Do not translate: the strings are due for deletion, and translating them would leave an orphan in every locale. Only the Mawkingbird Plus proxy and a self-hosted proxy stay.",
+    "translate": false
+  },
+  "flags.proxyAllorigins.description": {
+    "desc": "The four public CORS proxies are on the chopping block (2026-08-30) — they each failed often enough that they default to off. Do not translate: the strings are due for deletion, and translating them would leave an orphan in every locale. Only the Mawkingbird Plus proxy and a self-hosted proxy stay.",
+    "translate": false
+  },
+  "flags.proxyCorssh.label": {
+    "desc": "The four public CORS proxies are on the chopping block (2026-08-30) — they each failed often enough that they default to off. Do not translate: the strings are due for deletion, and translating them would leave an orphan in every locale. Only the Mawkingbird Plus proxy and a self-hosted proxy stay.",
+    "translate": false
+  },
+  "flags.proxyCorssh.description": {
+    "desc": "The four public CORS proxies are on the chopping block (2026-08-30) — they each failed often enough that they default to off. Do not translate: the strings are due for deletion, and translating them would leave an orphan in every locale. Only the Mawkingbird Plus proxy and a self-hosted proxy stay.",
+    "translate": false
+  },
+  "flags.proxyCorsfix.label": {
+    "desc": "The four public CORS proxies are on the chopping block (2026-08-30) — they each failed often enough that they default to off. Do not translate: the strings are due for deletion, and translating them would leave an orphan in every locale. Only the Mawkingbird Plus proxy and a self-hosted proxy stay.",
+    "translate": false
+  },
+  "flags.proxyCorsfix.description": {
+    "desc": "The four public CORS proxies are on the chopping block (2026-08-30) — they each failed often enough that they default to off. Do not translate: the strings are due for deletion, and translating them would leave an orphan in every locale. Only the Mawkingbird Plus proxy and a self-hosted proxy stay.",
+    "translate": false
+  },
+  "flags.proxyCorslol.label": {
+    "desc": "The four public CORS proxies are on the chopping block (2026-08-30) — they each failed often enough that they default to off. Do not translate: the strings are due for deletion, and translating them would leave an orphan in every locale. Only the Mawkingbird Plus proxy and a self-hosted proxy stay.",
+    "translate": false
+  },
+  "flags.proxyCorslol.description": {
+    "desc": "The four public CORS proxies are on the chopping block (2026-08-30) — they each failed often enough that they default to off. Do not translate: the strings are due for deletion, and translating them would leave an orphan in every locale. Only the Mawkingbird Plus proxy and a self-hosted proxy stay.",
+    "translate": false
   }
 }

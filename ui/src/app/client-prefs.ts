@@ -211,12 +211,18 @@ export type RssDensity = 'full' | 'headlines';
 /** Every valid {@link RssDensity}, for validating stored/typed input. */
 export const RSS_DENSITIES: readonly RssDensity[] = ['full', 'headlines'];
 
-export const RSS_CACHE_TTL_OPTIONS: readonly { hours: number; label: string }[] = [
-  { hours: 0, label: 'Always refetch (not recommended)' },
-  { hours: 1, label: '1 hour' },
-  { hours: 6, label: '6 hours' },
-  { hours: 24, label: '24 hours' },
-  { hours: 24 * 7, label: '7 days' },
+/** Cache lifetimes offered for RSS feeds. Labels are keys; see extract-i18n.mjs. */
+// i18n settings.rss.ttl.always: Always refetch (not recommended)
+// i18n settings.rss.ttl.hour1: 1 hour
+// i18n settings.rss.ttl.hour6: 6 hours
+// i18n settings.rss.ttl.hour24: 24 hours
+// i18n settings.rss.ttl.day7: 7 days
+export const RSS_CACHE_TTL_OPTIONS: readonly { hours: number; key: string }[] = [
+  { hours: 0, key: 'settings.rss.ttl.always' },
+  { hours: 1, key: 'settings.rss.ttl.hour1' },
+  { hours: 6, key: 'settings.rss.ttl.hour6' },
+  { hours: 24, key: 'settings.rss.ttl.hour24' },
+  { hours: 24 * 7, key: 'settings.rss.ttl.day7' },
 ];
 export type ChatKindFilter = 'all' | 'private' | 'public' | 'bsky' | 'bot';
 
@@ -318,7 +324,7 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export interface AccentPreset {
   id: string;
-  label: string;
+  labelKey: string;
   accent: string;
   accentHover: string;
   /** Tint used for soft backgrounds (light theme; dark theme derives its own). */
@@ -326,31 +332,56 @@ export interface AccentPreset {
 }
 
 /** Accent color presets, Twitter-Blue style. The first entry is the classic default. */
+/** Accent names, as keys: colour words differ per language. */
+// i18n accent.blue: Blue
+// i18n accent.yellow: Yellow
+// i18n accent.rose: Rose
+// i18n accent.purple: Purple
+// i18n accent.orange: Orange
+// i18n accent.green: Green
 export const ACCENT_PRESETS: AccentPreset[] = [
-  { id: 'blue', label: 'Blue', accent: '#1da1f2', accentHover: '#1a91da', accentSoft: '#e8f5fe' },
+  {
+    id: 'blue',
+    labelKey: 'accent.blue',
+    accent: '#1da1f2',
+    accentHover: '#1a91da',
+    accentSoft: '#e8f5fe',
+  },
   {
     id: 'yellow',
-    label: 'Yellow',
+    labelKey: 'accent.yellow',
     accent: '#ffad1f',
     accentHover: '#e79c16',
     accentSoft: '#fff5e0',
   },
-  { id: 'rose', label: 'Rose', accent: '#f91880', accentHover: '#dd1573', accentSoft: '#fee7f2' },
+  {
+    id: 'rose',
+    labelKey: 'accent.rose',
+    accent: '#f91880',
+    accentHover: '#dd1573',
+    accentSoft: '#fee7f2',
+  },
   {
     id: 'purple',
-    label: 'Purple',
+    labelKey: 'accent.purple',
     accent: '#7856ff',
     accentHover: '#6a4ce0',
     accentSoft: '#efebff',
   },
   {
     id: 'orange',
-    label: 'Orange',
+    labelKey: 'accent.orange',
     accent: '#ff7a00',
     accentHover: '#e56e00',
     accentSoft: '#ffefe0',
   },
-  { id: 'green', label: 'Green', accent: '#00ba7c', accentHover: '#00a56e', accentSoft: '#e0f7ef' },
+  {
+    id: 'green',
+    labelKey: 'accent.green',
+    accent: '#00ba7c',
+    accentHover: '#00a56e',
+    accentSoft: '#e0f7ef',
+  },
 ];
 
 const FONT_STACKS = Object.fromEntries(

@@ -56,16 +56,31 @@ function sources(dir, out = []) {
  *
  * The English runs to the end of the comment, so it may contain colons,
  * apostrophes and `{{placeholders}}` without escaping.
+ *
+ * Keys are dotted camelCase segments; a segment may be numeric (`uses.5`). A
+ * declaration whose key contains anything else is
+ * a **hard error** rather than a skip: when hyphens were merely unmatched, 40
+ * declarations generated from ids like `connector-mastodon` were silently
+ * dropped, `en.json` looked plausible, and the only symptom was a flag list that
+ * rendered nothing. Failing loudly costs one confused minute; failing quietly
+ * cost considerably more.
  */
-function declarations(text) {
+function declarations(text, where) {
   const found = [];
   const patterns = [
-    /<!--\s*i18n\s+([\w.]+)\s*:\s*([\s\S]*?)\s*-->/g,
-    /\/\/\s*i18n\s+([\w.]+)\s*:\s*(.*)$/gm,
+    /<!--\s*i18n\s+([^\s:]+)\s*:\s*([\s\S]*?)\s*-->/g,
+    /\/\/\s*i18n\s+([^\s:]+)\s*:\s*(.*)$/gm,
   ];
   for (const pattern of patterns) {
     for (const match of text.matchAll(pattern)) {
-      found.push([match[1], match[2].trim()]);
+      const key = match[1];
+      if (!/^[a-zA-Z]\w*(\.\w+)*$/.test(key)) {
+        throw new Error(
+          `${where}: "${key}" is not a valid translation key.\n` +
+            'Keys are dotted camelCase segments — no hyphens, no spaces.',
+        );
+      }
+      found.push([key, match[2].trim()]);
     }
   }
   return found;
@@ -96,7 +111,7 @@ const duplicates = [];
 
 for (const file of sources(APP_DIR)) {
   const rel = relative(APP_DIR, file).replace(/\\/g, '/');
-  for (const [key, value] of declarations(readFileSync(file, 'utf8'))) {
+  for (const [key, value] of declarations(readFileSync(file, 'utf8'), rel)) {
     if (key in english && english[key] !== value) {
       duplicates.push(`${key} — "${english[key]}" vs "${value}" (${rel})`);
     }

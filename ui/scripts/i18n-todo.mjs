@@ -99,9 +99,29 @@ const context = readJson(join(CONTEXT_DIR, 'en.context.json'), {});
 const stamps = readJson(STAMPS, {});
 const langStamps = stamps[lang] ?? {};
 
+/**
+ * Keys the context file marks `"translate": false`.
+ *
+ * Real, shipping, user-visible English that should nonetheless never reach a
+ * translator — the case this exists for is a feature on its way out. Sending it
+ * spends work across every locale on strings that are about to be deleted, and
+ * leaves an orphan in each of those files when they are.
+ *
+ * They stay in `en.json` (they still render), and `check-i18n` still counts
+ * them; they are simply never offered as work.
+ */
+const skipped = new Set(
+  Object.entries(context)
+    .filter(([, note]) => note && note.translate === false)
+    .map(([key]) => key),
+);
+
 const missing = [];
 const stale = [];
 for (const [key, english] of Object.entries(en)) {
+  if (skipped.has(key)) {
+    continue;
+  }
   if (!(key in target)) {
     missing.push(key);
   } else if (langStamps[key] && langStamps[key] !== stamp(english)) {
@@ -112,8 +132,9 @@ for (const [key, english] of Object.entries(en)) {
 const wanted = STALE_ONLY ? stale : [...missing, ...stale];
 
 if (wanted.length === 0) {
+  const note = skipped.size ? ` (${skipped.size} marked do-not-translate)` : '';
   console.log(
-    `${lang}.json is complete and current — ${Object.keys(en).length} keys, nothing to do.`,
+    `${lang}.json is complete and current — ${Object.keys(en).length} keys${note}, nothing to do.`,
   );
   process.exit(0);
 }

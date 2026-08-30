@@ -1,7 +1,72 @@
 # i18n Sprint 3b — The rest of Settings, and the registry pattern
 
-Status: PLANNED
+Status: **PARTIAL** (2026-08-30) — registries done, 7 page directories remain.
 Depends on: [[ui-i18n-3-settings]]
+
+## What shipped
+
+**Both blocking registries, plus the confirm dialog:**
+
+- `src/app/feature-flags.ts` — 46 strings; entries now hold `labelKey` / `descriptionKey`.
+- `src/app/bulk-actions.ts` — 47 strings; `labelKey`/`blurbKey`/`titleKey`/`effectKeys`/
+  `confirmLabelKey`/`unitKey`.
+- `bulk-actions-dialog` + `bulk-progress` — the confirm screen's own 15 sentences and its
+  template prose.
+- `pages/settings/feature-flags`, `pages/settings/bulk-actions`.
+
+**23 migrated directories, 546 keys, full suite green (5576/5576).**
+
+## The registry pattern, settled
+
+Both open questions from the plan are answered:
+
+1. **Declarations live beside the registry**, not beside each consumer — one place, and a new
+   entry needs one comment line next to the data it describes.
+2. **`effects` arrays get one key per item** (`bulk.reblogsOff.effect1`…), because each bullet is
+   an independent sentence a locale must be free to reorder or merge.
+
+Keys are derived from the entry `id`, camelCased: `connector-mastodon` → `flags.connectorMastodon`.
+Hyphens are not legal in a key (see below).
+
+## Two bugs found in shipping code
+
+- **`bulk-actions-dialog` did `.replace('this list', 'this collection')`** on the finished dialog
+  title. That is invisible string surgery on display text: once the title is German the substring
+  is absent, the replace silently does nothing, and the dialog says "list" over a collection in
+  every locale but English — the exact "small lie that makes a confirmation dialog untrustworthy"
+  its own comment warns about. Titles now carry `{{source}}` and the noun is passed in.
+- **The extractor silently dropped 40 declarations** whose keys contained hyphens. `en.json`
+  looked plausible; the only symptom would have been a flag list rendering nothing. A malformed
+  key is now a hard error, and the fix immediately caught two more real problems: a key whose
+  English legitimately begins with `:` and numeric segments like `uses.5`.
+
+## New: do-not-translate
+
+Boss's call (2026-08-30): **the four public CORS proxies are on the chopping block, so do not
+translate them.** A key marked `"translate": false` in `en.context.json` is skipped by
+`i18n-todo` and excluded from the coverage denominator, while still rendering and still being
+checked. Translating doomed strings would spend work across 30 locales and leave an orphan in
+every one when they go. The eight `flags.proxy{Allorigins,Corssh,Corsfix,Corslol}.*` keys carry it;
+`proxyMawkingbirdPlus` and the self-hosted proxy are untouched.
+
+## Remaining, measured in strings rather than lines
+
+Line count turned out to be a bad proxy for work — `import-export` is 1454 lines but 151 strings,
+while `connections` is a 131-line template that fans out into 13 connector sub-pages:
+
+| Directory | Strings |
+|---|---|
+| rss | 26 |
+| config | 52 |
+| i18n | 53 |
+| writing | 57 |
+| blue | 91 |
+| mawkingbird-plus | 108 |
+| import-export | 151 |
+| **connections** | **455** (twitter 75, hugo 66, blogger 43, doctor 41, …) |
+
+`connections` is 46% of the remaining Settings work on its own and is really 13 pages sharing a
+directory name; it deserves to be split out rather than treated as one item.
 
 ## Goal
 
@@ -40,12 +105,12 @@ Two things to decide once, here, and then apply everywhere:
 
 ## Directories
 
-**Registry-backed** (do the registry first, then the page):
-`feature-flags`, `bulk-actions`, `connections`, `writing`
+**Registry-backed:** `feature-flags` ✅, `bulk-actions` ✅ — both done. `connections` and
+`writing` remain (see the string table above; `writing` needs `publish-wizard.ts`, shared with
+`/write`).
 
-**Plain, just not reached** (no blocker, straight template work):
-`rss` (267 lines), `i18n` (350), `config` (358), `blue` (707), `mawkingbird-plus` (819),
-`import-export` (1454)
+**Plain page work, remaining:** `rss`, `i18n`, `config`, `blue`, `mawkingbird-plus`,
+`import-export`.
 
 ## Watch for
 

@@ -46,8 +46,17 @@ export type FeatureFlagGroup = 'features' | 'connectors' | 'proxies';
 
 export interface FeatureFlagDefinition {
   id: FeatureFlagId;
-  label: string;
-  description: string;
+  /**
+   * Translation keys, not English.
+   *
+   * The strings a reader sees live in the `// i18n` declarations above
+   * {@link FEATURE_FLAGS}, which `scripts/extract-i18n.mjs` reads into
+   * `public/i18n/en.json`. Holding English here would put ~50 user-visible
+   * strings outside the translation pipeline, where `check-i18n.mjs` cannot see
+   * them and no locale could ever cover them.
+   */
+  labelKey: string;
+  descriptionKey: string;
   defaultState: FeatureFlagState;
   group: FeatureFlagGroup;
 }
@@ -62,38 +71,81 @@ interface StoredFeatureFlags {
  * is — the catalog already sells the service, and someone reading this screen
  * is deciding whether turning it off will cost them something.
  */
+/** English for every flag label and description; see scripts/extract-i18n.mjs. */
+// i18n flags.pastebin.label: Pastebin
+// i18n flags.pastebin.description: Create, manage, and follow posts published through external paste services.
+// i18n flags.links.label: Links
+// i18n flags.links.description: Shorten URLs through Dub, Short.io or T.LY, and manage the links you have created.
+// i18n flags.write.label: Write
+// i18n flags.write.description: The writing workspace at /write — drafts, editor and notes side by side, plus zen mode.
+// i18n flags.unifiedShare.label: Unified share menu
+// i18n flags.unifiedShare.description: Collapse Boost, Quote and Share into one button on every post, opening a menu instead. Frees a slot on an action bar that already wraps on narrow screens.
+// i18n flags.mawkingbirdPlus.label: Mawkingbird Plus
+// i18n flags.mawkingbirdPlus.description: The Mawkingbird account tab in Settings, where you sign in to your Mawkingbird account.
+// i18n flags.connectorMastodon.label: Mastodon
+// i18n flags.connectorMastodon.description: Mastodon attached to a Bluesky-primary account: Explore, trends and tag timelines, read anonymously or signed in.
+// i18n flags.connectorBluesky.label: Bluesky
+// i18n flags.connectorBluesky.description: Bluesky posts in your timeline, replies and likes, and Bluesky DMs in Chat.
+// i18n flags.connectorTwitter.label: Twitter
+// i18n flags.connectorTwitter.description: Following and reading public Twitter accounts through a scraper service.
+// i18n flags.connectorMataroa.label: Blog (Mataroa)
+// i18n flags.connectorMataroa.description: Publishing blog posts and optionally including them on your profile.
+// i18n flags.connectorBlogger.label: Blog (Blogger)
+// i18n flags.connectorBlogger.description: Publishing posts and drafts to a Google Blogger blog.
+// i18n flags.connectorHugo.label: Blog (Hugo)
+// i18n flags.connectorHugo.description: Publishing posts to a Hugo site in a GitHub repository.
+// i18n flags.connectorOpenrouter.label: OpenRouter
+// i18n flags.connectorOpenrouter.description: AI search queries, hashtag suggestions and translation for read-only providers.
+// i18n flags.connectorRaindrop.label: Raindrop.io
+// i18n flags.connectorRaindrop.description: Saving posts and their links to a Raindrop.io collection.
+// i18n flags.connectorGithub.label: GitHub
+// i18n flags.connectorGithub.description: Finding the people you follow on GitHub, and reading unread notifications.
+// i18n flags.connectorDropbox.label: Dropbox
+// i18n flags.connectorDropbox.description: Browsing an app-specific Dropbox folder.
+// i18n flags.connectorLinkShortener.label: Link shortener
+// i18n flags.connectorLinkShortener.description: Shortening URLs as you write, and the list of links you have made.
+// i18n flags.connectorCorsProxy.label: CORS proxy
+// i18n flags.connectorCorsProxy.description: Relaying requests for sites that refuse browsers. Turning this off also stops the connectors that depend on it.
+// i18n flags.connectorRss.label: RSS feeds
+// i18n flags.connectorRss.description: Subscribing to RSS and Atom feeds, and merging them into your home timeline.
+// i18n flags.proxyMawkingbirdPlus.label: Mawkingbird Plus proxy
+// i18n flags.proxyMawkingbirdPlus.description: Offer the supporter tier of the Mawkingbird proxy. Needs an account and a subscription; the free Mawkingbird proxy is unaffected either way.
+// i18n flags.proxyAllorigins.label: AllOrigins proxy
+// i18n flags.proxyAllorigins.description: Offer AllOrigins as a CORS proxy. Strips custom headers, so no API key can travel through it, and it is frequently very slow.
+// i18n flags.proxyCorssh.label: CORS.SH proxy
+// i18n flags.proxyCorssh.description: Offer CORS.SH as a CORS proxy. Requires a free key before it will answer.
+// i18n flags.proxyCorsfix.label: Corsfix proxy
+// i18n flags.proxyCorsfix.description: Offer Corsfix as a CORS proxy. Fast, but a deployed site must register its domain first or every request is refused.
+// i18n flags.proxyCorslol.label: cors.lol proxy
+// i18n flags.proxyCorslol.description: Offer cors.lol as a CORS proxy. No signup, but it rate-limits aggressively — often on the first request of a session.
 export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
   {
     id: 'pastebin',
-    label: 'Pastebin',
-    description: 'Create, manage, and follow posts published through external paste services.',
+    labelKey: 'flags.pastebin.label',
+    descriptionKey: 'flags.pastebin.description',
     defaultState: 'production',
     group: 'features',
   },
   {
     id: 'links',
-    label: 'Links',
-    description:
-      'Shorten URLs through Dub, Short.io or T.LY, and manage the links you have created.',
+    labelKey: 'flags.links.label',
+    descriptionKey: 'flags.links.description',
     defaultState: 'production',
     group: 'features',
   },
   {
     id: 'write',
-    label: 'Write',
-    description:
-      'The writing workspace at /write — drafts, editor and notes side by side, plus zen mode.',
+    labelKey: 'flags.write.label',
+    descriptionKey: 'flags.write.description',
     defaultState: 'production',
     group: 'features',
   },
   {
     id: 'unified-share',
-    label: 'Unified share menu',
+    labelKey: 'flags.unifiedShare.label',
     // Says what turning it on changes, since this one is off by default and the
     // question a reader has is "what will this do to my posts".
-    description:
-      'Collapse Boost, Quote and Share into one button on every post, opening a menu instead. ' +
-      'Frees a slot on an action bar that already wraps on narrow screens.',
+    descriptionKey: 'flags.unifiedShare.description',
     // `test`, not `production`: this changes the action bar on every post in the
     // app, which is the most-used surface there is. It earns its way up rather
     // than starting at the top.
@@ -102,12 +154,11 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
   },
   {
     id: 'mawkingbird-plus',
-    label: 'Mawkingbird Plus',
+    labelKey: 'flags.mawkingbirdPlus.label',
     // Says what switching it off removes, per the convention above. Nothing
     // else in the app depends on an account, so this genuinely only hides the
     // one settings tab — signed-out users lose no functionality.
-    description:
-      'The Mawkingbird account tab in Settings, where you sign in to your Mawkingbird account.',
+    descriptionKey: 'flags.mawkingbirdPlus.description',
     // `test`, not `canary`: canary is production, on live billing, and this tab
     // leads to a checkout. Until there is a live Stripe price it must not be
     // reachable anywhere a real customer can press the button.
@@ -116,94 +167,92 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
   },
   {
     id: 'connector-mastodon',
-    label: 'Mastodon',
-    description:
-      'Mastodon attached to a Bluesky-primary account: Explore, trends and tag timelines, read anonymously or signed in.',
+    labelKey: 'flags.connectorMastodon.label',
+    descriptionKey: 'flags.connectorMastodon.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-bluesky',
-    label: 'Bluesky',
-    description: 'Bluesky posts in your timeline, replies and likes, and Bluesky DMs in Chat.',
+    labelKey: 'flags.connectorBluesky.label',
+    descriptionKey: 'flags.connectorBluesky.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-twitter',
-    label: 'Twitter',
-    description: 'Following and reading public Twitter accounts through a scraper service.',
+    labelKey: 'flags.connectorTwitter.label',
+    descriptionKey: 'flags.connectorTwitter.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-mataroa',
-    label: 'Blog (Mataroa)',
-    description: 'Publishing blog posts and optionally including them on your profile.',
+    labelKey: 'flags.connectorMataroa.label',
+    descriptionKey: 'flags.connectorMataroa.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-blogger',
-    label: 'Blog (Blogger)',
-    description: 'Publishing posts and drafts to a Google Blogger blog.',
+    labelKey: 'flags.connectorBlogger.label',
+    descriptionKey: 'flags.connectorBlogger.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-hugo',
-    label: 'Blog (Hugo)',
-    description: 'Publishing posts to a Hugo site in a GitHub repository.',
+    labelKey: 'flags.connectorHugo.label',
+    descriptionKey: 'flags.connectorHugo.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-openrouter',
-    label: 'OpenRouter',
-    description: 'AI search queries, hashtag suggestions and translation for read-only providers.',
+    labelKey: 'flags.connectorOpenrouter.label',
+    descriptionKey: 'flags.connectorOpenrouter.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-raindrop',
-    label: 'Raindrop.io',
-    description: 'Saving posts and their links to a Raindrop.io collection.',
+    labelKey: 'flags.connectorRaindrop.label',
+    descriptionKey: 'flags.connectorRaindrop.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-github',
-    label: 'GitHub',
-    description: 'Finding the people you follow on GitHub, and reading unread notifications.',
+    labelKey: 'flags.connectorGithub.label',
+    descriptionKey: 'flags.connectorGithub.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-dropbox',
-    label: 'Dropbox',
-    description: 'Browsing an app-specific Dropbox folder.',
+    labelKey: 'flags.connectorDropbox.label',
+    descriptionKey: 'flags.connectorDropbox.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-link-shortener',
-    label: 'Link shortener',
-    description: 'Shortening URLs as you write, and the list of links you have made.',
+    labelKey: 'flags.connectorLinkShortener.label',
+    descriptionKey: 'flags.connectorLinkShortener.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-cors-proxy',
-    label: 'CORS proxy',
-    description:
-      'Relaying requests for sites that refuse browsers. Turning this off also stops the connectors that depend on it.',
+    labelKey: 'flags.connectorCorsProxy.label',
+    descriptionKey: 'flags.connectorCorsProxy.description',
     defaultState: 'production',
     group: 'connectors',
   },
   {
     id: 'connector-rss',
-    label: 'RSS feeds',
-    description: 'Subscribing to RSS and Atom feeds, and merging them into your home timeline.',
+    labelKey: 'flags.connectorRss.label',
+    descriptionKey: 'flags.connectorRss.description',
     defaultState: 'production',
     group: 'connectors',
   },
@@ -228,9 +277,8 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
   // for exactly that.
   {
     id: 'proxy-mawkingbird-plus',
-    label: 'Mawkingbird Plus proxy',
-    description:
-      'Offer the supporter tier of the Mawkingbird proxy. Needs an account and a subscription; the free Mawkingbird proxy is unaffected either way.',
+    labelKey: 'flags.proxyMawkingbirdPlus.label',
+    descriptionKey: 'flags.proxyMawkingbirdPlus.description',
     // Paired with `mawkingbird-plus` above, and for the same reason: offering a
     // proxy tier nobody can buy is worse than not offering it.
     defaultState: 'test',
@@ -238,32 +286,29 @@ export const FEATURE_FLAGS: readonly FeatureFlagDefinition[] = [
   },
   {
     id: 'proxy-allorigins',
-    label: 'AllOrigins proxy',
-    description:
-      'Offer AllOrigins as a CORS proxy. Strips custom headers, so no API key can travel through it, and it is frequently very slow.',
+    labelKey: 'flags.proxyAllorigins.label',
+    descriptionKey: 'flags.proxyAllorigins.description',
     defaultState: 'off',
     group: 'proxies',
   },
   {
     id: 'proxy-corssh',
-    label: 'CORS.SH proxy',
-    description: 'Offer CORS.SH as a CORS proxy. Requires a free key before it will answer.',
+    labelKey: 'flags.proxyCorssh.label',
+    descriptionKey: 'flags.proxyCorssh.description',
     defaultState: 'off',
     group: 'proxies',
   },
   {
     id: 'proxy-corsfix',
-    label: 'Corsfix proxy',
-    description:
-      'Offer Corsfix as a CORS proxy. Fast, but a deployed site must register its domain first or every request is refused.',
+    labelKey: 'flags.proxyCorsfix.label',
+    descriptionKey: 'flags.proxyCorsfix.description',
     defaultState: 'off',
     group: 'proxies',
   },
   {
     id: 'proxy-corslol',
-    label: 'cors.lol proxy',
-    description:
-      'Offer cors.lol as a CORS proxy. No signup, but it rate-limits aggressively — often on the first request of a session.',
+    labelKey: 'flags.proxyCorslol.label',
+    descriptionKey: 'flags.proxyCorslol.description',
     defaultState: 'off',
     group: 'proxies',
   },

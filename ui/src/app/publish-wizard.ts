@@ -69,16 +69,20 @@ export function stepPosition(step: WizardStep, enabled: WizardSteps): number {
   return activeSteps(enabled).indexOf(step) + 1;
 }
 
-export function stepTitle(step: WizardStep): string {
+// i18n wizard.step.targets: Where should this be published?
+// i18n wizard.step.preview: How it will look
+// i18n wizard.step.quality: Before you publish
+// i18n wizard.step.when: Now, or later?
+export function stepTitleKey(step: WizardStep): string {
   switch (step) {
     case 'targets':
-      return 'Where should this be published?';
+      return 'wizard.step.targets';
     case 'preview':
-      return 'How it will look';
+      return 'wizard.step.preview';
     case 'quality':
-      return 'Before you publish';
+      return 'wizard.step.quality';
     case 'when':
-      return 'Now, or later?';
+      return 'wizard.step.when';
   }
 }
 

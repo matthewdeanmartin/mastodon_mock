@@ -12,6 +12,7 @@ import {
 import { LowerCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { FocusTrap } from '../../a11y/focus-trap';
 import { Api } from '../../api';
@@ -53,13 +54,13 @@ import {
   nextStep,
   previousStep,
   stepPosition,
-  stepTitle,
+  stepTitleKey,
 } from '../../publish-wizard';
 import { runQualityChecks } from './quality-checks';
 import { WriteBoard } from './board/write-board';
 import { WritingZen } from '../../writing-zen';
 import { PkmItem, PkmSource } from '../../pkm/pkm-source';
-import { PKM_KINDS, PkmKind, pkmLabel, pkmNoun, withPkmTag } from '../../pkm/pkm-tags';
+import { PKM_KINDS, PkmKind, pkmLabel, pkmNounKey, withPkmTag } from '../../pkm/pkm-tags';
 import { DraftItem, DraftKind, toSnapshot } from '../drafts/draft-items';
 import { DraftSources } from '../drafts/draft-sources';
 import {
@@ -135,6 +136,7 @@ interface PendingSwitch {
     TagHelperDialog,
     TranslateDialog,
     ProxyConsentDialog,
+    TranslocoPipe,
   ],
   templateUrl: './write-page.html',
   styleUrls: ['./write-workspace.css', './write-editor.css', './write-overlays.css'],
@@ -333,7 +335,7 @@ export class WritePage implements OnInit, OnDestroy {
   // to follow; a writing surface offers the user their own material.
 
   protected readonly pkmKindList = PKM_KINDS;
-  protected readonly pkmNoun = pkmNoun;
+  protected readonly pkmNounKey = pkmNounKey;
   /** Null is the "All" chip. */
   protected pkmFilter = signal<PkmKind | null>(null);
   /** The one-line jot box at the top of the notes pane. */
@@ -412,7 +414,7 @@ export class WritePage implements OnInit, OnDestroy {
     // a stray dash to split a two-word note into two posts.
     this.workspace.setSplitMode(`local:${id}`, 'demand');
     this.jotText.set('');
-    this.flash(`Saved a ${pkmNoun(kind)}.`);
+    this.flash(`Saved a ${pkmNounKey(kind)}.`);
   }
 
   protected visible = computed(() => {
@@ -1062,7 +1064,7 @@ export class WritePage implements OnInit, OnDestroy {
   protected wizardError = signal<string | null>(null);
   protected wizardBusy = signal(false);
 
-  protected readonly stepTitle = stepTitle;
+  protected readonly stepTitleKey = stepTitleKey;
   protected readonly targetLabel = targetLabel;
 
   protected canScheduleSelectedTarget = computed(

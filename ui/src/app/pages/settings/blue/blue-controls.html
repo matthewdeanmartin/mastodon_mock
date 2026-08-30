@@ -4,7 +4,7 @@
        planned as a third value here is its own row below — which pictures the
        app draws turned out to be independent of whether the bots exist. -->
   <div class="srow">
-    <span class="slabel">AI features</span>
+    <span class="slabel">{{ 'settings.blue.ai' | transloco }}</span>
     <div class="scontrol">
       <label class="radioline">
         <input
@@ -14,7 +14,7 @@
           (ngModelChange)="prefs.setAiMode($event)"
           name="aiMode"
         />
-        Show them
+        {{ 'settings.blue.ai.show' | transloco }}
       </label>
       <label class="radioline">
         <input
@@ -24,18 +24,16 @@
           (ngModelChange)="prefs.setAiMode($event)"
           name="aiMode"
         />
-        Hide them all
+        {{ 'settings.blue.ai.hide' | transloco }}
       </label>
       <span class="hint">
-        Hides Eliza, the OpenRouter chat, AI translation and the search and hashtag suggestions.
-        Nothing is deleted — your OpenRouter key and your conversations stay where they are, and
-        turning this back on restores them.
+        {{ 'settings.blue.ai.hint' | transloco }}
       </span>
     </div>
   </div>
 
   <div class="srow">
-    <span class="slabel">Illustrations</span>
+    <span class="slabel">{{ 'settings.blue.art' | transloco }}</span>
     <div class="scontrol">
       <label class="radioline">
         <input
@@ -45,7 +43,7 @@
           (ngModelChange)="prefs.setArtStyle($event)"
           name="artStyle"
         />
-        Hand-drawn
+        {{ 'settings.blue.art.hand' | transloco }}
       </label>
       <label class="radioline">
         <input
@@ -55,18 +53,16 @@
           (ngModelChange)="prefs.setArtStyle($event)"
           name="artStyle"
         />
-        Generated
+        {{ 'settings.blue.art.ai' | transloco }}
       </label>
       <span class="hint">
-        Which bird and which fail whale the app draws. The hand-drawn set is the default — they were
-        drawn for this app, by hand, on paper. The generated ones are the originals, kept for anyone
-        who prefers them.
+        {{ 'settings.blue.art.hint' | transloco }}
       </span>
     </div>
   </div>
 
   <div class="srow">
-    <span class="slabel">Theme</span>
+    <span class="slabel">{{ 'settings.blue.theme' | transloco }}</span>
     <div class="scontrol">
       <label class="radioline">
         <input
@@ -76,7 +72,7 @@
           (ngModelChange)="prefs.setThemeMode($event)"
           name="theme"
         />
-        Automatic
+        {{ 'settings.blue.theme.auto' | transloco }}
       </label>
       <label class="radioline">
         <input
@@ -86,7 +82,7 @@
           (ngModelChange)="prefs.setThemeMode($event)"
           name="theme"
         />
-        Light
+        {{ 'settings.blue.theme.light' | transloco }}
       </label>
       <label class="radioline">
         <input
@@ -96,17 +92,16 @@
           (ngModelChange)="prefs.setThemeMode($event)"
           name="theme"
         />
-        Dark
+        {{ 'settings.blue.theme.dark' | transloco }}
       </label>
       <span class="hint">
-        Automatic follows your system preference. Everything on this page applies immediately and is
-        saved in this browser.
+        {{ 'settings.blue.theme.hint' | transloco }}
       </span>
     </div>
   </div>
 
   <div class="srow">
-    <span class="slabel">Accent color</span>
+    <span class="slabel">{{ 'settings.blue.accent' | transloco }}</span>
     <div class="scontrol">
       <div class="accent-swatches">
         @for (preset of accents; track preset.id) {
@@ -115,8 +110,10 @@
             class="swatch"
             [class.selected]="prefs.accentId() === preset.id"
             [style.background]="preset.accent"
-            [title]="preset.label"
-            [attr.aria-label]="'Accent color: ' + preset.label"
+            [title]="preset.labelKey | transloco"
+            [attr.aria-label]="
+              'settings.blue.accent.aria' | transloco: { color: preset.labelKey | transloco }
+            "
             [attr.aria-pressed]="prefs.accentId() === preset.id"
             (click)="prefs.setAccent(preset.id)"
           ></button>
@@ -126,10 +123,10 @@
   </div>
 
   <div class="srow">
-    <span class="slabel">Custom colors</span>
+    <span class="slabel">{{ 'settings.blue.custom' | transloco }}</span>
     <div class="scontrol">
       <label class="inline-field">
-        Background
+        {{ 'settings.blue.custom.bg' | transloco }}
         <input
           type="color"
           [ngModel]="prefs.customBg() ?? '#f7f9f9'"
@@ -137,11 +134,13 @@
           name="custom_bg"
         />
         @if (prefs.customBg()) {
-          <button type="button" class="linklike" (click)="prefs.setCustomBg(null)">reset</button>
+          <button type="button" class="linklike" (click)="prefs.setCustomBg(null)">
+            {{ 'settings.blue.reset' | transloco }}
+          </button>
         }
       </label>
       <label class="inline-field">
-        Links &amp; buttons
+        {{ 'settings.blue.custom.links' | transloco }}
         <input
           type="color"
           [ngModel]="prefs.customLink() ?? '#1da1f2'"
@@ -149,11 +148,13 @@
           name="custom_link"
         />
         @if (prefs.customLink()) {
-          <button type="button" class="linklike" (click)="prefs.setCustomLink(null)">reset</button>
+          <button type="button" class="linklike" (click)="prefs.setCustomLink(null)">
+            {{ 'settings.blue.reset' | transloco }}
+          </button>
         }
       </label>
       <label class="inline-field">
-        Sidebar cards
+        {{ 'settings.blue.custom.sidebar' | transloco }}
         <input
           type="color"
           [ngModel]="prefs.customSidebar() ?? '#ffffff'"
@@ -162,19 +163,18 @@
         />
         @if (prefs.customSidebar()) {
           <button type="button" class="linklike" (click)="prefs.setCustomSidebar(null)">
-            reset
+            {{ 'settings.blue.reset' | transloco }}
           </button>
         }
       </label>
       <span class="hint">
-        Overrides ride on top of the theme; reset any of them to fall back to the theme's own color.
-        A custom link color replaces the accent preset above.
+        {{ 'settings.blue.custom.hint' | transloco }}
       </span>
     </div>
   </div>
 
   <div class="srow">
-    <span class="slabel">Favourites look like</span>
+    <span class="slabel">{{ 'settings.blue.favStyle' | transloco }}</span>
     <div class="scontrol">
       <label class="radioline">
         <input
@@ -184,7 +184,7 @@
           (ngModelChange)="prefs.setFavStyle($event)"
           name="fav_style"
         />
-        ⭐ Stars (classic Mastodon)
+        {{ 'settings.blue.favStyle.stars' | transloco }}
       </label>
       <label class="radioline">
         <input
@@ -194,211 +194,231 @@
           (ngModelChange)="prefs.setFavStyle($event)"
           name="fav_style"
         />
-        ❤️ Hearts (like the bird site)
+        {{ 'settings.blue.favStyle.hearts' | transloco }}
       </label>
     </div>
   </div>
 
-  <div class="srow">
-    <span class="slabel">Posts are called</span>
-    <div class="scontrol">
-      <label class="radioline">
-        <input
-          type="radio"
-          value="post"
-          [ngModel]="prefs.postNoun()"
-          (ngModelChange)="prefs.setPostNoun($event)"
-          name="post_noun"
-        />
-        Posts &amp; boosts (Mastodon)
-      </label>
-      <label class="radioline">
-        <input
-          type="radio"
-          value="tweet"
-          [ngModel]="prefs.postNoun()"
-          (ngModelChange)="prefs.setPostNoun($event)"
-          name="post_noun"
-        />
-        Tweets &amp; retweets (like the bird site)
-      </label>
-      <label class="radioline">
-        <input
-          type="radio"
-          value="florp"
-          [ngModel]="prefs.postNoun()"
-          (ngModelChange)="prefs.setPostNoun($event)"
-          name="post_noun"
-        />
-        Florps &amp; reflorps (nobody else's word)
-      </label>
-      <label class="radioline">
-        <input
-          type="radio"
-          value="skeet"
-          [ngModel]="prefs.postNoun()"
-          (ngModelChange)="prefs.setPostNoun($event)"
-          name="post_noun"
-        />
-        Skeets &amp; reskeets (Bluesky)
-      </label>
-      <label class="radioline">
-        <input
-          type="radio"
-          value="toot"
-          [ngModel]="prefs.postNoun()"
-          (ngModelChange)="prefs.setPostNoun($event)"
-          name="post_noun"
-        />
-        Toots &amp; boosts (classic Mastodon)
-      </label>
-      <label class="radioline custom-choice">
-        <input
-          type="radio"
-          value="custom"
-          [ngModel]="prefs.postNoun()"
-          (ngModelChange)="prefs.setPostNoun($event)"
-          name="post_noun"
-        />
-        <span><strong>Your words</strong> — call them whatever you want</span>
-      </label>
+  <!--
+    Terminology is an English-only feature by decree: every option here is an
+    English word or an English joke, and the words it sets get composed into
+    sentences in ways that only work in English. Offering a German reader a
+    choice between "Florps" and "Skeets" — and then splicing the winner into
+    German sentences — is worse than not offering it. Their stored choice is
+    kept, so switching the interface back to English finds it intact.
+  -->
+  @if (terminologyAvailable()) {
+    <!--
+    Terminology is an English-only feature by decree: every option here is an
+    English word or an English joke, and the words it sets get composed into
+    sentences in ways that only work in English. Offering a German reader a
+    choice between "Florps" and "Skeets" — and then splicing the winner into
+    German sentences — is worse than not offering it. Their stored choice is
+    kept, so switching the interface back to English finds it intact.
+  -->
+    @if (terminologyAvailable()) {
+      <div class="srow">
+        <span class="slabel">Posts are called</span>
+        <div class="scontrol">
+          <label class="radioline">
+            <input
+              type="radio"
+              value="post"
+              [ngModel]="prefs.postNoun()"
+              (ngModelChange)="prefs.setPostNoun($event)"
+              name="post_noun"
+            />
+            Posts &amp; boosts (Mastodon)
+          </label>
+          <label class="radioline">
+            <input
+              type="radio"
+              value="tweet"
+              [ngModel]="prefs.postNoun()"
+              (ngModelChange)="prefs.setPostNoun($event)"
+              name="post_noun"
+            />
+            Tweets &amp; retweets (like the bird site)
+          </label>
+          <label class="radioline">
+            <input
+              type="radio"
+              value="florp"
+              [ngModel]="prefs.postNoun()"
+              (ngModelChange)="prefs.setPostNoun($event)"
+              name="post_noun"
+            />
+            Florps &amp; reflorps (nobody else's word)
+          </label>
+          <label class="radioline">
+            <input
+              type="radio"
+              value="skeet"
+              [ngModel]="prefs.postNoun()"
+              (ngModelChange)="prefs.setPostNoun($event)"
+              name="post_noun"
+            />
+            Skeets &amp; reskeets (Bluesky)
+          </label>
+          <label class="radioline">
+            <input
+              type="radio"
+              value="toot"
+              [ngModel]="prefs.postNoun()"
+              (ngModelChange)="prefs.setPostNoun($event)"
+              name="post_noun"
+            />
+            Toots &amp; boosts (classic Mastodon)
+          </label>
+          <label class="radioline custom-choice">
+            <input
+              type="radio"
+              value="custom"
+              [ngModel]="prefs.postNoun()"
+              (ngModelChange)="prefs.setPostNoun($event)"
+              name="post_noun"
+            />
+            <span><strong>Your words</strong> — call them whatever you want</span>
+          </label>
 
-      @if (prefs.postNoun() === 'custom') {
-        <div class="terminology-custom" aria-label="Custom vocabulary">
-          <div class="terminology-intro">
-            <span>
-              Mawkingbird uses these forms throughout buttons, menus, notices, and sentences.
-              Changes apply instantly.
+          @if (prefs.postNoun() === 'custom') {
+            <div class="terminology-custom" aria-label="Custom vocabulary">
+              <div class="terminology-intro">
+                <span>
+                  Mawkingbird uses these forms throughout buttons, menus, notices, and sentences.
+                  Changes apply instantly.
+                </span>
+                <button
+                  type="button"
+                  class="terminology-reset"
+                  (click)="prefs.resetCustomTerminology()"
+                >
+                  Reset example
+                </button>
+              </div>
+
+              <div class="terminology-fields">
+                <label>
+                  <span>One item</span>
+                  <input
+                    type="text"
+                    maxlength="40"
+                    autocomplete="off"
+                    [ngModel]="prefs.customTerminology().post"
+                    (ngModelChange)="setCustomWord('post', $event)"
+                    name="custom_post"
+                    placeholder="chirp"
+                  />
+                </label>
+                <label>
+                  <span>Many items</span>
+                  <input
+                    type="text"
+                    maxlength="40"
+                    autocomplete="off"
+                    [ngModel]="prefs.customTerminology().posts"
+                    (ngModelChange)="setCustomWord('posts', $event)"
+                    name="custom_posts"
+                    placeholder="chirps"
+                  />
+                </label>
+                <label>
+                  <span>Person</span>
+                  <input
+                    type="text"
+                    maxlength="40"
+                    autocomplete="off"
+                    [ngModel]="prefs.customTerminology().poster"
+                    (ngModelChange)="setCustomWord('poster', $event)"
+                    name="custom_poster"
+                    placeholder="chirper"
+                  />
+                </label>
+                <label>
+                  <span>Published, past tense</span>
+                  <input
+                    type="text"
+                    maxlength="40"
+                    autocomplete="off"
+                    [ngModel]="prefs.customTerminology().posted"
+                    (ngModelChange)="setCustomWord('posted', $event)"
+                    name="custom_posted"
+                    placeholder="chirped"
+                  />
+                </label>
+                <label>
+                  <span>Share again</span>
+                  <input
+                    type="text"
+                    maxlength="40"
+                    autocomplete="off"
+                    [ngModel]="prefs.customTerminology().boost"
+                    (ngModelChange)="setCustomWord('boost', $event)"
+                    name="custom_boost"
+                    placeholder="echo"
+                  />
+                </label>
+                <label>
+                  <span>Many re-shares</span>
+                  <input
+                    type="text"
+                    maxlength="40"
+                    autocomplete="off"
+                    [ngModel]="prefs.customTerminology().boosts"
+                    (ngModelChange)="setCustomWord('boosts', $event)"
+                    name="custom_boosts"
+                    placeholder="echoes"
+                  />
+                </label>
+                <label>
+                  <span>Re-shared, past tense</span>
+                  <input
+                    type="text"
+                    maxlength="40"
+                    autocomplete="off"
+                    [ngModel]="prefs.customTerminology().boosted"
+                    (ngModelChange)="setCustomWord('boosted', $event)"
+                    name="custom_boosted"
+                    placeholder="echoed"
+                  />
+                </label>
+              </div>
+
+              <div class="terminology-preview" aria-live="polite">
+                <span class="terminology-preview-label">Live preview</span>
+                <strong>{{ words().Posts }}</strong> · {{ words().PostAll }} ·
+                {{ words().BoostedBy }} Riley · Undo {{ words().boost }}
+              </div>
+            </div>
+          } @else {
+            <span class="hint">
+              Sick of new words per platform? Bring the old ones back — or make your own.
             </span>
-            <button
-              type="button"
-              class="terminology-reset"
-              (click)="prefs.resetCustomTerminology()"
-            >
-              Reset example
-            </button>
-          </div>
-
-          <div class="terminology-fields">
-            <label>
-              <span>One item</span>
-              <input
-                type="text"
-                maxlength="40"
-                autocomplete="off"
-                [ngModel]="prefs.customTerminology().post"
-                (ngModelChange)="setCustomWord('post', $event)"
-                name="custom_post"
-                placeholder="chirp"
-              />
-            </label>
-            <label>
-              <span>Many items</span>
-              <input
-                type="text"
-                maxlength="40"
-                autocomplete="off"
-                [ngModel]="prefs.customTerminology().posts"
-                (ngModelChange)="setCustomWord('posts', $event)"
-                name="custom_posts"
-                placeholder="chirps"
-              />
-            </label>
-            <label>
-              <span>Person</span>
-              <input
-                type="text"
-                maxlength="40"
-                autocomplete="off"
-                [ngModel]="prefs.customTerminology().poster"
-                (ngModelChange)="setCustomWord('poster', $event)"
-                name="custom_poster"
-                placeholder="chirper"
-              />
-            </label>
-            <label>
-              <span>Published, past tense</span>
-              <input
-                type="text"
-                maxlength="40"
-                autocomplete="off"
-                [ngModel]="prefs.customTerminology().posted"
-                (ngModelChange)="setCustomWord('posted', $event)"
-                name="custom_posted"
-                placeholder="chirped"
-              />
-            </label>
-            <label>
-              <span>Share again</span>
-              <input
-                type="text"
-                maxlength="40"
-                autocomplete="off"
-                [ngModel]="prefs.customTerminology().boost"
-                (ngModelChange)="setCustomWord('boost', $event)"
-                name="custom_boost"
-                placeholder="echo"
-              />
-            </label>
-            <label>
-              <span>Many re-shares</span>
-              <input
-                type="text"
-                maxlength="40"
-                autocomplete="off"
-                [ngModel]="prefs.customTerminology().boosts"
-                (ngModelChange)="setCustomWord('boosts', $event)"
-                name="custom_boosts"
-                placeholder="echoes"
-              />
-            </label>
-            <label>
-              <span>Re-shared, past tense</span>
-              <input
-                type="text"
-                maxlength="40"
-                autocomplete="off"
-                [ngModel]="prefs.customTerminology().boosted"
-                (ngModelChange)="setCustomWord('boosted', $event)"
-                name="custom_boosted"
-                placeholder="echoed"
-              />
-            </label>
-          </div>
-
-          <div class="terminology-preview" aria-live="polite">
-            <span class="terminology-preview-label">Live preview</span>
-            <strong>{{ words().Posts }}</strong> · {{ words().PostAll }} ·
-            {{ words().BoostedBy }} Riley · Undo {{ words().boost }}
-          </div>
+          }
         </div>
-      } @else {
-        <span class="hint">
-          Sick of new words per platform? Bring the old ones back — or make your own.
-        </span>
-      }
-    </div>
-  </div>
+      </div>
+    }
 
-  <div class="srow">
-    <span class="slabel">Zen mode</span>
-    <div class="scontrol">
-      <label class="checkline">
-        <input
-          type="checkbox"
-          [ngModel]="prefs.zenMode()"
-          (ngModelChange)="prefs.setZenMode($event)"
-          name="zen_mode"
-        />
-        Hide both sidebars — just you and the feed
-      </label>
+    <div class="srow">
+      <span class="slabel">Zen mode</span>
+      <div class="scontrol">
+        <label class="checkline">
+          <input
+            type="checkbox"
+            [ngModel]="prefs.zenMode()"
+            (ngModelChange)="prefs.setZenMode($event)"
+            name="zen_mode"
+          />
+          Hide both sidebars — just you and the feed
+        </label>
+      </div>
     </div>
-  </div>
+  }
 </div>
 
 <div class="ssection">
   <div class="srow">
-    <span class="slabel">Posting</span>
+    <span class="slabel">{{ 'settings.blue.posting' | transloco }}</span>
     <div class="scontrol">
       <label class="checkline">
         <input
@@ -407,7 +427,7 @@
           (ngModelChange)="prefs.setConfirmBeforePost($event)"
           name="confirm_before_post"
         />
-        Ask "do you really want to post that?" before posting
+        {{ 'settings.blue.confirmPost' | transloco }}
       </label>
       <label class="checkline">
         <input
@@ -416,7 +436,7 @@
           (ngModelChange)="prefs.setDelayedSend($event)"
           name="delayed_send"
         />
-        Wait 30 seconds before posting, so you can cancel (or publish early)
+        {{ 'settings.blue.delayedSend' | transloco }}
       </label>
       <label class="checkline">
         <input
@@ -425,7 +445,7 @@
           (ngModelChange)="prefs.setRequireAltText($event)"
           name="require_alt_text"
         />
-        Require a description on every attachment before posting
+        {{ 'settings.writing.requireAlt' | transloco }}
       </label>
       <label class="checkline">
         <input
@@ -434,12 +454,10 @@
           (ngModelChange)="prefs.setThoughtfulPosting($event)"
           name="thoughtful_posting"
         />
-        Thoughtful posting: nothing publishes straight from a box
+        {{ 'settings.writing.thoughtful' | transloco }}
       </label>
       <span class="hint">
-        Home drops the Quick post button, leaving only Write, and that editor only saves. You post
-        later, from Drafts. Replies, chats and paste shares are never held back — they're urgent, or
-        already deliberate.
+        {{ 'settings.blue.thoughtful.hint' | transloco }}
       </span>
       <label class="checkline">
         <input
@@ -448,18 +466,18 @@
           (ngModelChange)="prefs.setAutoShowMiniComposer($event)"
           name="auto_show_mini_composer"
         />
-        Open the mini composer on Home automatically
+        {{ 'settings.blue.miniComposer' | transloco }}
       </label>
       <span class="hint">
-        Off by default: Home offers Write and Quick post, and the small box appears when you ask for
-        it. Turn this on to have it open on arrival. Thoughtful posting, above, overrides this.
-        These also live on <a routerLink="/settings/writing">Writing</a>.
+        {{ 'settings.blue.miniComposer.hint' | transloco }}
+        <a routerLink="/settings/writing">{{ 'settings.writing.title.plain' | transloco }}</a
+        >.
       </span>
     </div>
   </div>
 
   <div class="srow">
-    <span class="slabel">Blue checks</span>
+    <span class="slabel">{{ 'settings.blue.checks' | transloco }}</span>
     <div class="scontrol">
       <label class="radioline">
         <input
@@ -469,7 +487,7 @@
           (ngModelChange)="prefs.setVerifiedMode($event)"
           name="verified_mode"
         />
-        Top accounts only (a fixed follower bar)
+        {{ 'settings.blue.checks.top' | transloco }}
       </label>
       <label class="radioline">
         <input
@@ -479,7 +497,7 @@
           (ngModelChange)="prefs.setVerifiedMode($event)"
           name="verified_mode"
         />
-        More followers than me — compared to me, they're famous
+        {{ 'settings.blue.checks.relative' | transloco }}
       </label>
       <label class="radioline">
         <input
@@ -489,7 +507,7 @@
           (ngModelChange)="prefs.setVerifiedMode($event)"
           name="verified_mode"
         />
-        Everyone, because everyone deserves a blue check mark
+        {{ 'settings.blue.checks.everyone' | transloco }}
       </label>
     </div>
   </div>
@@ -497,7 +515,7 @@
 
 <div class="ssection">
   <div class="srow">
-    <span class="slabel">Timeline</span>
+    <span class="slabel">{{ 'settings.blue.timeline' | transloco }}</span>
     <div class="scontrol">
       <label class="checkline">
         <input
@@ -506,12 +524,10 @@
           (ngModelChange)="prefs.setAutoRefreshTimeline($event)"
           name="auto_refresh_timeline"
         />
-        Auto-refresh timeline — new posts arrive continually, without you asking
+        {{ 'settings.blue.autoRefresh' | transloco }}
       </label>
       <p class="muted small">
-        Off by default, and worth leaving off: a feed that rewrites itself moves the post you were
-        halfway through reading. Mastodon only — Twitter, Bluesky and RSS are polled and are not
-        affected.
+        {{ 'settings.blue.autoRefresh.hint' | transloco }}
       </p>
     </div>
   </div>
@@ -519,10 +535,10 @@
 
 <div class="ssection">
   <div class="srow">
-    <span class="slabel">Reader typography</span>
+    <span class="slabel">{{ 'settings.blue.typography' | transloco }}</span>
     <div class="scontrol">
       <label class="inline-field">
-        Font family
+        {{ 'settings.blue.fontFamily' | transloco }}
         <select
           [ngModel]="prefs.readerFontFamily()"
           (ngModelChange)="prefs.setReaderFontFamily($event)"
@@ -546,16 +562,16 @@
         />
       </label>
       <label class="inline-field">
-        Font weight
+        {{ 'settings.blue.fontWeight' | transloco }}
         <select
           [ngModel]="prefs.readerFontWeight()"
           (ngModelChange)="prefs.setReaderFontWeight(+$event)"
           name="reader_font_weight"
         >
-          <option [value]="300">Light</option>
-          <option [value]="400">Normal</option>
-          <option [value]="600">Semi-bold</option>
-          <option [value]="700">Bold</option>
+          <option [value]="300">{{ 'settings.blue.theme.light' | transloco }}</option>
+          <option [value]="400">{{ 'settings.blue.weight.normal' | transloco }}</option>
+          <option [value]="600">{{ 'settings.blue.weight.semibold' | transloco }}</option>
+          <option [value]="700">{{ 'settings.blue.weight.bold' | transloco }}</option>
         </select>
       </label>
       <label class="inline-field">
@@ -595,24 +611,24 @@
         />
       </label>
       <label class="inline-field">
-        Text alignment
+        {{ 'settings.blue.textAlign' | transloco }}
         <select
           [ngModel]="prefs.readerTextAlign()"
           (ngModelChange)="prefs.setReaderTextAlign($event)"
           name="reader_text_align"
         >
-          <option value="left">Left</option>
-          <option value="justify">Justified</option>
+          <option value="left">{{ 'settings.blue.align.left' | transloco }}</option>
+          <option value="justify">{{ 'settings.blue.align.justify' | transloco }}</option>
         </select>
       </label>
       <span class="hint">
-        Applies to reader mode on threads and, when feed reader is on, to every timeline.
+        {{ 'settings.blue.typography.hint' | transloco }}
       </span>
     </div>
   </div>
 
   <div class="srow">
-    <span class="slabel">Feed</span>
+    <span class="slabel">{{ 'settings.blue.feed' | transloco }}</span>
     <div class="scontrol">
       <label class="checkline">
         <input
@@ -621,7 +637,7 @@
           (ngModelChange)="prefs.setFeedReader($event)"
           name="feed_reader"
         />
-        Reader mode for feeds (reader typography, no pictures)
+        {{ 'settings.blue.feedReader' | transloco }}
       </label>
       <label class="checkline">
         <input
@@ -630,7 +646,7 @@
           (ngModelChange)="prefs.setShowImages($event)"
           name="show_images"
         />
-        Show images in feeds (off replaces pictures with a 🖼️ chip)
+        {{ 'settings.blue.showImages' | transloco }}
       </label>
 
       <label class="inline-field">
@@ -646,7 +662,7 @@
         />
       </label>
       <span class="hint">
-        Auto-loads more until the feed holds at least this many posts (or the timeline runs out).
+        {{ 'settings.blue.minPosts.hint' | transloco }}
       </span>
 
       <label class="inline-field">
@@ -662,8 +678,7 @@
         />
       </label>
       <span class="hint">
-        “You’ve had enough for now.” Load more is disabled once the feed reaches this size; it lifts
-        after about an hour or when you reload.
+        {{ 'settings.blue.maxPosts.hint' | transloco }}
       </span>
 
       <label class="checkline">
@@ -673,19 +688,16 @@
           (ngModelChange)="prefs.setIgnoreFeedCooldown($event)"
           name="ignore_feed_cooldown"
         />
-        Ignore the reading break
+        {{ 'settings.blue.ignoreCooldown' | transloco }}
       </label>
       <span class="hint">
-        Keeps “Load more” working past the maximum, with no cooldown. The break is a health guard,
-        not a technical limit — this is here because it is your call, and it lives in Settings
-        rather than at the end of the feed so that turning it off is a decision rather than a
-        reflex.
+        {{ 'settings.blue.ignoreCooldown.hint' | transloco }}
       </span>
     </div>
   </div>
 
   <div class="srow">
-    <span class="slabel">Analytics</span>
+    <span class="slabel">{{ 'settings.privacy.analytics' | transloco }}</span>
     <div class="scontrol">
       <label class="checkline">
         <input
@@ -694,13 +706,10 @@
           (ngModelChange)="prefs.setAnalytics($event)"
           name="analytics"
         />
-        Count my page views
+        {{ 'settings.privacy.analytics.label' | transloco }}
       </label>
       <span class="hint">
-        Anonymous page counts only — which kinds of page get used, never which account, post or tag
-        you looked at, and never a query string. Turn this off and the analytics script is never
-        loaded at all: nothing is fetched, counted or sent. The script is served from this site, not
-        from a third party.
+        {{ 'settings.blue.analytics.hint' | transloco }}
       </span>
     </div>
   </div>

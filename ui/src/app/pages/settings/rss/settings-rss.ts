@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { ClientPrefs, RSS_CACHE_TTL_OPTIONS } from '../../../client-prefs';
 import { CorsProxySettings } from '../../../providers/cors-proxy/cors-proxy-settings';
@@ -48,9 +49,64 @@ interface ImportReport {
  * Connections; what belongs on this page is the one question that is actually
  * about feeds — "should *this* feed go through it?".
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.rss.title: 📡 RSS feeds
+// i18n settings.rss.intro: Any RSS or Atom feed becomes posts in your home feed, read-only, with an "Open original" link. No account, no credential — a feed URL is all it takes.
+// i18n settings.rss.cors: Mockingbird has no server, so a feed only works if its site allows browser (CORS) access. Plenty don't. You'll know right away when you add one, because adding it fetches it.
+// i18n settings.rss.saved: {{count}} of {{limit}} feeds saved in this browser.
+// i18n settings.rss.proxy.before: Feeds that block browser access can be routed through
+// i18n settings.rss.proxy.after: , per feed, below.
+// i18n settings.rss.proxy.incomplete: Your CORS proxy is selected but not finished — it still needs a key or a valid address.
+// i18n settings.rss.proxy.none: No CORS proxy is set up. Without one, feeds that block browser access can't be read at all.
+// i18n settings.rss.proxy.change: Change
+// i18n settings.rss.proxy.setUp: Set one up
+// i18n settings.rss.scrollRead: Mark items read as I scroll past them
+// i18n settings.rss.scrollRead.hint: Off by default. Opening an item always marks it read regardless of this setting; this only covers items you scrolled past without opening, and waits until one has been on screen for a moment so a fast scroll to the bottom does not mark everything on the way.
+// i18n settings.rss.readOne: {{count}} item marked read, {{starred}} starred.
+// i18n settings.rss.readOther: {{count}} items marked read, {{starred}} starred.
+// i18n settings.rss.clearHistory: Clear reading history
+// i18n settings.rss.reuseFor: Reuse a fetched feed for
+// i18n settings.rss.cache.hint: Feeds are re-read by every view that shows them. Without a cache that is a request per visit — enough to exhaust a free CORS proxy's rate limit just by reading. Cached feeds are kept in this browser's IndexedDB, which has room for feeds far too large for ordinary settings storage.
+// i18n settings.rss.cachedOne: {{count}} feed cached in this browser.
+// i18n settings.rss.cachedOther: {{count}} feeds cached in this browser.
+// i18n settings.rss.cachedNone: Nothing cached yet.
+// i18n settings.rss.clearCache: Clear cache
+// i18n settings.rss.feedUrlPlaceholder: https://example.com/feed.xml
+// i18n settings.rss.checking: Checking…
+// i18n settings.rss.addFeed: Add feed
+// i18n settings.rss.retryVia: Try again via {{proxy}}
+// i18n settings.rss.proxyWarning: The proxy will see this feed's address and its contents.
+// i18n settings.rss.opml: 📄 Import & export (OPML)
+// i18n settings.rss.opml.hint: OPML is the subscription-list format every feed reader speaks. Export yours to move it somewhere else, or import a file from a reader you are leaving. Folders in an imported file are flattened — Mawkingbird has no folders yet.
+// i18n settings.rss.maxFeeds: Maximum feeds
+// i18n settings.rss.save: Save
+// i18n settings.rss.maxFeeds.hint: We suggest no more than {{recommended}}. Every feed is re-read by every view that shows them, so a long list opens slower and uses more of a free CORS proxy's quota — but it is your reading list, so set it where you want it. Lowering this never deletes a feed you already have.
+// i18n settings.rss.exportOpml: Export OPML
+// i18n settings.rss.importing: Importing…
+// i18n settings.rss.importOpml: Import OPML
+// i18n settings.rss.import.progress: Checking feed {{done}} of {{total}} — each one is fetched to prove this browser can actually read it.
+// i18n settings.rss.import.added: Added {{added}} of {{total}} feeds.
+// i18n settings.rss.import.already: {{count}} were already in your list.
+// i18n settings.rss.import.overLimit: {{count}} went past your limit of {{limit}}. Raise it above and import the same file again to pick up the rest.
+// i18n settings.rss.import.failed: {{count}} could not be read
+// i18n settings.rss.import.corsHint.before: — usually this is CORS, which a
+// i18n settings.rss.import.corsHint.link: CORS proxy
+// i18n settings.rss.import.corsHint.after:  can fix.
+// i18n settings.rss.import.whichFailed: Which ones failed
+// i18n settings.rss.viaProxy: via proxy
+// i18n settings.rss.viaProxy.title: Fetched through your CORS proxy
+// i18n settings.rss.fetchThrough: Fetch through {{proxy}}
+// i18n settings.rss.proxy: Proxy
+// i18n settings.rss.open: Open
+// i18n settings.rss.open.title: Open this feed's page
+// i18n settings.rss.refresh: Refresh
+// i18n settings.rss.refreshing: Refreshing…
+// i18n settings.rss.refresh.title: Fetch this feed again now
+// i18n settings.rss.remove: Remove
+// i18n settings.rss.noFeeds: No feeds yet.
 @Component({
   selector: 'app-settings-rss',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TranslocoPipe],
   templateUrl: './settings-rss.html',
   styleUrl: './settings-rss.css',
 })
@@ -68,6 +124,8 @@ export class SettingsRss implements OnInit {
   /** URL of the feed currently being force-refreshed, if any. */
   protected refreshing = signal<string | null>(null);
   /** How much is cached, or null before the count comes back. */
+  private transloco = inject(TranslocoService);
+
   protected cacheSummary = signal<string | null>(null);
 
   protected feedUrl = signal('');
@@ -382,8 +440,11 @@ export class SettingsRss implements OnInit {
     const cached = entries.filter((entry) => entry.fetchedAt > 0).length;
     this.cacheSummary.set(
       cached
-        ? `${cached} feed${cached === 1 ? '' : 's'} cached in this browser.`
-        : 'Nothing cached yet.',
+        ? this.transloco.translate<string>(
+            cached === 1 ? 'settings.rss.cachedOne' : 'settings.rss.cachedOther',
+            { count: cached },
+          )
+        : this.transloco.translate<string>('settings.rss.cachedNone'),
     );
   }
 }

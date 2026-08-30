@@ -150,15 +150,18 @@ export function pkmLabel(kind: PkmKind, vocab: PkmVocabulary): string {
   return `#${tagFor(kind, vocab).toUpperCase()}`;
 }
 
-/** How to describe a kind in a sentence. */
-export function pkmNoun(kind: PkmKind): string {
+/** Translation key describing a kind in a sentence. */
+// i18n pkm.noun.note: note
+// i18n pkm.noun.todo: to-do
+// i18n pkm.noun.cal: calendar item
+export function pkmNounKey(kind: PkmKind): string {
   switch (kind) {
     case 'note':
-      return 'note';
+      return 'pkm.noun.note';
     case 'todo':
-      return 'to-do';
+      return 'pkm.noun.todo';
     case 'cal':
-      return 'calendar item';
+      return 'pkm.noun.cal';
   }
 }
 

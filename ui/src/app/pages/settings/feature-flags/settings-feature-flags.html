@@ -1,96 +1,99 @@
 <div class="spage-head">
-  <h1>Feature flags</h1>
-  <p>Choose which release channel can use features that are being rolled out.</p>
+  <h1>{{ 'settings.flags.title' | transloco }}</h1>
+  <p>{{ 'settings.flags.intro' | transloco }}</p>
 </div>
 
 <div class="spage-body">
   <div class="ssection">
-    <h2>Features</h2>
+    <h2>{{ 'settings.flags.features' | transloco }}</h2>
     @for (flag of featureFlags; track flag.id) {
       <div class="srow">
-        <span class="slabel">{{ flag.label }}</span>
+        <span class="slabel">{{ flag.labelKey | transloco }}</span>
         <div class="scontrol">
           <select
             [ngModel]="state(flag)"
             (ngModelChange)="setState(flag, $event)"
-            [attr.aria-label]="flag.label + ' rollout'"
+            [attr.aria-label]="
+              'settings.flags.rollout' | transloco: { flag: flag.labelKey | transloco }
+            "
           >
-            <option value="production">Production</option>
-            <option value="canary">Canary and test</option>
-            <option value="test">Test only</option>
-            <option value="off">Off everywhere</option>
+            <option value="production">{{ 'settings.flags.state.production' | transloco }}</option>
+            <option value="canary">{{ 'settings.flags.state.canary' | transloco }}</option>
+            <option value="test">{{ 'settings.flags.state.test' | transloco }}</option>
+            <option value="off">{{ 'settings.flags.state.off' | transloco }}</option>
           </select>
-          <span class="hint">{{ flag.description }}</span>
-          <span class="hint">{{ defaultHint(flag) }}</span>
+          <span class="hint">{{ flag.descriptionKey | transloco }}</span>
+          <span class="hint">{{ defaultHintKey | transloco: defaultHintParams(flag) }}</span>
         </div>
       </div>
     }
   </div>
 
   <div class="ssection" id="connectors">
-    <h2>Connectors</h2>
+    <h2>{{ 'settings.flags.connectors' | transloco }}</h2>
     <p class="hint">
-      One switch per service, because that is how they break — when a third-party API goes down or
-      starts refusing browsers, turning that one off stops people setting it up and hitting the
-      failure. A turned-off connector still appears under
-      <a [routerLink]="['/settings/connections']">Connections</a>, greyed out. Anything you have
-      already connected keeps its credential; it just stops being offered.
+      {{ 'settings.flags.connectors.hint.before' | transloco }}
+      <a [routerLink]="['/settings/connections']">{{
+        'settings.flags.connectors.link' | transloco
+      }}</a
+      >{{ 'settings.flags.connectors.hint.after' | transloco }}
     </p>
     @for (flag of connectorFlags; track flag.id) {
       <div class="srow">
-        <span class="slabel">{{ flag.label }}</span>
+        <span class="slabel">{{ flag.labelKey | transloco }}</span>
         <div class="scontrol">
           <select
             [ngModel]="state(flag)"
             (ngModelChange)="setState(flag, $event)"
-            [attr.aria-label]="flag.label + ' rollout'"
+            [attr.aria-label]="
+              'settings.flags.rollout' | transloco: { flag: flag.labelKey | transloco }
+            "
           >
-            <option value="production">Production</option>
-            <option value="canary">Canary and test</option>
-            <option value="test">Test only</option>
-            <option value="off">Off everywhere</option>
+            <option value="production">{{ 'settings.flags.state.production' | transloco }}</option>
+            <option value="canary">{{ 'settings.flags.state.canary' | transloco }}</option>
+            <option value="test">{{ 'settings.flags.state.test' | transloco }}</option>
+            <option value="off">{{ 'settings.flags.state.off' | transloco }}</option>
           </select>
-          <span class="hint">{{ flag.description }}</span>
-          <span class="hint">{{ defaultHint(flag) }}</span>
+          <span class="hint">{{ flag.descriptionKey | transloco }}</span>
+          <span class="hint">{{ defaultHintKey | transloco: defaultHintParams(flag) }}</span>
         </div>
       </div>
     }
   </div>
 
   <div class="ssection" id="proxies">
-    <h2>CORS proxies</h2>
+    <h2>{{ 'settings.flags.proxies' | transloco }}</h2>
     <p class="hint">
-      Which public CORS proxies are offered under
-      <a [routerLink]="['/settings/connections/cors-proxy']">Connections → CORS proxy</a>. All four
-      are off by default: each one failed often enough in testing — stripped API keys, aggressive
-      rate limits, domain registration required, or simply very slow — that recommending them made
-      setup look broken. What remains is the Mawkingbird proxy and any proxy you run yourself.
-      Turning one on here adds it back to the picker, with its measured limitations written on the
-      card. Turning one off also stops it being used if it was already selected.
+      {{ 'settings.flags.proxies.hint.before' | transloco }}
+      <a [routerLink]="['/settings/connections/cors-proxy']">{{
+        'settings.flags.proxies.link' | transloco
+      }}</a
+      >{{ 'settings.flags.proxies.hint.after' | transloco }}
     </p>
     @for (flag of proxyFlags; track flag.id) {
       <div class="srow">
-        <span class="slabel">{{ flag.label }}</span>
+        <span class="slabel">{{ flag.labelKey | transloco }}</span>
         <div class="scontrol">
           <select
             [ngModel]="state(flag)"
             (ngModelChange)="setState(flag, $event)"
-            [attr.aria-label]="flag.label + ' rollout'"
+            [attr.aria-label]="
+              'settings.flags.rollout' | transloco: { flag: flag.labelKey | transloco }
+            "
           >
-            <option value="production">Production</option>
-            <option value="canary">Canary and test</option>
-            <option value="test">Test only</option>
-            <option value="off">Off everywhere</option>
+            <option value="production">{{ 'settings.flags.state.production' | transloco }}</option>
+            <option value="canary">{{ 'settings.flags.state.canary' | transloco }}</option>
+            <option value="test">{{ 'settings.flags.state.test' | transloco }}</option>
+            <option value="off">{{ 'settings.flags.state.off' | transloco }}</option>
           </select>
-          <span class="hint">{{ flag.description }}</span>
-          <span class="hint">{{ defaultHint(flag) }}</span>
+          <span class="hint">{{ flag.descriptionKey | transloco }}</span>
+          <span class="hint">{{ defaultHintKey | transloco: defaultHintParams(flag) }}</span>
         </div>
       </div>
     }
   </div>
 
   <p class="hint">
-    Overrides are local to this browser and this published version. When the published hash changes,
-    all flags return to the new version's defaults.
+    {{ 'settings.flags.overrides' | transloco }}
   </p>
 </div>

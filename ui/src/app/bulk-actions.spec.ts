@@ -6,6 +6,7 @@ import { Api } from './api';
 import { Auth } from './auth';
 import { BulkActions, BulkTarget, bulkAction, formatEta, needsList } from './bulk-actions';
 import { Account, Relationship } from './models';
+import en from '../../public/i18n/en.json';
 
 function account(id: string, acct = `user${id}`): Account {
   return { id, acct, username: acct, display_name: acct } as Account;
@@ -58,13 +59,28 @@ describe('formatEta', () => {
   });
 });
 
+/**
+ * The English effect bullets for one action, joined.
+ *
+ * The registry holds translation keys now, not English — that is what lets every
+ * locale make the same promises this file checks. The copy itself lives in
+ * `en.json`, so these assertions read it from there and keep testing the words
+ * rather than the indirection in front of them.
+ */
+function effectsText(id: Parameters<typeof bulkAction>[0]): string {
+  const dictionary = en.bulk as Record<string, string>;
+  return bulkAction(id)
+    .effectKeys.map((key) => dictionary[key.replace('bulk.', '')] ?? '')
+    .join(' ');
+}
+
 describe('bulkAction', () => {
   it('describes the destructive actions as recoverable only from a backup', () => {
     for (const id of ['mute-amnesty', 'block-amnesty'] as const) {
       const spec = bulkAction(id);
       expect(spec.danger).toBe(true);
       expect(spec.backup).toBeTruthy();
-      expect(spec.effects.join(' ')).toContain('backed up');
+      expect(effectsText(id)).toContain('backed up');
     }
   });
 
@@ -72,7 +88,7 @@ describe('bulkAction', () => {
     // The surprising consequence, and the one a user would otherwise report as a
     // bug: most servers only keep accounts you follow in a list. Hedged because
     // servers differ — our mock keeps the members.
-    const effects = bulkAction('list-unfollow').effects.join(' ');
+    const effects = effectsText('list-unfollow');
     expect(effects).toContain('may end up empty');
     expect(effects).toContain('never deleted');
     expect(bulkAction('list-unfollow').danger).toBe(true);
@@ -86,7 +102,7 @@ describe('bulkAction', () => {
   });
 
   it('promises the retweet actions do not unfollow anyone', () => {
-    expect(bulkAction('reblogs-off').effects.join(' ')).toContain('nobody is unfollowed');
+    expect(effectsText('reblogs-off')).toContain('nobody is unfollowed');
     expect(bulkAction('reblogs-off').danger).toBe(false);
   });
 });

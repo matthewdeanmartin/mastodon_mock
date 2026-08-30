@@ -83,118 +83,178 @@ export function needsList(action: BulkActionId): boolean {
 /** Static description of one operation, shared by the tab and the dialog. */
 export interface BulkActionSpec {
   id: BulkActionId;
+  /**
+   * Translation keys, not English.
+   *
+   * The strings a reader sees live in the `// i18n` declarations above
+   * {@link BULK_ACTIONS}, which `scripts/extract-i18n.mjs` reads into
+   * `public/i18n/en.json`. Holding English here would put every word of the
+   * confirm dialog — the screen that says what is about to happen to hundreds of
+   * accounts — outside the translation pipeline.
+   */
   /** Menu/button label, e.g. "Turn off retweets for all friends". */
-  label: string;
+  labelKey: string;
   /** One line under the label on the action card. */
-  blurb: string;
+  blurbKey: string;
   /** Dialog title. */
-  title: string;
+  titleKey: string;
   /** Bullet points spelling out exactly what will happen. */
-  effects: string[];
-  confirmLabel: string;
+  effectKeys: string[];
+  confirmLabelKey: string;
   /** Destructive: red confirm button, and a backup offer. */
   danger: boolean;
   /** Which CSV export backs this list up, when one applies. */
   backup?: 'mutes' | 'blocks';
-  /** Plural noun for counts: "friends", "muted accounts". */
-  unit: string;
+  /** Translation key for the plural noun in counts ("friends", "muted accounts"). */
+  unitKey: string;
 }
 
+/** English for every bulk action string; see scripts/extract-i18n.mjs. */
+// i18n bulk.reblogsOff.label: Turn off retweets for all friends
+// i18n bulk.reblogsOff.blurb: Keep following everyone, but stop their boosts from reaching your home timeline.
+// i18n bulk.reblogsOff.title: Turn off retweets for everyone you follow?
+// i18n bulk.reblogsOff.effect1: You keep following everyone — nobody is unfollowed.
+// i18n bulk.reblogsOff.effect2: Their own posts still appear in your home timeline.
+// i18n bulk.reblogsOff.effect3: Boosts they make stop appearing there.
+// i18n bulk.reblogsOff.effect4: You can turn retweets back on for everyone, or per account on their profile.
+// i18n bulk.reblogsOff.confirmLabel: Turn off retweets
+// i18n bulk.reblogsOn.label: Turn on retweets for all friends
+// i18n bulk.reblogsOn.blurb: Let boosts from everyone you follow back into your home timeline.
+// i18n bulk.reblogsOn.title: Turn on retweets for everyone you follow?
+// i18n bulk.reblogsOn.effect1: Boosts from everyone you follow start appearing in your home timeline again.
+// i18n bulk.reblogsOn.effect2: This includes accounts you had individually silenced boosts for.
+// i18n bulk.reblogsOn.effect3: Nothing else about who you follow changes.
+// i18n bulk.reblogsOn.confirmLabel: Turn on retweets
+// i18n bulk.muteAmnesty.label: Mute amnesty — unmute everyone
+// i18n bulk.muteAmnesty.blurb: Clear your mute list completely and start over.
+// i18n bulk.muteAmnesty.title: Unmute every account you have muted?
+// i18n bulk.muteAmnesty.effect1: Every account on your mute list is unmuted.
+// i18n bulk.muteAmnesty.effect2: Their posts and notifications start reaching you again.
+// i18n bulk.muteAmnesty.effect3: Muted words and filters are not affected — this is only accounts.
+// i18n bulk.muteAmnesty.effect4: This can only be undone if you backed up your mute list first.
+// i18n bulk.muteAmnesty.confirmLabel: Unmute everyone
+// i18n bulk.blockAmnesty.label: Block amnesty — unblock everyone
+// i18n bulk.blockAmnesty.blurb: Clear your block list completely and start over.
+// i18n bulk.blockAmnesty.title: Unblock every account you have blocked?
+// i18n bulk.blockAmnesty.effect1: Every account on your block list is unblocked.
+// i18n bulk.blockAmnesty.effect2: They can follow you, see your posts and interact with you again.
+// i18n bulk.blockAmnesty.effect3: They are not notified that you blocked them, or that you stopped.
+// i18n bulk.blockAmnesty.effect4: This can only be undone if you backed up your block list first.
+// i18n bulk.blockAmnesty.confirmLabel: Unblock everyone
+// i18n bulk.listFollow.label: Follow everyone on a list
+// i18n bulk.listFollow.blurb: Follow every account in one of your lists that you are not following yet.
+// i18n bulk.listFollow.title: Follow everyone on this {{source}}?
+// i18n bulk.listFollow.effect1: Every member of the list you are not already following gets followed.
+// i18n bulk.listFollow.effect2: Accounts that require approval get a follow request instead, which they can decline.
+// i18n bulk.listFollow.effect3: Their posts start appearing in your home timeline as well as the list.
+// i18n bulk.listFollow.effect4: Accounts you already follow are left exactly as they are.
+// i18n bulk.listFollow.confirmLabel: Follow everyone
+// i18n bulk.listUnfollow.label: Unfollow everyone on a list
+// i18n bulk.listUnfollow.blurb: Stop following every account in one of your lists.
+// i18n bulk.listUnfollow.title: Unfollow everyone on this {{source}}?
+// i18n bulk.listUnfollow.effect1: Every member of the list you currently follow gets unfollowed.
+// i18n bulk.listUnfollow.effect2: Any pending follow requests to members are withdrawn.
+// i18n bulk.listUnfollow.effect3: Most servers only keep accounts you follow in a list, so the list may end up empty. The list itself is never deleted.
+// i18n bulk.listUnfollow.effect4: Nobody is blocked or muted, and nobody is told.
+// i18n bulk.listUnfollow.confirmLabel: Unfollow everyone
+// i18n bulk.unit.friends: friends
+// i18n bulk.unit.mutedAccounts: muted accounts
+// i18n bulk.unit.blockedAccounts: blocked accounts
+// i18n bulk.unit.listMembers: list members
+// i18n bulk.source.list: list
+// i18n bulk.source.collection: collection
+// i18n bulk.processed: {{unit}} processed
 export const BULK_ACTIONS: readonly BulkActionSpec[] = [
   {
     id: 'reblogs-off',
-    label: 'Turn off retweets for all friends',
-    blurb: 'Keep following everyone, but stop their boosts from reaching your home timeline.',
-    title: 'Turn off retweets for everyone you follow?',
-    effects: [
-      'You keep following everyone — nobody is unfollowed.',
-      'Their own posts still appear in your home timeline.',
-      'Boosts they make stop appearing there.',
-      'You can turn retweets back on for everyone, or per account on their profile.',
+    labelKey: 'bulk.reblogsOff.label',
+    blurbKey: 'bulk.reblogsOff.blurb',
+    titleKey: 'bulk.reblogsOff.title',
+    effectKeys: [
+      'bulk.reblogsOff.effect1',
+      'bulk.reblogsOff.effect2',
+      'bulk.reblogsOff.effect3',
+      'bulk.reblogsOff.effect4',
     ],
-    confirmLabel: 'Turn off retweets',
+    confirmLabelKey: 'bulk.reblogsOff.confirmLabel',
     danger: false,
-    unit: 'friends',
+    unitKey: 'bulk.unit.friends',
   },
   {
     id: 'reblogs-on',
-    label: 'Turn on retweets for all friends',
-    blurb: 'Let boosts from everyone you follow back into your home timeline.',
-    title: 'Turn on retweets for everyone you follow?',
-    effects: [
-      'Boosts from everyone you follow start appearing in your home timeline again.',
-      'This includes accounts you had individually silenced boosts for.',
-      'Nothing else about who you follow changes.',
-    ],
-    confirmLabel: 'Turn on retweets',
+    labelKey: 'bulk.reblogsOn.label',
+    blurbKey: 'bulk.reblogsOn.blurb',
+    titleKey: 'bulk.reblogsOn.title',
+    effectKeys: ['bulk.reblogsOn.effect1', 'bulk.reblogsOn.effect2', 'bulk.reblogsOn.effect3'],
+    confirmLabelKey: 'bulk.reblogsOn.confirmLabel',
     danger: false,
-    unit: 'friends',
+    unitKey: 'bulk.unit.friends',
   },
   {
     id: 'mute-amnesty',
-    label: 'Mute amnesty — unmute everyone',
-    blurb: 'Clear your mute list completely and start over.',
-    title: 'Unmute every account you have muted?',
-    effects: [
-      'Every account on your mute list is unmuted.',
-      'Their posts and notifications start reaching you again.',
-      'Muted words and filters are not affected — this is only accounts.',
-      'This can only be undone if you backed up your mute list first.',
+    labelKey: 'bulk.muteAmnesty.label',
+    blurbKey: 'bulk.muteAmnesty.blurb',
+    titleKey: 'bulk.muteAmnesty.title',
+    effectKeys: [
+      'bulk.muteAmnesty.effect1',
+      'bulk.muteAmnesty.effect2',
+      'bulk.muteAmnesty.effect3',
+      'bulk.muteAmnesty.effect4',
     ],
-    confirmLabel: 'Unmute everyone',
+    confirmLabelKey: 'bulk.muteAmnesty.confirmLabel',
     danger: true,
     backup: 'mutes',
-    unit: 'muted accounts',
+    unitKey: 'bulk.unit.mutedAccounts',
   },
   {
     id: 'block-amnesty',
-    label: 'Block amnesty — unblock everyone',
-    blurb: 'Clear your block list completely and start over.',
-    title: 'Unblock every account you have blocked?',
-    effects: [
-      'Every account on your block list is unblocked.',
-      'They can follow you, see your posts and interact with you again.',
-      'They are not notified that you blocked them, or that you stopped.',
-      'This can only be undone if you backed up your block list first.',
+    labelKey: 'bulk.blockAmnesty.label',
+    blurbKey: 'bulk.blockAmnesty.blurb',
+    titleKey: 'bulk.blockAmnesty.title',
+    effectKeys: [
+      'bulk.blockAmnesty.effect1',
+      'bulk.blockAmnesty.effect2',
+      'bulk.blockAmnesty.effect3',
+      'bulk.blockAmnesty.effect4',
     ],
-    confirmLabel: 'Unblock everyone',
+    confirmLabelKey: 'bulk.blockAmnesty.confirmLabel',
     danger: true,
     backup: 'blocks',
-    unit: 'blocked accounts',
+    unitKey: 'bulk.unit.blockedAccounts',
   },
   {
     id: 'list-follow',
-    label: 'Follow everyone on a list',
-    blurb: 'Follow every account in one of your lists that you are not following yet.',
-    title: 'Follow everyone on this list?',
-    effects: [
-      'Every member of the list you are not already following gets followed.',
-      'Accounts that require approval get a follow request instead, which they can decline.',
-      'Their posts start appearing in your home timeline as well as the list.',
-      'Accounts you already follow are left exactly as they are.',
+    labelKey: 'bulk.listFollow.label',
+    blurbKey: 'bulk.listFollow.blurb',
+    titleKey: 'bulk.listFollow.title',
+    effectKeys: [
+      'bulk.listFollow.effect1',
+      'bulk.listFollow.effect2',
+      'bulk.listFollow.effect3',
+      'bulk.listFollow.effect4',
     ],
-    confirmLabel: 'Follow everyone',
+    confirmLabelKey: 'bulk.listFollow.confirmLabel',
     danger: false,
-    unit: 'list members',
+    unitKey: 'bulk.unit.listMembers',
   },
   {
     id: 'list-unfollow',
-    label: 'Unfollow everyone on a list',
-    blurb: 'Stop following every account in one of your lists.',
-    title: 'Unfollow everyone on this list?',
-    effects: [
-      'Every member of the list you currently follow gets unfollowed.',
-      'Any pending follow requests to members are withdrawn.',
+    labelKey: 'bulk.listUnfollow.label',
+    blurbKey: 'bulk.listUnfollow.blurb',
+    titleKey: 'bulk.listUnfollow.title',
+    effectKeys: [
+      'bulk.listUnfollow.effect1',
+      'bulk.listUnfollow.effect2',
       // Mastodon enforces "list members must be follows" and drops them on
       // unfollow; our mock server keeps them. Hedged deliberately — claiming the
       // list empties and then watching it not empty reads as a bug, and so does
       // the reverse. The one thing true everywhere is that the list survives.
-      'Most servers only keep accounts you follow in a list, so the list may end up empty. The list itself is never deleted.',
-      'Nobody is blocked or muted, and nobody is told.',
+      'bulk.listUnfollow.effect3',
+      'bulk.listUnfollow.effect4',
     ],
-    confirmLabel: 'Unfollow everyone',
+    confirmLabelKey: 'bulk.listUnfollow.confirmLabel',
     danger: true,
-    unit: 'list members',
+    unitKey: 'bulk.unit.listMembers',
   },
 ];
 
