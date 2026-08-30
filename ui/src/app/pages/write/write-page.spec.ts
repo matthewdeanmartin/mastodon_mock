@@ -96,6 +96,9 @@ interface PageInternals {
   onPaste(event: ClipboardEvent): void;
   targetUnsupportedReason(target: PostTarget): string | null;
   confirmAiProofreader(): Promise<void>;
+  visibility: Signal<string>;
+  visibilityLockReason: Signal<string | null>;
+  setVisibility(value: string): void;
 }
 
 function internals(fixture: ComponentFixture<WritePage>): PageInternals {
@@ -1289,5 +1292,151 @@ describe('WritePage', () => {
 
     page.open(second);
     expect(page.splitMode()).toBe('auto');
+  });
+
+  // -------------------------------------------------------------- visibility
+
+  describe('visibility', () => {
+    /** Save a draft at `visibility` and return the row the page lists for it. */
+    function savedAt(fixture: ComponentFixture<WritePage>, visibility: string): DraftItem {
+      const id = TestBed.inject(Drafts).save({
+        segments: ['a considered thought'],
+        spoilerText: '',
+        sensitive: false,
+        visibility,
+        poll: null,
+      });
+      fixture.detectChanges();
+      const item = internals(fixture)
+        .sources.items()
+        .find((row) => row.key === `local:${id}`);
+      if (!item) {
+        throw new Error('the saved draft did not appear in the list');
+      }
+      return item;
+    }
+
+    it('opens a new draft on the account posting default', () => {
+      TestBed.inject(ClientPrefs).defaultVisibility.set('private');
+      const page = internals(setUp());
+      page.newDraft();
+
+      expect(page.visibility()).toBe('private');
+    });
+
+    /**
+     * The regression this whole picker exists for. The page used to stamp
+     * `prefs.defaultVisibility()` into every snapshot and never read the saved
+     * value back, so a followers-only draft opened here was published public.
+     */
+    it('restores a saved visibility instead of the account default', () => {
+      TestBed.inject(ClientPrefs).defaultVisibility.set('public');
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.open(savedAt(fixture, 'private'));
+
+      expect(page.visibility()).toBe('private');
+    });
+
+    it('round-trips a visibility through open and save', () => {
+      TestBed.inject(ClientPrefs).defaultVisibility.set('public');
+      const fixture = setUp();
+      const page = internals(fixture);
+      page.open(savedAt(fixture, 'direct'));
+      page.onBodyInput('edited, but still just for them');
+      page.save();
+      fixture.detectChanges();
+
+      const saved = TestBed.inject(Drafts).drafts();
+      expect(saved.length).toBeGreaterThan(0);
+      expect(saved.every((draft) => draft.visibility === 'direct')).toBe(true);
+    });
+
+    it('carries the chosen visibility into the composer handoff', () => {
+      // Signed in, so the fediverse is the first usable target. Anonymously the
+      // wizard opens on a paste, which legitimately clamps to public.
+      signIn();
+      const fixture = setUp();
+      flushStatusScans([]);
+      const page = internals(fixture);
+      page.newDraft();
+      page.onBodyInput('followers only, please');
+      page.setVisibility('private');
+      runWizardToEnd(fixture);
+
+      expect(TestBed.inject(Drafts).takeHandoff()?.snapshot.visibility).toBe('private');
+    });
+
+    /**
+     * A blog or paste destination cannot express "followers only", so the
+     * picker clamps — but the choice must come back when the destination does,
+     * rather than leaving the post public because it once passed through a blog.
+     */
+    it('stashes and restores a visibility across a narrowing target', () => {
+      const page = internals(setUp());
+      page.newDraft();
+      page.setVisibility('private');
+
+      page.setWizardTarget('paste');
+      expect(page.visibility()).toBe('public');
+      expect(page.visibilityLockReason()).not.toBeNull();
+
+      page.setWizardTarget('fedi');
+      expect(page.visibility()).toBe('private');
+      expect(page.visibilityLockReason()).toBeNull();
+    });
+
+    it('restores the visibility chosen before any narrowing, not the clamped one', () => {
+      const page = internals(setUp());
+      page.newDraft();
+      page.setVisibility('unlisted');
+      page.setWizardTarget('paste');
+      page.setWizardTarget('bsky');
+      page.setWizardTarget('fedi');
+
+      expect(page.visibility()).toBe('unlisted');
+    });
+
+    it('ignores picker clicks while a destination has visibility locked', () => {
+      const page = internals(setUp());
+      page.newDraft();
+      page.setWizardTarget('paste');
+      page.setVisibility('private');
+
+      expect(page.visibility()).toBe('public');
+    });
+
+    /**
+     * A widening target change must leave a hand-picked visibility alone. The
+     * publish wizard selects a target as it opens, so getting this wrong resets
+     * the picker to the posting default at the exact moment it matters.
+     */
+    it('leaves a hand-picked visibility alone when no clamp is in force', () => {
+      TestBed.inject(ClientPrefs).defaultVisibility.set('public');
+      const page = internals(setUp());
+      page.newDraft();
+      page.setVisibility('private');
+      page.setWizardTarget('fedi');
+
+      expect(page.visibility()).toBe('private');
+    });
+
+    /**
+     * The lock and the stash are two halves of one promise: while a narrowing
+     * destination is selected the picker cannot be used at all, so the value
+     * stashed on the way in is always the value that comes back. A composer
+     * that let you "choose" during a clamp would be offering a choice it then
+     * discards.
+     */
+    it('keeps the pre-clamp choice because the picker is inert while clamped', () => {
+      const page = internals(setUp());
+      page.newDraft();
+      page.setVisibility('private');
+      page.setWizardTarget('paste');
+      page.setVisibility('public');
+      page.setWizardTarget('fedi');
+
+      expect(page.visibility()).toBe('private');
+    });
   });
 });

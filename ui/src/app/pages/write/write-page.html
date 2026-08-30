@@ -395,6 +395,29 @@
               </button>
             }
             <span class="bar-gap"></span>
+            <!-- The compact composer squeezes this into a <select>. Here there
+                 is room to show every choice and what it costs, which is the
+                 whole reason the writing page exists. -->
+            <div class="write-visibility" role="radiogroup" aria-label="Who can see this">
+              @for (option of visibilities; track option) {
+                <button
+                  class="write-visibility-option"
+                  type="button"
+                  role="radio"
+                  [class.active]="visibility() === option"
+                  [attr.aria-checked]="visibility() === option"
+                  [disabled]="!!visibilityLockReason()"
+                  [title]="visibilityHint(option)"
+                  (click)="setVisibility(option)"
+                >
+                  {{ visibilityIcon(option) }} {{ option }}
+                </button>
+              }
+            </div>
+            @if (visibilityLockReason(); as reason) {
+              <span class="write-visibility-locked muted small">🔒 {{ reason }}</span>
+            }
+            <span class="bar-gap"></span>
             <select
               class="write-language"
               [ngModel]="postLanguage()"

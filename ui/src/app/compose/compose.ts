@@ -17,6 +17,7 @@ import { PageDiagnostics } from '../page-diagnostics';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { ConfirmDialog } from '../confirm-dialog/confirm-dialog';
+import { VisibilityState, VISIBILITIES } from './visibility-state';
 import { TagHelperDialog } from './tag-helper-dialog/tag-helper-dialog';
 import { OpenRouterSession } from '../providers/openrouter/openrouter-session';
 import { AiAvailability } from '../ai-availability';
@@ -66,8 +67,6 @@ import { HugoDeployWatch } from '../providers/hugo/hugo-deploy-watch';
 import { describeDeployState } from '../providers/hugo/hugo-deploy';
 import { HugoApiError } from '../providers/hugo/hugo-contents';
 import { hugoStatus } from '../providers/hugo/hugo-post';
-
-const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const;
 
 /** Mastodon's default per-status character limit. */
 export const MAX_POST_CHARS = 500;
@@ -366,6 +365,7 @@ function dragHasFiles(event: DragEvent): boolean {
   ],
   templateUrl: './compose.html',
   styleUrl: './compose.css',
+  providers: [VisibilityState],
 })
 export class Compose implements OnDestroy {
   private api = inject(Api);
@@ -541,20 +541,14 @@ export class Compose implements OnDestroy {
   protected submitting = signal(false);
 
   // Visibility + content warning.
-  protected visibility = signal<string>('public');
-
   /**
-   * The visibility in effect before a paste-driven clamp overwrote it.
-   *
-   * Paste services only understand `public`/`unlisted` (and burn-after-reading
-   * only `unlisted`), so selecting Paste has to narrow whatever the user had.
-   * Without this, switching Fedi → Paste → Fedi silently left the post on
-   * `unlisted` — a real downgrade of a deliberate choice, and the reason this
-   * exists. Null means "nothing to put back": either no clamp has happened, or
-   * the user has since picked a visibility by hand while on Paste, which
-   * outranks anything we remembered for them.
+   * Visibility state, shared with `/write` so the stash/clamp/restore rules
+   * exist once. See {@link VisibilityState}; the picker markup stays local
+   * because a cramped `<select>` and the writing page's roomy row are
+   * genuinely different UI over the same state.
    */
-  private stashedVisibility: string | null = null;
+  private visibilityState = inject(VisibilityState);
+  protected visibility = this.visibilityState.value;
 
   /**
    * Selected post language: an ISO 639-1 code, or '' for "Not specified" (let
@@ -640,8 +634,7 @@ export class Compose implements OnDestroy {
       this.text.set(initialText);
       // No caller opinion means a top-level compose: open on the account's own
       // posting default rather than assuming `public`.
-      this.visibility.set(initialVisibility || this.prefs.defaultVisibility());
-      this.stashedVisibility = null;
+      this.visibilityState.seed(initialVisibility);
       // A handoff from "Edit for post" outranks a stale autosave: the user just
       // asked for this specific post, and it only ever seeds once. An explicitly
       // opened draft still wins over both.
@@ -1098,41 +1091,26 @@ export class Compose implements OnDestroy {
   });
 
   /**
-   * Narrow the visibility to what the paste target can express, remembering what
-   * was there so {@link restoreVisibility} can put it back. Only the *first*
-   * clamp stashes: going rentry → tinyurl → fedi must restore what the user
-   * chose before any of it, not the value the previous paste provider forced.
+   * Narrow the visibility to what the paste target can express.
    *
-   * Only applies while Paste is the live target. Provider/expiry state is also
+   * Only applies while Paste is the live target: provider/expiry state is also
    * touched when a saved draft is restored ({@link applySnapshot}), and a fedi
    * draft saved as `private` must not be narrowed to `unlisted` just because
-   * the composer set up its paste controls on the way past.
+   * the composer set up its paste controls on the way past. The stash/restore
+   * rules themselves live in {@link VisibilityState}.
    */
   private clampVisibilityForPaste(allowed: readonly string[]): void {
-    const current = this.visibility();
-    if (this.target() !== 'paste' || allowed.includes(current)) {
-      return;
-    }
-    this.stashedVisibility ??= current;
-    this.visibility.set(allowed[0] ?? 'unlisted');
+    this.visibilityState.clampFor(allowed, this.target() === 'paste');
   }
 
-  /**
-   * Put back the visibility a paste clamp took away. With nothing stashed (the
-   * composer never went near Paste, or the user has since chosen by hand) this
-   * falls back to the account's posting default, so a fresh paste-first
-   * composer — the anonymous default, see {@link target} — still lands somewhere
-   * the user chose rather than on `unlisted`.
-   */
+  /** Put back the visibility a paste clamp took away. */
   private restoreVisibility(): void {
-    this.visibility.set(this.stashedVisibility ?? this.prefs.defaultVisibility());
-    this.stashedVisibility = null;
+    this.visibilityState.restore();
   }
 
   /** A hand-picked visibility is the user's real intent; forget what we stashed. */
   onVisibilityChange(visibility: string): void {
-    this.visibility.set(visibility);
-    this.stashedVisibility = null;
+    this.visibilityState.choose(visibility);
   }
 
   onTargetChange(target: PostTarget): void {
@@ -1734,7 +1712,9 @@ export class Compose implements OnDestroy {
     this.sensitive.set(d.sensitive);
     this.postLanguage.set(d.postLanguage ?? '');
     if (!this.lockVisibility()) {
-      this.visibility.set(d.visibility);
+      // A saved draft's visibility is a real choice, so it outranks anything a
+      // paste clamp stashed on the way here.
+      this.visibilityState.choose(d.visibility);
     }
     this.target.set(this.restorableTarget(d.target ?? 'fedi'));
     this.onPasteProviderChange(d.pasteProviderId ?? this.pasteProviders.default.id);

@@ -805,3 +805,45 @@
   overflow-y: auto;
   padding: 16px;
 }
+
+/* The visibility picker. The compact composer uses a <select> because it has
+   no room; here every choice is visible and hoverable for its explanation. */
+.write-visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.write-visibility-option {
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85em;
+  padding: 2px 8px;
+  text-transform: capitalize;
+}
+
+.write-visibility-option:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.write-visibility-option.active {
+  background: var(--hover);
+  border-color: var(--accent);
+}
+
+.write-visibility-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.write-visibility-locked {
+  white-space: nowrap;
+}

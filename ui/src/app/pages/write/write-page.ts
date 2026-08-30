@@ -25,6 +25,7 @@ import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
 import { Draft, DraftMedia, DraftSnapshot, Drafts, draftHasContent } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { MAX_POST_CHARS, PostTarget } from '../../compose/compose';
+import { VISIBILITIES, VisibilityState } from '../../compose/visibility-state';
 import { EmojiPicker } from '../../emoji-picker/emoji-picker';
 import { CustomEmojis } from '../../custom-emojis';
 import { TagHelperDialog } from '../../compose/tag-helper-dialog/tag-helper-dialog';
@@ -131,6 +132,7 @@ interface PendingSwitch {
   ],
   templateUrl: './write-page.html',
   styleUrl: './write-page.css',
+  providers: [VisibilityState],
 })
 export class WritePage implements OnInit, OnDestroy {
   /** post/tweet/florp vocabulary, per the Blue setting. */
@@ -182,6 +184,18 @@ export class WritePage implements OnInit, OnDestroy {
 
   /** The editor body. One textarea; segmentation is computed, never typed into. */
   protected body = signal('');
+
+  /**
+   * Visibility, shared with the compact composer rather than re-derived.
+   *
+   * The writing page used to have no visibility control at all: every snapshot
+   * was stamped with the account default and `applyFeatureSnapshot` dropped the
+   * saved value, so a followers-only draft opened here came back public. It has
+   * the room for a real picker, so it gets one.
+   */
+  private visibilityState = inject(VisibilityState);
+  protected visibility = this.visibilityState.value;
+  protected readonly visibilities = VISIBILITIES;
   protected cwOpen = signal(false);
   protected spoilerText = signal('');
   protected sensitive = signal(false);
@@ -471,6 +485,61 @@ export class WritePage implements OnInit, OnDestroy {
       this.pollMultiple.set(false);
     }
     this.dirty.set(true);
+  }
+
+  protected setVisibility(value: string): void {
+    if (this.visibilityLockReason()) {
+      return;
+    }
+    this.visibilityState.choose(value);
+    this.dirty.set(true);
+  }
+
+  /**
+   * Why the picker is disabled, or null when it is live.
+   *
+   * Blog and paste destinations publish a document at a URL: "followers only"
+   * has no meaning there, and offering a control that silently does nothing is
+   * worse than saying so. The choice itself is not thrown away — it is stashed
+   * and comes back when the destination does.
+   */
+  protected visibilityLockReason = computed(() => {
+    switch (this.wizardTarget()) {
+      case 'blog':
+      case 'blogger':
+      case 'hugo':
+        return 'A blog post is public at its URL.';
+      case 'paste':
+        return 'A paste is reachable by anyone with the link.';
+      default:
+        return null;
+    }
+  });
+
+  protected visibilityIcon(value: string): string {
+    switch (value) {
+      case 'public':
+        return '🌐';
+      case 'unlisted':
+        return '🔉';
+      case 'private':
+        return '🔒';
+      default:
+        return '✉️';
+    }
+  }
+
+  protected visibilityHint(value: string): string {
+    switch (value) {
+      case 'public':
+        return 'Anyone, and it appears in public timelines.';
+      case 'unlisted':
+        return 'Anyone with the link, but kept out of public timelines.';
+      case 'private':
+        return 'Your followers only.';
+      default:
+        return 'Only the people you mention.';
+    }
   }
 
   protected setPollOption(index: number, value: string): void {
@@ -773,7 +842,7 @@ export class WritePage implements OnInit, OnDestroy {
       segments: segments.length ? segments : [this.body()],
       spoilerText: this.cwOpen() ? this.spoilerText() : '',
       sensitive: this.sensitive(),
-      visibility: this.prefs.defaultVisibility(),
+      visibility: this.visibility(),
       poll: this.pollOpen()
         ? {
             options: this.pollOptions(),
@@ -787,6 +856,9 @@ export class WritePage implements OnInit, OnDestroy {
   }
 
   private applyFeatureSnapshot(snapshot: DraftSnapshot): void {
+    // A saved visibility is a deliberate choice and outranks the account
+    // default; dropping it here is what used to silently widen private drafts.
+    this.visibilityState.choose(snapshot.visibility);
     this.spoilerText.set(snapshot.spoilerText);
     this.cwOpen.set(!!snapshot.spoilerText);
     this.sensitive.set(snapshot.sensitive);
@@ -805,6 +877,9 @@ export class WritePage implements OnInit, OnDestroy {
     }
     this.media.set([]);
     this.mediaNotice.set('');
+    // A fresh authoring session opens on the account's posting default; `open`
+    // then overwrites this with the draft's own saved visibility.
+    this.visibilityState.seed();
     this.cwOpen.set(false);
     this.spoilerText.set('');
     this.sensitive.set(false);
@@ -949,6 +1024,15 @@ export class WritePage implements OnInit, OnDestroy {
         // A date chosen for Mastodon must not leak into a target that cannot
         // hold the work server-side.
         this.wizardScheduleAt.set('');
+      }
+      // Narrowing to a URL-addressed destination stashes the fediverse choice;
+      // coming back puts it in place again rather than leaving the post on
+      // whatever the blog leg forced.
+      const allowed = allowedVisibilitiesFor(target);
+      if (allowed) {
+        this.visibilityState.clampFor(allowed, true);
+      } else {
+        this.visibilityState.restoreIfClamped();
       }
     }
   }
@@ -1361,5 +1445,27 @@ function kindNoun(kind: DraftKind): string {
       return 'private note';
     case 'paste':
       return 'paste';
+  }
+}
+
+/**
+ * The visibilities a destination can actually express, or null when it accepts
+ * the full fediverse set.
+ *
+ * Blogs and pastes publish to a URL, so the only honest answer is `public`.
+ * Bluesky has no followers-only or direct post, so a private draft crossing to
+ * it would be silently widened; clamping to `public` at least makes the change
+ * visible in the picker before publishing rather than after.
+ */
+function allowedVisibilitiesFor(target: PostTarget): readonly string[] | null {
+  switch (target) {
+    case 'blog':
+    case 'blogger':
+    case 'hugo':
+    case 'paste':
+    case 'bsky':
+      return ['public'];
+    default:
+      return null;
   }
 }
