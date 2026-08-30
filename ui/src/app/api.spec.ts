@@ -233,7 +233,7 @@ describe('Api service (HTTP isolated)', () => {
   });
 
   it('accountFollowingPage uses the opaque cursor from Link instead of an account id', () => {
-    let page: { accounts: unknown[]; nextMaxId: string | null } | undefined;
+    let page: { accounts: unknown[]; nextMaxId: string | null; source: string } | undefined;
     api.accountFollowingPage('me', 'opaque-1', 80).subscribe((result) => (page = result));
 
     const req = httpMock.expectOne((request) => request.url === '/api/v1/accounts/me/following');
@@ -246,6 +246,38 @@ describe('Api service (HTTP isolated)', () => {
     });
 
     expect(page?.nextMaxId).toBe('opaque-2');
+    expect(page?.source).toBe('link-header');
+  });
+
+  /**
+   * The CORS case. A browser hands back `null` for a header the response did not
+   * name in `Access-Control-Expose-Headers`, and a proxy in front of Mastodon
+   * routinely drops `Link`. Stopping there showed 80 followers to an account
+   * with thousands, which is indistinguishable from a hidden social graph.
+   */
+  it('accountFollowersPage keeps walking on the account id when Link never arrives', () => {
+    let page: { accounts: unknown[]; nextMaxId: string | null; source: string } | undefined;
+    api.accountFollowersPage('me', undefined, 3).subscribe((result) => (page = result));
+
+    const req = httpMock.expectOne((request) => request.url === '/api/v1/accounts/me/followers');
+    // A full page by the limit that was asked for, and no Link header at all.
+    req.flush([{ id: '10' }, { id: '11' }, { id: '12' }]);
+
+    expect(page?.nextMaxId).toBe('12');
+    expect(page?.source).toBe('account-id-fallback');
+  });
+
+  it('accountFollowersPage still stops on a short page with no Link header', () => {
+    let page: { accounts: unknown[]; nextMaxId: string | null; source: string } | undefined;
+    api.accountFollowersPage('me', undefined, 3).subscribe((result) => (page = result));
+
+    const req = httpMock.expectOne((request) => request.url === '/api/v1/accounts/me/followers');
+    req.flush([{ id: '10' }]);
+
+    // Short page: the list ended on its own, and guessing a cursor here is what
+    // would turn a clean end into an endless walk.
+    expect(page?.nextMaxId).toBeNull();
+    expect(page?.source).toBe('short-page');
   });
 });
 

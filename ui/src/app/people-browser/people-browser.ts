@@ -8,6 +8,14 @@ import { PeopleMode, PeopleSource } from './people-source';
 import { PeopleSourceFactory } from './people-sources';
 import { Relationship } from '../models';
 
+/**
+ * One page of people, matching the `limit` the Mastodon sources request.
+ *
+ * Used only as the slack in {@link PeopleBrowser.shortOfReported}: a walk that
+ * ended within one page of the advertised count ended normally.
+ */
+const PEOPLE_PAGE = 80;
+
 export type { PeopleMode } from './people-source';
 
 /** Per-account follow state, so the button can show the right label + spinner. */
@@ -50,6 +58,12 @@ export class PeopleBrowser {
   /** An empty page came back: the list is fully paged in. */
   protected exhausted = signal(false);
   protected error = signal(false);
+  /**
+   * True once a page came back on a guessed cursor, because the server's `Link`
+   * header did not reach us. The list still pages, but may skip or repeat rows,
+   * so the count is presented as approximate rather than exact.
+   */
+  protected approximate = signal(false);
 
   /** Relationship per account id, for the follow button state. */
   private rels = signal<Map<string, Relationship>>(new Map());
@@ -57,6 +71,24 @@ export class PeopleBrowser {
   private pending = signal<Map<string, FollowState>>(new Map());
 
   protected me = this.auth.account;
+
+  /**
+   * The walk ended well short of the count the profile advertises.
+   *
+   * The honest reading of that gap: paging stopped for a reason other than
+   * running out of people. A private list ends at zero and a normal list ends
+   * within a page of its count, so the threshold is one page — enough slack that
+   * ordinary drift (a follow removed between the count and the walk) does not
+   * trip it, tight enough to catch a walk that died on page one.
+   *
+   * Only meaningful once something loaded: a list that is genuinely empty, or
+   * one hidden by the account's privacy settings, is not this situation and has
+   * its own empty state above.
+   */
+  protected shortOfReported = computed(() => {
+    const loaded = this.accounts().length;
+    return loaded > 0 && this.reportedCount() - loaded > PEOPLE_PAGE;
+  });
 
   /** The current page's source, rebuilt whenever the target account changes. */
   private source!: PeopleSource;
@@ -83,6 +115,7 @@ export class PeopleBrowser {
     this.loadingMore.set(false);
     this.exhausted.set(false);
     this.error.set(false);
+    this.approximate.set(false);
     this.cursor = null;
   }
 
@@ -92,6 +125,7 @@ export class PeopleBrowser {
         this.cursor = page.cursor;
         this.loading.set(false);
         this.accounts.set(page.accounts);
+        if (page.approximate) this.approximate.set(true);
         this.exhausted.set(!page.accounts.length || !page.cursor);
         this.loadRelationships(page.accounts);
       },
@@ -111,6 +145,7 @@ export class PeopleBrowser {
       next: (page) => {
         this.cursor = page.cursor;
         this.loadingMore.set(false);
+        if (page.approximate) this.approximate.set(true);
         if (!page.accounts.length) {
           this.exhausted.set(true);
           return;

@@ -229,6 +229,34 @@
   font-size: 12px;
 }
 
+/* Which server does what, when a separate search server is configured. Stacked
+   rather than side by side: two hostnames on one narrow rail line is where
+   truncation starts, and a truncated hostname answers nothing. */
+.server-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.server-role {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.server-role-what {
+  font-weight: 700;
+}
+
+/* A hostname is one long unbreakable token; let it break anywhere rather than
+   widen the rail or spill out of it. */
+.server-role-host {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 .share-server {
   display: inline-flex;
   width: auto;

@@ -76,6 +76,51 @@ describe('itemToStatus', () => {
     expect(status.account.acct).toBe('blog.example.com');
   });
 
+  /**
+   * Comment parity: an RSS item with a discussion should say so the way a post
+   * says it has replies. This used to be a hard `0`, which rendered "0 replies"
+   * on an item with forty of them.
+   */
+  describe('replies_count', () => {
+    const feedUrl = 'https://blog.example.com/feed.xml';
+
+    it('carries the publisher’s declared comment count', () => {
+      const status = itemToStatus(makeItem({ commentCount: 47 }), feedUrl, account, FETCHED_AT);
+
+      expect(status.replies_count).toBe(47);
+    });
+
+    it('is 0, not null, when the feed declares no count', () => {
+      // `Status.replies_count` is a number and cards render it directly; a null
+      // would reach the template as "null replies".
+      const status = itemToStatus(makeItem({ commentCount: null }), feedUrl, account, FETCHED_AT);
+
+      expect(status.replies_count).toBe(0);
+    });
+
+    it('keeps a declared count that disagrees with the comments actually served', () => {
+      // The rule this test exists to document: the count is the publisher's
+      // *claim*, not a tally of the comment feed. A comment moderated after the
+      // count was cached, or a comment feed truncated to the latest ten, makes
+      // the two numbers differ legitimately. Neither is wrong, and the mismatch
+      // must not be "corrected" by recounting the thread.
+      const status = itemToStatus(makeItem({ commentCount: 47 }), feedUrl, account, FETCHED_AT);
+
+      expect(status.replies_count).toBe(47);
+    });
+
+    it('gives a comment 0 even if its own entry declares a count', () => {
+      // A comment feed states no reply count for its own entries, and nothing
+      // renders a reply count on a comment anyway.
+      const comment = itemToStatus(makeItem({ commentCount: 9 }), feedUrl, account, FETCHED_AT, {
+        inReplyToId: 'rss:https://blog.example.com/feed.xml::parent',
+        isComment: true,
+      });
+
+      expect(comment.replies_count).toBe(0);
+    });
+  });
+
   it('carries the parsed item’s full-content flag onto the status', () => {
     const full = itemToStatus(
       makeItem({ isFullContent: true }),

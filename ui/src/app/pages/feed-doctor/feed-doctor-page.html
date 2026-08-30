@@ -63,8 +63,20 @@
                 <a class="btn btn-outline" routerLink="/settings/appearance">{{ action.label }}</a>
               } @else if (action.kind === 'review-quiet') {
                 <a class="btn btn-outline" routerLink="/feeds">{{ action.label }}</a>
-              } @else if (action.kind === 'review-window') {
+              } @else if (action.kind === 'review-window' || action.kind === 'wait-out-cooldown') {
                 <a class="btn btn-outline" routerLink="/settings/appearance">{{ action.label }}</a>
+              } @else if (action.kind === 'widen-window') {
+                <!-- Widens the window and sends the reader back to the feed it
+                     just unblocked. Acting on the diagnosis is the point of the
+                     page; a link to a settings screen would make them find the
+                     control themselves after being told exactly what it is. -->
+                <button class="btn btn-outline" type="button" (click)="widenWindow()">
+                  {{ action.label }}
+                </button>
+              } @else if (action.kind === 'show-calm') {
+                <button class="btn btn-outline" type="button" (click)="turnCalmOff()">
+                  {{ action.label }}
+                </button>
               } @else {
                 <button class="btn btn-outline" type="button" (click)="act(action)">
                   {{ action.label }}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FeedCandidate, rankFeeds } from './feed-ranking';
+import { collapseFormats, FeedCandidate, rankFeeds } from './feed-ranking';
 
 const feed = (url: string, title = 'Feed'): FeedCandidate => ({ url, title });
 
@@ -88,5 +88,116 @@ describe('rankFeeds', () => {
   it('sorts an unparseable url last instead of throwing', () => {
     const ranked = rankFeeds([feed('not a url'), feed('https://blog.test/feed/')]);
     expect(ranked[0].url).toBe('https://blog.test/feed/');
+  });
+});
+
+/** A candidate with an explicit declared type, which is the publisher's own word. */
+const typed = (url: string, type: string, title = 'Feed'): FeedCandidate => ({ url, title, type });
+
+describe('collapseFormats', () => {
+  it('collapses one feed published as both RSS and Atom, keeping Atom', () => {
+    // The boss's case: "if they're the same thing, but 1 is atom, one is rss,
+    // then we should just pick the more expressive one." Atom wins because the
+    // app actually reads what it guarantees — stable ids, real timestamps, and
+    // content distinct from summary.
+    const out = collapseFormats([
+      typed('https://blog.test/feed/', 'application/rss+xml'),
+      typed('https://blog.test/feed/atom/', 'application/atom+xml'),
+    ]);
+
+    expect(out).toHaveLength(1);
+    expect(out[0].url).toBe('https://blog.test/feed/atom/');
+  });
+
+  it('collapses the extension form too', () => {
+    const out = collapseFormats([
+      typed('https://blog.test/index.rss', 'application/rss+xml'),
+      typed('https://blog.test/index.atom', 'application/atom+xml'),
+    ]);
+
+    expect(out).toHaveLength(1);
+    expect(out[0].url).toBe('https://blog.test/index.atom');
+  });
+
+  it('collapses the query-parameter form, keeping other params intact', () => {
+    const out = collapseFormats([
+      typed('https://blog.test/?feed=rss2', 'application/rss+xml'),
+      typed('https://blog.test/?feed=atom', 'application/atom+xml'),
+    ]);
+
+    expect(out).toHaveLength(1);
+  });
+
+  it('never collapses genuinely different sections', () => {
+    // "If the feeds offered on a page are like, politics, books or comics, then
+    // the user needs to pick." Different content is a real choice and must
+    // survive: silently picking one here decides what somebody reads.
+    const out = collapseFormats([
+      feed('https://news.test/politics/feed/', 'Politics'),
+      feed('https://news.test/books/feed/', 'Books'),
+      feed('https://news.test/comics/feed/', 'Comics'),
+    ]);
+
+    expect(out).toHaveLength(3);
+    expect(out.map((f) => f.title)).toEqual(['Politics', 'Books', 'Comics']);
+  });
+
+  it('keeps a query that names a section rather than a format', () => {
+    // `?cat=politics` is content, `?feed=atom` is serialisation. Only the
+    // second is dropped when deciding whether two URLs are the same feed.
+    const out = collapseFormats([
+      feed('https://news.test/?cat=politics'),
+      feed('https://news.test/?cat=books'),
+    ]);
+
+    expect(out).toHaveLength(2);
+  });
+
+  it('turns three sections in two formats into a clean three-way choice', () => {
+    // The case that makes collapsing worth doing: six declarations, but only
+    // three actual decisions. Presenting six would bury the real question.
+    const out = collapseFormats([
+      typed('https://news.test/politics/feed/', 'application/rss+xml', 'Politics'),
+      typed('https://news.test/politics/feed/atom/', 'application/atom+xml', 'Politics'),
+      typed('https://news.test/books/feed/', 'application/rss+xml', 'Books'),
+      typed('https://news.test/books/feed/atom/', 'application/atom+xml', 'Books'),
+      typed('https://news.test/comics/feed/', 'application/rss+xml', 'Comics'),
+      typed('https://news.test/comics/feed/atom/', 'application/atom+xml', 'Comics'),
+    ]);
+
+    expect(out).toHaveLength(3);
+    expect(out.map((f) => f.title)).toEqual(['Politics', 'Books', 'Comics']);
+    // Each survivor is the expressive one.
+    expect(out.every((f) => f.url.includes('atom'))).toBe(true);
+  });
+
+  it('preserves the ranking order it was given', () => {
+    // Collapsing decides which *format* survives, never which content ranks
+    // first — that is rankFeeds' job and this must not undo it.
+    const ranked = rankFeeds([
+      feed('https://blog.test/comments/feed/', 'Comments'),
+      feed('https://blog.test/feed/', 'Main'),
+    ]);
+    const out = collapseFormats(ranked);
+
+    expect(out[0].title).toBe('Main');
+  });
+
+  it('falls back to the URL when no type was declared', () => {
+    // Plenty of pages declare every feed as application/rss+xml regardless of
+    // what they serve, so the URL is the more honest signal when type is absent.
+    const out = collapseFormats([
+      feed('https://blog.test/feed.rss'),
+      feed('https://blog.test/feed.atom'),
+    ]);
+
+    expect(out).toHaveLength(1);
+    expect(out[0].url).toBe('https://blog.test/feed.atom');
+  });
+
+  it('keeps an unparseable URL rather than dropping it', () => {
+    const out = collapseFormats([feed('not-a-url'), feed('https://blog.test/feed/')]);
+
+    expect(out).toHaveLength(2);
   });
 });

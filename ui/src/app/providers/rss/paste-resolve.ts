@@ -7,7 +7,7 @@ import { PageDiagnostics } from '../../page-diagnostics';
 import { CorsProxy } from '../cors-proxy/cors-proxy';
 import { CorsProxySettings } from '../cors-proxy/cors-proxy-settings';
 import { externalFetch } from '../external-fetch';
-import { FeedCandidate, rankFeeds } from './feed-ranking';
+import { FeedCandidate, collapseFormats, rankFeeds } from './feed-ranking';
 import { feedLinksIn } from './rss-discovery';
 import { RssFetch } from './rss-fetch';
 
@@ -265,7 +265,12 @@ export class PasteResolve {
     }
     return {
       kind: 'feeds',
-      feeds: rankFeeds(found, titleOf(html)),
+      // Rank first, then collapse: the collapse keeps the order it is given, so
+      // ranking decides which content wins and the collapse only decides which
+      // *format* of a given content survives. A site publishing three sections
+      // in two formats each becomes a three-way choice rather than a six-way
+      // one — and one section in two formats stops being a choice at all.
+      feeds: collapseFormats(rankFeeds(found, titleOf(html))),
       siteUrl: pageUrl,
       // These came off a page we could only read through the proxy, but the feed
       // itself may well be CORS-friendly — the subscribe path tries direct first.

@@ -30,6 +30,7 @@ interface HomeInternals {
   showReplies: WritableSignal<boolean>;
   eliza: { follow(): void; unfollow(): void };
   loadMore(): void;
+  reviewBookmarks(): void;
   toggleBoosts(): void;
   toggleReplies(): void;
   view: WritableSignal<'feed' | 'members' | 'analytics' | 'media' | 'articles'>;
@@ -76,6 +77,9 @@ describe('Home', () => {
   let diagnostics: Pick<HomeDiagnostics, 'info' | 'warn' | 'error'>;
 
   beforeEach(() => {
+    // See docs/shared-jsdom-realm-in-tests.md: one realm, one module registry.
+    // A TestBed another suite left instantiated makes this throw.
+    TestBed.resetTestingModule();
     fakeStreaming = new FakeStreaming();
     diagnostics = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
@@ -464,6 +468,9 @@ describe('Home', () => {
     httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page(20, 0));
 
     internals(fixture).loadMore();
+    // "Load more" also decides the bookmark button (see BookmarkPresence); it
+    // is one request per day, not per page, and is unrelated to this assertion.
+    httpMock.expectOne('/api/v1/bookmarks?limit=1').flush([]);
     httpMock
       .expectOne(
         (request) =>
@@ -513,13 +520,22 @@ describe('Home', () => {
     internals(fixture).loadMore();
 
     httpMock.expectNone((r) => r.url === '/api/v1/timelines/home');
-    // Hitting the cap tacks the bookmark tail onto the bottom first.
-    httpMock.expectOne('/api/v1/bookmarks?limit=40').flush([]);
+    // The bookmark-button probe, not a tail: the automatic tail is gone.
+    httpMock.expectOne('/api/v1/bookmarks?limit=1').flush([]);
     expect(internals(fixture).capActive()).toBe(true);
     expect(internals(fixture).canLoadMore()).toBe(false);
   });
 
-  it('hitting the cap tacks up to 40 bookmarks onto the bottom, once', () => {
+  /**
+   * Replaces "hitting the cap tacks up to 40 bookmarks onto the bottom, once".
+   *
+   * The automatic tail is gone. It fired only when the cap, the cooldown and a
+   * non-empty bookmark list coincided, which is why it was never seen in
+   * practice; bookmarks now arrive when the reader presses a button. What the
+   * cap still does is stop the feed and say so — and offer that button, because
+   * reviewing what you already saved is not doomscrolling.
+   */
+  it('hitting the cap stops the feed without tacking bookmarks on by itself', () => {
     TestBed.inject(ClientPrefs).setFeedMax(20);
 
     const fixture = TestBed.createComponent(Home);
@@ -528,19 +544,17 @@ describe('Home', () => {
     httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page(20, 0));
 
     internals(fixture).loadMore();
-    httpMock.expectOne('/api/v1/bookmarks?limit=40').flush([makeStatus('bm1'), makeStatus('bm2')]);
-
+    // The probe behind the button, not a page of bookmarks: one bookmark is all
+    // "do you have any?" needs.
+    httpMock.expectOne('/api/v1/bookmarks?limit=1').flush([makeStatus('bm1')]);
     fixture.detectChanges();
-    const rendered = fixture.nativeElement.textContent as string;
-    expect(rendered).toContain('some posts you saved for later');
-    expect(rendered).toContain('status bm1');
-    // The "had enough" wall still lands after the bookmarks.
-    expect(rendered).toContain('You’ve had enough for now');
-    expect(rendered.indexOf('saved for later')).toBeLessThan(rendered.indexOf('had enough'));
 
-    // A second cap hit reuses the fetched tail — no refetch.
-    internals(fixture).loadMore();
-    httpMock.expectNone((r) => r.url === '/api/v1/bookmarks');
+    const rendered = fixture.nativeElement.textContent as string;
+    expect(rendered).toContain('You’ve had enough for now');
+    // Nothing was appended on its own.
+    expect(rendered).not.toContain('some posts you saved for later');
+    // But the way to reach them is offered.
+    expect(rendered).toContain('Review bookmarks');
   });
 
   // ---------------------------------------------------------------- Eliza merge
@@ -875,8 +889,309 @@ describe('Home', () => {
  * app: six filter controls above an empty column, and preview posts that
  * vanished later at some unrelated navigation.
  */
+/**
+ * The end of the feed has to say what stopped it.
+ *
+ * "You're all caught up" is a claim, and when a filter is holding posts back it
+ * is a false one — which is what sends a reader hunting for a bug in their
+ * follows. The Boosts/Replies chips already named their number; Calm and the
+ * language filter did not, and Calm emptying a feed silently is the case the
+ * boss hit in production.
+ */
+describe('Home, end-of-feed honesty', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    // Spec files share one jsdom realm and one module registry (see
+    // docs/shared-jsdom-realm-in-tests.md), so a TestBed left instantiated by
+    // the previous suite makes `configureTestingModule` throw here — and every
+    // suite after it fails wholesale. Reset first.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: Streaming, useValue: new FakeStreaming() },
+        { provide: HomeDiagnostics, useValue: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  // Separate hook: these fixtures use fixed dates, and the default 24h window
+  // would drop every one of them. Matches the outer suite.
+  beforeEach(() => {
+    TestBed.inject(ClientPrefs).setHomeWindow('all');
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+    localStorage.clear();
+  });
+
+  /** A post Calm hides: ratioed, per `isRatioed` (>=5 replies, >=2x the rest). */
+  function ratioed(id: string): Status {
+    return { ...makeStatus(id), replies_count: 20, favourites_count: 1, reblogs_count: 0 };
+  }
+
+  it('does not blame your follows when Calm hid every post that arrived', () => {
+    // The worst case in this class: posts were fetched, Calm hid all of them,
+    // and Home told the reader to go find friends to follow — sending them to
+    // fix follows that were working fine.
+    TestBed.inject(ClientPrefs).setAlgoCalm(true);
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock
+      .expectOne('/api/v1/timelines/home?limit=20')
+      .flush([ratioed('1'), ratioed('2'), ratioed('3')]);
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('3 posts loaded, and your filters are hiding them all');
+    expect(text).toContain('Turn Calm off to see 3');
+    expect(text).not.toContain('Find friends to follow');
+  });
+
+  it('names Calm at the end of a feed it only partly hid', () => {
+    // The partial case, which reaches the end-of-feed note rather than the
+    // all-hidden state: one post survives, two are held back.
+    TestBed.inject(ClientPrefs).setAlgoCalm(true);
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock
+      .expectOne('/api/v1/timelines/home?limit=20')
+      .flush([makeStatus('1'), ratioed('2'), ratioed('3')]);
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('hidden by Calm');
+    expect(text).not.toContain('You’re all caught up');
+  });
+
+  it('still says you are all caught up when nothing is being held back', () => {
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([makeStatus('1')]);
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('You’re all caught up');
+  });
+});
+
+/**
+ * The bookmark button pair, replacing the automatic tail nobody ever saw.
+ *
+ * > "I have never seen the bookmark tail. However it is currently implemented,
+ * > it is ineffective."
+ *
+ * The tail needed the cap, the cooldown and a non-empty bookmark list to
+ * coincide. These specs pin the two properties that make the replacement
+ * different: it is reachable by pressing a button, and it never appears on its
+ * own.
+ */
+describe('Home, bookmark review', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    // Spec files share one jsdom realm and one module registry (see
+    // docs/shared-jsdom-realm-in-tests.md), so a TestBed left instantiated by
+    // the previous suite makes `configureTestingModule` throw here — and every
+    // suite after it fails wholesale. Reset first.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: Streaming, useValue: new FakeStreaming() },
+        { provide: HomeDiagnostics, useValue: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  // Separate hook: these fixtures use fixed dates, and the default 24h window
+  // would drop every one of them. Matches the outer suite.
+  beforeEach(() => {
+    TestBed.inject(ClientPrefs).setHomeWindow('all');
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+    localStorage.clear();
+  });
+
+  /**
+   * Boot Home, press "Load more" — which is what asks whether there are any
+   * bookmarks — and answer that probe. Nothing asks on plain load, by design.
+   *
+   * The stored answer is seeded rather than flushed: `BookmarkPresence` is a
+   * root singleton that caches a yes forever and a no for a day, which is the
+   * whole point of it, so only the first test in a shared realm would see the
+   * request. Seeding gives every test the same starting state.
+   */
+  function setUpWithBookmarks(has: boolean): ComponentFixture<Home> {
+    localStorage.setItem('mockingbird_has_bookmarks_v1', JSON.stringify({ has, at: Date.now() }));
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([makeStatus('1')]);
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    fixture.detectChanges();
+
+    internals(fixture).loadMore();
+    // Whatever paging "Load more" did is not what these specs are about; drain
+    // it so the assertions can be about the bookmark button alone.
+    for (const open of httpMock.match((c) => c.url.startsWith('/api/v1/timelines/home'))) {
+      open.flush([]);
+    }
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('asks nothing about bookmarks until the reader heads for the end of the feed', () => {
+    // The constraint: no bookmark call per feed load. A session that never
+    // presses "Load more" never asks.
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([makeStatus('1')]);
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    fixture.detectChanges();
+
+    httpMock.expectNone((c) => c.url === '/api/v1/bookmarks');
+    expect(fixture.nativeElement.textContent).not.toContain('Review bookmarks');
+  });
+
+  it('offers the pair only when the reader actually has bookmarks', () => {
+    const fixture = setUpWithBookmarks(true);
+    expect(fixture.nativeElement.textContent).toContain('Review bookmarks');
+  });
+
+  it('hides the button rather than showing a dead one', () => {
+    const fixture = setUpWithBookmarks(false);
+    const text = fixture.nativeElement.textContent;
+    expect(text).not.toContain('Review bookmarks');
+    // The feed's own end-of-feed note is unaffected — only the bookmark half
+    // comes off. (This fixture exhausts the timeline, so the note is the
+    // "all caught up" one rather than a "Load more" button.)
+    expect(text).toContain('You’re all caught up');
+  });
+
+  it('appends a page of bookmarks on press, and never before', () => {
+    const fixture = setUpWithBookmarks(true);
+    // Nothing appended yet: the tail used to arrive uninvited, this does not.
+    expect(fixture.nativeElement.textContent).not.toContain('From your bookmarks');
+
+    internals(fixture).reviewBookmarks();
+    httpMock
+      .expectOne((c) => c.url === '/api/v1/bookmarks' && c.params.get('limit') === '20')
+      .flush([makeStatus('b1'), makeStatus('b2')]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('From your bookmarks');
+  });
+
+  it('stops offering more once a short page comes back', () => {
+    const fixture = setUpWithBookmarks(true);
+    internals(fixture).reviewBookmarks();
+    // Fewer than the page size: that is the end of the bookmarks.
+    httpMock
+      .expectOne((c) => c.url === '/api/v1/bookmarks' && c.params.get('limit') === '20')
+      .flush([makeStatus('b1')]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Review bookmarks');
+  });
+});
+
+/**
+ * The reading break stays, and stays overridable — from Settings only.
+ */
+describe('Home, reading break', () => {
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    // Spec files share one jsdom realm and one module registry (see
+    // docs/shared-jsdom-realm-in-tests.md), so a TestBed left instantiated by
+    // the previous suite makes `configureTestingModule` throw here — and every
+    // suite after it fails wholesale. Reset first.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: Streaming, useValue: new FakeStreaming() },
+        { provide: HomeDiagnostics, useValue: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } },
+      ],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  // Separate hook: these fixtures use fixed dates, and the default 24h window
+  // would drop every one of them. Matches the outer suite.
+  beforeEach(() => {
+    TestBed.inject(ClientPrefs).setHomeWindow('all');
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+    localStorage.clear();
+  });
+
+  it('stops the feed at the maximum, and says so', () => {
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.setFeedMax(5);
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock
+      .expectOne('/api/v1/timelines/home?limit=20')
+      .flush(['1', '2', '3', '4', '5', '6'].map(makeStatus));
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    fixture.detectChanges();
+
+    internals(fixture).loadMore();
+    httpMock.expectOne('/api/v1/bookmarks?limit=1').flush([]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('You’ve had enough for now');
+  });
+
+  it('lets a reader who chose to ignore the break keep paging', () => {
+    // The override is a Settings decision, not a button at the end of the feed:
+    // relabelling "Load more" would be a different label, not real friction.
+    const prefs = TestBed.inject(ClientPrefs);
+    prefs.setFeedMax(5);
+    prefs.setIgnoreFeedCooldown(true);
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock
+      .expectOne('/api/v1/timelines/home?limit=20')
+      .flush(['1', '2', '3', '4', '5', '6'].map(makeStatus));
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    fixture.detectChanges();
+
+    internals(fixture).loadMore();
+    httpMock.expectOne('/api/v1/bookmarks?limit=1').flush([]);
+    // The override is on, so paging continues rather than hitting the wall.
+    for (const open of httpMock.match((c) => c.url.startsWith('/api/v1/timelines/home'))) {
+      open.flush([]);
+    }
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('You’ve had enough for now');
+    // And the reason it kept going is the setting, not an absent cap.
+    expect(internals(fixture).capActive()).toBe(false);
+  });
+});
+
 describe('Home, first run', () => {
   beforeEach(() => {
+    // See docs/shared-jsdom-realm-in-tests.md.
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),

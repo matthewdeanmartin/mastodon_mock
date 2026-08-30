@@ -12,7 +12,9 @@
   type="button"
   [class.on]="starred()"
   [attr.aria-pressed]="starred()"
-  [attr.aria-label]="starred() ? 'Unstar ' + title() : 'Star ' + title()"
+  [attr.aria-label]="
+    starred() ? 'Remove ' + title() + ' from Read later' : 'Save ' + title() + ' to read later'
+  "
   (click)="toggleStar()"
 >
   {{ starred() ? '★' : '☆' }}

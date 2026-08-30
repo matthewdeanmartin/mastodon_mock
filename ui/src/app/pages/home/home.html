@@ -225,6 +225,31 @@
       <p class="home-empty-lead">Your timeline is empty — you're not following anyone yet.</p>
       <a class="btn" routerLink="/find-friends">Find people to follow</a>
     </div>
+  } @else if (!visible().length && allHiddenByFilters()) {
+    <!-- Posts arrived and the filters hid every one of them. "Find friends to
+         follow" is the worst possible answer here: it blames the reader's
+         follows for a feed their own filters emptied, and sends them off to fix
+         something that is not broken. Name the filter and offer the undo, the
+         same as the end-of-feed notes below. -->
+    <div class="feed-all-hidden">
+      <p class="muted">
+        {{ statuses().length }} post{{ statuses().length === 1 ? '' : 's' }} loaded, and your
+        filters are hiding {{ statuses().length === 1 ? 'it' : 'them all' }}.
+      </p>
+      @if (hiddenByCalm()) {
+        <button type="button" class="link-button" (click)="showCalmHidden()">
+          Turn Calm off to see {{ hiddenByCalm() }}.
+        </button>
+      } @else if (hiddenByFilters()) {
+        <button type="button" class="link-button" (click)="showEverything()">
+          Show {{ hiddenByFilters() }} hidden by Boosts/Replies.
+        </button>
+      } @else {
+        <span class="muted small">
+          The language picker at the top of the feed is what is holding them back.
+        </span>
+      }
+    </div>
   } @else if (!visible().length) {
     <p class="muted center">
       <a routerLink="/find-friends">Find friends to follow →</a>
@@ -239,32 +264,66 @@
       />
     }
 
-    @if (capActive()) {
-      @if (visibleBookmarkTail().length) {
-        <div class="feed-cap">
-          <div class="feed-cap-rule">—— some posts you saved for later ——</div>
-        </div>
-        @for (s of visibleBookmarkTail(); track s.id) {
-          <div class="bookmark-label muted">🔖 From your bookmarks</div>
-          <app-status-card
-            [status]="s"
-            (changed)="onBookmarkChanged(s, $event)"
-            (deleted)="onBookmarkDeleted($event)"
-            (replied)="onPosted($event)"
-          />
-        }
+    <!-- Bookmarks the reader asked for, below the feed and above the buttons.
+         Appended a page at a time by "Review bookmarks" and never on their own:
+         the old automatic tail fired only when the cap, the cooldown and a
+         non-empty bookmark list coincided, which meant nobody ever saw it. -->
+    @if (visibleBookmarkReview().length) {
+      <div class="feed-cap">
+        <div class="feed-cap-rule">—— some posts you saved for later ——</div>
+      </div>
+      @for (s of visibleBookmarkReview(); track s.id) {
+        <div class="bookmark-label muted">🔖 From your bookmarks</div>
+        <app-status-card
+          [status]="s"
+          (changed)="onBookmarkChanged(s, $event)"
+          (deleted)="onBookmarkDeleted($event)"
+          (replied)="onPosted($event)"
+        />
       }
+    }
+
+    @if (capActive()) {
       <div class="feed-cap">
         <div class="feed-cap-rule">—— that’s the end of your feed for now ——</div>
         <p class="feed-cap-msg">
           You’ve had enough for now, bub. Take it easy.
           <span class="muted">Resets in ~{{ capMinutesLeft() }} min, or on reload.</span>
         </p>
+        <!-- The cooldown still stops the feed; what changed is that it no longer
+             stops it silently, and no longer stops the bookmarks the reader
+             already saved. Reviewing what you kept is not doomscrolling. -->
+        @if (canReviewBookmarks()) {
+          <button
+            class="btn btn-outline more"
+            type="button"
+            [disabled]="loadingBookmarks()"
+            (click)="reviewBookmarks()"
+          >
+            {{ loadingBookmarks() ? 'Loading…' : 'Review bookmarks' }}
+          </button>
+        }
       </div>
     } @else if (autoLoading()) {
       <p class="muted center">Loading more…</p>
     } @else if (canLoadMore()) {
-      <button class="btn btn-outline more" (click)="loadMore()">Load more</button>
+      <!-- The pair. Each press appends its own kind and re-renders both, so the
+           reader can alternate freely: a page of feed, a page of bookmarks,
+           another page of feed. "Review bookmarks" appears only when there are
+           bookmarks to show — a dead button beside a live one is noise. -->
+      <div class="feed-more-actions">
+        <button class="btn btn-outline more" type="button" (click)="loadMore()">Load more</button>
+        @if (canReviewBookmarks()) {
+          <button
+            class="btn btn-outline more"
+            type="button"
+            [disabled]="loadingBookmarks()"
+            (click)="reviewBookmarks()"
+          >
+            {{ loadingBookmarks() ? 'Loading…' : 'Review bookmarks' }}
+          </button>
+        }
+      </div>
     } @else if (olderAvailable()) {
       <!-- Not the end of the timeline: the *window* stopped the fetch, because a
            page crossed the cutoff. Saying "all caught up" here is false — there
@@ -291,11 +350,45 @@
           <button type="button" class="link-button" (click)="showEverything()">
             Show {{ hidden }} more already loaded (hidden by Boosts/Replies).
           </button>
+        } @else if (hiddenByCalm(); as calmed) {
+          <!-- Calm could empty a feed without ever saying so, which reads as
+               "my follows went quiet" rather than "I turned a filter on". Same
+               shape as the chips above: name the number, offer the undo. -->
+          That’s everything Calm mode is letting through.
+          <button type="button" class="link-button" (click)="showCalmHidden()">
+            Show {{ calmed }} more already loaded (hidden by Calm).
+          </button>
+        } @else if (hiddenByLanguage(); as byLanguage) {
+          <!-- No one-click undo for this one, deliberately: the language filter
+               is a multi-language choice rather than a toggle, so re-admitting
+               "the rest" would mean guessing which languages were meant. The
+               picker is in the filter bar at the top of this same page, so
+               naming the number and pointing at it is the honest move. -->
+          That’s everything in your chosen languages.
+          <span class="muted">
+            {{ byLanguage }} more already loaded {{ byLanguage === 1 ? 'is' : 'are' }} in another
+            language — the language picker is at the top of the feed.
+          </span>
         } @else {
           You’re all caught up. Were you expecting more?
           <a routerLink="/feed-doctor">Check the Feed Doctor.</a>
         }
       </p>
+      <!-- The end of the feed is where saved posts are most welcome, and the
+           one place the reader is definitely not still scrolling something
+           else. Offered here as well as beside "Load more". -->
+      @if (canReviewBookmarks()) {
+        <div class="feed-more-actions">
+          <button
+            class="btn btn-outline more"
+            type="button"
+            [disabled]="loadingBookmarks()"
+            (click)="reviewBookmarks()"
+          >
+            {{ loadingBookmarks() ? 'Loading…' : 'Review bookmarks' }}
+          </button>
+        </div>
+      }
     }
   }
 

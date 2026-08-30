@@ -12,9 +12,11 @@ describe('feedLinksIn', () => {
       <link rel="alternate" type="application/rss+xml" title="Blog" href="/feed.xml">
       <link rel="alternate" type="application/atom+xml" href="https://x.test/atom">
     `;
+    // `type` is carried through, not discarded: two declarations of the same
+    // content in different formats are told apart by it. See `collapseFormats`.
     expect(feedLinksIn(html, 'https://x.test/')).toEqual([
-      { url: 'https://x.test/feed.xml', title: 'Blog' },
-      { url: 'https://x.test/atom', title: 'x.test' },
+      { url: 'https://x.test/feed.xml', title: 'Blog', type: 'application/rss+xml' },
+      { url: 'https://x.test/atom', title: 'x.test', type: 'application/atom+xml' },
     ]);
   });
 
@@ -103,6 +105,7 @@ describe('RssDiscovery', () => {
         title: 'Feed',
         siteUrl: 'https://blog.test/',
         via: 'alice',
+        type: 'application/rss+xml',
       },
     ]);
   });

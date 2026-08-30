@@ -111,7 +111,7 @@ itself.
    best pre-picked; **a fediverse handle offers Follow first**, with RSS as a deliberately
    de-emphasised secondary option.
 
-**Deferred past Sprint 6** (explicitly out of scope until re-planned): RSS comments (see below),
+**Deferred past Sprint 6** (RSS comments have since shipped — [[rss-8-comments-parity]]):
 "friends shared items" synthetic feed, reader harmonization across long-post/tweet-storm/RSS-article
 (explicitly named as *not now* by the boss, and reaffirmed 2026-08-23), Home megatweets/tweet-storms
 appearing in the split pane's left rail (named as "someday," not scheduled).
@@ -146,9 +146,17 @@ Three bugs found in `test`, all fixed and runtime-verified.
    specific feed, so the reader keeps their place. Ordinary posts still say "Exit reader" and get
    no return link. Three specs guard this.
 
-### RSS comments — the options, for whenever this is picked up
+### RSS comments — DONE ([[rss-8-comments-parity]], 2026-08-30)
 
-Nothing in `spec/` covers this; the formats offer three routes, only one of which carries content:
+Picked up and closed. The analysis below was right — `wfw:commentRss` is the answer — and
+the implementation had in fact already been built to match it: parser, provider, adapter
+and thread rendering all shipped, read-only, exactly as scoped here. The only thing
+missing was that `replies_count` stayed hardcoded at `0`, so an item with a discussion
+advertised none of it outside the thread. One line.
+
+The read-only limit below still holds and is permanent, not a deferral.
+
+The original analysis, kept because it is what the decision rests on:
 
 | Option | What it gives | Verdict |
 | --- | --- | --- |

@@ -71,7 +71,15 @@ export const MINOR_SOURCE_SHARE = 0.02;
 
 /** An action the page offers. Never applied automatically — the user decides. */
 export interface DoctorAction {
-  kind: 'mute' | 'unfollow' | 'review-filters' | 'review-quiet' | 'review-window';
+  kind:
+    | 'mute'
+    | 'unfollow'
+    | 'review-filters'
+    | 'review-quiet'
+    | 'review-window'
+    | 'widen-window'
+    | 'show-calm'
+    | 'wait-out-cooldown';
   label: string;
   /** The account it applies to, for the account-scoped actions. */
   account?: Account;
@@ -80,7 +88,7 @@ export interface DoctorAction {
 }
 
 export interface Verdict {
-  id: 'flooding' | 'ended' | 'mixing' | 'sources' | 'timespans';
+  id: 'flooding' | 'ended' | 'stopped' | 'mixing' | 'sources' | 'timespans';
   severity: Severity;
   /** One sentence, already phrased for a human. */
   headline: string;
@@ -200,6 +208,116 @@ export function diagnoseEnding(outcomes: SourceOutcome[]): Verdict {
           : 'Your feed ended early.',
     detail: severity === 'ok' ? [] : detail,
     actions: severity === 'ok' ? [] : actions,
+  };
+}
+
+/**
+ * What is bounding the feed right now.
+ *
+ * This is the verdict the Doctor was missing, and the reason it kept failing at
+ * its one job. `diagnoseEnding` answers "which *follow* went quiet", which only
+ * the anonymous feed can even ask — so a signed-in reader whose feed stopped got
+ * flooding, freshness and mixing verdicts, none of which mention the thing that
+ * actually stopped their feed:
+ *
+ * > "feed doctor ended up only saying 'well, no single person is flooding your
+ * > feed' and stuff like that. It never successfully diagnosis why a feed ended."
+ *
+ * The five mechanisms below can each end or thin a feed, and every one of them
+ * is invisible at the point it acts. They are reported together because the
+ * reader's question is singular — *why did this stop* — and answering it with
+ * four separate green ticks and no red one is how the Doctor lost their trust.
+ *
+ * Ordered by how completely each one bounds the feed: a cooldown stops paging
+ * outright, a window stops it at a date, and the filters merely thin what was
+ * already fetched. The first applicable one leads, because a reader stopped by
+ * the cooldown does not need to hear about their language filter yet.
+ */
+export interface FeedBounds {
+  /** Posts held out of view by Calm mode, out of what else would have shown. */
+  hiddenByCalm: number;
+  /** Posts held out of view by the language filter, likewise. */
+  hiddenByLanguage: number;
+  /** Posts held out of view by the Boosts/Replies chips. */
+  hiddenByChips: number;
+  /** Posts not fetched because they fall outside the time window. */
+  droppedByWindow: number;
+  /** The window in words ("the last day"), or null when unbounded. */
+  windowLabel: string | null;
+  /** True while the reading cooldown is holding paging back. */
+  cooldownActive: boolean;
+  /** Minutes left on that cooldown. */
+  cooldownMinutes: number;
+  /** True when the feed genuinely reached the end of every source. */
+  exhausted: boolean;
+  /** How many posts are on screen, for phrasing. */
+  shown: number;
+}
+
+export function diagnoseStopped(bounds: FeedBounds): Verdict {
+  const detail: string[] = [];
+  const actions: DoctorAction[] = [];
+
+  if (bounds.cooldownActive) {
+    detail.push(
+      `A reading break is in force — about ${bounds.cooldownMinutes} minute${bounds.cooldownMinutes === 1 ? '' : 's'} left, or until you reload.`,
+    );
+    actions.push({ kind: 'wait-out-cooldown', label: 'Feed settings' });
+  }
+  if (bounds.droppedByWindow > 0 && bounds.windowLabel) {
+    detail.push(
+      `${bounds.droppedByWindow} older post${bounds.droppedByWindow === 1 ? '' : 's'} were not loaded — Home is limited to ${bounds.windowLabel}.`,
+    );
+    actions.push({ kind: 'widen-window', label: 'Load older posts' });
+  }
+  if (bounds.hiddenByCalm > 0) {
+    detail.push(
+      `Calm mode is holding back ${bounds.hiddenByCalm} already-loaded post${bounds.hiddenByCalm === 1 ? '' : 's'}.`,
+    );
+    actions.push({ kind: 'show-calm', label: 'Turn Calm off' });
+  }
+  if (bounds.hiddenByLanguage > 0) {
+    detail.push(
+      `${bounds.hiddenByLanguage} already-loaded post${bounds.hiddenByLanguage === 1 ? ' is' : 's are'} in a language you filtered out.`,
+    );
+  }
+  if (bounds.hiddenByChips > 0) {
+    detail.push(
+      `The Boosts/Replies chips are hiding ${bounds.hiddenByChips} already-loaded post${bounds.hiddenByChips === 1 ? '' : 's'}.`,
+    );
+    actions.push({ kind: 'review-filters', label: 'Review filters' });
+  }
+
+  if (!detail.length) {
+    // Nothing is bounding the feed. Say which of the two that means, because
+    // "nothing is limiting you" and "you have read everything" are different
+    // answers and only one of them means more will arrive.
+    return {
+      id: 'stopped',
+      severity: 'ok',
+      headline: bounds.exhausted
+        ? 'Your feed ended because every source ran out — nothing is filtering it.'
+        : 'Nothing is limiting your feed right now.',
+      detail: [],
+      actions: [],
+    };
+  }
+
+  // A cooldown or a window bounds what can be *fetched*; the filters only thin
+  // what already arrived. Warn on the former, note the latter.
+  const severity: Severity =
+    bounds.cooldownActive || bounds.droppedByWindow > 0 ? 'warn' : 'notice';
+
+  return {
+    id: 'stopped',
+    severity,
+    headline: bounds.cooldownActive
+      ? 'Your feed stopped because of a reading break.'
+      : bounds.droppedByWindow > 0
+        ? `Your feed stopped at the edge of ${bounds.windowLabel}.`
+        : 'Your feed is shorter than it looks — filters are hiding posts.',
+    detail,
+    actions,
   };
 }
 
@@ -492,6 +610,12 @@ export interface DiagnoseOptions {
    * anonymous feed, which has one kind of source and its own `outcomes`.
    */
   slices?: ProviderSlice[];
+  /**
+   * What is bounding the feed. Available to both feeds — unlike `outcomes`,
+   * every mechanism in it applies whoever you are signed in as — and it is what
+   * answers "why did my feed end" when there are no per-follow outcomes.
+   */
+  bounds?: FeedBounds;
   now?: number;
 }
 
@@ -508,6 +632,11 @@ export interface DiagnoseOptions {
  *    anonymous feed has no equivalent for: per-provider freshness and time
  *    spans, which is where the signed-in feed actually goes wrong.
  *
+ * `bounds` is the exception to that split: cooldowns, windows and filters bound
+ * both feeds identically, so {@link diagnoseStopped} runs for whoever supplies
+ * it. It is what a signed-in reader gets instead of {@link diagnoseEnding}, and
+ * without it the Doctor cannot answer the question it exists for.
+ *
  * A verdict with nothing behind it is omitted rather than rendered as a
  * reassuring green tick — claiming "every follow returned posts" when nothing was
  * measured is worse than saying nothing.
@@ -518,6 +647,9 @@ export function diagnoseFeed(options: DiagnoseOptions): FeedDiagnosis {
 
   if (options.slices?.length) {
     verdicts.push(diagnoseSources(options.slices, now), diagnoseTimespans(options.slices, now));
+  }
+  if (options.bounds) {
+    verdicts.push(diagnoseStopped(options.bounds));
   }
   if (options.outcomes.length) {
     verdicts.push(diagnoseEnding(options.outcomes));

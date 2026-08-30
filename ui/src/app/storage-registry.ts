@@ -1015,6 +1015,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     sensitivity: 'cache',
     note: 'Privacy-scrubbed diagnostic timeline for this tab (DiagnosticLog). Credentials and tokens are redacted before anything is written; retained only for the session.',
   },
+  {
+    base: 'mockingbird_has_bookmarks_v1',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'cache',
+    note: 'Whether this reader has any bookmarks, so Home can show a "Review bookmarks" button without asking the server on every load. A true is kept indefinitely; a false expires after a day. Holds no bookmark content — only the yes/no and when it was asked.',
+  },
 ];
 
 /** Which sensitivities each export profile includes. */

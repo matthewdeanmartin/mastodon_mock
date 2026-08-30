@@ -16,6 +16,13 @@ export interface DiscoveredFeed {
   siteUrl: string;
   /** Handle of the followed account whose post linked here. */
   via: string;
+  /**
+   * The declared feed MIME type, when the page gave one.
+   *
+   * Carried so a caller can collapse the same feed published in two formats —
+   * see `collapseFormats` in `feed-ranking.ts`.
+   */
+  type?: string;
 }
 
 /**
@@ -56,9 +63,12 @@ function siteRootOf(link: string): string | null {
  *
  * Exported for testing: parsing is the part with edge cases, fetching is not.
  */
-export function feedLinksIn(html: string, baseUrl: string): { url: string; title: string }[] {
+export function feedLinksIn(
+  html: string,
+  baseUrl: string,
+): { url: string; title: string; type: string }[] {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const out: { url: string; title: string }[] = [];
+  const out: { url: string; title: string; type: string }[] = [];
   const seen = new Set<string>();
 
   for (const link of Array.from(doc.querySelectorAll('link[rel~="alternate"][href]'))) {
@@ -89,6 +99,10 @@ export function feedLinksIn(html: string, baseUrl: string): { url: string; title
     out.push({
       url,
       title: link.getAttribute('title')?.trim() || resolved.host.replace(/^www\./, ''),
+      // Carried through rather than discarded: two declarations of the same
+      // content in different formats are a choice nobody should be asked to
+      // make, and the format is what tells them apart. See `collapseFormats`.
+      type,
     });
   }
   return out;
@@ -196,7 +210,7 @@ export class RssDiscovery {
   }
 
   /** Fetch one site and read its feed declarations. Failures are not fatal. */
-  private async probe(siteUrl: string): Promise<{ url: string; title: string }[]> {
+  private async probe(siteUrl: string): Promise<{ url: string; title: string; type: string }[]> {
     try {
       const request = this.proxy.proxyRequest(siteUrl, 'article');
       const html = await firstValueFrom(

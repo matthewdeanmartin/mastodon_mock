@@ -1,13 +1,20 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { catchError, forkJoin, map, Observable, of, timeout } from 'rxjs';
-import { AccountStatusesOptions, nextMaxIdFrom } from '../../api';
+import { AccountStatusesOptions } from '../../api';
+import { PeopleCursorSource, peopleCursorFrom } from '../../people-cursor';
 import { Account, Collection, Context, SearchResults, Status, StatusEdit, Tag } from '../../models';
 import { externalFetch } from '../external-fetch';
 import { adaptAnonymousAccount, adaptAnonymousStatus } from './anonymous-mastodon-provider';
 import { AnonymousPublicRef } from './anonymous-route-ref';
 
 const REQUEST_TIMEOUT_MS = 8_000;
+
+/**
+ * Followers/following page size. Named because {@link peopleCursorFrom} needs
+ * the same number to tell a full page from the short one that ends a walk.
+ */
+const PEOPLE_PAGE_LIMIT = 80;
 const ANONYMOUS_POST_SEARCH_TAG_LIMIT = 10;
 
 /**
@@ -91,14 +98,22 @@ export class AnonymousPublicApi {
   getAccountFollowersPage(
     ref: AnonymousPublicRef,
     maxId?: string,
-  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+  ): Observable<{
+    accounts: Account[];
+    nextMaxId: string | null;
+    source: PeopleCursorSource;
+  }> {
     return this.getAccountPeople(ref, 'followers', maxId);
   }
 
   getAccountFollowingPage(
     ref: AnonymousPublicRef,
     maxId?: string,
-  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+  ): Observable<{
+    accounts: Account[];
+    nextMaxId: string | null;
+    source: PeopleCursorSource;
+  }> {
     return this.getAccountPeople(ref, 'following', maxId);
   }
 
@@ -301,8 +316,12 @@ export class AnonymousPublicApi {
     ref: AnonymousPublicRef,
     kind: 'followers' | 'following',
     maxId?: string,
-  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
-    let params = new HttpParams().set('limit', '80');
+  ): Observable<{
+    accounts: Account[];
+    nextMaxId: string | null;
+    source: PeopleCursorSource;
+  }> {
+    let params = new HttpParams().set('limit', String(PEOPLE_PAGE_LIMIT));
     if (maxId) params = params.set('max_id', maxId);
     return this.http
       .get<
@@ -310,16 +329,21 @@ export class AnonymousPublicApi {
       >(`${ref.server}/api/v1/accounts/${encodeURIComponent(ref.id)}/${kind}`, { params, context: externalFetch(), observe: 'response' })
       .pipe(
         timeout(REQUEST_TIMEOUT_MS),
-        map((response) => ({
-          accounts: (response.body ?? []).map((account) =>
+        map((response) => {
+          const accounts = (response.body ?? []).map((account) =>
             adaptAnonymousAccount(account, ref.server),
-          ),
-          // A cross-origin read only exposes headers the server allows. Mastodon
-          // sends `Access-Control-Expose-Headers: Link`, so this is populated in
-          // practice; when a server does not, `null` degrades to "one page",
-          // which is the same behaviour as before rather than a new failure.
-          nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
-        })),
+          );
+          // A cross-origin read only exposes headers the server allows, and
+          // `Link` is not CORS-safelisted — so anything that drops
+          // `Access-Control-Expose-Headers` makes the cursor unreadable here.
+          // Degrading to "one page" hides thousands of rows behind what looks
+          // like a privacy setting, so a missing header falls back to the
+          // account-id cursor instead — see `peopleCursorFrom` for the fences.
+          return {
+            accounts,
+            ...peopleCursorFrom(response.headers.get('Link'), accounts, PEOPLE_PAGE_LIMIT),
+          };
+        }),
       );
   }
 }

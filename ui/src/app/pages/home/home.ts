@@ -9,6 +9,7 @@ import { ClientPrefs, FEED_MAX_COOLDOWN_MS, HomeWindow } from '../../client-pref
 import { Status } from '../../models';
 import { byNewestFirst } from '../../status-sort';
 import { CalmVerdicts } from '../../calm-verdicts';
+import { BookmarkPresence } from '../../bookmark-presence';
 import { FeedLanguageFilter } from '../../trend-language-filter';
 import { CommandBar, FeedView } from '../../command-bar/command-bar';
 import { FeedAnalytics } from '../../feed-analytics/feed-analytics';
@@ -54,8 +55,8 @@ import { ReaderToolbar } from '../../reader-toolbar/reader-toolbar';
 /** Below this many follows, nudge toward /find-friends (few follows = empty-feeling feed). */
 const FOLLOW_NUDGE_THRESHOLD = 5;
 const NUDGE_DISMISSED_KEY = 'mockingbird_follow_nudge_dismissed';
-/** How many saved bookmarks get tacked onto the feed when the cap hits. */
-const BOOKMARK_TAIL_SIZE = 40;
+/** How many saved bookmarks one press of "Review bookmarks" appends. */
+const BOOKMARK_PAGE_SIZE = 20;
 
 @Component({
   selector: 'app-home',
@@ -88,6 +89,7 @@ export class Home implements OnInit, OnDestroy {
   protected prefs = inject(ClientPrefs);
   private feedLangFilter = inject(FeedLanguageFilter);
   private calm = inject(CalmVerdicts);
+  private bookmarkPresence = inject(BookmarkPresence);
   private visibility = inject(StatusVisibility);
   private streaming = inject(Streaming);
   private homeTimelineFeed = inject(HomeTimelineFeed);
@@ -208,18 +210,33 @@ export class Home implements OnInit, OnDestroy {
    */
   private maxHitAt = signal<number | null>(null);
   /**
-   * Saved bookmarks tacked onto the bottom when the feed cap hits — something
-   * the reader chose to keep, instead of an abrupt wall. Fetched once per cap.
+   * Bookmarks the reader has pulled in, a page at a time, from the button at the
+   * end of the feed.
+   *
+   * This replaces the old "bookmark tail", which appended 40 bookmarks
+   * automatically when the feed cap hit. The boss never saw it fire:
+   *
+   * > "I have never seen the bookmark tail. However it is currently implemented,
+   * > it is ineffective."
+   *
+   * It required the cap *and* the cooldown *and* a non-empty bookmark list to
+   * coincide, so it was invisible in normal use and a surprise when it was not.
+   * Now it is a button: pressed on purpose, paged like the feed, and never
+   * appearing on its own.
    */
-  protected bookmarkTail = signal<Status[]>([]);
+  protected bookmarkReview = signal<Status[]>([]);
   /**
-   * The tail minus bookmarks whose card would render nothing. Each one carries a
-   * "🔖 From your bookmarks" label of its own, so a self-suppressing card would
+   * The review minus bookmarks whose card would render nothing. Each one carries
+   * a "🔖 From your bookmarks" label of its own, so a self-suppressing card would
    * strand the label over empty space — see {@link StatusVisibility}.
    */
-  protected visibleBookmarkTail = computed(() =>
-    this.bookmarkTail().filter((s) => !this.visibility.rendersNothing(s)),
+  protected visibleBookmarkReview = computed(() =>
+    this.bookmarkReview().filter((s) => !this.visibility.rendersNothing(s)),
   );
+  /** True while a bookmark page is in flight, so the button can say so. */
+  protected loadingBookmarks = signal(false);
+  /** No more bookmarks to append: the last page came back short. */
+  protected bookmarksExhausted = signal(false);
   /** Ticks so `capActive` re-evaluates the cooldown without a user action. */
   private now = signal(Date.now());
   private clock: ReturnType<typeof setInterval> | null = null;
@@ -327,6 +344,71 @@ export class Home implements OnInit, OnDestroy {
     }).length;
   });
 
+  /**
+   * How many fetched posts Calm mode is holding back right now.
+   *
+   * Counted for the same reason {@link hiddenByFilters} is counted, and it was
+   * the conspicuous omission: Calm can empty a feed silently, and the reader is
+   * left concluding their follows went quiet. The boss hit exactly this — "maybe
+   * too much got filtered out by calm (that happened to me today)".
+   *
+   * Measured against posts the *other* filters would have shown, so the number
+   * is what turning Calm off would actually reveal rather than a headline the
+   * click cannot deliver on.
+   */
+  protected hiddenByCalm = computed(() => {
+    if (!this.prefs.algoCalm()) {
+      return 0;
+    }
+    return this.statuses().filter((status) => {
+      if (!this.calm.hidden(status)) {
+        return false;
+      }
+      return (
+        (this.showBoosts() || status.reblog === null) &&
+        (this.showReplies() || status.in_reply_to_id === null) &&
+        this.feedLangFilter.shouldShow(status)
+      );
+    }).length;
+  });
+
+  /**
+   * How many fetched posts the language filter is holding back right now.
+   *
+   * The other silent shortener. A reader who set a language filter months ago
+   * and follows people who post in a second language sees a feed that ends
+   * early for no stated reason.
+   */
+  protected hiddenByLanguage = computed(() => {
+    return this.statuses().filter((status) => {
+      if (this.feedLangFilter.shouldShow(status)) {
+        return false;
+      }
+      return (
+        (this.showBoosts() || status.reblog === null) &&
+        (this.showReplies() || status.in_reply_to_id === null) &&
+        !(this.prefs.algoCalm() && this.calm.hidden(status))
+      );
+    }).length;
+  });
+
+  /**
+   * Posts were fetched, and every one of them is filtered out of view.
+   *
+   * Distinct from an empty feed, and the distinction is the whole point: an
+   * empty feed means nobody posted, this means the reader cannot see what did.
+   * Rendering "you're not following anyone" over this state blamed follows for
+   * a filter's work.
+   */
+  protected allHiddenByFilters = computed(
+    () => this.statuses().length > 0 && this.visible().length === 0,
+  );
+
+  /** Stop hiding calm-filtered posts, from the end-of-feed note. */
+  protected showCalmHidden(): void {
+    this.prefs.setAlgoCalm(false);
+  }
+
   /** Turn both chips back on from the end-of-feed prompt, in one click. */
   protected showEverything(): void {
     this.showBoosts.set(true);
@@ -364,8 +446,18 @@ export class Home implements OnInit, OnDestroy {
     );
   }
 
-  /** True while the max-feed cap is in force (hit, and within the cooldown). */
+  /**
+   * True while the max-feed cap is in force (hit, and within the cooldown).
+   *
+   * The reading break is a health guard rather than a technical limit, so it is
+   * overridable — but only from Settings, never from a button at the end of the
+   * feed. Relabelling "Load more" as "you should take a break, load more?" is
+   * not friction; walking to Settings is. See `ClientPrefs.ignoreFeedCooldown`.
+   */
   protected capActive = computed(() => {
+    if (this.prefs.ignoreFeedCooldown()) {
+      return false;
+    }
     const hit = this.maxHitAt();
     return hit !== null && this.now() - hit < FEED_MAX_COOLDOWN_MS;
   });
@@ -561,7 +653,9 @@ export class Home implements OnInit, OnDestroy {
     this.calm.reset();
     this.feedLangFilter.reset();
     this.maxHitAt.set(null);
-    this.bookmarkTail.set([]);
+    this.bookmarkReview.set([]);
+    this.bookmarksExhausted.set(false);
+    this.loadingBookmarks.set(false);
     if (this.waitingForServerList()) {
       this.statuses.set([]);
       return;
@@ -765,6 +859,9 @@ export class Home implements OnInit, OnDestroy {
   }
 
   loadMore(): void {
+    // Heading for the end of the feed: decide the bookmark button now, so it is
+    // ready rather than appearing late.
+    this.askAboutBookmarks();
     this.diagnostics.info('user:load-more', {
       stored: this.statuses().length,
       canLoadMore: this.canLoadMore(),
@@ -774,7 +871,6 @@ export class Home implements OnInit, OnDestroy {
     // cooldown. Paging may overshoot slightly (a partial last page) — fine.
     if (this.statuses().length >= this.prefs.feedMax()) {
       this.maxHitAt.set(Date.now());
-      this.loadBookmarkTail();
       return;
     }
     if (!this.canLoadMore()) {
@@ -881,30 +977,96 @@ export class Home implements OnInit, OnDestroy {
     }, {});
   }
 
-  /** Fetch the bookmark tail once per cap; a failure just means no tail. */
-  private loadBookmarkTail(): void {
-    if (this.bookmarkTail().length) {
-      return;
-    }
+  /**
+   * Whether to offer the "Review bookmarks" button.
+   *
+   * Three conditions, all of them about not showing a button that would do
+   * nothing: the reader has bookmarks ({@link BookmarkPresence} answers this
+   * with at most one request a day), there are more to fetch, and Home is not
+   * in server-only mode — where bookmarks from other servers would contradict
+   * the one thing that mode promises.
+   */
+  protected canReviewBookmarks = computed(
+    () =>
+      this.bookmarkPresence.has() === true &&
+      !this.bookmarksExhausted() &&
+      !this.justMyServer.effectiveEnabled(),
+  );
+
+  /**
+   * Ask whether there are bookmarks, at the moment the answer is first needed.
+   *
+   * Deliberately **not** on feed load. The button lives at the end of the feed
+   * and most sessions never reach it, so probing on load would spend a request
+   * per session answering a question most readers never ask — the opposite of
+   * the constraint this feature was given:
+   *
+   * > "we don't want to do dozens of bookmark calls a day to constantly reaffirm
+   * > that there is at least 1."
+   *
+   * Called from {@link loadMore}: pressing "Load more" is the first evidence
+   * that this reader is heading for the end of the feed. The answer lands well
+   * before they get there, and a session that never presses it costs nothing.
+   * Repeat calls are free — {@link BookmarkPresence} caches a yes forever and a
+   * no for a day.
+   */
+  private askAboutBookmarks(): void {
     if (this.justMyServer.effectiveEnabled()) {
       return;
     }
-    if (this.auth.isAnonymous) {
-      this.bookmarkTail.set(this.anonymousBookmarks.bookmarks().slice(0, BOOKMARK_TAIL_SIZE));
+    this.bookmarkPresence.check();
+  }
+
+  /**
+   * Append the next page of saved bookmarks.
+   *
+   * Paged by the id of the last one held, matching how `/bookmarks` is walked on
+   * its own page: `/api/v1/bookmarks` returns statuses, and a short page is what
+   * ends the walk. Alternating this with "Load more" is the point — the two
+   * buttons sit side by side and each one re-renders both, so the reader can
+   * take a page of feed, a page of bookmarks, and another page of feed.
+   */
+  protected reviewBookmarks(): void {
+    if (this.loadingBookmarks() || this.bookmarksExhausted()) {
       return;
     }
-    this.bookmarkSub = this.api.bookmarks(undefined, BOOKMARK_TAIL_SIZE).subscribe({
-      next: (marks) => this.bookmarkTail.set(marks),
-      error: () => undefined,
+    const held = this.bookmarkReview();
+    if (this.auth.isAnonymous) {
+      // Local rows: no request, and the slice itself is the paging.
+      const all = this.anonymousBookmarks.bookmarks();
+      const next = all.slice(held.length, held.length + BOOKMARK_PAGE_SIZE);
+      this.bookmarkReview.update((list) => [...list, ...next]);
+      this.bookmarksExhausted.set(held.length + next.length >= all.length);
+      return;
+    }
+    this.loadingBookmarks.set(true);
+    this.bookmarkSub = this.api.bookmarks(held.at(-1)?.id, BOOKMARK_PAGE_SIZE).subscribe({
+      next: (marks) => {
+        this.loadingBookmarks.set(false);
+        // Dedupe against what is already held: a repeated boundary item would
+        // otherwise render twice under its own "from your bookmarks" label.
+        const seen = new Set(held.map((s) => s.id));
+        const fresh = marks.filter((s) => !seen.has(s.id));
+        this.bookmarkReview.update((list) => [...list, ...fresh]);
+        // Short page, or a page that added nothing new, is the end.
+        this.bookmarksExhausted.set(marks.length < BOOKMARK_PAGE_SIZE || !fresh.length);
+      },
+      error: (error: unknown) => {
+        this.loadingBookmarks.set(false);
+        this.diagnostics.error('bookmarks:page-error', error);
+        // Stop offering a button that just failed rather than inviting a retry
+        // loop; a reload re-arms it.
+        this.bookmarksExhausted.set(true);
+      },
     });
   }
 
   onBookmarkChanged(original: Status, updated: Status): void {
-    this.bookmarkTail.update((list) => list.map((s) => (s === original ? updated : s)));
+    this.bookmarkReview.update((list) => list.map((s) => (s === original ? updated : s)));
   }
 
   onBookmarkDeleted(removed: Status): void {
-    this.bookmarkTail.update((list) => list.filter((s) => s.id !== removed.id));
+    this.bookmarkReview.update((list) => list.filter((s) => s.id !== removed.id));
   }
 
   /** Timeline-derived widgets (who-to-follow) only understand Mastodon posts. */

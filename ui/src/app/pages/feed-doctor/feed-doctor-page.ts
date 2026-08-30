@@ -11,12 +11,15 @@ import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousMastodonProvider } from '../../providers/anonymous/anonymous-mastodon-provider';
 import {
   DoctorAction,
+  FeedBounds,
   FeedDiagnosis,
   ProviderSlice,
   Verdict,
   diagnoseFeed,
   sliceByProvider,
 } from '../../feed-doctor';
+import { CalmVerdicts } from '../../calm-verdicts';
+import { FeedLanguageFilter } from '../../trend-language-filter';
 import { feedSubject } from '../../feed-metrics';
 import { sampleFeed } from '../../feed-sample';
 
@@ -49,6 +52,8 @@ export class FeedDoctorPage implements OnInit {
   private aggregator = inject(FeedAggregator);
   private registry = inject(ProviderRegistry);
   private prefs = inject(ClientPrefs);
+  private calm = inject(CalmVerdicts);
+  private langFilter = inject(FeedLanguageFilter);
 
   protected loading = signal(true);
   protected diagnosis = signal<FeedDiagnosis | null>(null);
@@ -124,17 +129,65 @@ export class FeedDoctorPage implements OnInit {
       diagnoseFeed({
         posts,
         outcomes: this.provider.lastOutcomes(),
+        // Zero, and not a placeholder: the anonymous stitched feed reads each
+        // follow directly and applies no time window, so nothing can be dropped
+        // by one. `JustMyServer` and `FeedAggregator` are the two that do.
+        bounds: this.bounds(posts, 0),
         bySource: this.countSources(posts),
       }),
     );
   }
 
   /**
+   * What is bounding the feed, measured on the sample this page just fetched.
+   *
+   * Computed here rather than read off Home because the Doctor is reachable
+   * without Home being open, and a diagnosis that silently reports the last
+   * feed someone happened to scroll is worse than one that measures its own.
+   *
+   * The counts mirror Home's `hiddenByFilters` / `hiddenByCalm` /
+   * `hiddenByLanguage`: each filter is counted against posts the *other*
+   * filters would have shown, so the numbers add up to what turning that one
+   * filter off would actually reveal rather than overlapping into a total
+   * larger than the feed.
+   *
+   * The Boosts/Replies chips are Home's own view state and do not exist here,
+   * so `hiddenByChips` is 0 — the Doctor reports what it can measure and does
+   * not invent the rest.
+   */
+  private bounds(posts: Status[], droppedByWindow: number): FeedBounds {
+    const calmOn = this.prefs.algoCalm();
+    const hiddenByCalm = calmOn
+      ? posts.filter((p) => this.calm.hidden(p) && this.langFilter.shouldShow(p)).length
+      : 0;
+    const hiddenByLanguage = posts.filter(
+      (p) => !this.langFilter.shouldShow(p) && !(calmOn && this.calm.hidden(p)),
+    ).length;
+    const window = this.prefs.homeWindow();
+    return {
+      hiddenByCalm,
+      hiddenByLanguage,
+      hiddenByChips: 0,
+      droppedByWindow,
+      windowLabel: window === 'all' ? null : window === 'today' ? 'the last day' : 'the last week',
+      // The reading cooldown lives in Home's component state and resets on
+      // reload, so by the time this page is open it is not in force here.
+      cooldownActive: false,
+      cooldownMinutes: 0,
+      exhausted: !droppedByWindow && !hiddenByCalm && !hiddenByLanguage,
+      shown: posts.length,
+    };
+  }
+
+  /**
    * The signed-in diagnosis: which of your connected sources is behind, and do
    * they cover the same stretch of time.
    *
-   * No `outcomes` — there are no per-follow reads to report on — so the "why did
-   * your feed end" verdict is omitted rather than faked.
+   * No `outcomes` — there are no per-follow reads to report on — so
+   * {@link diagnoseEnding} stays omitted rather than faked. `bounds` is what
+   * answers "why did your feed end" here instead: cooldowns, windows and
+   * filters apply identically whoever is signed in, and leaving them unreported
+   * is what left this page saying only that nobody was flooding the feed.
    */
   private reportAggregated(posts: Status[]): void {
     const labels: Record<string, string> = { mastodon: 'Mastodon' };
@@ -152,10 +205,34 @@ export class FeedDoctorPage implements OnInit {
       diagnoseFeed({
         posts,
         outcomes: [],
+        bounds: this.bounds(posts, this.aggregator.droppedByWindow()),
         bySource: Object.fromEntries(slices.map((slice) => [slice.label, slice.count])),
         slices,
       }),
     );
+  }
+
+  /**
+   * Widen the reading window one step, then re-diagnose.
+   *
+   * Re-running the sample rather than only flipping the setting: the verdict on
+   * screen was computed against the narrow window, and leaving it there would
+   * have the page still blaming a window the reader just widened.
+   */
+  protected widenWindow(): void {
+    this.prefs.setHomeWindow(this.prefs.homeWindow() === 'today' ? 'week' : 'all');
+    this.rerun();
+  }
+
+  /** Turn Calm off from the diagnosis that named it, then re-diagnose. */
+  protected turnCalmOff(): void {
+    this.prefs.setAlgoCalm(false);
+    this.rerun();
+  }
+
+  private rerun(): void {
+    this.loading.set(true);
+    this.ngOnInit();
   }
 
   private report(diagnosis: FeedDiagnosis): void {

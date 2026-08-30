@@ -387,6 +387,7 @@ interface StoredPrefs {
   chatKind?: ChatKindFilter;
   feedMin?: number;
   feedMax?: number;
+  ignoreFeedCooldown?: boolean;
   algoAudience?: AlgoAudience;
   algoCalm?: boolean;
   algoTags?: boolean;
@@ -634,6 +635,19 @@ export class ClientPrefs {
    */
   readonly feedMin = signal<number>(FEED_MIN_DEFAULT);
   readonly feedMax = signal<number>(FEED_MAX_DEFAULT);
+  /**
+   * Let the reader page past the reading break.
+   *
+   * The cooldown is a health guard, not a technical limit — it exists because
+   * two hours of scrolling is bad for you, not because the server minds. So it
+   * is overridable, and the override is a deliberate setting rather than a
+   * button at the end of the feed: turning it off should cost a trip to
+   * Settings, which is friction proportional to what is being switched off.
+   *
+   * Off by default. Someone who wants endurance doomscrolling can have it; the
+   * point is that they have to say so somewhere other than mid-scroll.
+   */
+  readonly ignoreFeedCooldown = signal<boolean>(false);
 
   /** Favourite buttons render as ⭐ (Mastodon-style) or ❤️ (Twitter-style). */
   readonly favStyle = signal<FavStyle>('star');
@@ -990,6 +1004,11 @@ export class ClientPrefs {
     this.algoCalm.set(on);
   }
 
+  setIgnoreFeedCooldown(on: boolean): void {
+    this.ignoreFeedCooldown.set(on);
+    this.persist();
+  }
+
   setAlgoTags(on: boolean): void {
     this.algoTags.set(on);
   }
@@ -1306,6 +1325,9 @@ export class ClientPrefs {
     this.loadBool(stored.algoCalm, this.algoCalm);
     this.loadBool(stored.algoTags, this.algoTags);
     // feedMax first so setFeedMin can clamp against it.
+    if (typeof stored.ignoreFeedCooldown === 'boolean') {
+      this.ignoreFeedCooldown.set(stored.ignoreFeedCooldown);
+    }
     if (typeof stored.feedMax === 'number') {
       this.setFeedMax(stored.feedMax);
     }
@@ -1379,6 +1401,7 @@ export class ClientPrefs {
       chatKind: this.chatKind(),
       feedMin: this.feedMin(),
       feedMax: this.feedMax(),
+      ignoreFeedCooldown: this.ignoreFeedCooldown(),
       algoAudience: this.algoAudience(),
       algoCalm: this.algoCalm(),
       algoTags: this.algoTags(),

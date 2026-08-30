@@ -101,13 +101,18 @@
           >
             All
           </button>
+          <!-- "Read later", not "Starred". Same store, same gesture, plainer
+               name: a star is a symbol whose meaning every app defines
+               differently, while "read later" says what the list is for. The
+               internal id stays `starred` — renaming the persisted key would
+               throw away everybody's saved items for a copy change. -->
           <button
             type="button"
             [class.active]="filter() === 'starred'"
             [attr.aria-pressed]="filter() === 'starred'"
             (click)="setFilter('starred')"
           >
-            Starred
+            Read later
           </button>
         </span>
 
@@ -194,7 +199,7 @@
                 [attr.aria-pressed]="readState.isStarred(s.id)"
                 (click)="readState.toggleStarred(s.id)"
               >
-                {{ readState.isStarred(s.id) ? '★ Starred' : '☆ Star' }}
+                {{ readState.isStarred(s.id) ? '★ Saved' : '☆ Read later' }}
               </button>
               <button class="link-btn" type="button" (click)="toggleRead(s)">
                 {{ readState.isRead(s.id) ? 'Mark unread' : 'Mark read' }}
@@ -205,7 +210,7 @@
         }
       } @empty {
         @if (filter() === 'starred') {
-          <p class="muted center">Nothing starred here yet.</p>
+          <p class="muted center">Nothing saved for later yet.</p>
         } @else if (subs.feeds().length) {
           <p class="muted center">Nothing to read here.</p>
         } @else if (!isAllActive()) {

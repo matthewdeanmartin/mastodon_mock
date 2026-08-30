@@ -53,7 +53,22 @@
 
   <div class="people-more">
     @if (exhausted()) {
-      <span class="muted small">End of the list.</span>
+      <!-- "End of the list" is a claim, and it is wrong in the one case that
+           matters most: the server's paging cursor never reached us and the
+           walk stopped short of a list the profile says has thousands in it.
+           Say which of the two happened. -->
+      @if (shortOfReported()) {
+        <span class="muted small">
+          Stopped at {{ accounts().length }} of {{ reportedCount() }} — this server did not send the
+          rest of its paging information.
+        </span>
+      } @else if (approximate()) {
+        <span class="muted small"
+          >End of the list (approximate — paged without the server's cursor).</span
+        >
+      } @else {
+        <span class="muted small">End of the list.</span>
+      }
     } @else {
       <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
         {{ loadingMore() ? 'Loading…' : 'More' }}

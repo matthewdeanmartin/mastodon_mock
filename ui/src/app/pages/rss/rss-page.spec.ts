@@ -333,6 +333,22 @@ describe('RssPage', () => {
       expect(text).not.toContain('Beta item');
     });
 
+    it('calls the saved list "Read later" while keeping the stored key', async () => {
+      // The rename is copy-only and deliberately so: `starred` stays the
+      // internal id and `mockingbird_rss_starred` stays the storage key,
+      // because renaming a persisted key would throw away everybody's saved
+      // items to change a label. Asserted together so a later "tidy-up" that
+      // renames the key has to fail this test first.
+      const fixture = await twoFolders();
+      TestBed.inject(RssReadState).setStarred(idOf(URL_A, 'A-Alpha item'), true);
+      fixture.detectChanges();
+
+      const text = textOf(fixture);
+      expect(text).toContain('Read later');
+      expect(text).not.toContain('Starred');
+      expect(localStorage.getItem('mockingbird_rss_starred')).not.toBeNull();
+    });
+
     it('persists the density preference', async () => {
       await twoFolders();
       const prefs = TestBed.inject(ClientPrefs);

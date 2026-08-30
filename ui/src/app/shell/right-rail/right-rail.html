@@ -189,6 +189,28 @@
           <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
           <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
         }
+
+        <!-- Two servers are in play, so the card names two rather than one.
+             Without this the rail states a single server as *the* server while
+             every search silently goes somewhere else — and "why are my search
+             results from a different place" has no answer anywhere in the UI.
+             Roles rather than bare hostnames: which server does what is the
+             fact worth reading, and it is not inferable from a domain. -->
+        @if (searchServer.active()) {
+          <div class="server-roles">
+            <span
+              class="server-role"
+              [title]="'Feeds, profiles and posting: ' + (homeHost() || 'your server')"
+            >
+              <span class="server-role-what">Feeds &amp; posting</span>
+              <span class="server-role-host">{{ homeHost() || 'your server' }}</span>
+            </span>
+            <span class="server-role" [title]="'Search runs on ' + searchServer.host()">
+              <span class="server-role-what">🔍 Search</span>
+              <span class="server-role-host">{{ searchServer.host() }}</span>
+            </span>
+          </div>
+        }
         <!-- The server's own announcements, counted here because this card is
              where "what is this server" already lives. The callout fires only
              on something the server marks unread — every live announcement is

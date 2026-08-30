@@ -9,9 +9,11 @@ import {
   diagnoseFlooding,
   diagnoseMixing,
   diagnoseSources,
+  diagnoseStopped,
   diagnoseTimespans,
   sliceByProvider,
 } from './feed-doctor';
+import type { FeedBounds } from './feed-doctor';
 
 function account(id: string): Account {
   return {
@@ -306,5 +308,115 @@ describe('diagnoseFeed', () => {
 
     expect(diagnosis.sampleSize).toBe(20);
     expect(diagnosis.verdicts.map((v) => v.id)).toEqual(['flooding', 'ended', 'mixing']);
+  });
+});
+
+/**
+ * Nothing bounding the feed, as a starting point. Each test names only the one
+ * mechanism it is about, so the assertions read as the situation they describe.
+ */
+function bounds(overrides: Partial<FeedBounds> = {}): FeedBounds {
+  return {
+    hiddenByCalm: 0,
+    hiddenByLanguage: 0,
+    hiddenByChips: 0,
+    droppedByWindow: 0,
+    windowLabel: null,
+    cooldownActive: false,
+    cooldownMinutes: 0,
+    exhausted: true,
+    shown: 40,
+    ...overrides,
+  };
+}
+
+describe('diagnoseStopped', () => {
+  it('names Calm when Calm is what emptied the feed', () => {
+    // The boss's own case: "maybe too much got filtered out by calm (that
+    // happened to me today)". Before this verdict existed, the Doctor's answer
+    // was that nobody was flooding the feed.
+    const verdict = diagnoseStopped(bounds({ hiddenByCalm: 31, exhausted: false }));
+
+    expect(verdict.id).toBe('stopped');
+    expect(verdict.severity).toBe('notice');
+    expect(verdict.detail.join(' ')).toContain('Calm mode is holding back 31');
+    expect(verdict.actions.map((a) => a.kind)).toContain('show-calm');
+  });
+
+  it('names the window, and offers to widen it', () => {
+    const verdict = diagnoseStopped(
+      bounds({ droppedByWindow: 812, windowLabel: 'the last day', exhausted: false }),
+    );
+
+    expect(verdict.severity).toBe('warn');
+    expect(verdict.headline).toContain('the last day');
+    expect(verdict.detail.join(' ')).toContain('812 older posts were not loaded');
+    expect(verdict.actions.map((a) => a.kind)).toContain('widen-window');
+  });
+
+  it('leads with the cooldown when several things bound the feed at once', () => {
+    // A reader stopped by the cooldown cannot page at all, so hearing about
+    // their language filter first would be answering a question they have not
+    // reached yet. Everything still gets reported — only the headline is ranked.
+    const verdict = diagnoseStopped(
+      bounds({
+        cooldownActive: true,
+        cooldownMinutes: 42,
+        droppedByWindow: 12,
+        windowLabel: 'the last week',
+        hiddenByCalm: 3,
+        exhausted: false,
+      }),
+    );
+
+    expect(verdict.headline).toContain('reading break');
+    expect(verdict.detail).toHaveLength(3);
+    expect(verdict.detail[0]).toContain('42 minutes');
+  });
+
+  it('distinguishes a genuinely exhausted feed from an unfiltered one', () => {
+    // Two different green answers. Only one of them means more will arrive.
+    expect(diagnoseStopped(bounds({ exhausted: true })).headline).toContain('every source ran out');
+    expect(diagnoseStopped(bounds({ exhausted: false })).headline).toContain(
+      'Nothing is limiting your feed',
+    );
+  });
+
+  it('counts one post once, however many filters could have caught it', () => {
+    // The counts arrive pre-apportioned by the caller; this asserts the verdict
+    // reports each one as given rather than summing them into a total larger
+    // than the feed.
+    const verdict = diagnoseStopped(
+      bounds({ hiddenByCalm: 2, hiddenByLanguage: 3, hiddenByChips: 4, exhausted: false }),
+    );
+
+    expect(verdict.detail).toHaveLength(3);
+    expect(verdict.detail.join(' ')).toContain('2');
+    expect(verdict.detail.join(' ')).toContain('3');
+    expect(verdict.detail.join(' ')).toContain('4');
+  });
+});
+
+describe('diagnoseFeed with bounds', () => {
+  it('gives a signed-in feed a reason it stopped, where it previously had none', () => {
+    // The regression this sprint exists to prevent: the signed-in path supplies
+    // no `outcomes`, so before `bounds` there was no verdict at all about why
+    // the feed ended — only flooding and mixing.
+    const diagnosis = diagnoseFeed({
+      posts: [],
+      outcomes: [],
+      bySource: {},
+      bounds: bounds({ hiddenByCalm: 9, exhausted: false }),
+    });
+
+    expect(diagnosis.verdicts.map((v) => v.id)).toContain('stopped');
+  });
+
+  it('omits the verdict entirely when no bounds were measured', () => {
+    // Same principle the rest of this module follows: a verdict with nothing
+    // behind it is worse than silence.
+    const diagnosis = diagnoseFeed({ posts: [], outcomes: [], bySource: {} });
+
+    expect(diagnosis.verdicts.map((v) => v.id)).not.toContain('stopped');
   });
 });

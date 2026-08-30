@@ -40,6 +40,11 @@ import {
   UserList,
 } from './models';
 import { TrendLanguageFilter } from './trend-language-filter';
+import { PeopleCursorSource, nextMaxIdFrom, peopleCursorFrom } from './people-cursor';
+
+// Re-exported: it lived here first and several specs and callers import it from
+// this module. Its home is now `people-cursor.ts`, beside the fallback that uses it.
+export { nextMaxIdFrom } from './people-cursor';
 
 /** Filters/paging for an account's statuses (Mastodon query params). */
 export interface AccountStatusesOptions {
@@ -180,12 +185,22 @@ export class Api {
    * that appears nowhere in the account objects it returns. Walking it with the
    * last account's `id` re-reads page one forever — a 3,000-follower account
    * happily yields 9,000 "accounts" that way.
+   *
+   * When the `Link` header does not reach us at all — anything that drops
+   * `Access-Control-Expose-Headers: Link` hides it from the browser — the walk
+   * falls back to that imperfect account-id cursor rather than stopping at one
+   * page. {@link peopleCursorFrom} explains why that trade is the right one and
+   * how it is fenced; `source` reports which cursor is in play.
    */
   accountFollowersPage(
     id: string,
     maxId?: string,
     limit = 80,
-  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+  ): Observable<{
+    accounts: Account[];
+    nextMaxId: string | null;
+    source: PeopleCursorSource;
+  }> {
     let params = new HttpParams().set('limit', String(limit));
     if (maxId) {
       params = params.set('max_id', maxId);
@@ -193,23 +208,32 @@ export class Api {
     return this.http
       .get<Account[]>(`/api/v1/accounts/${id}/followers`, { params, observe: 'response' })
       .pipe(
-        map((response) => ({
-          accounts: response.body ?? [],
-          nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
-        })),
+        map((response) => {
+          const accounts = response.body ?? [];
+          return {
+            accounts,
+            ...peopleCursorFrom(response.headers.get('Link'), accounts, limit),
+          };
+        }),
       );
   }
 
   /**
    * One following page with Mastodon's opaque next cursor from the Link header.
    * Account ids are not pagination cursors on every server, so bulk walkers must
-   * use this instead of guessing `max_id` from the last account in the body.
+   * use this instead of guessing `max_id` from the last account in the body —
+   * except when the header never arrives, where {@link peopleCursorFrom} prefers
+   * the imperfect guess to a list that stops at 80. `source` says which happened.
    */
   accountFollowingPage(
     id: string,
     maxId?: string,
     limit = 80,
-  ): Observable<{ accounts: Account[]; nextMaxId: string | null }> {
+  ): Observable<{
+    accounts: Account[];
+    nextMaxId: string | null;
+    source: PeopleCursorSource;
+  }> {
     let params = new HttpParams().set('limit', String(limit));
     if (maxId) {
       params = params.set('max_id', maxId);
@@ -220,10 +244,13 @@ export class Api {
         observe: 'response',
       })
       .pipe(
-        map((response) => ({
-          accounts: response.body ?? [],
-          nextMaxId: nextMaxIdFrom(response.headers.get('Link')),
-        })),
+        map((response) => {
+          const accounts = response.body ?? [];
+          return {
+            accounts,
+            ...peopleCursorFrom(response.headers.get('Link'), accounts, limit),
+          };
+        }),
       );
   }
 
@@ -1084,35 +1111,4 @@ export class Api {
     }
     return params;
   }
-}
-
-/**
- * Pull the `max_id` cursor out of a `Link: <…>; rel="next"` header.
- *
- * Only the cursor is taken, never the URL itself: the `next` link is an absolute
- * address on whatever host the server thinks it is, and re-issuing that verbatim
- * would skip the server-rewriting and auth interceptors that make every other
- * call in this file work. Feeding the id back into a normal relative request
- * keeps one code path.
- *
- * Returns null when there is no header, no `next` relation, or no usable id —
- * all of which mean the same thing to a caller: stop.
- */
-export function nextMaxIdFrom(linkHeader: string | null): string | null {
-  if (!linkHeader) {
-    return null;
-  }
-  for (const part of linkHeader.split(',')) {
-    const match = part.match(/<([^>]+)>\s*;\s*rel="?next"?/i);
-    if (!match) {
-      continue;
-    }
-    try {
-      const maxId = new URL(match[1], 'https://placeholder.invalid').searchParams.get('max_id');
-      return maxId || null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
 }

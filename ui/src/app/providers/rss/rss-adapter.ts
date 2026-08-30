@@ -246,7 +246,20 @@ export function itemToStatus(
     reblog: null,
     quote: null,
     in_reply_to_id: options.inReplyToId ?? null,
-    replies_count: 0,
+    // The publisher's declared comment count (`slash:comments`, Atom `thr:total`),
+    // so an RSS item shows a discussion the way a post shows replies. It used to
+    // be a hard 0, which rendered "0 replies" on an item with forty of them — a
+    // confident wrong number, which is worse than a blank.
+    //
+    // **This is a claim, not a tally.** It can legitimately disagree with the
+    // number of comments the feed actually serves: a comment was moderated after
+    // the count was cached at publish time, or the comment feed is truncated to
+    // the latest ten. Both numbers are correct about different things, and
+    // neither is a bug — do not "fix" a mismatch by recounting the thread.
+    //
+    // Comments themselves get 0: a comment feed states no reply count for its own
+    // entries, and `inReplyToId` is set only for them.
+    replies_count: options.inReplyToId ? 0 : (item.commentCount ?? 0),
     reblogs_count: 0,
     favourites_count: 0,
     favourited: false,

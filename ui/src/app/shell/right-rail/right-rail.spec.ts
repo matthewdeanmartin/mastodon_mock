@@ -8,6 +8,7 @@ import { HouseAdStore } from '../../house-ad-store';
 import { HOUSE_ADS_SHOWN } from '../../house-ads';
 import { Account } from '../../models';
 import { Server } from '../../server';
+import { SearchServer } from '../../search-server';
 import { MastodonConnector } from '../../providers/mastodon/mastodon-connector';
 import { seedBskyIdentity } from '../../testing/seed-storage';
 import { RightRail } from './right-rail';
@@ -48,6 +49,58 @@ describe('RightRail', () => {
     httpMock.match(() => true).forEach((req) => req.flush({}, { status: 404, statusText: 'NF' }));
     return fixture;
   }
+
+  /**
+   * With a search server configured, two instances are serving this session and
+   * the rail must say so.
+   *
+   * Before this the card named one server as *the* server while every search
+   * quietly went somewhere else, which left "why are my results from a
+   * different place?" with no answer anywhere in the UI.
+   */
+  describe('two-server roles', () => {
+    function renderWithInstance(): ComponentFixture<RightRail> {
+      TestBed.inject(Auth).account.set({ id: '1', acct: 'matt@elekk.xyz' } as Account);
+      const fixture = TestBed.createComponent(RightRail);
+      fixture.detectChanges();
+      httpMock
+        .match((r) => r.url === '/api/v2/instance' || r.url === '/api/v1/instance')
+        .forEach((req) =>
+          req.flush({
+            domain: 'elekk.xyz',
+            title: 'Elekk',
+            version: '4.3.0',
+            usage: { users: { active_month: 12 } },
+          }),
+        );
+      httpMock.match(() => true).forEach((req) => req.flush({}, { status: 404, statusText: 'NF' }));
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('names both servers and what each one does', () => {
+      TestBed.inject(SearchServer).setBaseUrl('mastodon.social');
+      const el = renderWithInstance().nativeElement as HTMLElement;
+
+      const roles = el.querySelector('.server-roles');
+      expect(roles).not.toBeNull();
+      const text = roles?.textContent ?? '';
+      // Both hosts, each labelled with the job it is actually doing — a bare
+      // pair of hostnames would not say which is which.
+      expect(text).toContain('elekk.xyz');
+      expect(text).toContain('mastodon.social');
+      expect(text).toContain('Feeds');
+      expect(text).toContain('Search');
+    });
+
+    it('says nothing when one server does everything', () => {
+      // No badge without a second server: a row reading "Search: your server"
+      // is furniture, and the card already names that server above.
+      const el = renderWithInstance().nativeElement as HTMLElement;
+
+      expect(el.querySelector('.server-roles')).toBeNull();
+    });
+  });
 
   it("infers the donate host from the account's acct domain", () => {
     TestBed.inject(Auth).account.set({ id: '1', acct: 'matt@elekk.xyz' } as Account);

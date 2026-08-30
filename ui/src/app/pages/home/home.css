@@ -284,6 +284,30 @@ a.eliza-invite:hover {
   margin: 0;
 }
 
+/* Posts arrived and every one is filtered out of view. Same centred, quiet
+   shape as the window-end note — it answers the same kind of question. */
+.feed-all-hidden {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.feed-all-hidden p {
+  margin: 0;
+}
+
+/* "Load more" and "Review bookmarks", side by side. Wraps rather than
+   shrinking, so a narrow screen stacks them instead of clipping the labels. */
+.feed-more-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
 /* A button that reads as a link, for the inline "Try again now" on the Twitter
    unavailable notice. Same shape as the one in status-card.css; component
    styles are scoped, so it does not carry across. */

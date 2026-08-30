@@ -15,6 +15,16 @@ export type PeopleMode = 'followers' | 'following';
 export interface PeoplePage {
   accounts: Account[];
   cursor: string | null;
+  /**
+   * True when `cursor` is a best guess rather than the server's own cursor.
+   *
+   * Only Mastodon sets this, and only when the `Link` header did not survive the
+   * trip (a CORS proxy that does not forward it). The walk continues on the
+   * account-id cursor instead of stopping at one page, but it may skip or repeat
+   * rows, so the browser says the list is approximate rather than presenting a
+   * possibly-incomplete list as complete. See `peopleCursorFrom`.
+   */
+  approximate?: boolean;
 }
 
 /**

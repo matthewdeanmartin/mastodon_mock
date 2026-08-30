@@ -52,9 +52,10 @@ class MastodonPeopleSource implements PeopleSource {
         ? this.api.accountFollowersPage(this.accountId, maxId)
         : this.api.accountFollowingPage(this.accountId, maxId);
     return page.pipe(
-      map(({ accounts, nextMaxId }) => ({
+      map(({ accounts, nextMaxId, source }) => ({
         accounts,
         cursor: nextMaxId,
+        approximate: source === 'account-id-fallback',
       })),
     );
   }
@@ -105,9 +106,10 @@ class AnonymousPeopleSource implements PeopleSource {
         ? this.publicApi.getAccountFollowersPage(ref, maxId)
         : this.publicApi.getAccountFollowingPage(ref, maxId);
     return page.pipe(
-      map(({ accounts, nextMaxId }) => ({
+      map(({ accounts, nextMaxId, source }) => ({
         accounts,
         cursor: nextMaxId,
+        approximate: source === 'account-id-fallback',
       })),
     );
   }

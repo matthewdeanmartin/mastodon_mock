@@ -82,4 +82,46 @@ describe('PeopleBrowser', () => {
     expect(fixture.nativeElement.textContent).toContain('privacy settings');
     expect(fixture.nativeElement.textContent).not.toContain('Not following anyone');
   });
+
+  /**
+   * The symptom this whole change exists for: a profile advertising thousands of
+   * followers whose list stops after one page, under the words "End of the
+   * list." The reader concludes the account is hiding something, or that the app
+   * is broken, and neither is true — the server's `Link` header did not survive
+   * a CORS hop.
+   */
+  it('does not call a truncated list the end of the list', () => {
+    const fixture = TestBed.createComponent(PeopleBrowser);
+    fixture.componentRef.setInput('accountId', '900');
+    fixture.componentRef.setInput('mode', 'followers');
+    fixture.componentRef.setInput('server', 'https://social.example');
+    fixture.componentRef.setInput('reportedCount', 3000);
+    fixture.detectChanges();
+
+    // One short page, no Link header: the walk genuinely cannot continue.
+    httpMock
+      .expectOne((c) => c.url === 'https://social.example/api/v1/accounts/900/followers')
+      .flush([account('10')]);
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Stopped at 1 of 3000');
+    expect(text).not.toContain('End of the list.');
+  });
+
+  it('still says end of the list when the count agrees with what loaded', () => {
+    const fixture = TestBed.createComponent(PeopleBrowser);
+    fixture.componentRef.setInput('accountId', '900');
+    fixture.componentRef.setInput('mode', 'followers');
+    fixture.componentRef.setInput('server', 'https://social.example');
+    fixture.componentRef.setInput('reportedCount', 2);
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne((c) => c.url === 'https://social.example/api/v1/accounts/900/followers')
+      .flush([account('10'), account('11')]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('End of the list.');
+  });
 });
