@@ -2,13 +2,15 @@ import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { forkJoin, Observable, of } from 'rxjs';
 import { Api } from '../../../api';
 import { ContentFilter, FilterAction, FilterContext, FilterKeyword } from '../../../models';
 
 interface ContextOption {
   value: FilterContext;
-  label: string;
+  /** Translation key, resolved in the template — see scripts/extract-i18n.mjs. */
+  key: string;
 }
 
 /** Draft keyword row: existing rows carry their server id, new rows id=null. */
@@ -23,9 +25,43 @@ interface KeywordRow {
  * keyword list. Keywords on an existing filter are added/removed immediately via
  * the keywords sub-API; on a new filter they're sent as `keywords_attributes`.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.filters.add: Add new filter
+// i18n settings.filters.edit: Edit filter
+// i18n settings.filters.edit.intro: Posts matching any keyword are hidden with a warning, or removed entirely.
+// i18n settings.filters.titleLabel: Title
+// i18n settings.filters.titlePlaceholder: e.g. Spoilers
+// i18n settings.filters.contexts: Filter contexts
+// i18n settings.filters.contexts.hint: Where the filter should apply.
+// i18n settings.filters.context.home: Home and lists
+// i18n settings.filters.context.notifications: Notifications
+// i18n settings.filters.context.public: Public timelines
+// i18n settings.filters.context.thread: Conversations
+// i18n settings.filters.context.account: Profiles
+// i18n settings.filters.action: Filter action
+// i18n settings.filters.action.warn: Hide with a warning — the post is collapsed behind the filter's title
+// i18n settings.filters.action.hide: Hide completely — the post disappears as if it didn't exist
+// i18n settings.filters.expire: Expire after
+// i18n settings.filters.keepExpiry: Keep current expiry ({{when}})
+// i18n settings.filters.neverExpires: never expires
+// i18n settings.filters.expiry.never: Never
+// i18n settings.filters.expiry.min30: 30 minutes
+// i18n settings.filters.expiry.hour1: 1 hour
+// i18n settings.filters.expiry.hour6: 6 hours
+// i18n settings.filters.expiry.hour12: 12 hours
+// i18n settings.filters.expiry.day1: 1 day
+// i18n settings.filters.expiry.week1: 1 week
+// i18n settings.filters.keywords: Keywords or phrases
+// i18n settings.filters.keywordPlaceholder: Keyword or phrase
+// i18n settings.filters.wholeWord: Whole word
+// i18n settings.filters.removeKeyword: Remove keyword
+// i18n settings.filters.addKeyword: + Add keyword
+// i18n settings.filters.wholeWord.hint: Whole word: "cat" matches only the word cat, not "category". Existing keywords can be removed and re-added to change them.
+// i18n settings.filters.create: Create filter
+// i18n common.cancel: Cancel
 @Component({
   selector: 'app-settings-filter-edit',
-  imports: [DatePipe, FormsModule, RouterLink],
+  imports: [DatePipe, FormsModule, RouterLink, TranslocoPipe],
   templateUrl: './settings-filter-edit.html',
   styleUrl: './settings-filter-edit.css',
 })
@@ -35,22 +71,22 @@ export class SettingsFilterEdit implements OnInit {
   private router = inject(Router);
 
   protected readonly contextOptions: ContextOption[] = [
-    { value: 'home', label: 'Home and lists' },
-    { value: 'notifications', label: 'Notifications' },
-    { value: 'public', label: 'Public timelines' },
-    { value: 'thread', label: 'Conversations' },
-    { value: 'account', label: 'Profiles' },
+    { value: 'home', key: 'settings.filters.context.home' },
+    { value: 'notifications', key: 'settings.filters.context.notifications' },
+    { value: 'public', key: 'settings.filters.context.public' },
+    { value: 'thread', key: 'settings.filters.context.thread' },
+    { value: 'account', key: 'settings.filters.context.account' },
   ];
 
   /** Expiry choices, in seconds; null = never. */
-  protected readonly expiryOptions: { value: number | null; label: string }[] = [
-    { value: null, label: 'Never' },
-    { value: 1800, label: '30 minutes' },
-    { value: 3600, label: '1 hour' },
-    { value: 21600, label: '6 hours' },
-    { value: 43200, label: '12 hours' },
-    { value: 86400, label: '1 day' },
-    { value: 604800, label: '1 week' },
+  protected readonly expiryOptions: { value: number | null; key: string }[] = [
+    { value: null, key: 'settings.filters.expiry.never' },
+    { value: 1800, key: 'settings.filters.expiry.min30' },
+    { value: 3600, key: 'settings.filters.expiry.hour1' },
+    { value: 21600, key: 'settings.filters.expiry.hour6' },
+    { value: 43200, key: 'settings.filters.expiry.hour12' },
+    { value: 86400, key: 'settings.filters.expiry.day1' },
+    { value: 604800, key: 'settings.filters.expiry.week1' },
   ];
 
   protected filterId = signal<string | null>(null);

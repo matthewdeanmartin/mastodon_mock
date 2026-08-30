@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Observable, of } from 'rxjs';
 import { Api } from '../../../api';
 import { BulkActionId, BulkActions } from '../../../bulk-actions';
@@ -53,9 +54,48 @@ const DOMAIN_PAGE_SIZE = 100;
  * {@link pageCache} — which is what keeps First/Prev/Next/Last from re-hitting
  * the server once a page has been seen.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.accountList.title: Muted & Blocked
+// i18n settings.accountList.subtitle.mutes: You won't see posts or notifications from these accounts. They can still follow you.
+// i18n settings.accountList.subtitle.blocks: These accounts can't follow you, see your posts, or interact with you.
+// i18n settings.accountList.subtitle.domains: Blocking a domain hides every account on that server at once — their posts, their notifications, and any followers you have there.
+// i18n settings.accountList.tabs: Account restriction
+// i18n settings.accountList.tab.mutes: Mute
+// i18n settings.accountList.tab.blocks: Block
+// i18n settings.accountList.tab.domains: Domains
+// i18n settings.accountList.amnesty.mutes: Unmute everyone
+// i18n settings.accountList.amnesty.blocks: Unblock everyone
+// i18n settings.accountList.amnesty.hint: Done with this list? {{action}} at once — you’ll be shown exactly how many accounts that is, and offered a backup, before anything changes.
+// i18n settings.accountList.blockDomain: Block a domain
+// i18n settings.accountList.domain.hint.before: A handle or a link works too —
+// i18n settings.accountList.domain.hint.after: or a profile URL will be reduced to the domain.
+// i18n settings.accountList.noDomains: No blocked domains.
+// i18n settings.accountList.empty: Nothing here.
+// i18n settings.accountList.unblock: Unblock
+// i18n settings.accountList.unmute: Unmute
+// i18n settings.accountList.also.blocked: also blocked
+// i18n settings.accountList.also.muted: also muted
+// i18n settings.accountList.alsoApply.block: Also block this account, keeping the current restriction
+// i18n settings.accountList.alsoApply.mute: Also mute this account, keeping the current restriction
+// i18n settings.accountList.convert.block: Convert to block
+// i18n settings.accountList.convert.mute: Convert to mute
+// i18n settings.accountList.convert.block.title: Replace this with a block
+// i18n settings.accountList.convert.mute.title: Replace this with a mute
+// i18n settings.accountList.following: following
+// i18n settings.accountList.following.title: You still follow this account
+// i18n settings.accountList.unfollow: Unfollow
+// i18n settings.accountList.unfollow.title: Stop following — the mute stays as it is
+// i18n settings.accountList.pages: Pages
+// i18n settings.accountList.first: « First
+// i18n settings.accountList.previous: ‹ Previous
+// i18n settings.accountList.page: Page {{page}}
+// i18n settings.accountList.pageOf: of {{total}}
+// i18n settings.accountList.next: Next ›
+// i18n settings.accountList.last: Last »
+// i18n common.running: Running…
 @Component({
   selector: 'app-settings-account-list',
-  imports: [RouterLink, FormsModule, BulkActionsDialog, BulkProgress],
+  imports: [RouterLink, FormsModule, BulkActionsDialog, BulkProgress, TranslocoPipe],
   templateUrl: './settings-account-list.html',
   styleUrl: './settings-account-list.css',
 })
@@ -203,8 +243,10 @@ export class SettingsAccountList implements OnInit {
     this.kind() === 'mutes' ? 'mute-amnesty' : 'block-amnesty',
   );
 
-  protected readonly amnestyLabel = computed(() =>
-    this.kind() === 'mutes' ? 'Unmute everyone' : 'Unblock everyone',
+  protected readonly amnestyLabelKey = computed(() =>
+    this.kind() === 'mutes'
+      ? 'settings.accountList.amnesty.mutes'
+      : 'settings.accountList.amnesty.blocks',
   );
 
   /**
@@ -259,32 +301,55 @@ export class SettingsAccountList implements OnInit {
     this.reset();
   }
 
-  protected readonly title = 'Muted & Blocked';
-
-  protected get subtitle(): string {
+  protected get subtitleKey(): string {
     switch (this.kind()) {
       case 'mutes':
-        return "You won't see posts or notifications from these accounts. They can still follow you.";
+        return 'settings.accountList.subtitle.mutes';
       case 'blocks':
-        return "These accounts can't follow you, see your posts, or interact with you.";
+        return 'settings.accountList.subtitle.blocks';
       case 'domains':
-        return 'Blocking a domain hides every account on that server at once — their posts, their notifications, and any followers you have there.';
+        return 'settings.accountList.subtitle.domains';
     }
   }
 
-  /** Label for the opposite list, used across the row buttons and badges. */
-  protected get otherWord(): string {
-    return this.kind() === 'mutes' ? 'block' : 'mute';
+  /**
+   * Keys naming the *opposite* list, for the row buttons and badges.
+   *
+   * These used to be word fragments composed in the template
+   * (`'Also ' + otherWord`, `'Convert to ' + otherWord`). English tolerates that;
+   * most languages do not — the noun inflects with the verb, and the original
+   * comment here already noted that even English needed "muteed" spelled out by
+   * hand. So each phrase is now one whole key per direction, and no sentence is
+   * built by concatenation.
+   */
+  protected get otherVerbKey(): string {
+    return this.kind() === 'mutes'
+      ? 'settings.accountList.tab.blocks'
+      : 'settings.accountList.tab.mutes';
   }
 
-  /** {@link otherWord} as a button label. */
-  protected get otherVerb(): string {
-    return this.kind() === 'mutes' ? 'Block' : 'Mute';
+  protected get otherAlsoKey(): string {
+    return this.kind() === 'mutes'
+      ? 'settings.accountList.also.blocked'
+      : 'settings.accountList.also.muted';
   }
 
-  /** Past tense for the badge. Spelled out because "mute" + "ed" is "muteed". */
-  protected get otherPastTense(): string {
-    return this.kind() === 'mutes' ? 'blocked' : 'muted';
+  protected get otherAlsoApplyKey(): string {
+    return this.kind() === 'mutes'
+      ? 'settings.accountList.alsoApply.block'
+      : 'settings.accountList.alsoApply.mute';
+  }
+
+  protected get otherConvertKey(): string {
+    return this.kind() === 'mutes'
+      ? 'settings.accountList.convert.block'
+      : 'settings.accountList.convert.mute';
+  }
+
+  protected get otherConvertTitleKey(): string {
+    return this.kind() === 'mutes'
+      ? 'settings.accountList.convert.block.title'
+      : 'settings.accountList.convert.mute.title';
   }
 
   // ------------------------------------------------------------ fetching

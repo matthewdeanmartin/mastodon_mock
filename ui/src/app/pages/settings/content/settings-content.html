@@ -1,22 +1,19 @@
 <div class="spage-head">
-  <h1>🙈 Trust: CW/Sensitive</h1>
+  <h1>{{ 'settings.content.title' | transloco }}</h1>
   <p>
-    A content warning is the author's judgement about their audience, not about you. For people you
-    read all the time, clicking through the same warning every day is friction without safety — so
-    you can switch it off, either for everyone or for specific people.
+    {{ 'settings.content.intro' | transloco }}
   </p>
   <p class="muted">
-    This is the flipside of <a routerLink="/settings/moderation">Muted &amp; Blocked</a>: that page
-    is for accounts you want less of, this one is for accounts you want without a doorway in front
-    of them.
+    {{ 'settings.content.flipside.before' | transloco }}
+    <a routerLink="/settings/moderation">{{ 'settings.content.flipside.link' | transloco }}</a
+    >{{ 'settings.content.flipside.after' | transloco }}
   </p>
 </div>
 
 <div class="spage-body">
-  <h2>How far trust goes</h2>
+  <h2>{{ 'settings.content.howFar' | transloco }}</h2>
   <p class="muted small">
-    One choice, so there is never a question of which setting wins. Whoever this covers, their
-    content warnings open on their own and their sensitive media renders unblurred.
+    {{ 'settings.content.howFar.hint' | transloco }}
   </p>
 
   <div class="scontrol trust-levels">
@@ -27,10 +24,10 @@
         [checked]="trusted.level() === 'none'"
         (change)="setLevel('none')"
       />
-      Trust no one
+      {{ 'settings.content.level.none' | transloco }}
     </label>
     <p class="muted small checkline-note">
-      Every warning and blur stays in place, including for accounts on the list below.
+      {{ 'settings.content.level.none.note' | transloco }}
     </p>
 
     <label class="checkline">
@@ -40,10 +37,10 @@
         [checked]="trusted.level() === 'individuals'"
         (change)="setLevel('individuals')"
       />
-      Trust individual people
+      {{ 'settings.content.level.individuals' | transloco }}
     </label>
     <p class="muted small checkline-note">
-      Only the accounts you have named, listed further down. This is the default.
+      {{ 'settings.content.level.individuals.note' | transloco }}
     </p>
 
     <label class="checkline">
@@ -53,11 +50,10 @@
         [checked]="trusted.level() === 'follows'"
         (change)="setLevel('follows')"
       />
-      Trust everyone I follow
+      {{ 'settings.content.level.follows' | transloco }}
     </label>
     <p class="muted small checkline-note">
-      Including people you follow in future — this is checked as you read, not copied into a list,
-      so it keeps up on its own. Boosts are still judged by whoever originally wrote them.
+      {{ 'settings.content.level.follows.note' | transloco }}
     </p>
 
     <label class="checkline">
@@ -67,25 +63,22 @@
         [checked]="trusted.level() === 'follows-boosts'"
         (change)="setLevel('follows-boosts')"
       />
-      Trust everyone I follow, and what they boost
+      {{ 'settings.content.level.followsBoosts' | transloco }}
     </label>
     <p class="muted small checkline-note">
-      The widest setting. A boost from someone you follow opens the warning on the boosted post too,
-      even though you may not follow — or know — whoever wrote it.
+      {{ 'settings.content.level.followsBoosts.note' | transloco }}
     </p>
   </div>
 
   @if (trusted.trustsFollows()) {
     <p class="muted small">
-      Nobody is added to your list by this. Your named accounts below are kept exactly as they are,
-      so switching back to "individual people" finds them still there.
+      {{ 'settings.content.keptNote' | transloco }}
     </p>
   }
 
-  <h2>Everyone</h2>
+  <h2>{{ 'settings.content.everyone' | transloco }}</h2>
   <p class="muted small">
-    Applies to every post from every account, on this Mastodon account only. Stored in this browser
-    — it is a reading preference, not something the server knows about.
+    {{ 'settings.content.everyone.hint' | transloco }}
   </p>
 
   <div class="scontrol">
@@ -97,11 +90,10 @@
         (change)="toggleCw()"
         name="expand_all_cw"
       />
-      Auto-expand content warnings
+      {{ 'settings.content.expandCw' | transloco }}
     </label>
     <p class="muted small checkline-note">
-      Posts with a content warning render already open. The warning text is still shown above the
-      post, so you always know one was set.
+      {{ 'settings.content.expandCw.note' | transloco }}
     </p>
 
     <label class="checkline">
@@ -112,16 +104,16 @@
         (change)="toggleSensitive()"
         name="show_all_sensitive"
       />
-      Auto-show sensitive media
+      {{ 'settings.content.showSensitive' | transloco }}
     </label>
     <p class="muted small checkline-note">
-      Images and video flagged sensitive render without the blur.
+      {{ 'settings.content.showSensitive.note' | transloco }}
     </p>
   </div>
 
   @if (trusted.level() === 'none') {
     <p class="muted small">
-      These two are off while trust is revoked. Choose another level above to use them.
+      {{ 'settings.content.revokedNote' | transloco }}
     </p>
   }
 
@@ -130,32 +122,34 @@
        Preferences page, behind a session cookie. Hence a status row and a link
        out, rather than a switch that would silently fail to save. -->
   @if (showsServerRow() && serverExpandsCw() !== null) {
-    <h2>On your server</h2>
+    <h2>{{ 'settings.content.onServer' | transloco }}</h2>
     <p class="muted small">
-      Your Mastodon account has its own "always expand content warnings" preference, which other
-      apps read. It is currently
-      <strong>{{ serverExpandsCw() ? 'on' : 'off' }}</strong
-      >. Mawkingbird can read it but not change it — Mastodon has no API for that, so it can only be
-      set from your server's own settings page.
+      {{ 'settings.content.onServer.before' | transloco }}
+      <strong>{{
+        (serverExpandsCw() ? 'settings.content.on' : 'settings.content.off') | transloco
+      }}</strong
+      >{{ 'settings.content.onServer.after' | transloco }}
       @if (serverPrefsUrl(); as prefsUrl) {
-        <a [href]="prefsUrl" target="_blank" rel="noopener noreferrer">Change it there</a>.
+        <a [href]="prefsUrl" target="_blank" rel="noopener noreferrer">{{
+          'settings.content.changeThere' | transloco
+        }}</a
+        >.
       }
     </p>
     <p class="muted small">
-      The switches above are what Mawkingbird itself obeys, and are independent of it.
+      {{ 'settings.content.independent' | transloco }}
     </p>
   }
 
-  <h2>Trusted accounts</h2>
+  <h2>{{ 'settings.content.trusted' | transloco }}</h2>
   <p class="muted small">
-    People whose warnings and sensitive flags are ignored, whatever the switches above are set to.
-    Add someone from the <strong>•••</strong> menu on their profile.
+    {{ 'settings.content.trusted.before' | transloco }} <strong>•••</strong>
+    {{ 'settings.content.trusted.after' | transloco }}
   </p>
 
   @if (!trusted.list().length) {
     <p class="muted">
-      Nobody yet. Trusting an account is useful for someone whose posts are routinely warned but
-      never something you need warning about.
+      {{ 'settings.content.trusted.empty' | transloco }}
     </p>
   } @else {
     <ul class="trust-list">
@@ -163,28 +157,25 @@
         <li class="trust-row">
           <span class="trust-acct">{{ row.acct }}</span>
           <button type="button" class="btn btn-outline btn-sm" (click)="untrust(row.key)">
-            Stop trusting
+            {{ 'settings.content.stopTrusting' | transloco }}
           </button>
         </li>
       }
     </ul>
     <button type="button" class="btn btn-outline btn-sm" (click)="clearAll()">
-      Stop trusting everyone ({{ trusted.count() }})
+      {{ 'settings.content.stopTrustingAll' | transloco: { count: trusted.count() } }}
     </button>
   }
 
-  <h2>Revoke everything</h2>
+  <h2>{{ 'settings.content.revoke' | transloco }}</h2>
   <p class="muted small">
-    Drops to "trust no one", turns both switches off, and forgets every account you have trusted.
-    Unlike the choices above, this one throws the list away — there is no undo.
+    {{ 'settings.content.revoke.hint' | transloco }}
   </p>
   <button type="button" class="btn btn-outline btn-sm" (click)="revokeAll()">
-    Revoke all trust
+    {{ 'settings.content.revokeAll' | transloco }}
   </button>
 
   <p class="muted small footnote">
-    Trust never overrides a filter. A word filter you set, or a post your server chose to hide,
-    stays hidden — those are your rules and the server's, and one person being trusted is not a
-    reason to break them.
+    {{ 'settings.content.footnote' | transloco }}
   </p>
 </div>

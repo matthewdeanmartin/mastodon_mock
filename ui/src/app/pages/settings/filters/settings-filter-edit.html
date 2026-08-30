@@ -1,28 +1,28 @@
 <div class="spage-head">
-  <h1>{{ isNew ? 'Add new filter' : 'Edit filter' }}</h1>
-  <p>Posts matching any keyword are hidden with a warning, or removed entirely.</p>
+  <h1>{{ (isNew ? 'settings.filters.add' : 'settings.filters.edit') | transloco }}</h1>
+  <p>{{ 'settings.filters.edit.intro' | transloco }}</p>
 </div>
 
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'common.loading' | transloco }}</p>
 } @else {
   <form class="spage-body" (ngSubmit)="save()">
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Title</span>
+        <span class="slabel">{{ 'settings.filters.titleLabel' | transloco }}</span>
         <div class="scontrol">
           <input
             type="text"
             [ngModel]="title()"
             (ngModelChange)="title.set($event)"
             name="title"
-            placeholder="e.g. Spoilers"
+            [attr.placeholder]="'settings.filters.titlePlaceholder' | transloco"
           />
         </div>
       </div>
 
       <div class="srow">
-        <span class="slabel">Filter contexts</span>
+        <span class="slabel">{{ 'settings.filters.contexts' | transloco }}</span>
         <div class="scontrol">
           @for (opt of contextOptions; track opt.value) {
             <label class="checkline">
@@ -31,15 +31,15 @@
                 [checked]="hasContext(opt.value)"
                 (change)="toggleContext(opt.value, $any($event.target).checked)"
               />
-              {{ opt.label }}
+              {{ opt.key | transloco }}
             </label>
           }
-          <span class="hint">Where the filter should apply.</span>
+          <span class="hint">{{ 'settings.filters.contexts.hint' | transloco }}</span>
         </div>
       </div>
 
       <div class="srow">
-        <span class="slabel">Filter action</span>
+        <span class="slabel">{{ 'settings.filters.action' | transloco }}</span>
         <div class="scontrol">
           <label class="radioline">
             <input
@@ -49,7 +49,7 @@
               [checked]="action() === 'warn'"
               (change)="action.set('warn')"
             />
-            Hide with a warning — the post is collapsed behind the filter's title
+            {{ 'settings.filters.action.warn' | transloco }}
           </label>
           <label class="radioline">
             <input
@@ -59,13 +59,13 @@
               [checked]="action() === 'hide'"
               (change)="action.set('hide')"
             />
-            Hide completely — the post disappears as if it didn't exist
+            {{ 'settings.filters.action.hide' | transloco }}
           </label>
         </div>
       </div>
 
       <div class="srow">
-        <span class="slabel">Expire after</span>
+        <span class="slabel">{{ 'settings.filters.expire' | transloco }}</span>
         <div class="scontrol">
           @if (!isNew) {
             <label class="checkline">
@@ -74,9 +74,15 @@
                 [checked]="keepExpiry()"
                 (change)="keepExpiry.set($any($event.target).checked)"
               />
-              Keep current expiry ({{
-                currentExpiry() ? (currentExpiry() | date: 'medium') : 'never expires'
-              }})
+              {{
+                'settings.filters.keepExpiry'
+                  | transloco
+                    : {
+                        when: currentExpiry()
+                          ? (currentExpiry() | date: 'medium')
+                          : ('settings.filters.neverExpires' | transloco),
+                      }
+              }}
             </label>
           }
           @if (isNew || !keepExpiry()) {
@@ -85,8 +91,8 @@
               [ngModel]="expiresIn()"
               (ngModelChange)="expiresIn.set($event)"
             >
-              @for (opt of expiryOptions; track opt.label) {
-                <option [ngValue]="opt.value">{{ opt.label }}</option>
+              @for (opt of expiryOptions; track opt.key) {
+                <option [ngValue]="opt.value">{{ opt.key | transloco }}</option>
               }
             </select>
           }
@@ -95,13 +101,13 @@
     </div>
 
     <div class="ssection">
-      <h2>Keywords or phrases</h2>
+      <h2>{{ 'settings.filters.keywords' | transloco }}</h2>
       <div class="kw-table">
         @for (row of keywords(); track $index; let i = $index) {
           <div class="kw-row">
             <input
               type="text"
-              placeholder="Keyword or phrase"
+              [attr.placeholder]="'settings.filters.keywordPlaceholder' | transloco"
               [ngModel]="row.keyword"
               (ngModelChange)="setKeyword(i, 'keyword', $event)"
               [name]="'kw_' + i"
@@ -114,13 +120,13 @@
                 [disabled]="row.id !== null"
                 (change)="setKeyword(i, 'whole_word', $any($event.target).checked)"
               />
-              Whole word
+              {{ 'settings.filters.wholeWord' | transloco }}
             </label>
             <button
               type="button"
               class="btn btn-outline btn-sm"
               (click)="removeKeywordRow(i)"
-              aria-label="Remove keyword"
+              [attr.aria-label]="'settings.filters.removeKeyword' | transloco"
             >
               ✕
             </button>
@@ -128,11 +134,10 @@
         }
       </div>
       <button type="button" class="btn btn-outline btn-sm" (click)="addKeywordRow()">
-        + Add keyword
+        {{ 'settings.filters.addKeyword' | transloco }}
       </button>
       <p class="hint">
-        Whole word: "cat" matches only the word cat, not "category". Existing keywords can be
-        removed and re-added to change them.
+        {{ 'settings.filters.wholeWord.hint' | transloco }}
       </p>
     </div>
 
@@ -141,9 +146,14 @@
     }
 
     <div class="sactions">
-      <a class="btn btn-outline" routerLink="/settings/filters">Cancel</a>
+      <a class="btn btn-outline" routerLink="/settings/filters">{{
+        'common.cancel' | transloco
+      }}</a>
       <button class="btn" type="submit" [disabled]="saving()">
-        {{ saving() ? 'Saving…' : isNew ? 'Create filter' : 'Save changes' }}
+        {{
+          (saving() ? 'common.saving' : isNew ? 'settings.filters.create' : 'common.saveChanges')
+            | transloco
+        }}
       </button>
     </div>
   </form>

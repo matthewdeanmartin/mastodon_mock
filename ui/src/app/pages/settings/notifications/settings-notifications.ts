@@ -2,11 +2,25 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MockApi } from '../../../mock-api';
 import { EmailNotificationSettings } from '../../../models';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /** Email notification toggles (mock-only settings section). */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.notifications.title: Email notifications
+// i18n settings.notifications.intro: Choose which events send you an e-mail.
+// i18n settings.notifications.events: Events
+// i18n settings.notifications.follow: Someone followed you
+// i18n settings.notifications.followRequest: Someone requested to follow you
+// i18n settings.notifications.reblog: Someone boosted your post
+// i18n settings.notifications.favourite: Someone favourited your post
+// i18n settings.notifications.mention: Someone mentioned you
+// i18n settings.notifications.report: A new report is submitted
+// i18n settings.notifications.report.hint: Moderators only.
+// i18n settings.notifications.digest: Digest
+// i18n settings.notifications.digest.label: Send digest e-mails of missed activity
 @Component({
   selector: 'app-settings-notifications',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './settings-notifications.html',
 })
 export class SettingsNotifications implements OnInit {

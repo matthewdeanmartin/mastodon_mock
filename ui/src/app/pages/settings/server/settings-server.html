@@ -1,14 +1,13 @@
 <div class="spage-head">
-  <h1>Server</h1>
+  <h1>{{ 'settings.server.title' | transloco }}</h1>
   <p>
-    Choose the Mastodon server used for public timelines, profiles, and searches while you browse
-    anonymously. Your browser-local identity and preferences stay the same.
+    {{ 'settings.server.intro' | transloco }}
   </p>
 </div>
 
 <div class="spage-body">
   <section class="ssection">
-    <h2>Current server</h2>
+    <h2>{{ 'settings.server.current' | transloco }}</h2>
     <div class="current-card">
       <div>
         <strong>{{ currentHost() }}</strong>
@@ -18,7 +17,9 @@
               {{ item.category }}
             }
             @if (item.users) {
-              · {{ item.users.toLocaleString() }} users listed
+              {{
+                'settings.server.usersListed' | transloco: { count: item.users.toLocaleString() }
+              }}
             }
           </div>
           @if (item.description) {
@@ -33,40 +34,41 @@
       >
         @switch (connectionStatus()) {
           @case ('checking') {
-            Checking…
+            {{ 'settings.server.status.checking' | transloco }}
           }
           @case ('available') {
-            ✓ Available
+            {{ 'settings.server.status.available' | transloco }}
           }
           @case ('degraded') {
-            ⚠ Available, but degraded — images will not load
+            {{ 'settings.server.status.degraded' | transloco }}
           }
           @case ('unreachable') {
-            ⚠ Unreachable
+            {{ 'settings.server.status.unreachable' | transloco }}
           }
         }
       </div>
     </div>
     <button class="btn btn-outline btn-sm check-button" type="button" (click)="checkCurrent()">
-      Check connection
+      {{ 'settings.server.checkConnection' | transloco }}
     </button>
     @if (changed()) {
-      <p class="success" aria-live="polite">Now browsing anonymously via {{ currentHost() }}.</p>
+      <p class="success" aria-live="polite">
+        {{ 'settings.server.changed' | transloco: { host: currentHost() } }}
+      </p>
     }
   </section>
 
   <section class="ssection">
-    <h2>Find another server</h2>
+    <h2>{{ 'settings.server.findAnother' | transloco }}</h2>
     <p class="muted">
-      We’ll check randomly selected servers from the bundled Mastodon directory. Nothing changes
-      until you approve a working server.
+      {{ 'settings.server.findAnother.hint' | transloco }}
     </p>
     <app-server-discovery [currentServer]="currentUrl()" (selected)="useServer($event)" />
   </section>
 
   <section class="ssection">
-    <h2>Use a specific server</h2>
-    <p class="muted">Enter a server domain if you already know where you want to browse.</p>
+    <h2>{{ 'settings.server.specific' | transloco }}</h2>
+    <p class="muted">{{ 'settings.server.specific.hint' | transloco }}</p>
     <app-server-picker (picked)="useServer($event)" />
   </section>
 
@@ -74,26 +76,24 @@
        servers turn it off for logged-out visitors while serving everything else
        fine. Feeds, profiles and your account stay put. -->
   <section class="ssection">
-    <h2>Search server</h2>
+    <h2>{{ 'settings.server.search' | transloco }}</h2>
     <p class="muted">
-      Many servers disable search for logged-out visitors, and practically none will full-text
-      search posts without an account — the best you get is the posts behind a hashtag, and not
-      every server serves those either. Search — and only search — can be sent to one that does.
+      {{ 'settings.server.search.hint' | transloco }}
     </p>
 
     <div class="current-card">
       <div>
         @if (searchServer.host(); as host) {
           <strong>{{ host }}</strong>
-          <div class="muted small">Searches go here. Everything else uses your own server.</div>
+          <div class="muted small">{{ 'settings.server.search.here' | transloco }}</div>
         } @else {
-          <strong>Your own server</strong>
-          <div class="muted small">No separate search server configured.</div>
+          <strong>{{ 'settings.server.search.own' | transloco }}</strong>
+          <div class="muted small">{{ 'settings.server.search.none' | transloco }}</div>
         }
       </div>
       @if (searchServer.active()) {
         <button class="btn btn-outline btn-sm" type="button" (click)="clearSearchServer()">
-          Use my own server
+          {{ 'settings.server.search.useOwn' | transloco }}
         </button>
       }
     </div>
@@ -108,12 +108,15 @@
     @if (rejects.count()) {
       <details class="reject-list">
         <summary>
-          {{ rejects.count() }} server{{ rejects.count() === 1 ? '' : 's' }} checked and rejected
+          {{
+            (rejects.count() === 1
+              ? 'settings.server.rejects.one'
+              : 'settings.server.rejects.other'
+            ) | transloco: { count: rejects.count() }
+          }}
         </summary>
         <p class="muted small">
-          These are skipped when hunting for a search server, so a second hunt doesn't re-probe the
-          same servers. A server that turns search on later won't be found again until you forget
-          them.
+          {{ 'settings.server.rejects.hint' | transloco }}
         </p>
         <ul>
           @for (server of rejects.recent(); track server.domain) {
@@ -124,21 +127,20 @@
           }
         </ul>
         <button class="btn btn-outline btn-sm" type="button" (click)="forgetRejects()">
-          Forget all {{ rejects.count() }} and re-check
+          {{ 'settings.server.rejects.forget' | transloco: { count: rejects.count() } }}
         </button>
       </details>
     }
   </section>
 
   <details class="ssection anonymous-browsing">
-    <summary>Anonymous browsing</summary>
+    <summary>{{ 'settings.server.anonymous' | transloco }}</summary>
     <div class="anonymous-setting">
       <label for="followed-post-max-age">
-        <strong>Maximum age of posts from followed accounts</strong>
+        <strong>{{ 'settings.anonymous.maxAge' | transloco }}</strong>
       </label>
       <p class="muted small">
-        Older posts are left out when Anonymous builds Home. Posts from followed hashtags are not
-        affected.
+        {{ 'settings.anonymous.maxAge.hint' | transloco }}
       </p>
       <select
         id="followed-post-max-age"
@@ -146,7 +148,7 @@
         (ngModelChange)="setMaximumAge($event)"
       >
         @for (option of ageOptions; track option.days) {
-          <option [ngValue]="option.days">{{ option.label }}</option>
+          <option [ngValue]="option.days">{{ option.key | transloco }}</option>
         }
       </select>
     </div>

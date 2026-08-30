@@ -18,6 +18,7 @@ import { dedupeInterceptor } from './dedupe.interceptor';
 import { rateLimitInterceptor } from './rate-limit.interceptor';
 import { plusTokenInterceptor } from './providers/account/plus-token.interceptor';
 import { PageTitleStrategy } from './a11y/page-title-strategy';
+import { provideI18nForApp } from './i18n/i18n.config';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -25,6 +26,9 @@ export const appConfig: ApplicationConfig = {
     // so a failed dynamic import (a rejected promise) reaches GlobalErrorHandler.
     provideBrowserGlobalErrorListeners(),
     { provide: ErrorHandler, useClass: GlobalErrorHandler },
+    // Interface language. Dictionaries load at runtime from i18n/{lang}.json;
+    // see i18n/i18n.config.ts for why this is not @angular/localize.
+    provideI18nForApp(),
     // Per-route document titles; see page-title-strategy.ts for why the
     // default strategy is not enough.
     { provide: TitleStrategy, useClass: PageTitleStrategy },

@@ -1,4 +1,6 @@
+import { TestBed } from '@angular/core/testing';
 import { beforeEach, vi } from 'vitest';
+import { translocoTesting } from './app/i18n/i18n.testing';
 
 // The default 5s per-test timeout flakes on loaded machines — component-heavy
 // specs (full Shell, StatusCard) intermittently exceed it under worker
@@ -66,4 +68,45 @@ beforeEach(() => {
   restoreLocation();
   localStorage.clear();
   sessionStorage.clear();
+  installTranslations();
 });
+
+/**
+ * Give every spec finished English strings, without touching 286 spec files.
+ *
+ * `TestBed.configureTestingModule` is additive and may be called more than once
+ * before the first injection, so configuring here — ahead of each spec's own
+ * call — merges rather than conflicts. That is the only way to introduce
+ * translation into a suite this size without a mechanical edit to every file,
+ * and without those files' `HttpTestingController.verify()` seeing a stray
+ * request for `i18n/en.json`.
+ *
+ * See `app/i18n/i18n.testing.ts` for why the loader must be synchronous and
+ * English-only rather than the real one.
+ */
+function installTranslations(): void {
+  TestBed.configureTestingModule({ imports: [translocoTesting()] });
+}
+
+/**
+ * Re-install translations after a spec resets the injector mid-test.
+ *
+ * A `beforeEach` alone is not enough. Around thirty spec files call
+ * `TestBed.resetTestingModule()` inside their *own* `beforeEach` — legitimately,
+ * because root singletons like `Auth` seed themselves from `localStorage` at
+ * construction and would otherwise leak a logged-in state into later files. That
+ * reset runs *after* this file's `beforeEach` and discards everything it
+ * configured, so the component under test then fails with
+ * `No provider for TRANSLOCO_TRANSPILER` — in components that have nothing to do
+ * with translation, which makes the error deeply unhelpful.
+ *
+ * Wrapping the reset keeps the fix in one place instead of in every spec that
+ * legitimately needs a clean injector, and means a *future* spec that resets
+ * inherits the fix for free rather than failing mysteriously.
+ */
+const originalReset = TestBed.resetTestingModule.bind(TestBed);
+TestBed.resetTestingModule = function patchedReset(this: unknown, ...args: []) {
+  const result = originalReset(...args);
+  installTranslations();
+  return result;
+} as typeof TestBed.resetTestingModule;

@@ -10,6 +10,7 @@ import { Auth } from '../../../auth';
 import { ConfirmDialog } from '../../../confirm-dialog/confirm-dialog';
 import { Account } from '../../../models';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /** One credential stored in this browser, with the size of the data it owns. */
 interface StoredAccount {
@@ -48,9 +49,23 @@ type PendingAction =
  * when it's the only account left, since there is then somewhere coherent to land
  * (the logged-out main screen), so that case is allowed and navigates away.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.accounts.title: Signed-in accounts
+// i18n settings.accounts.intro: Every credential saved in this browser, and the local data each one owns. Use this to clean up duplicate logins, or to reset one account's local data without signing out of it.
+// i18n settings.accounts.signedIn: Signed in
+// i18n settings.accounts.localOnly: Local only
+// i18n settings.accounts.keys.one: {{count}} key
+// i18n settings.accounts.keys.other: {{count}} keys
+// i18n settings.accounts.deleteData: Delete data
+// i18n settings.accounts.deleteAndLeave: Delete data & leave
+// i18n settings.accounts.deleteAndLogout: Delete data & log out
+// i18n settings.accounts.footnote.before: Deleting data removes this browser's saved settings for that account — RSS feeds, linked accounts, local moderation and similar. It never touches anything on the server. For a key-by-key view of the current account, see
+// i18n settings.accounts.footnote.link: Local storage
+// i18n settings.accounts.footnote.after: .
+// i18n common.delete: Delete
 @Component({
   selector: 'app-settings-accounts',
-  imports: [ConfirmDialog],
+  imports: [ConfirmDialog, TranslocoPipe],
   templateUrl: './settings-accounts.html',
   styleUrl: './settings-accounts.css',
 })

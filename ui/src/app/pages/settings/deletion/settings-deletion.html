@@ -1,12 +1,12 @@
 <div class="spage-head">
-  <h1>Automatic post deletion</h1>
-  <p>Automatically delete your posts once they reach a specified age, with exceptions.</p>
+  <h1>{{ 'settings.deletion.title' | transloco }}</h1>
+  <p>{{ 'settings.deletion.intro' | transloco }}</p>
 </div>
 
 <form class="spage-body" (ngSubmit)="save()">
   <div class="ssection">
     <div class="srow">
-      <span class="slabel">Deletion</span>
+      <span class="slabel">{{ 'settings.deletion.section' | transloco }}</span>
       <div class="scontrol">
         <label class="checkline">
           <input
@@ -15,13 +15,13 @@
             (ngModelChange)="enabled.set($event)"
             name="enabled"
           />
-          Automatically delete old posts
+          {{ 'settings.deletion.enabled' | transloco }}
         </label>
       </div>
     </div>
 
     <div class="srow">
-      <span class="slabel">Age threshold (days)</span>
+      <span class="slabel">{{ 'settings.deletion.age' | transloco }}</span>
       <div class="scontrol">
         <input
           type="number"
@@ -30,14 +30,14 @@
           (ngModelChange)="minAgeDays.set($event)"
           name="min_age_days"
         />
-        <span class="hint">Posts older than this many days become eligible for deletion.</span>
+        <span class="hint">{{ 'settings.deletion.age.hint' | transloco }}</span>
       </div>
     </div>
   </div>
 
   <div class="ssection">
     <div class="srow">
-      <span class="slabel">Exceptions</span>
+      <span class="slabel">{{ 'settings.deletion.exceptions' | transloco }}</span>
       <div class="scontrol">
         <label class="checkline">
           <input
@@ -46,7 +46,7 @@
             (ngModelChange)="keepPinned.set($event)"
             name="keep_pinned"
           />
-          Keep pinned posts
+          {{ 'settings.deletion.keepPinned' | transloco }}
         </label>
         <label class="checkline">
           <input
@@ -55,7 +55,7 @@
             (ngModelChange)="keepFavourited.set($event)"
             name="keep_favourited"
           />
-          Keep posts you favourited
+          {{ 'settings.deletion.keepFavourited' | transloco }}
         </label>
         <label class="checkline">
           <input
@@ -64,7 +64,7 @@
             (ngModelChange)="keepMedia.set($event)"
             name="keep_media"
           />
-          Keep posts with media
+          {{ 'settings.deletion.keepMedia' | transloco }}
         </label>
         <label class="checkline">
           <input
@@ -73,13 +73,13 @@
             (ngModelChange)="keepPolls.set($event)"
             name="keep_polls"
           />
-          Keep posts with polls
+          {{ 'settings.deletion.keepPolls' | transloco }}
         </label>
       </div>
     </div>
 
     <div class="srow">
-      <span class="slabel">Keep posts with at least this many favourites</span>
+      <span class="slabel">{{ 'settings.deletion.minFavourites' | transloco }}</span>
       <div class="scontrol">
         <input
           type="number"
@@ -88,12 +88,12 @@
           (ngModelChange)="minFavourites.set($event)"
           name="min_favourites"
         />
-        <span class="hint">0 = no threshold.</span>
+        <span class="hint">{{ 'settings.deletion.noThreshold' | transloco }}</span>
       </div>
     </div>
 
     <div class="srow">
-      <span class="slabel">Keep posts with at least this many boosts</span>
+      <span class="slabel">{{ 'settings.deletion.minReblogs' | transloco }}</span>
       <div class="scontrol">
         <input
           type="number"
@@ -102,17 +102,17 @@
           (ngModelChange)="minReblogs.set($event)"
           name="min_reblogs"
         />
-        <span class="hint">0 = no threshold.</span>
+        <span class="hint">{{ 'settings.deletion.noThreshold' | transloco }}</span>
       </div>
     </div>
   </div>
 
   <div class="sactions">
     @if (saved()) {
-      <span class="saved-note">Saved ✓</span>
+      <span class="saved-note">{{ 'common.saved' | transloco }}</span>
     }
     <button class="btn" type="submit" [disabled]="saving()">
-      {{ saving() ? 'Saving…' : 'Save changes' }}
+      {{ (saving() ? 'common.saving' : 'common.saveChanges') | transloco }}
     </button>
   </div>
 </form>

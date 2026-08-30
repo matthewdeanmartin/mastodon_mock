@@ -2,15 +2,33 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../../../api';
 import { Server } from '../../../server';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
  * Account: username, password, sessions note. Password "changes" are simulated on the
  * mock only; real Mastodon has no client API for this, so against a real instance we
  * link to its /auth/edit page instead.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.account.title: Account
+// i18n settings.account.intro: Your account identity and security settings.
+// i18n settings.account.username: Username
+// i18n settings.account.username.hint: Your username is unique on this server and cannot be changed.
+// i18n settings.account.currentPassword: Current password
+// i18n settings.account.newPassword: New password
+// i18n settings.account.confirmPassword: Confirm new password
+// i18n settings.account.mockNote: Password changes are simulated in this mock — nothing is stored.
+// i18n settings.account.password: Password
+// i18n settings.account.password.hint: Mastodon has no client API for changing passwords — that happens on your instance's own website.
+// i18n settings.account.password.link: Change your password on {{host}} ↗
+// i18n settings.account.sessions: Sessions
+// i18n settings.account.sessions.mock: Session management is not implemented in the mock.
+// i18n settings.account.sessions.hint: Mastodon has no client API for listing or revoking sessions — manage them on your instance's own website.
+// i18n settings.account.sessions.link: Manage sessions on {{host}} ↗
+// i18n settings.account.changePassword: Change password
 @Component({
   selector: 'app-settings-account',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './settings-account.html',
 })
 export class SettingsAccount implements OnInit {

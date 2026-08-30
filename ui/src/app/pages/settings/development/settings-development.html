@@ -1,12 +1,12 @@
 <div class="spage-head">
-  <h1>Development</h1>
-  <p>Applications with access to your account.</p>
+  <h1>{{ 'settings.development.title' | transloco }}</h1>
+  <p>{{ 'settings.development.intro' | transloco }}</p>
 </div>
 
 <div class="spage-body">
   <div class="ssection">
     @if (!loading() && !apps().length) {
-      <p class="hint">No applications have been authorized for this account.</p>
+      <p class="hint">{{ 'settings.development.none' | transloco }}</p>
     }
     @for (app of apps(); track app.id) {
       <div class="srow">
@@ -22,29 +22,30 @@
               <code>{{ scope }}</code>
             }
           </div>
-          <span class="hint">Last used: {{ formatDate(app.last_used_at) }}</span>
+          <span class="hint">{{
+            'settings.development.lastUsed' | transloco: { date: formatDate(app.last_used_at) }
+          }}</span>
         </div>
       </div>
     }
     <div class="srow">
       <span class="slabel"></span>
       <div class="scontrol">
-        <span class="hint">New applications register themselves via POST /api/v1/apps.</span>
+        <span class="hint">{{ 'settings.development.register' | transloco }}</span>
       </div>
     </div>
   </div>
 
   <div class="ssection">
     <div class="srow">
-      <span class="slabel"><strong>Report a bug</strong></span>
+      <span class="slabel"
+        ><strong>{{ 'settings.development.reportBug' | transloco }}</strong></span
+      >
       <div class="scontrol">
         <button class="btn btn-outline" type="button" (click)="reporting.set(true)">
-          Report a bug
+          {{ 'settings.development.reportBug' | transloco }}
         </button>
-        <span class="hint">
-          Builds a report from your description plus build and environment details. Nothing is sent
-          automatically — you review it, then copy it or open a prefilled GitHub issue.
-        </span>
+        <span class="hint">{{ 'settings.development.reportBug.hint' | transloco }}</span>
       </div>
     </div>
   </div>

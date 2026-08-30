@@ -1,12 +1,12 @@
 <div class="spage-head">
-  <h1>Email notifications</h1>
-  <p>Choose which events send you an e-mail.</p>
+  <h1>{{ 'settings.notifications.title' | transloco }}</h1>
+  <p>{{ 'settings.notifications.intro' | transloco }}</p>
 </div>
 
 <form class="spage-body" (ngSubmit)="save()">
   <div class="ssection">
     <div class="srow">
-      <span class="slabel">Events</span>
+      <span class="slabel">{{ 'settings.notifications.events' | transloco }}</span>
       <div class="scontrol">
         <label class="checkline">
           <input
@@ -15,7 +15,7 @@
             (ngModelChange)="follow.set($event)"
             name="follow"
           />
-          Someone followed you
+          {{ 'settings.notifications.follow' | transloco }}
         </label>
         <label class="checkline">
           <input
@@ -24,7 +24,7 @@
             (ngModelChange)="followRequest.set($event)"
             name="follow_request"
           />
-          Someone requested to follow you
+          {{ 'settings.notifications.followRequest' | transloco }}
         </label>
         <label class="checkline">
           <input
@@ -33,7 +33,7 @@
             (ngModelChange)="reblog.set($event)"
             name="reblog"
           />
-          Someone boosted your post
+          {{ 'settings.notifications.reblog' | transloco }}
         </label>
         <label class="checkline">
           <input
@@ -42,7 +42,7 @@
             (ngModelChange)="favourite.set($event)"
             name="favourite"
           />
-          Someone favourited your post
+          {{ 'settings.notifications.favourite' | transloco }}
         </label>
         <label class="checkline">
           <input
@@ -51,7 +51,7 @@
             (ngModelChange)="mention.set($event)"
             name="mention"
           />
-          Someone mentioned you
+          {{ 'settings.notifications.mention' | transloco }}
         </label>
         <label class="checkline">
           <input
@@ -60,14 +60,14 @@
             (ngModelChange)="report.set($event)"
             name="report"
           />
-          A new report is submitted
+          {{ 'settings.notifications.report' | transloco }}
         </label>
-        <span class="hint">Moderators only.</span>
+        <span class="hint">{{ 'settings.notifications.report.hint' | transloco }}</span>
       </div>
     </div>
 
     <div class="srow">
-      <span class="slabel">Digest</span>
+      <span class="slabel">{{ 'settings.notifications.digest' | transloco }}</span>
       <div class="scontrol">
         <label class="checkline">
           <input
@@ -76,7 +76,7 @@
             (ngModelChange)="digest.set($event)"
             name="digest"
           />
-          Send digest e-mails of missed activity
+          {{ 'settings.notifications.digest.label' | transloco }}
         </label>
       </div>
     </div>
@@ -84,10 +84,10 @@
 
   <div class="sactions">
     @if (saved()) {
-      <span class="saved-note">Saved ✓</span>
+      <span class="saved-note">{{ 'common.saved' | transloco }}</span>
     }
     <button class="btn" type="submit" [disabled]="saving()">
-      {{ saving() ? 'Saving…' : 'Save changes' }}
+      {{ (saving() ? 'common.saving' : 'common.saveChanges') | transloco }}
     </button>
   </div>
 </form>

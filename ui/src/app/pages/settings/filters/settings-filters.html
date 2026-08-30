@@ -1,17 +1,17 @@
 <div class="spage-head">
-  <h1>Filters</h1>
-  <p>Hide posts containing muted words or phrases, per context. Filters apply to all sessions.</p>
+  <h1>{{ 'settings.filters.title' | transloco }}</h1>
+  <p>{{ 'settings.filters.intro' | transloco }}</p>
 </div>
 
 <div class="filters-toolbar">
-  <a class="btn" routerLink="/settings/filters/new">+ Add new filter</a>
+  <a class="btn" routerLink="/settings/filters/new">{{ 'settings.filters.addNew' | transloco }}</a>
 </div>
 
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'common.loading' | transloco }}</p>
 } @else if (!filters().length) {
   <p class="muted center">
-    You have no filters. Add one to hide posts containing certain words or phrases.
+    {{ 'settings.filters.empty' | transloco }}
   </p>
 } @else {
   <ul class="filter-list">
@@ -19,19 +19,29 @@
       <li class="filter-row">
         <a class="filter-main" [routerLink]="['/settings/filters', f.id]">
           <span class="filter-title">
-            {{ f.title || '(untitled filter)' }}
+            {{ f.title || ('settings.filters.untitled' | transloco) }}
             <span class="filter-action" [class.hide]="f.filter_action === 'hide'">
-              {{ f.filter_action === 'hide' ? 'Hide completely' : 'Hide with a warning' }}
+              {{
+                (f.filter_action === 'hide'
+                  ? 'settings.filters.hideCompletely'
+                  : 'settings.filters.hideWarning'
+                ) | transloco
+              }}
             </span>
           </span>
           <span class="filter-keywords muted">{{ keywordSummary(f) }}</span>
           <span class="filter-meta muted">
-            {{ f.context.join(', ') || 'no contexts' }} · {{ expirySummary(f) }}
+            {{ f.context.join(', ') || ('settings.filters.noContexts' | transloco) }} ·
+            {{ expirySummary(f) }}
           </span>
         </a>
         <span class="filter-actions">
-          <a class="btn btn-outline btn-sm" [routerLink]="['/settings/filters', f.id]">Edit</a>
-          <button class="btn btn-outline btn-sm danger" (click)="remove(f)">Delete</button>
+          <a class="btn btn-outline btn-sm" [routerLink]="['/settings/filters', f.id]">{{
+            'common.edit' | transloco
+          }}</a>
+          <button class="btn btn-outline btn-sm danger" (click)="remove(f)">
+            {{ 'common.delete' | transloco }}
+          </button>
         </span>
       </li>
     }

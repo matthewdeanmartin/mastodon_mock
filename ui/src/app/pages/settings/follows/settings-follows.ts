@@ -5,11 +5,26 @@ import { Account } from '../../../models';
 import { Auth } from '../../../auth';
 import { AnonymousFollow, AnonymousFollows } from '../../../providers/anonymous/anonymous-follows';
 import { anonymousAccountRouteRef } from '../../../providers/anonymous/anonymous-route-ref';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /** Approve or reject pending follow requests. */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.follows.title: Approve follow requests
+// i18n settings.follows.intro: Pending follow requests. Requests only appear when your account requires follow approval.
+// i18n settings.follows.intro.anonymous: Accounts followed by Anonymous. Sources are fetched only when you explicitly load a feed.
+// i18n settings.follows.crosslink.before: Looking to turn retweets on or off for everyone you follow?
+// i18n settings.follows.crosslink.link: Bulk actions
+// i18n settings.follows.crosslink.after: does that in one pass, and tells you how many accounts it would change before you agree.
+// i18n settings.follows.empty: No pending follow requests.
+// i18n settings.follows.empty.anonymous: You are not following any Mastodon accounts yet.
+// i18n settings.follows.retry: Retry API
+// i18n settings.follows.unfollow: Unfollow
+// i18n settings.follows.accept: Accept
+// i18n settings.follows.reject: Reject
+// i18n common.loading: Loading…
 @Component({
   selector: 'app-settings-follows',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './settings-follows.html',
   styleUrl: './settings-follows.css',
 })

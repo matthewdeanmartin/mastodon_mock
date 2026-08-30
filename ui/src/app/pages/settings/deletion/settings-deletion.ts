@@ -2,11 +2,27 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MockApi } from '../../../mock-api';
 import { PostDeletionSettings } from '../../../models';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /** Automatic post deletion policy (mock-only settings section). */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.deletion.title: Automatic post deletion
+// i18n settings.deletion.intro: Automatically delete your posts once they reach a specified age, with exceptions.
+// i18n settings.deletion.section: Deletion
+// i18n settings.deletion.enabled: Automatically delete old posts
+// i18n settings.deletion.age: Age threshold (days)
+// i18n settings.deletion.age.hint: Posts older than this many days become eligible for deletion.
+// i18n settings.deletion.exceptions: Exceptions
+// i18n settings.deletion.keepPinned: Keep pinned posts
+// i18n settings.deletion.keepFavourited: Keep posts you favourited
+// i18n settings.deletion.keepMedia: Keep posts with media
+// i18n settings.deletion.keepPolls: Keep posts with polls
+// i18n settings.deletion.minFavourites: Keep posts with at least this many favourites
+// i18n settings.deletion.minReblogs: Keep posts with at least this many boosts
+// i18n settings.deletion.noThreshold: 0 = no threshold.
 @Component({
   selector: 'app-settings-deletion',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './settings-deletion.html',
 })
 export class SettingsDeletion implements OnInit {

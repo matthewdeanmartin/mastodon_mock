@@ -22,7 +22,7 @@ interface SettingsAccountListInternals {
   showPager(): boolean;
   undo(acc: Account): void;
   amnestyAction(): string;
-  amnestyLabel(): string;
+  amnestyLabelKey(): string;
   asking: WritableSignal<boolean>;
   askAmnesty(): void;
   page: WritableSignal<number>;
@@ -148,7 +148,12 @@ describe('SettingsAccountList', () => {
     flushPage([makeAccount('1')]);
 
     expect(internals(fixture).amnestyAction()).toBe('block-amnesty');
-    expect(internals(fixture).amnestyLabel()).toBe('Unblock everyone');
+    // Asserted through the rendered button rather than the key, so this keeps
+    // testing what the reader sees rather than the indirection behind it. The
+    // amnesty row only renders once the page has accounts, hence the extra pass.
+    fixture.detectChanges();
+    const amnesty = (fixture.nativeElement as HTMLElement).querySelector('.amnesty-row .btn');
+    expect(amnesty?.textContent?.trim()).toBe('Unblock everyone');
   });
 
   it('asks before running an amnesty, and issues no request until confirmed', () => {

@@ -1,23 +1,20 @@
 <div class="spage-head">
-  <h1>Anonymous</h1>
-  <p>Control how the browser-local Anonymous home feed is assembled.</p>
+  <h1>{{ 'settings.anonymous.title' | transloco }}</h1>
+  <p>{{ 'settings.anonymous.intro' | transloco }}</p>
 </div>
 
 <section class="anonymous-setting">
   <label for="followed-post-max-age"
-    ><strong>Maximum age of posts from followed accounts</strong></label
+    ><strong>{{ 'settings.anonymous.maxAge' | transloco }}</strong></label
   >
-  <p class="muted small">
-    Older posts are left out when Anonymous builds Home. Posts from followed hashtags are not
-    affected.
-  </p>
+  <p class="muted small">{{ 'settings.anonymous.maxAge.hint' | transloco }}</p>
   <select
     id="followed-post-max-age"
     [ngModel]="prefs.followedPostMaxAgeDays()"
     (ngModelChange)="setMaximumAge($event)"
   >
     @for (option of ageOptions; track option.days) {
-      <option [ngValue]="option.days">{{ option.label }}</option>
+      <option [ngValue]="option.days">{{ option.key | transloco }}</option>
     }
   </select>
 </section>

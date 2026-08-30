@@ -1,6 +1,6 @@
 <div class="spage-head">
-  <h1>Appearance</h1>
-  <p>Adjust how the web interface looks and behaves.</p>
+  <h1>{{ 'settings.appearance.title' | transloco }}</h1>
+  <p>{{ 'settings.appearance.intro' | transloco }}</p>
 </div>
 
 <form class="spage-body" (ngSubmit)="save()">
@@ -9,16 +9,16 @@
   @if (isMock) {
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Media display</span>
+        <span class="slabel">{{ 'settings.appearance.media' | transloco }}</span>
         <div class="scontrol">
           <select
             [ngModel]="displayMedia()"
             (ngModelChange)="displayMedia.set($event)"
             name="display_media"
           >
-            <option value="default">Hide media marked as sensitive</option>
-            <option value="show_all">Always show media</option>
-            <option value="hide_all">Always hide media</option>
+            <option value="default">{{ 'settings.appearance.media.default' | transloco }}</option>
+            <option value="show_all">{{ 'settings.appearance.media.showAll' | transloco }}</option>
+            <option value="hide_all">{{ 'settings.appearance.media.hideAll' | transloco }}</option>
           </select>
         </div>
       </div>
@@ -26,7 +26,7 @@
 
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Animations</span>
+        <span class="slabel">{{ 'settings.appearance.animations' | transloco }}</span>
         <div class="scontrol">
           <label class="checkline">
             <input
@@ -35,7 +35,7 @@
               (ngModelChange)="reduceMotion.set($event)"
               name="reduce_motion"
             />
-            Reduce motion in animations
+            {{ 'settings.appearance.reduceMotion' | transloco }}
           </label>
           <label class="checkline">
             <input
@@ -44,13 +44,13 @@
               (ngModelChange)="disableSwiping.set($event)"
               name="disable_swiping"
             />
-            Disable swiping motions
+            {{ 'settings.appearance.disableSwiping' | transloco }}
           </label>
         </div>
       </div>
 
       <div class="srow">
-        <span class="slabel">Content warnings</span>
+        <span class="slabel">{{ 'settings.appearance.contentWarnings' | transloco }}</span>
         <div class="scontrol">
           <label class="checkline">
             <input
@@ -59,7 +59,7 @@
               (ngModelChange)="expandSpoilers.set($event)"
               name="expand_spoilers"
             />
-            Always expand posts marked with content warnings
+            {{ 'settings.appearance.expandSpoilers' | transloco }}
           </label>
         </div>
       </div>
@@ -67,10 +67,10 @@
 
     <div class="sactions">
       @if (saved()) {
-        <span class="saved-note">Saved ✓</span>
+        <span class="saved-note">{{ 'common.saved' | transloco }}</span>
       }
       <button class="btn" type="submit" [disabled]="saving()">
-        {{ saving() ? 'Saving…' : 'Save changes' }}
+        {{ (saving() ? 'common.saving' : 'common.saveChanges') | transloco }}
       </button>
     </div>
   }

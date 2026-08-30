@@ -405,6 +405,7 @@ interface StoredPrefs {
   customLink?: CustomColor;
   customSidebar?: CustomColor;
   excludeUnknownLangTrends?: boolean;
+  uiLocale?: string | null;
   knownLanguages?: string[];
   hideForeignLangPosts?: boolean;
   feedLanguages?: string[];
@@ -446,6 +447,23 @@ function normalizeLangs(list: unknown): string[] {
     }
   }
   return [...seen];
+}
+
+/**
+ * A stored UI-locale choice, or `null` when there isn't a usable one.
+ *
+ * Deliberately does **not** check the code against the shipped locale list: a
+ * hand-edited or newer-build value that names a locale this build doesn't have
+ * should fall back to English at render time (Transloco's `fallbackLang`), not
+ * be silently erased from storage here. Erasing it would turn "I chose Finnish
+ * on the canary build" into "I never chose anything" on the production one.
+ */
+function normalizeLocale(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const code = value.toLowerCase().split(/[-_]/)[0];
+  return /^[a-z]{2,3}$/.test(code) ? code : null;
 }
 
 /**
@@ -736,6 +754,19 @@ export class ClientPrefs {
    * TrendLanguageFilter service for where it is applied.
    */
   readonly excludeUnknownLangTrends = signal<boolean>(true);
+
+  /**
+   * The interface language the user has **explicitly chosen**, or `null` to let
+   * the browser decide (see `i18n/locale.ts`).
+   *
+   * `null` is not the same as `'en'`, and the difference is the whole design:
+   * `null` means "negotiate from `navigator.languages` every visit", so someone
+   * who later changes their OS language follows along. `'en'` means "this person
+   * asked for English" and must survive a German browser forever. Persisting a
+   * *negotiated* result would silently collapse the first case into the second.
+   */
+  readonly uiLocale = signal<string | null>(null);
+
   /**
    * Languages the user has explicitly said they know (ISO 639-1). This is the
    * future home of Mastodon's "public timeline languages" checkbox list; it
@@ -1350,6 +1381,7 @@ export class ClientPrefs {
     this.customLink.set(normalizeColor(stored.customLink ?? null));
     this.customSidebar.set(normalizeColor(stored.customSidebar ?? null));
     this.loadBool(stored.excludeUnknownLangTrends, this.excludeUnknownLangTrends);
+    this.uiLocale.set(normalizeLocale(stored.uiLocale));
     this.knownLanguages.set(normalizeLangs(stored.knownLanguages));
     this.loadBool(stored.hideForeignLangPosts, this.hideForeignLangPosts);
     this.feedLanguages.set(normalizeLangs(stored.feedLanguages).slice(0, MAX_FEED_LANGUAGES));
@@ -1419,6 +1451,7 @@ export class ClientPrefs {
       customLink: this.customLink(),
       customSidebar: this.customSidebar(),
       excludeUnknownLangTrends: this.excludeUnknownLangTrends(),
+      uiLocale: this.uiLocale(),
       knownLanguages: this.knownLanguages(),
       hideForeignLangPosts: this.hideForeignLangPosts(),
       feedLanguages: this.feedLanguages(),

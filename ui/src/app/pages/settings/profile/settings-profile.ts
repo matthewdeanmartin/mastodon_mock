@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
 import { Auth } from '../../../auth';
@@ -13,9 +14,30 @@ import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
 import { BskyBlobRef, BskyProfile } from '../../../providers/bluesky/bluesky-types';
 
 /** Public profile: display name, bio, metadata fields, avatar/header. */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.profile.title: Public profile
+// i18n settings.profile.intro: How you appear to other people on this server.
+// i18n settings.profile.intro.anonymous: Your browser-local identity. Nothing here is published to {{server}}.
+// i18n settings.profile.intro.bluesky: How you appear to people on Bluesky.
+// i18n settings.profile.displayName: Display name
+// i18n settings.profile.localHandle: Local handle
+// i18n settings.profile.localHandle.hint: Shown only in this browser. It does not create an account.
+// i18n settings.profile.bio: Bio
+// i18n settings.profile.bio.hint: Describe yourself. Appears on your public profile.
+// i18n settings.profile.metadata: Profile metadata
+// i18n settings.profile.field.label: Label
+// i18n settings.profile.field.content: Content
+// i18n settings.profile.field.remove: Remove field
+// i18n settings.profile.verified: ✓ verified
+// i18n settings.profile.verified.title: Link ownership verified via rel=me on {{date}}
+// i18n settings.profile.addField: + Add field
+// i18n settings.profile.metadata.hint: Up to 4 table rows shown on your profile (links, pronouns, ...). A link whose page links back to your profile with rel="me" shows as ✓ verified (checked by the server when you save).
+// i18n settings.profile.avatar: Avatar
+// i18n settings.profile.header: Header
+// i18n settings.profile.resetLocal: Reset local profile
 @Component({
   selector: 'app-settings-profile',
-  imports: [DatePipe, FormsModule],
+  imports: [DatePipe, FormsModule, TranslocoPipe],
   templateUrl: './settings-profile.html',
   styleUrl: './settings-profile.css',
 })

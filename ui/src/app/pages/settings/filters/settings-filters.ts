@@ -2,11 +2,22 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../../../api';
 import { ContentFilter } from '../../../models';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /** Filters: list of the user's v2 filters (muted words/phrases live here). */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.filters.title: Filters
+// i18n settings.filters.intro: Hide posts containing muted words or phrases, per context. Filters apply to all sessions.
+// i18n settings.filters.addNew: + Add new filter
+// i18n settings.filters.empty: You have no filters. Add one to hide posts containing certain words or phrases.
+// i18n settings.filters.untitled: (untitled filter)
+// i18n settings.filters.hideCompletely: Hide completely
+// i18n settings.filters.hideWarning: Hide with a warning
+// i18n settings.filters.noContexts: no contexts
+// i18n common.edit: Edit
 @Component({
   selector: 'app-settings-filters',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './settings-filters.html',
   styleUrl: './settings-filters.css',
 })

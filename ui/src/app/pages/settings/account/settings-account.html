@@ -1,15 +1,15 @@
 <div class="spage-head">
-  <h1>Account</h1>
-  <p>Your account identity and security settings.</p>
+  <h1>{{ 'settings.account.title' | transloco }}</h1>
+  <p>{{ 'settings.account.intro' | transloco }}</p>
 </div>
 
 <form class="spage-body" (ngSubmit)="changePassword()">
   <div class="ssection">
     <div class="srow">
-      <span class="slabel">Username</span>
+      <span class="slabel">{{ 'settings.account.username' | transloco }}</span>
       <div class="scontrol">
         <strong>&#64;{{ acct() }}</strong>
-        <span class="hint">Your username is unique on this server and cannot be changed.</span>
+        <span class="hint">{{ 'settings.account.username.hint' | transloco }}</span>
       </div>
     </div>
   </div>
@@ -17,7 +17,7 @@
   @if (isMock) {
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Current password</span>
+        <span class="slabel">{{ 'settings.account.currentPassword' | transloco }}</span>
         <div class="scontrol">
           <input
             type="password"
@@ -30,7 +30,7 @@
       </div>
 
       <div class="srow">
-        <span class="slabel">New password</span>
+        <span class="slabel">{{ 'settings.account.newPassword' | transloco }}</span>
         <div class="scontrol">
           <input
             type="password"
@@ -43,7 +43,7 @@
       </div>
 
       <div class="srow">
-        <span class="slabel">Confirm new password</span>
+        <span class="slabel">{{ 'settings.account.confirmPassword' | transloco }}</span>
         <div class="scontrol">
           <input
             type="password"
@@ -55,21 +55,18 @@
           @if (passwordError()) {
             <span class="hint error">{{ passwordError() }}</span>
           }
-          <span class="hint">Password changes are simulated in this mock — nothing is stored.</span>
+          <span class="hint">{{ 'settings.account.mockNote' | transloco }}</span>
         </div>
       </div>
     </div>
   } @else {
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Password</span>
+        <span class="slabel">{{ 'settings.account.password' | transloco }}</span>
         <div class="scontrol">
-          <span class="hint">
-            Mastodon has no client API for changing passwords — that happens on your instance's own
-            website.
-          </span>
+          <span class="hint">{{ 'settings.account.password.hint' | transloco }}</span>
           <a [href]="passwordChangeUrl" target="_blank" rel="noopener noreferrer">
-            Change your password on {{ instanceHost }} ↗
+            {{ 'settings.account.password.link' | transloco: { host: instanceHost } }}
           </a>
         </div>
       </div>
@@ -79,23 +76,20 @@
   @if (isMock) {
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Sessions</span>
+        <span class="slabel">{{ 'settings.account.sessions' | transloco }}</span>
         <div class="scontrol">
-          <span class="hint">Session management is not implemented in the mock.</span>
+          <span class="hint">{{ 'settings.account.sessions.mock' | transloco }}</span>
         </div>
       </div>
     </div>
   } @else {
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Sessions</span>
+        <span class="slabel">{{ 'settings.account.sessions' | transloco }}</span>
         <div class="scontrol">
-          <span class="hint">
-            Mastodon has no client API for listing or revoking sessions — manage them on your
-            instance's own website.
-          </span>
+          <span class="hint">{{ 'settings.account.sessions.hint' | transloco }}</span>
           <a [href]="passwordChangeUrl" target="_blank" rel="noopener noreferrer">
-            Manage sessions on {{ instanceHost }} ↗
+            {{ 'settings.account.sessions.link' | transloco: { host: instanceHost } }}
           </a>
         </div>
       </div>
@@ -105,9 +99,11 @@
   @if (isMock) {
     <div class="sactions">
       @if (saved()) {
-        <span class="saved-note">Saved ✓</span>
+        <span class="saved-note">{{ 'common.saved' | transloco }}</span>
       }
-      <button class="btn" type="submit" [disabled]="saving()">Change password</button>
+      <button class="btn" type="submit" [disabled]="saving()">
+        {{ 'settings.account.changePassword' | transloco }}
+      </button>
     </div>
   }
 </form>

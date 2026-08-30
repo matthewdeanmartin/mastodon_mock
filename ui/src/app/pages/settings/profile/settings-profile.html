@@ -1,18 +1,18 @@
 <div class="spage-head">
-  <h1>Public profile</h1>
+  <h1>{{ 'settings.profile.title' | transloco }}</h1>
   @if (auth.isAnonymous) {
-    <p>Your browser-local identity. Nothing here is published to {{ anonymous.server() }}.</p>
+    <p>{{ 'settings.profile.intro.anonymous' | transloco: { server: anonymous.server() } }}</p>
   } @else if (auth.isBlueskyPrimary) {
-    <p>How you appear to people on Bluesky.</p>
+    <p>{{ 'settings.profile.intro.bluesky' | transloco }}</p>
   } @else {
-    <p>How you appear to other people on this server.</p>
+    <p>{{ 'settings.profile.intro' | transloco }}</p>
   }
 </div>
 
 <form class="spage-body" (ngSubmit)="saveProfile()">
   <div class="ssection">
     <div class="srow">
-      <span class="slabel">Display name</span>
+      <span class="slabel">{{ 'settings.profile.displayName' | transloco }}</span>
       <div class="scontrol">
         <input
           type="text"
@@ -26,7 +26,7 @@
 
     @if (auth.isAnonymous) {
       <div class="srow">
-        <span class="slabel">Local handle</span>
+        <span class="slabel">{{ 'settings.profile.localHandle' | transloco }}</span>
         <div class="scontrol">
           <input
             type="text"
@@ -35,13 +35,13 @@
             name="username"
             maxlength="64"
           />
-          <span class="hint">Shown only in this browser. It does not create an account.</span>
+          <span class="hint">{{ 'settings.profile.localHandle.hint' | transloco }}</span>
         </div>
       </div>
     }
 
     <div class="srow">
-      <span class="slabel">Bio</span>
+      <span class="slabel">{{ 'settings.profile.bio' | transloco }}</span>
       <div class="scontrol">
         <textarea
           rows="3"
@@ -50,7 +50,7 @@
           name="note"
           [maxlength]="auth.isBlueskyPrimary ? 256 : null"
         ></textarea>
-        <span class="hint">Describe yourself. Appears on your public profile.</span>
+        <span class="hint">{{ 'settings.profile.bio.hint' | transloco }}</span>
       </div>
     </div>
   </div>
@@ -58,20 +58,20 @@
   @if (!auth.isBlueskyPrimary) {
     <div class="ssection">
       <div class="srow">
-        <span class="slabel">Profile metadata</span>
+        <span class="slabel">{{ 'settings.profile.metadata' | transloco }}</span>
         <div class="scontrol">
           @for (f of fields(); track $index; let i = $index) {
             <div class="meta-row" [class.meta-verified]="verifiedAt()[f.name]">
               <input
                 type="text"
-                placeholder="Label"
+                [attr.placeholder]="'settings.profile.field.label' | transloco"
                 [ngModel]="f.name"
                 (ngModelChange)="setField(i, 'name', $event)"
                 [name]="'field_name_' + i"
               />
               <input
                 type="text"
-                placeholder="Content"
+                [attr.placeholder]="'settings.profile.field.content' | transloco"
                 [ngModel]="f.value"
                 (ngModelChange)="setField(i, 'value', $event)"
                 [name]="'field_value_' + i"
@@ -80,29 +80,28 @@
                 type="button"
                 class="btn btn-outline btn-sm"
                 (click)="removeField(i)"
-                aria-label="Remove field"
+                [attr.aria-label]="'settings.profile.field.remove' | transloco"
               >
                 ✕
               </button>
               @if (verifiedAt()[f.name]; as when) {
                 <span
                   class="meta-verified-badge"
-                  [title]="'Link ownership verified via rel=me on ' + (when | date: 'mediumDate')"
-                  >✓ verified</span
+                  [title]="
+                    'settings.profile.verified.title'
+                      | transloco: { date: when | date: 'mediumDate' }
+                  "
+                  >{{ 'settings.profile.verified' | transloco }}</span
                 >
               }
             </div>
           }
           @if (fields().length < 4) {
             <button type="button" class="btn btn-outline btn-sm add-field" (click)="addField()">
-              + Add field
+              {{ 'settings.profile.addField' | transloco }}
             </button>
           }
-          <span class="hint">
-            Up to 4 table rows shown on your profile (links, pronouns, ...). A link whose page links
-            back to your profile with rel="me" shows as ✓ verified (checked by the server when you
-            save).
-          </span>
+          <span class="hint">{{ 'settings.profile.metadata.hint' | transloco }}</span>
         </div>
       </div>
     </div>
@@ -110,13 +109,13 @@
 
   <div class="ssection">
     <div class="srow">
-      <span class="slabel">Avatar</span>
+      <span class="slabel">{{ 'settings.profile.avatar' | transloco }}</span>
       <div class="scontrol">
         <input type="file" accept="image/*" (change)="onAvatar($event)" />
       </div>
     </div>
     <div class="srow">
-      <span class="slabel">Header</span>
+      <span class="slabel">{{ 'settings.profile.header' | transloco }}</span>
       <div class="scontrol">
         <input type="file" accept="image/*" (change)="onHeader($event)" />
       </div>
@@ -128,15 +127,15 @@
       <span class="error">{{ error }}</span>
     }
     @if (saved()) {
-      <span class="saved-note">Saved ✓</span>
+      <span class="saved-note">{{ 'common.saved' | transloco }}</span>
     }
     @if (auth.isAnonymous) {
       <button class="btn btn-outline" type="button" (click)="resetAnonymousProfile()">
-        Reset local profile
+        {{ 'settings.profile.resetLocal' | transloco }}
       </button>
     }
     <button class="btn" type="submit" [disabled]="saving()">
-      {{ saving() ? 'Saving…' : 'Save changes' }}
+      {{ (saving() ? 'common.saving' : 'common.saveChanges') | transloco }}
     </button>
   </div>
 </form>

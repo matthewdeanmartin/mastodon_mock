@@ -5,15 +5,31 @@ import { ClientPrefs } from '../../../client-prefs';
 import { AppearanceSettings } from '../../../models';
 import { Server } from '../../../server';
 import { BlueControls } from '../blue/blue-controls';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
  * Appearance: the shared Mockingbird Blue controls (theme, accent, undo send,
  * reader typography — instant, localStorage) plus media/motion/spoiler
  * preferences stored on the mock server and only shown there.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.appearance.title: Appearance
+// i18n settings.appearance.intro: Adjust how the web interface looks and behaves.
+// i18n settings.appearance.media: Media display
+// i18n settings.appearance.media.default: Hide media marked as sensitive
+// i18n settings.appearance.media.showAll: Always show media
+// i18n settings.appearance.media.hideAll: Always hide media
+// i18n settings.appearance.animations: Animations
+// i18n settings.appearance.reduceMotion: Reduce motion in animations
+// i18n settings.appearance.disableSwiping: Disable swiping motions
+// i18n settings.appearance.contentWarnings: Content warnings
+// i18n settings.appearance.expandSpoilers: Always expand posts marked with content warnings
+// i18n common.saved: Saved ✓
+// i18n common.saving: Saving…
+// i18n common.saveChanges: Save changes
 @Component({
   selector: 'app-settings-appearance',
-  imports: [FormsModule, BlueControls],
+  imports: [FormsModule, BlueControls, TranslocoPipe],
   templateUrl: './settings-appearance.html',
 })
 export class SettingsAppearance implements OnInit {

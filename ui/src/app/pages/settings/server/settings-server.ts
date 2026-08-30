@@ -12,13 +12,40 @@ import { SearchServer } from '../../../search-server';
 import { FeedCapability } from '../../../feed-capability';
 import { SearchCapability } from '../../../search-capability';
 import { SearchServerRejects, rejectReason } from '../../../search-server-rejects';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 type ConnectionStatus = 'checking' | 'available' | 'degraded' | 'unreachable';
 
 /** Anonymous-only control for the public Mastodon instance used by read-only API calls. */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.server.title: Server
+// i18n settings.server.intro: Choose the Mastodon server used for public timelines, profiles, and searches while you browse anonymously. Your browser-local identity and preferences stay the same.
+// i18n settings.server.current: Current server
+// i18n settings.server.usersListed: · {{count}} users listed
+// i18n settings.server.status.checking: Checking…
+// i18n settings.server.status.available: ✓ Available
+// i18n settings.server.status.degraded: ⚠ Available, but degraded — images will not load
+// i18n settings.server.status.unreachable: ⚠ Unreachable
+// i18n settings.server.checkConnection: Check connection
+// i18n settings.server.changed: Now browsing anonymously via {{host}}.
+// i18n settings.server.findAnother: Find another server
+// i18n settings.server.findAnother.hint: We’ll check randomly selected servers from the bundled Mastodon directory. Nothing changes until you approve a working server.
+// i18n settings.server.specific: Use a specific server
+// i18n settings.server.specific.hint: Enter a server domain if you already know where you want to browse.
+// i18n settings.server.search: Search server
+// i18n settings.server.search.hint: Many servers disable search for logged-out visitors, and practically none will full-text search posts without an account — the best you get is the posts behind a hashtag, and not every server serves those either. Search — and only search — can be sent to one that does.
+// i18n settings.server.search.here: Searches go here. Everything else uses your own server.
+// i18n settings.server.search.own: Your own server
+// i18n settings.server.search.none: No separate search server configured.
+// i18n settings.server.search.useOwn: Use my own server
+// i18n settings.server.rejects.one: {{count}} server checked and rejected
+// i18n settings.server.rejects.other: {{count}} servers checked and rejected
+// i18n settings.server.rejects.hint: These are skipped when hunting for a search server, so a second hunt doesn't re-probe the same servers. A server that turns search on later won't be found again until you forget them.
+// i18n settings.server.rejects.forget: Forget all {{count}} and re-check
+// i18n settings.server.anonymous: Anonymous browsing
 @Component({
   selector: 'app-settings-server',
-  imports: [FormsModule, ServerDiscovery, ServerPicker, SearchServerDiscovery],
+  imports: [FormsModule, ServerDiscovery, ServerPicker, SearchServerDiscovery, TranslocoPipe],
   templateUrl: './settings-server.html',
   styleUrl: './settings-server.css',
 })
@@ -40,13 +67,18 @@ export class SettingsServer implements OnInit {
   );
   protected readonly connectionStatus = signal<ConnectionStatus>('checking');
   protected readonly changed = signal(false);
+  /**
+   * Retention choices, sharing the `settings.anonymous.age.*` keys with the
+   * Anonymous settings page: it is the same control rendered in two places, and
+   * one set of translations should cover both.
+   */
   protected readonly ageOptions = [
-    { days: 30, label: '30 days' },
-    { days: 90, label: '3 months' },
-    { days: 180, label: '6 months' },
-    { days: 365, label: '1 year' },
-    { days: 730, label: '2 years' },
-    { days: 1825, label: '5 years' },
+    { days: 30, key: 'settings.anonymous.age.days30' },
+    { days: 90, key: 'settings.anonymous.age.months3' },
+    { days: 180, key: 'settings.anonymous.age.months6' },
+    { days: 365, key: 'settings.anonymous.age.years1' },
+    { days: 730, key: 'settings.anonymous.age.years2' },
+    { days: 1825, key: 'settings.anonymous.age.years5' },
   ];
 
   ngOnInit(): void {

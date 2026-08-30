@@ -2,8 +2,8 @@
   <section class="storage-section">
     <div class="page-head">
       <div>
-        <h1>Local storage</h1>
-        <p class="muted">Inspect account-scoped data without switching the active account.</p>
+        <h1>{{ 'settings.storage.title' | transloco }}</h1>
+        <p class="muted">{{ 'settings.storage.intro' | transloco }}</p>
       </div>
       <button
         class="btn btn-outline danger"
@@ -11,27 +11,31 @@
         [disabled]="!storage().entries.length"
         (click)="clearAll()"
       >
-        Clear this account
+        {{ 'settings.storage.clearAccount' | transloco }}
       </button>
     </div>
 
     <label class="account-picker">
-      <span>Account</span>
+      <span>{{ 'settings.storage.account' | transloco }}</span>
       <select
         [ngModel]="selectedAccount()"
         (ngModelChange)="selectAccount($event)"
-        aria-label="Storage account"
+        [attr.aria-label]="'settings.storage.account.aria' | transloco"
       >
         @for (account of accounts(); track account.key) {
           <option [value]="account.key">
-            {{ account.label }} · {{ account.detail }}{{ account.active ? ' (active)' : '' }}
+            {{ account.label }} · {{ account.detail
+            }}{{ account.active ? ' ' + ('settings.storage.active' | transloco) : '' }}
           </option>
         }
       </select>
     </label>
 
     <p class="summary muted small">
-      {{ storage().entries.length }} keys · {{ formatBytes(storage().totalBytes) }}
+      {{
+        'settings.storage.summary'
+          | transloco: { count: storage().entries.length, size: formatBytes(storage().totalBytes) }
+      }}
     </p>
 
     @if (storage().entries.length) {
@@ -46,25 +50,24 @@
               class="btn btn-outline btn-sm danger"
               type="button"
               (click)="deleteKey(entry)"
-              [attr.aria-label]="'Delete ' + entry.key"
+              [attr.aria-label]="'settings.storage.deleteKey' | transloco: { key: entry.key }"
             >
-              Delete
+              {{ 'common.delete' | transloco }}
             </button>
           </div>
         }
       </div>
     } @else {
-      <p class="empty muted">This account has no local storage.</p>
+      <p class="empty muted">{{ 'settings.storage.empty' | transloco }}</p>
     }
   </section>
 
   <section class="storage-section idb-section">
     <div class="section-head">
       <div>
-        <h2>IndexedDB</h2>
+        <h2>{{ 'settings.storage.idb' | transloco }}</h2>
         <p class="muted small">
-          Shared browser caches, grouped by schema category. Sizes are approximate serialized
-          payload sizes.
+          {{ 'settings.storage.idb.hint' | transloco }}
         </p>
       </div>
       <div class="idb-actions">
@@ -75,7 +78,9 @@
           [disabled]="idbLoading()"
           (click)="refreshIndexedDb()"
         >
-          {{ idbLoading() ? 'Scanning…' : 'Refresh' }}
+          {{
+            (idbLoading() ? 'settings.storage.scanning' : 'settings.storage.refresh') | transloco
+          }}
         </button>
       </div>
     </div>
@@ -95,8 +100,22 @@
                   <strong>{{ storeLabel(database.name, store.name) }}</strong>
                   <span class="muted small">
                     <code>{{ database.name }} / {{ store.name }}</code> ·
-                    {{ store.count === null ? 'unknown' : store.count.toLocaleString() }} records ·
-                    {{ store.bytes === null ? 'size unavailable' : formatBytes(store.bytes) }}
+                    {{
+                      'settings.storage.records'
+                        | transloco
+                          : {
+                              count:
+                                store.count === null
+                                  ? ('settings.storage.unknown' | transloco)
+                                  : store.count.toLocaleString(),
+                            }
+                    }}
+                    ·
+                    {{
+                      store.bytes === null
+                        ? ('settings.storage.sizeUnavailable' | transloco)
+                        : formatBytes(store.bytes)
+                    }}
                   </span>
                 </div>
                 <button
@@ -104,20 +123,23 @@
                   type="button"
                   [disabled]="idbLoading() || !store.count"
                   (click)="clearStore(database, store)"
-                  [attr.aria-label]="'Delete ' + storeLabel(database.name, store.name)"
+                  [attr.aria-label]="
+                    'settings.storage.deleteKey'
+                      | transloco: { key: storeLabel(database.name, store.name) }
+                  "
                 >
-                  Delete category
+                  {{ 'settings.storage.deleteCategory' | transloco }}
                 </button>
               </article>
             }
           }
           @if (!report.databases.length) {
-            <p class="empty muted">No IndexedDB data is stored for this site.</p>
+            <p class="empty muted">{{ 'settings.storage.idb.empty' | transloco }}</p>
           }
         </div>
       }
     } @else {
-      <p class="empty muted">Scanning IndexedDB…</p>
+      <p class="empty muted">{{ 'settings.storage.idb.scanning' | transloco }}</p>
     }
   </section>
 </div>

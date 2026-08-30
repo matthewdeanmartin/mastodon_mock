@@ -16,6 +16,7 @@ import {
 } from '../../../observability/local-storage-inspector';
 import { AnonymousAccount } from '../../../providers/anonymous/anonymous-account';
 import { PageDiagnostics } from '../../../page-diagnostics';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 interface StorageAccount {
   key: string;
@@ -26,9 +27,29 @@ interface StorageAccount {
 }
 
 /** Browser storage manager for every saved account plus origin-wide IndexedDB caches. */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.storage.title: Local storage
+// i18n settings.storage.intro: Inspect account-scoped data without switching the active account.
+// i18n settings.storage.clearAccount: Clear this account
+// i18n settings.storage.account: Account
+// i18n settings.storage.account.aria: Storage account
+// i18n settings.storage.active: (active)
+// i18n settings.storage.summary: {{count}} keys · {{size}}
+// i18n settings.storage.deleteKey: Delete {{key}}
+// i18n settings.storage.empty: This account has no local storage.
+// i18n settings.storage.idb: IndexedDB
+// i18n settings.storage.idb.hint: Shared browser caches, grouped by schema category. Sizes are approximate serialized payload sizes.
+// i18n settings.storage.scanning: Scanning…
+// i18n settings.storage.refresh: Refresh
+// i18n settings.storage.records: {{count}} records
+// i18n settings.storage.unknown: unknown
+// i18n settings.storage.sizeUnavailable: size unavailable
+// i18n settings.storage.deleteCategory: Delete category
+// i18n settings.storage.idb.empty: No IndexedDB data is stored for this site.
+// i18n settings.storage.idb.scanning: Scanning IndexedDB…
 @Component({
   selector: 'app-settings-storage',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './settings-storage.html',
   styleUrl: './settings-storage.css',
 })

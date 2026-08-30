@@ -45,3 +45,7 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 /mockingbird_handdrawn.zip
+
+# Translation work orders: regenerated on demand by `make i18n-todo L=xx`.
+# The context and stamps beside them ARE committed; only the todo is disposable.
+i18n-context/todo-*.md

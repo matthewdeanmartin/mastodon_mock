@@ -1,9 +1,9 @@
 <div class="spage-head">
-  <h1>Approve follow requests</h1>
+  <h1>{{ 'settings.follows.title' | transloco }}</h1>
   @if (auth.isAnonymous) {
-    <p>Accounts followed by Anonymous. Sources are fetched only when you explicitly load a feed.</p>
+    <p>{{ 'settings.follows.intro.anonymous' | transloco }}</p>
   } @else {
-    <p>Pending follow requests. Requests only appear when your account requires follow approval.</p>
+    <p>{{ 'settings.follows.intro' | transloco }}</p>
   }
 </div>
 
@@ -12,20 +12,18 @@
        for anything to do with who they follow — including the boost switches,
        which live on the Bulk actions page. Point rather than duplicate. -->
   <p class="follows-crosslink muted small">
-    Looking to turn retweets on or off for everyone you follow?
-    <a routerLink="/settings/bulk-actions">Bulk actions</a> does that in one pass, and tells you how
-    many accounts it would change before you agree.
+    {{ 'settings.follows.crosslink.before' | transloco }}
+    <a routerLink="/settings/bulk-actions">{{ 'settings.follows.crosslink.link' | transloco }}</a>
+    {{ 'settings.follows.crosslink.after' | transloco }}
   </p>
 }
 
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'common.loading' | transloco }}</p>
 } @else if (!requests().length) {
   <p class="muted center">
     {{
-      auth.isAnonymous
-        ? 'You are not following any Mastodon accounts yet.'
-        : 'No pending follow requests.'
+      (auth.isAnonymous ? 'settings.follows.empty.anonymous' : 'settings.follows.empty') | transloco
     }}
   </p>
 } @else {
@@ -49,14 +47,22 @@
           <span class="req-actions">
             <span class="muted small">{{ sourceStatus(follow) }}</span>
             @if (anonymousFollows.hasBackoff(follow)) {
-              <button class="btn btn-outline btn-sm" (click)="retry(follow)">Retry API</button>
+              <button class="btn btn-outline btn-sm" (click)="retry(follow)">
+                {{ 'settings.follows.retry' | transloco }}
+              </button>
             }
-            <button class="btn btn-outline btn-sm" (click)="unfollow(follow)">Unfollow</button>
+            <button class="btn btn-outline btn-sm" (click)="unfollow(follow)">
+              {{ 'settings.follows.unfollow' | transloco }}
+            </button>
           </span>
         } @else {
           <span class="req-actions">
-            <button class="btn btn-sm" (click)="authorize(a)">Accept</button>
-            <button class="btn btn-outline btn-sm" (click)="reject(a)">Reject</button>
+            <button class="btn btn-sm" (click)="authorize(a)">
+              {{ 'settings.follows.accept' | transloco }}
+            </button>
+            <button class="btn btn-outline btn-sm" (click)="reject(a)">
+              {{ 'settings.follows.reject' | transloco }}
+            </button>
           </span>
         }
       </li>

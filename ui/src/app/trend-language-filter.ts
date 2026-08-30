@@ -2,10 +2,21 @@ import { computed, inject, Injectable, Signal } from '@angular/core';
 import { ClientPrefs } from './client-prefs';
 import { detectLanguage, detectScriptCandidates } from './language-detect';
 import { Status, Tag } from './models';
+import { UiLocale } from './i18n/locale';
 import { stripHtml } from './sentiment';
 
-/** The interface language the app currently ships in. A constant today; will
- *  become a real user setting when the UI is localized. */
+/**
+ * The interface language the app ships in **when nothing else is known**.
+ *
+ * This used to be *the* interface language, back when there was only one. It is
+ * now only the floor: the live value comes from {@link UiLocale.active}, which
+ * accounts for the user's choice and the browser's preference. Kept exported
+ * because it is still the right answer anywhere a locale is needed outside an
+ * injection context.
+ *
+ * @deprecated Prefer `inject(UiLocale).active()` — this constant cannot see a
+ * reader who switched the interface to German.
+ */
 export const UI_LANGUAGE = 'en';
 
 /** Normalize a possibly-regioned tag ("en-US", "pt_BR") to a bare ISO 639-1 code. */
@@ -18,7 +29,7 @@ function bare(code: string): string {
  * the app can see without asking. Mastodon leaks language knowledge in three
  * places, and we mirror all of them:
  *
- *   1. **Interface language** — what the UI is rendered in ({@link UI_LANGUAGE}),
+ *   1. **Interface language** — what the UI is rendered in ({@link UiLocale.active}),
  *      plus the browser's `navigator.languages` (the OS/browser locale chain).
  *   2. **Posting default language** — pushed into `knownLanguages` by the caller
  *      that reads `source.language` (kept as an explicit entry so it survives
@@ -32,6 +43,7 @@ function bare(code: string): string {
 @Injectable({ providedIn: 'root' })
 export class KnownLanguages {
   private prefs = inject(ClientPrefs);
+  private uiLocale = inject(UiLocale);
 
   /** Browser locale chain, computed once (it doesn't change within a session). */
   private readonly browserLangs: string[] = (() => {
@@ -40,9 +52,13 @@ export class KnownLanguages {
     return list.map(bare);
   })();
 
-  /** ISO 639-1 codes the user is assumed to know. Reactive to the prefs list. */
+  /**
+   * ISO 639-1 codes the user is assumed to know. Reactive to the prefs list and
+   * to the interface language — someone who switches the UI to German has told
+   * us they read German, and trending tags should follow immediately.
+   */
   readonly codes: Signal<Set<string>> = computed(() => {
-    const set = new Set<string>([UI_LANGUAGE, ...this.browserLangs]);
+    const set = new Set<string>([this.uiLocale.active(), ...this.browserLangs]);
     for (const c of this.prefs.knownLanguages()) {
       set.add(bare(c));
     }

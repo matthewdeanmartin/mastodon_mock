@@ -1,0 +1,349 @@
+/**
+ * Keep the interface translatable as the app keeps changing.
+ *
+ * The epic this serves (sprint/ui-i18n-0-overview.md) exists under an unusual
+ * constraint: one maintainer, no translation budget, and a target of 50-60
+ * languages. That only works if **a new feature cannot quietly become
+ * untranslatable**, and if adding a language stays a JSON file rather than a
+ * project. This script is what enforces the first half.
+ *
+ * Three rules, and the difference between them is the whole design:
+ *
+ *   1. **Hardcoded user-visible text** in a migrated directory. FATAL.
+ *   2. **A key used but missing from `en.json`, or an orphan in it.** FATAL —
+ *      this is what stops a typo shipping as `footer.privcy` in production.
+ *   3. **Non-English coverage.** REPORTED, NEVER FATAL.
+ *
+ * Rule 3 is deliberate and load-bearing. If a feature could not merge until all
+ * 60 locales had its strings, every feature would block on translation and the
+ * gate would be bypassed within a month. Instead a new key ships in English the
+ * day it lands and falls back per-key (Transloco `useFallbackTranslation`), so a
+ * Finnish reader sees one English button rather than a broken page. Coverage is
+ * a number to watch, not a wall.
+ *
+ * ## The MIGRATED allowlist
+ *
+ * Rule 1 applies only inside directories listed in {@link MIGRATED}. The app is
+ * being retrofitted a sprint at a time, so an unmigrated template is not a
+ * failure — it is simply not in scope yet. The array is a ratchet: it only ever
+ * grows, and in ui-i18n-5 it inverts into an EXEMPT list so that everything is
+ * checked by default and a *new* directory is covered automatically.
+ *
+ * It lives here rather than in a vitest spec because the Angular test build has
+ * no Node types and no filesystem access — the same reason
+ * `check-storage-registry.mjs` and `check-terminology.mjs` are scripts.
+ *
+ * Run: `npm run check:i18n`
+ */
+
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const APP_DIR = join(ROOT, 'src', 'app');
+const I18N_DIR = join(ROOT, 'public', 'i18n');
+const CONTEXT_PATH = join(ROOT, 'i18n-context', 'en.context.json');
+
+/**
+ * Directories (relative to `src/app`) whose templates must not hardcode text.
+ *
+ * Grows one sprint at a time. See the header for why this is an allowlist today
+ * and becomes a denylist in ui-i18n-5.
+ */
+const MIGRATED = ['shell/app-footer', 'locale-picker', 'pages/settings/anonymous', 'pages/settings/development', 'pages/settings/follows', 'pages/settings/appearance', 'pages/settings/invites', 'pages/settings/accounts', 'pages/settings/notifications', 'pages/settings/deletion', 'pages/settings/spotlight', 'pages/settings/account', 'pages/settings/storage', 'pages/settings/profile', 'pages/settings/server', 'pages/settings/privacy', 'pages/settings/content', 'pages/settings/filters', 'pages/settings/account-list'];
+
+/**
+ * Lines exempted from the hardcoded-text rule.
+ *
+ * Kept deliberately short, in the same spirit as `check-terminology.mjs`'s
+ * ALLOWED: an entry belongs here only when the text is genuinely not interface
+ * language — a brand name, a symbol, or a string the user never reads.
+ */
+const ALLOWED = [
+  {
+    file: 'locale-picker/locale-picker.ts',
+    contains: 'option.name',
+    why: 'Language endonyms are deliberately never translated — see locale.ts.',
+  },
+  {
+    file: 'pages/settings/account-list/settings-account-list.html',
+    contains: 'placeholder="example.social"',
+    why: 'An example domain, not a word. Translating it would suggest a different server exists.',
+  },
+  {
+    file: 'pages/settings/account-list/settings-account-list.html',
+    contains: '<code>&#64;someone&#64;example.social</code>',
+    why: 'A literal handle shown as a code sample; it is syntax, not prose.',
+  },
+];
+
+/** Read a locale dictionary, flattened to dotted keys. */
+function loadLocale(code) {
+  const path = join(I18N_DIR, `${code}.json`);
+  try {
+    return flatten(JSON.parse(readFileSync(path, 'utf8')));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw new Error(`${code}.json is not valid JSON: ${error.message}`);
+  }
+}
+
+/** `{a: {b: 'x'}}` -> `{'a.b': 'x'}`. Keys may already contain dots. */
+function flatten(object, prefix = '', out = {}) {
+  for (const [key, value] of Object.entries(object)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      flatten(value, path, out);
+    } else {
+      out[path] = value;
+    }
+  }
+  return out;
+}
+
+/** Every source file under `src/app`, as absolute paths. */
+function sources(dir, out = []) {
+  for (const entry of readdirSync(dir)) {
+    if (entry === 'node_modules') {
+      continue;
+    }
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      sources(full, out);
+    } else if (/\.(html|ts)$/.test(entry) && !entry.endsWith('.spec.ts')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+const rel = (file) => relative(APP_DIR, file).replace(/\\/g, '/');
+const isMigrated = (file) => MIGRATED.some((dir) => rel(file).startsWith(`${dir}/`));
+
+/**
+ * Translation keys referenced by a file.
+ *
+ * Matches the pipe (`'a.b' | transloco`), the service (`translate('a.b')`), the
+ * signal helper (`translateSignal('a.b')`), and a bare `key: 'a.b'` property.
+ *
+ * The last one exists for **indirect keys**: a component holding a list of
+ * options (`{days: 365, key: 'settings.anonymous.age.years1'}`) renders them as
+ * `{{ option.key | transloco }}`, so the key never appears next to the word
+ * `transloco` anywhere. Without this pattern every such key looks like an
+ * orphan, and the fix would be to weaken the orphan rule — which is the rule
+ * that catches renamed and mistyped keys. Better to recognise the idiom.
+ *
+ * Declaring a key (`// i18n a.b: English`) also counts as using it, since the
+ * declaration is deliberate authorship rather than a leftover.
+ */
+function keysUsed(text) {
+  const found = new Set();
+  const patterns = [
+    /'([a-zA-Z][\w.]*)'\s*\|\s*transloco/g,
+    /translate(?:Signal|Object)?\(\s*'([a-zA-Z][\w.]*)'/g,
+    /key:\s*'([a-zA-Z][\w.]*\.[\w.]+)'/g,
+    /(?:<!--|\/\/)\s*i18n\s+([\w.]+)\s*:/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      found.add(match[1]);
+    }
+  }
+  return found;
+}
+
+/**
+ * User-visible text hardcoded in a template.
+ *
+ * Deliberately *not* matched, for the same reasons `check-terminology.mjs`
+ * skips them: bound expressions, CSS classes, route paths, and anything inside
+ * an interpolation. What is matched is the text a reader actually sees.
+ */
+function hardcoded(line, isTemplate) {
+  // A static aria-label / title / placeholder with real words in it.
+  const staticAttr = /(?<!\[)(?:aria-label|title|placeholder)="([^"{}]*[A-Za-z]{2,}[^"{}]*)"/;
+  const attrMatch = staticAttr.exec(line);
+  if (attrMatch && /[A-Za-z]{3,}/.test(attrMatch[1])) {
+    return attrMatch[1].trim();
+  }
+  // A text node between tags: `>Some words<`, with no binding or control flow.
+  //
+  // Only meaningful in markup. In TypeScript the same shape is just comparison
+  // operators — `page() > 0 && page() < lastPage()` reads as a text node to this
+  // regex — so inline-template components rely on the attribute rule above and
+  // on `i18n` declarations instead.
+  if (!isTemplate) {
+    return null;
+  }
+  const textNode = />([^<>{}@]*[A-Za-z]{3,}[^<>{}@]*)</;
+  const textMatch = textNode.exec(line);
+  if (textMatch) {
+    const text = textMatch[1].trim();
+    // Single symbols, entities and lone short tokens are not sentences.
+    if (text && /[A-Za-z]{3,}/.test(text) && !/^&[a-z]+;$/.test(text)) {
+      return text;
+    }
+  }
+  return null;
+}
+
+/** The translator's brief; absent entries are fine (see i18n-context/README.md). */
+let context = {};
+try {
+  context = JSON.parse(readFileSync(CONTEXT_PATH, 'utf8'));
+} catch (error) {
+  if (error.code !== 'ENOENT') {
+    throw new Error(`en.context.json is not valid JSON: ${error.message}`);
+  }
+}
+
+const problems = [];
+const usedKeys = new Set();
+
+for (const file of sources(APP_DIR)) {
+  const text = readFileSync(file, 'utf8');
+  for (const key of keysUsed(text)) {
+    usedKeys.add(key);
+  }
+  if (!isMigrated(file)) {
+    continue;
+  }
+  text.split('\n').forEach((line, index) => {
+    const offender = hardcoded(line, file.endsWith('.html'));
+    if (!offender) {
+      return;
+    }
+    const exempt = ALLOWED.some(
+      (entry) => entry.file === rel(file) && line.includes(entry.contains),
+    );
+    if (!exempt) {
+      problems.push(`${rel(file)}:${index + 1}  hardcoded text: "${offender}"`);
+    }
+  });
+}
+
+// ---- Rule 2: keys and en.json must agree ----
+
+const en = loadLocale('en');
+if (!en) {
+  console.error(`\nMissing ${join('public', 'i18n', 'en.json')} — the source dictionary.\n`);
+  process.exit(1);
+}
+
+for (const key of [...usedKeys].sort()) {
+  if (!(key in en)) {
+    problems.push(`en.json is missing key "${key}" (used in a template or source)`);
+  }
+}
+for (const key of Object.keys(en).sort()) {
+  if (!usedKeys.has(key)) {
+    problems.push(`en.json has orphan key "${key}" (nothing uses it)`);
+  }
+}
+
+// ---- Rule 4: a translation must not corrupt what it translates ----
+//
+// This is the only review available for a language nobody on the project reads.
+// A wrong *word* is invisible and survivable; a dropped `{{name}}` renders a
+// blank where a username should be, in every locale that has it, forever. So
+// structural damage is fatal and linguistic judgement is advisory.
+
+/** `{{name}}` placeholders in a string, sorted. */
+function placeholders(text) {
+  return [...String(text).matchAll(/\{\{\s*([\w.]+)\s*\}\}/g)].map((m) => m[1]).sort();
+}
+
+/** Inline markup tag names in a string, sorted. */
+function markup(text) {
+  return [...String(text).matchAll(/<\/?([a-zA-Z][\w-]*)/g)].map((m) => m[1].toLowerCase()).sort();
+}
+
+const localeCodes = readdirSync(I18N_DIR)
+  .filter((name) => name.endsWith('.json') && name !== 'en.json')
+  .map((name) => name.replace(/\.json$/, ''))
+  .sort();
+
+const advisories = [];
+
+for (const code of localeCodes) {
+  const dict = loadLocale(code);
+  if (!dict) {
+    continue;
+  }
+  for (const [key, value] of Object.entries(dict)) {
+    if (!(key in en)) {
+      problems.push(`${code}.json has orphan key "${key}" (not in en.json)`);
+      continue;
+    }
+    const wanted = placeholders(en[key]).join(', ');
+    const got = placeholders(value).join(', ');
+    if (wanted !== got) {
+      problems.push(
+        `${code}.json "${key}" placeholder mismatch: en has [${wanted}], ${code} has [${got}]`,
+      );
+    }
+    const wantedTags = markup(en[key]).join(', ');
+    const gotTags = markup(value).join(', ');
+    if (wantedTags !== gotTags) {
+      problems.push(
+        `${code}.json "${key}" markup mismatch: en has [${wantedTags}], ${code} has [${gotTags}]`,
+      );
+    }
+    if (String(value).trim() === String(en[key]).trim()) {
+      advisories.push(`${code} "${key}" is identical to English`);
+    }
+    const max = context[key]?.max;
+    if (typeof max === 'number' && String(value).length > max) {
+      advisories.push(`${code} "${key}" is ${String(value).length} chars, over its ${max} budget`);
+    }
+  }
+}
+
+if (problems.length > 0) {
+  console.error('\ni18n problems:\n');
+  for (const problem of problems) {
+    console.error(`  - ${problem}`);
+  }
+  console.error(
+    '\nMove user-visible text into a `// i18n <key>: <English>` declaration and\n' +
+      "reference it by key: {{ 'area.thing' | transloco }}. Run `npm run i18n:extract`\n" +
+      'to regenerate en.json. A placeholder or tag lost in translation renders a blank\n' +
+      'where real content belongs — see .claude/skills/translate-ui/SKILL.md.\n' +
+      'If a string genuinely is not interface language, add a justified entry to\n' +
+      'ALLOWED in scripts/check-i18n.mjs.\n',
+  );
+  process.exit(1);
+}
+
+// ---- Rule 3: coverage and advisories, reported and never fatal ----
+
+const total = Object.keys(en).length;
+
+console.log(
+  `i18n OK — ${total} keys, ${MIGRATED.length} migrated ` +
+    `director${MIGRATED.length === 1 ? 'y' : 'ies'}.`,
+);
+
+if (localeCodes.length > 0) {
+  const coverage = localeCodes.map((code) => {
+    const dict = loadLocale(code) ?? {};
+    const done = Object.keys(en).filter((key) => key in dict).length;
+    return `${code} ${Math.round((done / total) * 100)}%`;
+  });
+  // Never fatal: an incomplete locale falls back to English key by key, which is
+  // what lets a feature ship before its translations do. See the header.
+  console.log(`Coverage: ${coverage.join('  ')}`);
+}
+
+if (advisories.length > 0) {
+  console.log(`\nAdvisory (not failures):`);
+  for (const advisory of advisories.slice(0, 20)) {
+    console.log(`  - ${advisory}`);
+  }
+  if (advisories.length > 20) {
+    console.log(`  ...and ${advisories.length - 20} more.`);
+  }
+}

@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../../../api';
 import { ClientPrefs } from '../../../client-prefs';
 import { POSTING_LANGUAGE_OPTIONS } from '../../../language-detect';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /** The credentials fields this page owns, one per control. */
 type PrivacyField = 'locked' | 'discoverable' | 'bot' | 'privacy' | 'sensitive' | 'language';
@@ -29,9 +30,40 @@ type PrivacyField = 'locked' | 'discoverable' | 'bot' | 'privacy' | 'sensitive' 
  * particular that is the wrong way to be wrong: believing you are locked when
  * you are public is worse than being told the save failed.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n settings.privacy.title: 🔒 Privacy
+// i18n settings.privacy.intro: Who can see you, who can reach you, and what this app counts while you use it.
+// i18n settings.privacy.applyNote: Every setting on this page applies the moment you change it.
+// i18n settings.privacy.whoSees: Who can see you
+// i18n settings.privacy.reach: Reach
+// i18n settings.privacy.locked: Require follow requests
+// i18n settings.privacy.locked.hint: Manually approve who can follow you.
+// i18n settings.privacy.discoverable: Feature profile and posts in discovery algorithms
+// i18n settings.privacy.automation: Automation
+// i18n settings.privacy.bot: This is an automated account
+// i18n settings.privacy.bot.hint: Signals to others that the account mainly performs automated actions.
+// i18n settings.privacy.whoSeesPosts: Who sees what you post
+// i18n settings.privacy.crosslink.before: The same controls are on
+// i18n settings.privacy.crosslink.link: Writing
+// i18n settings.privacy.crosslink.after: , where they read as "what am I being asked at the moment I publish" rather than "who ends up seeing this". Either page saves the same thing.
+// i18n settings.privacy.visibility: Post visibility
+// i18n settings.privacy.visibility.public: Public
+// i18n settings.privacy.visibility.unlisted: Quiet public
+// i18n settings.privacy.visibility.private: Followers only
+// i18n settings.privacy.visibility.hint: Default visibility for new posts. You can change it per post.
+// i18n settings.privacy.media: Media
+// i18n settings.privacy.sensitive: Mark media as sensitive by default
+// i18n settings.privacy.language: Posting language
+// i18n settings.privacy.language.unset: Not specified
+// i18n settings.privacy.language.hint: Default language attached to new posts. You can change it per post.
+// i18n settings.privacy.counts: What this app counts
+// i18n settings.privacy.analytics: Analytics
+// i18n settings.privacy.analytics.label: Count my page views
+// i18n settings.privacy.analytics.hint: Anonymous page counts only — which kinds of page get used, never which account, post or tag you looked at, and never a query string. Turn this off and the analytics script is never loaded at all: nothing is fetched, counted or sent. The script is served from this site, not from a third party. This one is stored in your browser, so there is nothing to save and nothing to fail.
+// i18n common.errorPrefix: ⚠ {{message}}
 @Component({
   selector: 'app-settings-privacy',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TranslocoPipe],
   templateUrl: './settings-privacy.html',
 })
 export class SettingsPrivacy implements OnInit {
