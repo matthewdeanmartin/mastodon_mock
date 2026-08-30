@@ -298,7 +298,7 @@ export class DraftsPage implements OnInit {
     const { item } = pending;
     this.busy.set(true);
     this.actionError.set(null);
-    const draftId = this.drafts.save(toSnapshot(item.source, this.prefs.defaultVisibility()));
+    this.drafts.save(toSnapshot(item.source, this.prefs.defaultVisibility()));
     this.api.cancelScheduledStatus(item.id).subscribe({
       next: () => {
         this.sources.forgetScheduled(item.id);
@@ -315,7 +315,6 @@ export class DraftsPage implements OnInit {
           'Saved as a local draft, but the parked post could not be cancelled on the server — ' +
             'it is still scheduled. Try removing it from the list below.',
         );
-        void draftId;
       },
     });
   }

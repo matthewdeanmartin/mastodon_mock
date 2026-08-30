@@ -152,7 +152,16 @@
                 ⏳ Park as a schedule…
               </button>
             }
-            <span class="menu-note muted">Copies never remove the original.</span>
+            @if (item.kind === 'scheduled') {
+              <!-- The one action here that removes its source, so it is asked
+                   about and kept visually apart from the copies above it. -->
+              <button type="button" class="menu-move" (click)="askUnpark(item)">
+                ↩ Unpark to a draft…
+              </button>
+            }
+            <span class="menu-note muted">
+              Copies never remove the original. Unparking does — it asks first.
+            </span>
           </div>
         </details>
         <button
@@ -350,6 +359,35 @@
         (click)="confirmConvertToSchedule()"
       >
         {{ busy() ? 'Parking…' : 'Park it' }}
+      </button>
+    </div>
+  </div>
+}
+
+<!-- Unpark dialog. The only conversion on this page that removes its source,
+     so it says plainly what stops happening as well as what starts. -->
+@if (pendingUnpark(); as pending) {
+  <div
+    class="convert-backdrop"
+    role="presentation"
+    tabindex="-1"
+    (click)="cancelUnpark()"
+    (keyup.escape)="cancelUnpark()"
+  ></div>
+  <div class="convert-dialog" role="dialog" aria-modal="true" aria-label="Unpark to a draft">
+    <h3>Unpark to a draft?</h3>
+    <p class="muted">
+      It comes back as a local draft in this browser, and the server stops holding it — so it will
+      not publish itself on its parked date.
+    </p>
+    <p class="muted small">
+      This is the one conversion here that removes the original. Everything else copies.
+    </p>
+
+    <div class="convert-actions">
+      <button class="btn btn-outline btn-sm" type="button" (click)="cancelUnpark()">Cancel</button>
+      <button class="btn btn-sm" type="button" [disabled]="busy()" (click)="confirmUnpark()">
+        {{ busy() ? 'Unparking…' : 'Unpark it' }}
       </button>
     </div>
   </div>

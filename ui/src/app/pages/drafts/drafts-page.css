@@ -153,6 +153,13 @@
   background: var(--border);
 }
 
+/* The one entry that removes its source, separated from the copies above it. */
+.row-menu-panel .menu-move {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
 .row-menu-panel .menu-note {
   display: block;
   padding: 6px 9px 2px;

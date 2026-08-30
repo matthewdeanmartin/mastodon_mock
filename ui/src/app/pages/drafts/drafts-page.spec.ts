@@ -36,6 +36,10 @@ interface PageInternals {
   convertToLocal(item: DraftItem): void;
   askConvertToPaste(item: DraftItem): void;
   askConvertToSchedule(item: DraftItem): void;
+  askUnpark(item: DraftItem): void;
+  confirmUnpark(): void;
+  cancelUnpark(): void;
+  pendingUnpark: WritableSignal<{ item: DraftItem } | null>;
   confirmConvertToPaste(): void;
   confirmConvertToSchedule(): void;
   writing: WritableSignal<boolean>;
@@ -416,6 +420,74 @@ describe('DraftsPage', () => {
     // Source survives: no DELETE, and the row is still listed.
     httpMock.verify();
     expect(itemOfKind(f, 'scheduled')).toBeTruthy();
+  });
+
+  // --------------------------------------------------------------- unparking
+
+  it('asks before unparking, since it is the one conversion that removes its source', () => {
+    const f = withAllKinds();
+
+    internals(f).askUnpark(itemOfKind(f, 'scheduled'));
+    f.detectChanges();
+
+    expect(internals(f).pendingUnpark()).not.toBeNull();
+    // Nothing has happened yet — no DELETE, no draft.
+    httpMock.verify();
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(0);
+  });
+
+  it('brings a parked post back as a local draft and cancels the server copy', () => {
+    const f = withAllKinds();
+    const drafts = TestBed.inject(Drafts);
+
+    internals(f).askUnpark(itemOfKind(f, 'scheduled'));
+    internals(f).confirmUnpark();
+    httpMock.expectOne({ url: `${SCHEDULED_URL}/p1`, method: 'DELETE' }).flush(null);
+    f.detectChanges();
+
+    expect(drafts.drafts()).toHaveLength(1);
+    expect(drafts.drafts()[0].segments[0]).toBe('parked p1');
+    // The source is gone from the list: unparking moves, it does not copy.
+    expect(
+      internals(f)
+        .visible()
+        .some((item) => item.kind === 'scheduled'),
+    ).toBe(false);
+    expect(internals(f).notice()).toContain('Unparked');
+  });
+
+  /**
+   * The ordering guarantee. Saving first means a failed cancellation still
+   * leaves the user holding their writing; cancelling first would risk losing
+   * the post entirely if the save then failed.
+   */
+  it('keeps the draft and says so when the server refuses to cancel', () => {
+    const f = withAllKinds();
+    const drafts = TestBed.inject(Drafts);
+
+    internals(f).askUnpark(itemOfKind(f, 'scheduled'));
+    internals(f).confirmUnpark();
+    httpMock
+      .expectOne({ url: `${SCHEDULED_URL}/p1`, method: 'DELETE' })
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    f.detectChanges();
+
+    expect(drafts.drafts()).toHaveLength(1);
+    expect(internals(f).actionError()).toContain('still scheduled');
+    // Still listed, because the server still holds it.
+    expect(itemOfKind(f, 'scheduled')).toBeTruthy();
+  });
+
+  it('does nothing at all when the dialog is dismissed', () => {
+    const f = withAllKinds();
+
+    internals(f).askUnpark(itemOfKind(f, 'scheduled'));
+    internals(f).cancelUnpark();
+    f.detectChanges();
+
+    expect(internals(f).pendingUnpark()).toBeNull();
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(0);
+    httpMock.verify();
   });
 
   it('copies a self draft to local on a real visibility, leaving the note in place', () => {
