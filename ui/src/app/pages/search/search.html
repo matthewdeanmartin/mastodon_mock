@@ -704,7 +704,7 @@
                             [checked]="isAuthorExcluded(a.value)"
                             (change)="toggleExcludedAuthor(a.value)"
                           />
-                          <span>{{ a.label }}</span>
+                          <span>{{ a.labelKey ? (a.labelKey | transloco) : a.text }}</span>
                           <span class="muted facet-count">{{ a.count }}</span>
                         </label>
                         <!-- Escalation: excluding is scoped to this query, muting
