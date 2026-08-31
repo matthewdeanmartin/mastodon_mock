@@ -1,10 +1,10 @@
 @if (offered().length) {
   <div class="kits">
-    <h3>Start with a kit</h3>
+    <h3>{{ 'pages.rss.kits.startWithKit' | transloco }}</h3>
     <p class="muted small">
-      One click subscribes you to a themed set of feeds, filed into its own folder. You can remove
-      any of them later on the
-      <a routerLink="/settings/rss">Manage RSS feeds</a> page.
+      {{ 'pages.rss.kits.intro' | transloco }}
+      <a routerLink="/settings/rss">{{ 'pages.rss.manageFeeds' | transloco }}</a>
+      {{ 'pages.rss.kits.page' | transloco }}
     </p>
 
     <ul class="kit-list">
@@ -15,7 +15,12 @@
             <span class="kit-title">{{ kit.title }}</span>
             <span class="muted small">{{ kit.blurb }}</span>
             <span class="muted small kit-feeds">
-              {{ kit.feeds.length }} feed{{ kit.feeds.length === 1 ? '' : 's' }}:
+              {{
+                (kit.feeds.length === 1
+                  ? 'pages.rss.kits.feedCount.one'
+                  : 'pages.rss.kits.feedCount.other'
+                ) | transloco: { count: kit.feeds.length }
+              }}:
               {{ kitFeedNames(kit) }}
             </span>
           </span>
@@ -26,9 +31,13 @@
             (click)="install(kit)"
           >
             @if (installing(kit)) {
-              Adding {{ installer.progress()?.done }}/{{ installer.progress()?.total }}…
+              {{
+                'pages.rss.kits.addingProgress'
+                  | transloco
+                    : { done: installer.progress()?.done, total: installer.progress()?.total }
+              }}
             } @else {
-              Add
+              {{ 'pages.rss.kits.add' | transloco }}
             }
           </button>
         </li>
@@ -37,35 +46,37 @@
 
     @if (anyDoesNotFit()) {
       <p class="muted small">
-        Some kits are larger than your remaining subscription slots ({{ subs.remaining() }} left of
-        {{ subs.limit() }}).
+        {{
+          'pages.rss.kits.tooLarge'
+            | transloco: { remaining: subs.remaining(), limit: subs.limit() }
+        }}
         <button class="link-btn" type="button" (click)="raiseLimit()">
-          Raise the limit to {{ neededLimit() }}
+          {{ 'pages.rss.kits.raiseLimit' | transloco: { limit: neededLimit() } }}
         </button>
-        to fit them all.
+        {{ 'pages.rss.kits.toFitAll' | transloco }}
       </p>
     }
   </div>
 }
 
 <div class="kits discovery">
-  <h3>Feeds from people you follow</h3>
+  <h3>{{ 'pages.rss.kits.feedsFromFollowing' | transloco }}</h3>
   <p class="muted small">
-    Checks the sites linked in your timeline for an RSS or Atom feed. Nothing is subscribed until
-    you say so.
+    {{ 'pages.rss.kits.discoveryIntro' | transloco }}
   </p>
 
   @if (!discovery.available()) {
     <p class="muted small">
-      This needs a <a routerLink="/settings/rss">CORS proxy</a> — the sites have to be fetched from
-      your browser.
+      {{ 'pages.rss.kits.needsProxy' | transloco }}
+      <a routerLink="/settings/rss">{{ 'pages.rss.article.corsProxy' | transloco }}</a>
+      {{ 'pages.rss.kits.browserFetch' | transloco }}
     </p>
   } @else {
     <button class="btn" type="button" [disabled]="discovery.running()" (click)="findFriendFeeds()">
       @if (discovery.running()) {
-        Checking sites…
+        {{ 'pages.rss.kits.checkingSites' | transloco }}
       } @else {
-        Look for feeds
+        {{ 'pages.rss.kits.lookForFeeds' | transloco }}
       }
     </button>
   }
@@ -82,7 +93,9 @@
           <span class="kit-text">
             <span class="kit-title">{{ feed.title }}</span>
             <span class="muted small">{{ feed.siteUrl }}</span>
-            <span class="muted small">linked by &commat;{{ feed.via }}</span>
+            <span class="muted small">{{
+              'pages.rss.kits.linkedBy' | transloco: { via: feed.via }
+            }}</span>
           </span>
           <button
             class="btn"
@@ -90,15 +103,21 @@
             [disabled]="adding() !== null"
             (click)="addDiscovered(feed)"
           >
-            {{ adding() === feed.url ? 'Adding…' : 'Add' }}
+            {{
+              (adding() === feed.url ? 'pages.rss.kits.adding' : 'pages.rss.kits.add') | transloco
+            }}
           </button>
         </li>
       }
     </ul>
   } @else if (searched() && !discovery.running()) {
     <p class="muted small">
-      No feeds found on the {{ discovery.checked() }} site{{ discovery.checked() === 1 ? '' : 's' }}
-      checked. Many sites don't declare one, and some block being read this way.
+      {{
+        (discovery.checked() === 1
+          ? 'pages.rss.kits.noFeedsFound.one'
+          : 'pages.rss.kits.noFeedsFound.other'
+        ) | transloco: { count: discovery.checked() }
+      }}
     </p>
   }
 </div>
@@ -106,19 +125,28 @@
 @if (installer.report(); as report) {
   <p class="kit-report" role="status">
     @if (report.added) {
-      Added {{ report.added }} feed{{ report.added === 1 ? '' : 's' }}.
+      {{
+        (report.added === 1 ? 'pages.rss.kits.added.one' : 'pages.rss.kits.added.other')
+          | transloco: { count: report.added }
+      }}
     }
     @if (report.alreadySubscribed) {
-      {{ report.alreadySubscribed }} already subscribed.
+      {{ 'pages.rss.kits.alreadySubscribed' | transloco: { count: report.alreadySubscribed } }}
     }
     @if (report.skippedForLimit) {
-      {{ report.skippedForLimit }} skipped — you're at your
-      <a routerLink="/settings/rss">subscription limit</a>.
+      {{ 'pages.rss.kits.skipped' | transloco: { count: report.skippedForLimit } }}
+      <a routerLink="/settings/rss">{{ 'pages.rss.kits.subscriptionLimit' | transloco }}</a
+      >{{ 'pages.rss.period' | transloco }}
     }
     @if (report.failed.length) {
       <span class="kit-failed">
-        Couldn't load {{ report.failed.length }}: {{ failedNames(report) }}. These usually need a
-        <a routerLink="/settings/rss">CORS proxy</a>.
+        {{
+          'pages.rss.kits.couldntLoad'
+            | transloco: { count: report.failed.length, names: failedNames(report) }
+        }}
+        {{ 'pages.rss.kits.usuallyNeed' | transloco }}
+        <a routerLink="/settings/rss">{{ 'pages.rss.article.corsProxy' | transloco }}</a
+        >{{ 'pages.rss.period' | transloco }}
       </span>
     }
   </p>

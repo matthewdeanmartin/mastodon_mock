@@ -6,6 +6,13 @@ import { VerifiedBadge } from '../../../verified-badge/verified-badge';
 import { scopedKey } from '../../../account-scope';
 import { RailProfile } from './rail-profile';
 import { RailProfiles } from './rail-profiles';
+import { TranslocoPipe } from '@jsverse/transloco';
+
+// i18n shell.profile.active: active
+// i18n shell.profile.show: Show {{network}} profile for {{name}}
+// i18n shell.profile.viewProfile: View profile →
+// i18n shell.profile.viewOn: View on {{network}} →
+// i18n shell.profile.switch: Switch to this account
 
 const SELECTED_KEY_BASE = 'mockingbird_rail_profile';
 
@@ -28,7 +35,7 @@ function loadSelected(key: string): string | null {
  */
 @Component({
   selector: 'app-profile-stack',
-  imports: [RouterLink, VerifiedBadge, HumanCountPipe],
+  imports: [RouterLink, VerifiedBadge, HumanCountPipe, TranslocoPipe],
   templateUrl: './profile-stack.html',
   styleUrl: './profile-stack.css',
 })

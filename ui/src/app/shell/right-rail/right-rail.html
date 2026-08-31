@@ -12,20 +12,20 @@
         <!-- Someone else's client or service, so say so rather than let it read
              as one of ours. Nothing here is paid placement either way. -->
         @if (ad.kind === 'endorsement') {
-          <span class="spotlight-kind">endorsement</span>
+          <span class="spotlight-kind">{{ 'shell.rail.endorsement' | transloco }}</span>
         }
       </span>
       <span class="spotlight-text">{{ ad.text }}</span>
       <span class="spotlight-cta">{{ ad.cta }}</span>
     </a>
     <p class="spotlight-disclosure muted">
-      <a routerLink="/settings/spotlight">House endorsement</a>
+      <a routerLink="/settings/spotlight">{{ 'shell.rail.houseEndorsement' | transloco }}</a>
       <!-- Outside the link above, or dismissing would open the advertiser. -->
       <button
         type="button"
         class="spotlight-dismiss"
-        [attr.aria-label]="'Dismiss ' + ad.title"
-        title="Hide this until you reload"
+        [attr.aria-label]="'shell.toast.dismiss' | transloco"
+        [attr.title]="'shell.rail.hideAd' | transloco"
         (click)="houseAds.dismiss(ad.id)"
       >
         ✕
@@ -42,8 +42,8 @@
   <section class="card server-mode-card">
     <div class="server-mode-heading">
       <div>
-        <span class="server-mode-kicker">Single Server Mode</span>
-        <h2 class="card-title server-mode-title">Just My Server</h2>
+        <span class="server-mode-kicker">{{ 'shell.rail.singleServerMode' | transloco }}</span>
+        <h2 class="card-title server-mode-title">{{ 'shell.rail.justMyServer' | transloco }}</h2>
       </div>
       <label
         class="server-mode-switch"
@@ -54,14 +54,16 @@
           [checked]="justMyServer.enabled()"
           [disabled]="(!justMyServer.ready() && !justMyServer.enabled()) || justMyServer.updating()"
           (change)="justMyServer.requestEnabled($any($event.target).checked)"
-          aria-label="Just My Server mode"
+          [attr.aria-label]="'shell.rail.justMyServerAria' | transloco"
         />
         <span aria-hidden="true"></span>
       </label>
     </div>
     <p class="muted server-mode-copy">
-      Home shows only people you follow on {{ justMyServer.homeHost() || 'this server' }}. Remote
-      boosts stay out.
+      {{
+        'shell.rail.homeOnly'
+          | transloco: { server: justMyServer.homeHost() || ('shell.dead.thisServer' | transloco) }
+      }}
     </p>
     <button
       type="button"
@@ -69,17 +71,21 @@
       [disabled]="justMyServer.preparing() || justMyServer.updating()"
       (click)="justMyServer.prepareUpdate()"
     >
-      {{ justMyServer.preparing() ? 'Checking friends…' : 'Update My Server list' }}
+      {{
+        (justMyServer.preparing() ? 'shell.rail.checkingFriends' : 'shell.rail.updateMyServer')
+          | transloco
+      }}
     </button>
     @if (justMyServer.checking()) {
-      <p class="muted small server-mode-status">Checking for the generated list…</p>
+      <p class="muted small server-mode-status">{{ 'shell.rail.checkingGenerated' | transloco }}</p>
     } @else if (!justMyServer.ready() && !justMyServer.error()) {
-      <p class="muted small server-mode-status">Update the list before turning this mode on.</p>
+      <p class="muted small server-mode-status">
+        {{ 'shell.rail.updateBeforeEnable' | transloco }}
+      </p>
     }
     @if (justMyServer.result(); as result) {
       <p class="small server-mode-status ok">
-        Added {{ result.added }} · Removed {{ result.removed }} · Already present
-        {{ result.alreadyPresent }} · Failed {{ result.failed }}
+        {{ 'shell.rail.updateResult' | transloco: result }}
       </p>
     }
     @if (justMyServer.error()) {
@@ -93,10 +99,11 @@
      to fund, so that block does not exist here rather than being translated. -->
 @if (usableBluesky() && bskyService(); as svc) {
   <section class="card bsky-service-card">
-    <h2 class="card-title">Your Bluesky</h2>
+    <h2 class="card-title">{{ 'shell.rail.yourBluesky' | transloco }}</h2>
     <p class="bsky-handle">&#64;{{ svc.handle }}</p>
     <p class="muted server-line">
-      {{ svc.host }} &middot; {{ svc.entryway ? 'entryway' : 'self-hosted' }}
+      {{ svc.host }} &middot;
+      {{ (svc.entryway ? 'shell.rail.entryway' : 'shell.rail.selfHosted') | transloco }}
     </p>
   </section>
 }
@@ -107,7 +114,7 @@
      entirely when the unspecced endpoints refuse. -->
 @if (usableBluesky() && bskyTrends.trends().length) {
   <section class="card">
-    <h2 class="card-title">Trending on Bluesky</h2>
+    <h2 class="card-title">{{ 'shell.rail.trendingBluesky' | transloco }}</h2>
     @for (trend of bskyTrends.trends(); track trend.url) {
       <a
         class="rail-link bsky-trend"
@@ -127,7 +134,7 @@
 
 @if (usableMastodon()) {
   <section class="card">
-    <h2 class="card-title">Fediverse</h2>
+    <h2 class="card-title">{{ 'shell.rail.fediverse' | transloco }}</h2>
 
     <!-- Trends are not universal: some instances serve no trending links at all,
        and a rail row leading to an error page reads as our bug. Hidden only
@@ -138,7 +145,7 @@
           <circle cx="12" cy="12" r="9" />
           <path d="m15.5 8.5-2 5-5 2 2-5z" />
         </svg>
-        <span>News</span>
+        <span>{{ 'shell.rail.news' | transloco }}</span>
       </a>
     }
     @if (feedCaps.shows('trending-statuses')) {
@@ -146,20 +153,23 @@
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3 17l6-6 4 4 7-7M14 8h6v6" />
         </svg>
-        <span>Trending posts</span>
+        <span>{{ 'shell.rail.trendingPosts' | transloco }}</span>
       </a>
     }
     <a class="rail-link" routerLink="/feeds">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
       </svg>
-      <span>All feeds</span>
+      <span>{{ 'shell.rail.allFeeds' | transloco }}</span>
     </a>
 
     <div class="donate-block">
-      <p class="donate-head muted">Keep the network running</p>
+      <p class="donate-head muted">{{ 'shell.rail.keepNetworkRunning' | transloco }}</p>
       <a class="donate-link" [href]="donateServerUrl()" target="_blank" rel="noopener noreferrer">
-        💙 Donate to {{ homeHost() || 'your server' }}
+        {{
+          'shell.rail.donateTo'
+            | transloco: { server: homeHost() || ('shell.dead.thisServer' | transloco) }
+        }}
       </a>
       @if (showSearchServerDonate()) {
         <a
@@ -168,8 +178,8 @@
           target="_blank"
           rel="noopener noreferrer"
         >
-          🔍 Donate to {{ searchServer.host() }}
-          <span class="muted small">Your search server</span>
+          {{ 'shell.rail.donateSearch' | transloco: { server: searchServer.host() } }}
+          <span class="muted small">{{ 'shell.rail.yourSearchServer' | transloco }}</span>
         </a>
       }
       <a
@@ -178,7 +188,7 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-        🐘 Donate to Mastodon
+        {{ 'shell.rail.donateMastodon' | transloco }}
       </a>
     </div>
 
@@ -187,7 +197,9 @@
         @if (instance(); as info) {
           <p class="server-title">{{ info.title }}</p>
           <p class="muted server-line">{{ info.domain }} &middot; v{{ info.version }}</p>
-          <p class="muted server-line">{{ info.usage.users.active_month }} active this month</p>
+          <p class="muted server-line">
+            {{ 'shell.rail.activeThisMonth' | transloco: { count: info.usage.users.active_month } }}
+          </p>
         }
 
         <!-- Two servers are in play, so the card names two rather than one.
@@ -200,13 +212,21 @@
           <div class="server-roles">
             <span
               class="server-role"
-              [title]="'Feeds, profiles and posting: ' + (homeHost() || 'your server')"
+              [title]="
+                'shell.rail.feedsPostingTitle'
+                  | transloco: { server: homeHost() || ('shell.dead.thisServer' | transloco) }
+              "
             >
-              <span class="server-role-what">Feeds &amp; posting</span>
-              <span class="server-role-host">{{ homeHost() || 'your server' }}</span>
+              <span class="server-role-what">{{ 'shell.rail.feedsPosting' | transloco }}</span>
+              <span class="server-role-host">{{
+                homeHost() || ('shell.dead.thisServer' | transloco)
+              }}</span>
             </span>
-            <span class="server-role" [title]="'Search runs on ' + searchServer.host()">
-              <span class="server-role-what">🔍 Search</span>
+            <span
+              class="server-role"
+              [title]="'shell.rail.searchRunsOn' | transloco: { server: searchServer.host() }"
+            >
+              <span class="server-role-what">{{ 'shell.rail.search' | transloco }}</span>
               <span class="server-role-host">{{ searchServer.host() }}</span>
             </span>
           </div>
@@ -221,15 +241,15 @@
             [class.has-unread]="announcements.hasUnread()"
             routerLink="/server"
           >
-            <span>📣 Announcements</span>
+            <span>{{ 'shell.rail.announcements' | transloco }}</span>
             <span class="announcement-count">
               @if (announcements.activeCount()) {
                 {{ announcements.activeCount() }}
                 @if (announcements.hasUnread()) {
-                  <span class="announcement-new">new</span>
+                  <span class="announcement-new">{{ 'shell.rail.new' | transloco }}</span>
                 }
               } @else {
-                all read
+                {{ 'shell.rail.allRead' | transloco }}
               }
             </span>
           </a>
@@ -239,7 +259,7 @@
               class="btn btn-outline btn-sm dismiss-all"
               (click)="announcements.dismissAll()"
             >
-              Dismiss all
+              {{ 'shell.rail.dismissAll' | transloco }}
             </button>
           }
         }
@@ -247,9 +267,9 @@
           type="button"
           class="btn btn-outline btn-sm share-server"
           (click)="openShare()"
-          title="Copy a link that opens this server anonymously"
+          [attr.title]="'shell.rail.copyShareTitle' | transloco"
         >
-          Share this server
+          {{ 'shell.rail.shareServer' | transloco }}
         </button>
       </div>
     }
@@ -271,10 +291,9 @@
       (click)="$event.stopPropagation()"
       (keyup)="$event.stopPropagation()"
     >
-      <h3 id="share-server-title">Share this server</h3>
+      <h3 id="share-server-title">{{ 'shell.rail.shareServer' | transloco }}</h3>
       <p class="muted small">
-        This link opens Mawkingbird anonymously on {{ homeHost() }}. Copy it to share — it won't
-        take you anywhere.
+        {{ 'shell.rail.shareDescription' | transloco: { server: homeHost() } }}
       </p>
       <div class="share-url-row">
         <input
@@ -282,20 +301,24 @@
           type="text"
           readonly
           [value]="anonymousShareAbsoluteUrl()"
-          aria-label="Shareable server link"
+          [attr.aria-label]="'shell.rail.shareLinkAria' | transloco"
           (focus)="$any($event.target).select()"
         />
-        <button class="btn" type="button" (click)="copyShareUrl()">Copy</button>
+        <button class="btn" type="button" (click)="copyShareUrl()">
+          {{ 'shell.rail.copy' | transloco }}
+        </button>
       </div>
       @if (copyState() === 'copied') {
-        <p class="share-copy-note ok small">Copied to clipboard.</p>
+        <p class="share-copy-note ok small">{{ 'shell.rail.copied' | transloco }}</p>
       } @else if (copyState() === 'failed') {
         <p class="share-copy-note fail small">
-          Couldn't copy automatically — select the text above and copy it manually.
+          {{ 'shell.rail.copyFailed' | transloco }}
         </p>
       }
       <div class="share-actions">
-        <button class="btn btn-outline" type="button" (click)="closeShare()">Close</button>
+        <button class="btn btn-outline" type="button" (click)="closeShare()">
+          {{ 'shell.rail.close' | transloco }}
+        </button>
       </div>
     </div>
   </div>
@@ -317,18 +340,34 @@
       (click)="$event.stopPropagation()"
       (keyup)="$event.stopPropagation()"
     >
-      <h3 id="server-list-update-title">Update My Server list?</h3>
+      <h3 id="server-list-update-title">{{ 'shell.rail.updateTitle' | transloco }}</h3>
       @if (justMyServer.plan(); as plan) {
         <p>
-          Add {{ plan.addIds.length }} {{ plan.addIds.length === 1 ? 'user' : 'users' }} and remove
-          {{ plan.removeIds.length }}
-          {{ plan.removeIds.length === 1 ? 'user' : 'users' }} so the list contains only friends on
-          {{ justMyServer.homeHost() }}?
+          {{
+            'shell.rail.updatePrompt'
+              | transloco
+                : {
+                    addCount: plan.addIds.length,
+                    addWord:
+                      (plan.addIds.length === 1 ? 'shell.rail.user.one' : 'shell.rail.user.other')
+                      | transloco,
+                    removeCount: plan.removeIds.length,
+                    removeWord:
+                      (plan.removeIds.length === 1
+                        ? 'shell.rail.user.one'
+                        : 'shell.rail.user.other'
+                      ) | transloco,
+                    server: justMyServer.homeHost(),
+                  }
+          }}
         </p>
         <p class="muted small">
-          {{ plan.alreadyPresent }} already present. The list is
-          <strong>{{ justMyServer.listTitle() }}</strong
-          >.
+          <span
+            [innerHTML]="
+              'shell.rail.alreadyPresent'
+                | transloco: { count: plan.alreadyPresent, title: justMyServer.listTitle() }
+            "
+          ></span>
         </p>
       }
       @if (justMyServer.updating()) {
@@ -344,7 +383,7 @@
           [disabled]="justMyServer.updating()"
           (click)="justMyServer.closeDialog()"
         >
-          Cancel
+          {{ 'shell.rail.cancel' | transloco }}
         </button>
         <button
           class="btn"
@@ -352,7 +391,9 @@
           [disabled]="justMyServer.updating()"
           (click)="justMyServer.confirmUpdate()"
         >
-          {{ justMyServer.updating() ? 'Updating…' : 'Update list' }}
+          {{
+            (justMyServer.updating() ? 'shell.rail.updating' : 'shell.rail.updateList') | transloco
+          }}
         </button>
       </div>
     </div>

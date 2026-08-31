@@ -4,24 +4,32 @@
          Bluesky account linked this is a switch between one thing and an error
          message. -->
     @if (bskySession.linked()) {
-      <div class="seg source-seg" role="group" aria-label="Notification source">
+      <div
+        class="seg source-seg"
+        role="group"
+        [attr.aria-label]="'pages.notifications.sourceAriaLabel' | transloco"
+      >
         <button [class.active]="source() === 'mastodon'" (click)="setSource('mastodon')">
-          🐘 Mastodon
+          {{ 'pages.notifications.source.mastodon' | transloco }}
         </button>
         <button [class.active]="source() === 'bluesky'" (click)="setSource('bluesky')">
-          🦋 Bluesky
+          {{ 'pages.notifications.source.bluesky' | transloco }}
         </button>
       </div>
     }
     <!-- Accounts New to Me reads relationships from the Mastodon server, so it
          has nothing to say about Bluesky actors. -->
     @if (source() === 'mastodon') {
-      <div class="seg view-seg" role="group" aria-label="Notification view">
+      <div
+        class="seg view-seg"
+        role="group"
+        [attr.aria-label]="'pages.notifications.viewAriaLabel' | transloco"
+      >
         <button [class.active]="view() === 'notifications'" (click)="setView('notifications')">
-          Notifications
+          {{ 'pages.notifications.notifications' | transloco }}
         </button>
         <button [class.active]="view() === 'new-accounts'" (click)="setView('new-accounts')">
-          Accounts New to Me
+          {{ 'pages.notifications.newAccounts' | transloco }}
         </button>
       </div>
     }
@@ -30,13 +38,19 @@
            server issued. A `bsky:` id can only 400 there, so the filter is
            hidden rather than shown and broken. -->
       @if (source() === 'mastodon') {
-        <div class="seg" role="group" aria-label="From">
-          <button [class.active]="audience() === 'all'" (click)="audience.set('all')">All</button>
+        <div
+          class="seg"
+          role="group"
+          [attr.aria-label]="'pages.notifications.audience.from' | transloco"
+        >
+          <button [class.active]="audience() === 'all'" (click)="audience.set('all')">
+            {{ 'pages.notifications.audience.all' | transloco }}
+          </button>
           <button [class.active]="audience() === 'friends'" (click)="audience.set('friends')">
-            Friends
+            {{ 'pages.notifications.audience.friends' | transloco }}
           </button>
           <button [class.active]="audience() === 'followers'" (click)="audience.set('followers')">
-            Followers
+            {{ 'pages.notifications.audience.followers' | transloco }}
           </button>
         </div>
       }
@@ -46,11 +60,11 @@
         class="type-select"
         [ngModel]="typeFilter()"
         (ngModelChange)="typeFilter.set($event)"
-        title="Notification type"
+        [title]="'pages.notifications.type.title' | transloco"
       >
-        <option value="all">All types</option>
+        <option value="all">{{ 'pages.notifications.type.all' | transloco }}</option>
         @for (t of types(); track t) {
-          <option [value]="t">{{ t }}</option>
+          <option [value]="t">{{ label(t) }}</option>
         }
       </select>
     }
@@ -64,9 +78,9 @@
       <a
         class="live-badge"
         routerLink="/settings/blue"
-        title="Live: new notifications stream in as they arrive. Turn off in Blue → Auto-refresh timeline."
+        [title]="'pages.notifications.live.title' | transloco"
       >
-        ● Live
+        {{ 'pages.notifications.live.label' | transloco }}
       </a>
     }
   } @else {
@@ -74,31 +88,31 @@
       class="btn btn-outline"
       [disabled]="loading()"
       (click)="refresh()"
-      title="Check Bluesky for new notifications"
+      [title]="'pages.notifications.refresh.title' | transloco"
     >
-      ↻ Refresh
+      {{ 'pages.notifications.refresh.label' | transloco }}
     </button>
   }
 </div>
 
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'pages.notifications.loading' | transloco }}</p>
 } @else if (bskyError(); as error) {
   <!-- A reason beats "No notifications yet", which would be a different and
        wrong claim when the fetch is what failed. -->
   <p class="muted center">{{ error }}</p>
 } @else if (!items().length) {
-  <p class="muted center">No notifications yet.</p>
+  <p class="muted center">{{ 'pages.notifications.empty' | transloco }}</p>
 } @else if (view() === 'new-accounts') {
   @if (accountActionError(); as error) {
     <p class="new-account-error" role="alert">{{ error }}</p>
   }
   @if (relationshipChecksPending() && !newAccounts().length) {
-    <p class="muted center">Checking which accounts are new to you…</p>
+    <p class="muted center">{{ 'pages.notifications.checkingAccounts' | transloco }}</p>
   } @else if (relationshipCheckFailed() && !newAccounts().length) {
-    <p class="muted center">Couldn’t check account relationships. Try this view again.</p>
+    <p class="muted center">{{ 'pages.notifications.relationshipCheckFailed' | transloco }}</p>
   } @else if (!newAccounts().length) {
-    <p class="muted center">No unfamiliar accounts in the notifications loaded so far.</p>
+    <p class="muted center">{{ 'pages.notifications.noUnfamiliarAccounts' | transloco }}</p>
   } @else {
     <div class="new-account-list">
       @for (candidate of newAccounts(); track candidate.account.id) {
@@ -118,7 +132,7 @@
     </div>
   }
 } @else if (!visible().length) {
-  <p class="muted center">No notifications match the filters.</p>
+  <p class="muted center">{{ 'pages.notifications.noMatch' | transloco }}</p>
 } @else {
   @for (row of rows(); track row.key) {
     @if (row.kind === 'group') {
@@ -148,7 +162,7 @@
               <button
                 class="others-link"
                 (click)="openGroupList(row)"
-                [title]="label(row.type) + ' — see everyone'"
+                [title]="'pages.notifications.seeEveryone' | transloco: { type: label(row.type) }"
               >
                 {{ othersLabel(row) }}
               </button>
@@ -175,39 +189,40 @@
         </div>
       </div>
     } @else {
-      @let n = row.notif;
       <div class="notif">
-        <a [routerLink]="['/accounts', n.account.id]">
+        <a [routerLink]="['/accounts', row.notif.account.id]">
           <img
             class="notif-avatar"
-            [ngSrc]="n.account.avatar_static || n.account.avatar || 'favicon-32x32.png'"
-            [alt]="n.account.username"
+            [ngSrc]="
+              row.notif.account.avatar_static || row.notif.account.avatar || 'favicon-32x32.png'
+            "
+            [alt]="row.notif.account.username"
             width="40"
             height="40"
           />
         </a>
         <div class="notif-body">
-          <a class="who" [routerLink]="['/accounts', n.account.id]">{{
-            n.account.display_name || n.account.username
+          <a class="who" [routerLink]="['/accounts', row.notif.account.id]">{{
+            row.notif.account.display_name || row.notif.account.username
           }}</a>
-          <span class="what muted">{{ label(n.type) }}</span>
-          @if (n.status) {
+          <span class="what muted">{{ label(row.notif.type) }}</span>
+          @if (row.notif.status) {
             <!-- Bluesky replies and mentions also arrive as type 'mention', but
                  "open in chat" means the Mastodon DM tab and `chatKey` builds a
                  key from a Mastodon acct. A bsky reply goes to its thread, which
                  is where the reply actually is. -->
-            @if (n.type === 'mention' && source() === 'mastodon') {
+            @if (row.notif.type === 'mention' && source() === 'mastodon') {
               <!-- Mentions open as a chat: click the body to jump into the DM
                    tab's public chat with this person (we nudge chat over thread). -->
               <a
                 class="excerpt"
                 [routerLink]="['/conversations']"
-                [queryParams]="{ open: chatKey(n) }"
+                [queryParams]="{ open: chatKey(row.notif) }"
               >
-                <span class="excerpt-content" [innerHTML]="n.status.content"></span>
-                @if (n.status.media_attachments.length && showImages()) {
+                <span class="excerpt-content" [innerHTML]="row.notif.status.content"></span>
+                @if (row.notif.status.media_attachments.length && showImages()) {
                   <span class="excerpt-media">
-                    @for (m of n.status.media_attachments; track m.id) {
+                    @for (m of row.notif.status.media_attachments; track m.id) {
                       <img
                         [src]="m.preview_url || m.url"
                         [alt]="m.description || ''"
@@ -222,20 +237,20 @@
                 <a
                   class="btn btn-sm"
                   [routerLink]="['/conversations']"
-                  [queryParams]="{ open: chatKey(n) }"
+                  [queryParams]="{ open: chatKey(row.notif) }"
                 >
-                  💬 Open in chat
+                  {{ 'pages.notifications.openChat' | transloco }}
                 </a>
-                <a class="btn btn-outline btn-sm" [routerLink]="['/statuses', n.status.id]">
-                  🧵 View thread
+                <a class="btn btn-outline btn-sm" [routerLink]="['/statuses', row.notif.status.id]">
+                  {{ 'pages.notifications.viewThread' | transloco }}
                 </a>
               </div>
             } @else {
-              <a class="excerpt" [routerLink]="['/statuses', n.status.id]">
-                <span class="excerpt-content" [innerHTML]="n.status.content"></span>
-                @if (n.status.media_attachments.length && showImages()) {
+              <a class="excerpt" [routerLink]="['/statuses', row.notif.status.id]">
+                <span class="excerpt-content" [innerHTML]="row.notif.status.content"></span>
+                @if (row.notif.status.media_attachments.length && showImages()) {
                   <span class="excerpt-media">
-                    @for (m of n.status.media_attachments; track m.id) {
+                    @for (m of row.notif.status.media_attachments; track m.id) {
                       <img
                         [src]="m.preview_url || m.url"
                         [alt]="m.description || ''"
@@ -257,10 +272,13 @@
 @if (!loading() && items().length) {
   <div class="load-more-row">
     @if (exhausted()) {
-      <span class="muted small">You're all caught up.</span>
+      <span class="muted small">{{ 'pages.notifications.caughtUp' | transloco }}</span>
     } @else {
       <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        {{
+          (loadingMore() ? 'pages.notifications.loading' : 'pages.notifications.loadMore')
+            | transloco
+        }}
       </button>
     }
   </div>

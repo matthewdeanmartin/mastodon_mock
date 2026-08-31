@@ -14,6 +14,7 @@ import { PageDiagnostics } from '../../page-diagnostics';
 import { Auth } from '../../auth';
 import { BlueskyNotifications } from '../../providers/bluesky/bluesky-notifications';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
 type NotifAudience = 'all' | 'friends' | 'followers';
 type NotificationView = 'notifications' | 'new-accounts';
@@ -36,6 +37,53 @@ export interface NewAccountCandidate {
   notification: MastodonNotification;
   notificationCount: number;
 }
+
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n pages.notifications.sourceAriaLabel: Notification source
+// i18n pages.notifications.source.mastodon: 🐘 Mastodon
+// i18n pages.notifications.source.bluesky: 🦋 Bluesky
+// i18n pages.notifications.viewAriaLabel: Notification view
+// i18n pages.notifications.notifications: Notifications
+// i18n pages.notifications.newAccounts: Accounts New to Me
+// i18n pages.notifications.audience.from: From
+// i18n pages.notifications.audience.all: All
+// i18n pages.notifications.audience.friends: Friends
+// i18n pages.notifications.audience.followers: Followers
+// i18n pages.notifications.type.title: Notification type
+// i18n pages.notifications.type.all: All types
+// i18n pages.notifications.live.title: Live: new notifications stream in as they arrive. Turn off in Blue → Auto-refresh timeline.
+// i18n pages.notifications.live.label: ● Live
+// i18n pages.notifications.refresh.title: Check Bluesky for new notifications
+// i18n pages.notifications.refresh.label: ↻ Refresh
+// i18n pages.notifications.loading: Loading…
+// i18n pages.notifications.empty: No notifications yet.
+// i18n pages.notifications.checkingAccounts: Checking which accounts are new to you…
+// i18n pages.notifications.relationshipCheckFailed: Couldn’t check account relationships. Try this view again.
+// i18n pages.notifications.noUnfamiliarAccounts: No unfamiliar accounts in the notifications loaded so far.
+// i18n pages.notifications.noMatch: No notifications match the filters.
+// i18n pages.notifications.seeEveryone: {{type}} — see everyone
+// i18n pages.notifications.openChat: 💬 Open in chat
+// i18n pages.notifications.viewThread: 🧵 View thread
+// i18n pages.notifications.caughtUp: You're all caught up.
+// i18n pages.notifications.loadMore: Load more
+// i18n pages.notifications.bskyNotLinked: Link a Bluesky account in Settings → Connections to see its notifications.
+// i18n pages.notifications.bskyLoadFailed: Could not load Bluesky notifications.
+// i18n pages.notifications.reason.likedPost: liked your post
+// i18n pages.notifications.reason.boostedPost: boosted your post
+// i18n pages.notifications.reason.replied: replied to you
+// i18n pages.notifications.reason.mentioned: mentioned you
+// i18n pages.notifications.reason.followed: followed you
+// i18n pages.notifications.reason.more.one: {{base}} · {{count}} more recent notification
+// i18n pages.notifications.reason.more.other: {{base}} · {{count}} more recent notifications
+// i18n pages.notifications.followFailed: Could not follow @{{acct}}.
+// i18n pages.notifications.muteFailed: Could not mute @{{acct}}.
+// i18n pages.notifications.blockFailed: Could not block @{{acct}}.
+// i18n pages.notifications.others.one: and {{count}} other
+// i18n pages.notifications.others.other: and {{count}} others
+// i18n pages.notifications.label.favourite: favourited your status
+// i18n pages.notifications.label.reblog: boosted your status
+// i18n pages.notifications.label.follow: followed you
+// i18n pages.notifications.label.mention: mentioned you
 
 function normalizedAccountUrl(url: string): string | null {
   try {
@@ -196,7 +244,14 @@ export function accountsNewToMe(
 
 @Component({
   selector: 'app-notifications',
-  imports: [RouterLink, FormsModule, AccountListDialog, NgOptimizedImage, AccountResultCard],
+  imports: [
+    RouterLink,
+    FormsModule,
+    AccountListDialog,
+    NgOptimizedImage,
+    AccountResultCard,
+    TranslocoPipe,
+  ],
   templateUrl: './notifications.html',
   styleUrl: './notifications.css',
 })
@@ -208,6 +263,7 @@ export class Notifications implements OnInit, OnDestroy {
   private auth = inject(Auth);
   private bskyNotifications = inject(BlueskyNotifications);
   protected bskySession = inject(BlueskySession);
+  private transloco = inject(TranslocoService);
 
   /** Media thumbnails respect the feed-wide images on/off preference. */
   protected showImages = this.prefs.showImages;
@@ -387,9 +443,7 @@ export class Notifications implements OnInit, OnDestroy {
     if (!this.bskySession.linked()) {
       this.loading.set(false);
       this.exhausted.set(true);
-      this.bskyError.set(
-        'Link a Bluesky account in Settings → Connections to see its notifications.',
-      );
+      this.bskyError.set(this.transloco.translate<string>('pages.notifications.bskyNotLinked'));
       return;
     }
     const cursor = this.bskyCursor;
@@ -419,7 +473,9 @@ export class Notifications implements OnInit, OnDestroy {
         this.exhausted.set(true);
         this.diagnostics.error('Notifications', 'load:bsky-error', error);
         this.bskyError.set(
-          error instanceof Error ? error.message : 'Could not load Bluesky notifications.',
+          error instanceof Error
+            ? error.message
+            : this.transloco.translate<string>('pages.notifications.bskyLoadFailed'),
         );
       },
     });
@@ -504,23 +560,32 @@ export class Notifications implements OnInit, OnDestroy {
     let base: string;
     switch (notification.type) {
       case 'favourite':
-        base = 'liked your post';
+        base = this.transloco.translate<string>('pages.notifications.reason.likedPost');
         break;
       case 'reblog':
-        base = 'boosted your post';
+        base = this.transloco.translate<string>('pages.notifications.reason.boostedPost');
         break;
       case 'mention':
-        base = notification.status?.in_reply_to_id ? 'replied to you' : 'mentioned you';
+        base = this.transloco.translate<string>(
+          notification.status?.in_reply_to_id
+            ? 'pages.notifications.reason.replied'
+            : 'pages.notifications.reason.mentioned',
+        );
         break;
       case 'follow':
-        base = 'followed you';
+        base = this.transloco.translate<string>('pages.notifications.reason.followed');
         break;
       default:
         base = this.label(notification.type);
     }
     const extra = candidate.notificationCount - 1;
     return extra > 0
-      ? `${base} · ${extra} more recent notification${extra === 1 ? '' : 's'}`
+      ? this.transloco.translate<string>(
+          extra === 1
+            ? 'pages.notifications.reason.more.one'
+            : 'pages.notifications.reason.more.other',
+          { base, count: extra },
+        )
       : base;
   }
 
@@ -544,7 +609,11 @@ export class Notifications implements OnInit, OnDestroy {
       },
       error: () => {
         this.setAccountActionBusy(account.id, false);
-        this.accountActionError.set(`Could not follow @${account.acct}.`);
+        this.accountActionError.set(
+          this.transloco.translate<string>('pages.notifications.followFailed', {
+            acct: account.acct,
+          }),
+        );
       },
     });
   }
@@ -562,7 +631,11 @@ export class Notifications implements OnInit, OnDestroy {
       next: (relationship) => this.finishModeration(account.id, relationship),
       error: () => {
         this.setAccountActionBusy(account.id, false);
-        this.accountActionError.set(`Could not mute @${account.acct}.`);
+        this.accountActionError.set(
+          this.transloco.translate<string>('pages.notifications.muteFailed', {
+            acct: account.acct,
+          }),
+        );
       },
     });
   }
@@ -576,7 +649,11 @@ export class Notifications implements OnInit, OnDestroy {
       next: (relationship) => this.finishModeration(account.id, relationship),
       error: () => {
         this.setAccountActionBusy(account.id, false);
-        this.accountActionError.set(`Could not block @${account.acct}.`);
+        this.accountActionError.set(
+          this.transloco.translate<string>('pages.notifications.blockFailed', {
+            acct: account.acct,
+          }),
+        );
       },
     });
   }
@@ -618,7 +695,10 @@ export class Notifications implements OnInit, OnDestroy {
 
   othersLabel(row: NotifRow & { kind: 'group' }): string {
     const rest = row.count - row.sample.length;
-    return `and ${rest} ${rest === 1 ? 'other' : 'others'}`;
+    return this.transloco.translate<string>(
+      rest === 1 ? 'pages.notifications.others.one' : 'pages.notifications.others.other',
+      { count: rest },
+    );
   }
 
   openGroupList(row: NotifRow & { kind: 'group' }): void {
@@ -663,13 +743,13 @@ export class Notifications implements OnInit, OnDestroy {
   label(type: string): string {
     switch (type) {
       case 'favourite':
-        return 'favourited your status';
+        return this.transloco.translate<string>('pages.notifications.label.favourite');
       case 'reblog':
-        return 'boosted your status';
+        return this.transloco.translate<string>('pages.notifications.label.reblog');
       case 'follow':
-        return 'followed you';
+        return this.transloco.translate<string>('pages.notifications.label.follow');
       case 'mention':
-        return 'mentioned you';
+        return this.transloco.translate<string>('pages.notifications.label.mention');
       default:
         return type;
     }

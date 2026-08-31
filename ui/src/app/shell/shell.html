@@ -4,8 +4,7 @@
      answer changes what every other thing on the page means. -->
 @if (isTest) {
   <div class="test-build-banner" role="status">
-    Test deployment — nothing here is real. Payments use Stripe's sandbox and no money moves. The
-    real app is at
+    {{ 'shell.testDeployment' | transloco }}
     <a href="https://mawkingbird.com/">mawkingbird.com</a>.
   </div>
 }
@@ -15,12 +14,18 @@
      This is deliberately a superset of the global zen preference: with both on,
      the result is indistinguishable from writing zen alone. -->
 @if (!writingZen.active()) {
-  <a class="skip-link" href="#main" (click)="skipToMain($event)">Skip to main content</a>
+  <a class="skip-link" href="#main" (click)="skipToMain($event)">{{
+    'shell.skipToMain' | transloco
+  }}</a>
 
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand-lockup">
-        <a class="brand" routerLink="/home" [attr.aria-label]="brand + ' home'">
+        <a
+          class="brand"
+          routerLink="/home"
+          [attr.aria-label]="'shell.brandHome' | transloco: { brand: brand }"
+        >
           <img
             class="brand-mark"
             [src]="logoSrc()"
@@ -35,7 +40,10 @@
         </a>
 
         @if (deploymentLabel; as deployment) {
-          <span class="deployment-label">{{ deployment }}</span>
+          <span class="deployment-label">{{
+            (deployment === 'Canary' ? 'shell.deployment.canary' : 'shell.deployment.test')
+              | transloco
+          }}</span>
         }
 
         <!-- Gated on the same flag as the page it leads to. The badge is a
@@ -56,13 +64,14 @@
               [attr.aria-expanded]="planOpen()"
               aria-controls="plan-card"
               [attr.aria-label]="
-                plusBadge.state() === 'plus'
-                  ? 'Mawkingbird Plus active — show plan details'
+                (plusBadge.state() === 'plus'
+                  ? 'shell.plan.badgePlusAria'
                   : plusBadge.state() === 'checking'
-                    ? 'Checking Mawkingbird plan — show plan details'
+                    ? 'shell.plan.badgeCheckingAria'
                     : plusBadge.state() === 'unavailable'
-                      ? 'Could not check Mawkingbird plan — show plan details'
-                      : 'Mawkingbird Free — show what Plus adds'
+                      ? 'shell.plan.badgeUnavailableAria'
+                      : 'shell.plan.badgeFreeAria'
+                ) | transloco
               "
               (click)="togglePlanCard()"
             >
@@ -76,16 +85,16 @@
               <span>
                 @switch (plusBadge.state()) {
                   @case ('checking') {
-                    Checking…
+                    {{ 'shell.plan.state.checking' | transloco }}
                   }
                   @case ('plus') {
-                    Plus
+                    {{ 'shell.plan.state.plus' | transloco }}
                   }
                   @case ('unavailable') {
-                    Plan?
+                    {{ 'shell.plan.state.unavailable' | transloco }}
                   }
                   @default {
-                    Free
+                    {{ 'shell.plan.state.free' | transloco }}
                   }
                 }
               </span>
@@ -99,7 +108,7 @@
               class="plan-popover"
               [class.plan-popover-open]="planOpen()"
               [attr.inert]="planOpen() ? null : ''"
-              aria-label="Mawkingbird plan benefits"
+              [attr.aria-label]="'shell.plan.ariaBenefits' | transloco"
             >
               <header>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -111,24 +120,29 @@
                 </svg>
                 <div>
                   <strong>
-                    {{ plusBadge.state() === 'plus' ? 'Mawkingbird Plus' : 'Mawkingbird Free' }}
+                    {{
+                      (plusBadge.state() === 'plus'
+                        ? 'shell.plan.activeName'
+                        : 'shell.plan.freeName'
+                      ) | transloco
+                    }}
                   </strong>
                   <span>
                     @if (plusBadge.state() === 'plus') {
-                      Thanks — your subscription is active. Here is what it is doing.
+                      {{ 'shell.plan.activeDescription' | transloco }}
                     } @else if (plusBadge.state() === 'checking') {
-                      Checking your account before deciding which plan is active…
+                      {{ 'shell.plan.checkingDescription' | transloco }}
                     } @else if (plusBadge.state() === 'unavailable') {
-                      The account service could not confirm your plan. Open the Plus page to retry.
+                      {{ 'shell.plan.unavailableDescription' | transloco }}
                     } @else {
-                      Free works without a subscription. Here is what Plus adds.
+                      {{ 'shell.plan.freeDescription' | transloco }}
                     }
                   </span>
                 </div>
                 <button
                   class="plan-close"
                   type="button"
-                  aria-label="Close plan details"
+                  [attr.aria-label]="'shell.plan.close' | transloco"
                   (click)="closePlanCard(true)"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -140,12 +154,18 @@
               <div class="plan-benefits">
                 @for (benefit of plusBenefits(); track benefit.id) {
                   <div class="plan-benefit">
-                    <strong>{{ benefit.label }}</strong>
+                    <strong>{{ benefitText(benefit, 'label') }}</strong>
                     @if (plusBadge.state() === 'plus') {
-                      <span>{{ benefit.plus }}</span>
+                      <span>{{ benefitText(benefit, 'plus') }}</span>
                     } @else {
-                      <span><b>Free:</b> {{ benefit.free }}</span>
-                      <span class="plan-benefit-upgrade"><b>Plus:</b> {{ benefit.plus }}</span>
+                      <span
+                        ><b>{{ 'shell.plan.freeLabel' | transloco }}</b>
+                        {{ benefitText(benefit, 'free') }}</span
+                      >
+                      <span class="plan-benefit-upgrade"
+                        ><b>{{ 'shell.plan.plusLabel' | transloco }}</b>
+                        {{ benefitText(benefit, 'plus') }}</span
+                      >
                     }
                   </div>
                 }
@@ -161,9 +181,9 @@
                   (click)="closePlanCard()"
                 >
                   @if (plusBadge.state() === 'plus') {
-                    Subscription details and diagnostics
+                    {{ 'shell.plan.subscriptionDetails' | transloco }}
                   } @else {
-                    See the Plus page — ${{ plusPriceUsd }} a year
+                    {{ 'shell.plan.seePlus' | transloco: { price: plusPriceUsd } }}
                   }
                 </a>
               </footer>
@@ -172,12 +192,12 @@
         }
       </div>
 
-      <nav class="primary-nav" aria-label="Primary navigation">
+      <nav class="primary-nav" [attr.aria-label]="'shell.nav.primary' | transloco">
         <a routerLink="/home" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M3 11.5 12 4l9 7.5v8a1 1 0 0 1-1 1h-5.5v-6h-5v6H4a1 1 0 0 1-1-1z" />
           </svg>
-          <span>Home</span>
+          <span>{{ 'shell.nav.home' | transloco }}</span>
         </a>
         <a routerLink="/algo" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -185,20 +205,20 @@
               d="M11 4l1.8 4.7L17.5 10.5l-4.7 1.8L11 17l-1.8-4.7L4.5 10.5l4.7-1.8zM18.5 14l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z"
             />
           </svg>
-          <span>Algo</span>
+          <span>{{ 'shell.nav.algo' | transloco }}</span>
         </a>
         @if (!auth.isAnonymous) {
           <a routerLink="/notifications" routerLinkActive="active">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5" />
             </svg>
-            <span>Inbox</span>
+            <span>{{ 'shell.nav.inbox' | transloco }}</span>
           </a>
           <a routerLink="/conversations" routerLinkActive="active">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 5h16v12H8l-4 4z" />
             </svg>
-            <span>Chat</span>
+            <span>{{ 'shell.nav.chat' | transloco }}</span>
           </a>
         }
         <!-- Anonymous visitors get Chat too, and it is the same page signed-in
@@ -209,7 +229,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 5h16v12H8l-4 4z" />
             </svg>
-            <span>Chat</span>
+            <span>{{ 'shell.nav.chat' | transloco }}</span>
           </a>
         }
         <a routerLink="/search" routerLinkActive="active">
@@ -217,94 +237,94 @@
             <circle cx="10.5" cy="10.5" r="6.5" />
             <path d="m15.5 15.5 5 5" />
           </svg>
-          <span>Search</span>
+          <span>{{ 'shell.nav.search' | transloco }}</span>
         </a>
         <a routerLink="/feeds" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
           </svg>
-          <span>Feeds</span>
+          <span>{{ 'shell.nav.feeds' | transloco }}</span>
         </a>
         <a routerLink="/rss" routerLinkActive="active">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 4a16 16 0 0 1 16 16M4 4v6a10 10 0 0 1 10 10h6A16 16 0 0 0 4 4Z" />
             <circle cx="6.5" cy="17.5" r="2" />
           </svg>
-          <span>RSS</span>
+          <span>{{ 'shell.nav.rss' | transloco }}</span>
         </a>
         @if (auth.shouldOfferLogin) {
           <a class="login-nav" routerLink="/login" (click)="auth.exitAnonymous()">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />
             </svg>
-            <span>Login</span>
+            <span>{{ 'shell.nav.login' | transloco }}</span>
           </a>
         }
       </nav>
 
       <div class="header-actions">
         <details class="more-menu" (toggle)="onMoreToggle($event)">
-          <summary aria-label="More navigation">
+          <summary [attr.aria-label]="'shell.nav.moreAria' | transloco">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="5" cy="12" r="1.5" />
               <circle cx="12" cy="12" r="1.5" />
               <circle cx="19" cy="12" r="1.5" />
             </svg>
-            <span>More</span>
+            <span>{{ 'shell.nav.more' | transloco }}</span>
           </summary>
           <div class="menu-panel">
             <!-- "Meet Eliza" used to sit here. She is an easter egg, not a
                headline feature, and this menu is short on room — she is found
                in Chat, or at /eliza by anyone who goes looking. -->
 
-            <a routerLink="/settings">Settings</a>
+            <a routerLink="/settings">{{ 'shell.menu.settings' | transloco }}</a>
 
             <!-- Feed-likes -->
             <div class="menu-divider"></div>
             @if (!auth.isAnonymous) {
-              <a routerLink="/favourites">Likes</a>
+              <a routerLink="/favourites">{{ 'shell.menu.likes' | transloco }}</a>
             }
-            <a routerLink="/bookmarks">Bookmarks</a>
+            <a routerLink="/bookmarks">{{ 'shell.menu.bookmarks' | transloco }}</a>
             <!-- Lists and Tags moved to the Feeds landing page's drill-down
                  category list (2 clicks: Feeds -> Lists / Feeds -> Tags) — this
                  menu had no room left. Their routes (/feeds/lists, /feeds/tags)
                  are unchanged, only this shortcut row is gone. -->
             <!-- RSS reading moved to its own primary-nav destination (/rss).
                  This row is feed *management* only — add/remove, OPML, proxy. -->
-            <a routerLink="/settings/rss">Manage RSS feeds</a>
+            <a routerLink="/settings/rss">{{ 'shell.menu.manageRss' | transloco }}</a>
 
             <!-- Write / draft-likes -->
             <div class="menu-divider"></div>
             @if (featureFlags.enabled('write')) {
-              <a routerLink="/write">Write</a>
+              <a routerLink="/write">{{ 'shell.menu.write' | transloco }}</a>
             }
-            <a routerLink="/drafts">Drafts</a>
+            <a routerLink="/drafts">{{ 'shell.menu.drafts' | transloco }}</a>
             @if (posse.count(); as pending) {
               <!-- Only rendered while something is actually waiting: a queue you
                  have emptied should not leave a row behind advertising itself. -->
               <a routerLink="/posse">
-                Waiting to publish
+                {{ 'shell.menu.waitingToPublish' | transloco }}
                 <span class="nav-count">{{ pending }}</span>
               </a>
             }
             @if (featureFlags.enabled('pastebin')) {
-              <a routerLink="/pastes">Pastes</a>
+              <a routerLink="/pastes">{{ 'shell.menu.pastes' | transloco }}</a>
             }
             @if (featureFlags.enabled('links')) {
-              <a routerLink="/links">Links</a>
+              <a routerLink="/links">{{ 'shell.menu.links' | transloco }}</a>
             }
 
             <!-- Find people to follow. Starter Kits and "Find my friends" used to
                sit here as separate rows; both are now on the Find Friends hub,
                along with search, the directory and the people browser. -->
             <div class="menu-divider"></div>
-            <a routerLink="/find-friends">Find Friends</a>
-            <a routerLink="/invites">Invites</a>
+            <a routerLink="/find-friends">{{ 'shell.menu.findFriends' | transloco }}</a>
+            <a routerLink="/invites">{{ 'shell.menu.invites' | transloco }}</a>
 
             <!-- Analytics (of self + the client) -->
             <div class="menu-divider"></div>
             @if (!auth.isAnonymous) {
-              <a routerLink="/analytics">Analytics</a>
+              <a routerLink="/analytics">{{ 'shell.menu.analytics' | transloco }}</a>
             }
             <!-- Feed Doctor is deliberately *not* here. This menu is full, and a
                diagnostic nobody can find is a diagnostic nobody runs — it belongs
@@ -313,25 +333,29 @@
             <!-- Storage Diagnostics has no row of its own here any more — this
                  menu had no room left, and /observability already links to it
                  prominently (page-menu-link, and the storage-summary card). -->
-            <a routerLink="/observability">Observability</a>
+            <a routerLink="/observability">{{ 'shell.menu.observability' | transloco }}</a>
 
             <!-- Docs & grab-bag -->
             <div class="menu-divider"></div>
-            <a routerLink="/blog">Docs</a>
+            <a routerLink="/blog">{{ 'shell.menu.docs' | transloco }}</a>
             @if (!isCanary) {
               <!-- Relative to <base href>: /canary/ on the custom domain and
                  /mawkingbird/canary/ on the github.io fallback. -->
-              <a href="canary/" target="_blank" rel="noopener noreferrer">Canary ↗</a>
+              <a href="canary/" target="_blank" rel="noopener noreferrer">{{
+                'shell.menu.canary' | transloco
+              }}</a>
             }
 
             @if (mockTooling || isStaff()) {
               <div class="menu-divider"></div>
               @if (mockTooling) {
-                <a routerLink="/dev/faults">Faults</a>
-                <a href="/docs" target="_blank" rel="noopener">API Docs ↗</a>
+                <a routerLink="/dev/faults">{{ 'shell.menu.faults' | transloco }}</a>
+                <a href="/docs" target="_blank" rel="noopener">{{
+                  'shell.menu.apiDocs' | transloco
+                }}</a>
               }
               @if (isStaff()) {
-                <a routerLink="/admin" class="admin-link">Admin</a>
+                <a routerLink="/admin" class="admin-link">{{ 'shell.menu.admin' | transloco }}</a>
               }
             }
           </div>
@@ -341,7 +365,7 @@
           <details class="account-menu">
             <summary
               class="account-pill"
-              [attr.aria-label]="'Account menu for ' + acc.display_name"
+              [attr.aria-label]="'shell.account.menuFor' | transloco: { name: acc.display_name }"
             >
               <img
                 [ngSrc]="acc.avatar_static || acc.avatar || 'favicon-32x32.png'"
@@ -370,7 +394,7 @@
 
               @if (auth.otherSessions().length) {
                 <div class="menu-divider"></div>
-                <p class="menu-label">Switch account</p>
+                <p class="menu-label">{{ 'shell.account.switch' | transloco }}</p>
                 @for (s of auth.otherSessions(); track s.key) {
                   <button type="button" class="switch-row" (click)="switchTo(s)">
                     <img
@@ -384,7 +408,9 @@
                     <span class="switch-name">
                       {{
                         s.account?.display_name ||
-                          (s.kind === 'anonymous' ? 'Anonymous' : 'Saved account')
+                          (s.kind === 'anonymous'
+                            ? ('shell.account.anonymous' | transloco)
+                            : ('shell.account.saved' | transloco))
                       }}
                       @if (s.account?.username) {
                         <small class="muted">&#64;{{ s.account?.username }}</small>
@@ -397,22 +423,27 @@
               <div class="menu-divider"></div>
               @if (!auth.isAnonymous || auth.shouldOfferLogin) {
                 <button type="button" class="menu-action" (click)="addMastodonAccount()">
-                  + Add Mastodon account
+                  {{ 'shell.account.addMastodon' | transloco }}
                 </button>
                 <button type="button" class="menu-action" (click)="addBlueskyAccount()">
-                  + Add Bluesky account
+                  {{ 'shell.account.addBluesky' | transloco }}
                 </button>
               }
               <!-- "Log out" is right for a Bluesky-primary identity: it is a real
                    account with real credentials, not the browser-local session
                    "Exit anonymous" describes. -->
               <button type="button" class="menu-action danger" (click)="logout()">
-                {{ auth.isAnonymous ? 'Exit anonymous' : 'Log out' }}
+                {{
+                  (auth.isAnonymous ? 'shell.account.exitAnonymous' : 'shell.account.logout')
+                    | transloco
+                }}
               </button>
             </div>
           </details>
         } @else {
-          <button class="logout-button" type="button" (click)="logout()">Log out</button>
+          <button class="logout-button" type="button" (click)="logout()">
+            {{ 'shell.account.logout' | transloco }}
+          </button>
         }
       </div>
     </div>
@@ -450,9 +481,12 @@
 @if (toast(); as message) {
   <div class="toast" role="alert">
     <span>{{ message }}</span>
-    <button type="button" class="toast-close" aria-label="Dismiss" (click)="dismissToast()">
-      &times;
-    </button>
+    <button
+      type="button"
+      class="toast-close"
+      [attr.aria-label]="'shell.toast.dismiss' | transloco"
+      (click)="dismissToast()"
+    ></button>
   </div>
 }
 
@@ -467,18 +501,29 @@
     aria-labelledby="dead-session-title"
     (keydown.escape)="dismissDeadSession()"
   >
-    <h2 id="dead-session-title">Can't switch to {{ deadSessionName() }}</h2>
+    <h2 id="dead-session-title">
+      {{
+        'shell.dead.title'
+          | transloco: { name: deadSessionName() || ('shell.dead.thatAccount' | transloco) }
+      }}
+    </h2>
     <p>
-      {{ deadSessionServer() }} rejected that account's saved session. This usually means it
-      expired, or the access was revoked.
+      {{
+        'shell.dead.description'
+          | transloco: { server: deadSessionServer() || ('shell.dead.thisServer' | transloco) }
+      }}
     </p>
-    <p class="dead-session-note">You're still signed in as before — nothing has changed yet.</p>
+    <p class="dead-session-note">{{ 'shell.dead.note' | transloco }}</p>
     <div class="dead-session-actions">
-      <button type="button" class="btn" (click)="reauthenticate()">Reauthenticate</button>
-      <button type="button" class="btn btn-outline danger" (click)="forgetDeadSession()">
-        Remove account
+      <button type="button" class="btn" (click)="reauthenticate()">
+        {{ 'shell.dead.reauthenticate' | transloco }}
       </button>
-      <button type="button" class="btn btn-outline" (click)="dismissDeadSession()">Cancel</button>
+      <button type="button" class="btn btn-outline danger" (click)="forgetDeadSession()">
+        {{ 'shell.dead.remove' | transloco }}
+      </button>
+      <button type="button" class="btn btn-outline" (click)="dismissDeadSession()">
+        {{ 'shell.dead.cancel' | transloco }}
+      </button>
     </div>
   </div>
 }

@@ -17,13 +17,14 @@ import { PasteProviderRegistry } from '../../providers/paste/paste-provider-regi
 import { DraftItem, DraftKind, toSnapshot } from './draft-items';
 import { DraftSources } from './draft-sources';
 import { Terminology } from '../../terminology';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
 /** Filter chips above the merged list; 'all' is the default. */
 type DraftFilter = 'all' | DraftKind;
 
 interface FilterChip {
   id: DraftFilter;
-  label: string;
+  labelKey: string;
 }
 
 /** What a pending removal will actually destroy — the confirm copy depends on it. */
@@ -95,23 +96,20 @@ function parkFailure(error: unknown): string {
     error instanceof HttpErrorResponse && typeof error.error?.error === 'string'
       ? ` (${error.error.error})`
       : '';
-  return (
-    `That publish time was refused${detail}. Try a nearer date — nothing was changed and ` +
-    `your draft is untouched.`
-  );
+  return detail;
 }
 
 /** How to name a kind in a sentence, for the "source is still here" reassurance. */
 function kindNoun(kind: DraftKind): string {
   switch (kind) {
     case 'local':
-      return 'original draft';
+      return 'pages.drafts.kind.originalDraft';
     case 'scheduled':
-      return 'parked post';
+      return 'pages.drafts.kind.parkedPost';
     case 'self':
-      return 'private note';
+      return 'pages.drafts.kind.privateNote';
     case 'paste':
-      return 'paste';
+      return 'pages.drafts.kind.paste';
   }
 }
 
@@ -124,15 +122,112 @@ function kindNoun(kind: DraftKind): string {
  * out of that list and shown separately below it. A post that publishes tomorrow
  * is not a draft, and displaying it as one invites exactly the wrong assumption.
  */
+// i18n pages.drafts.title: Drafts
+// i18n pages.drafts.openWrite: Open in Write →
+// i18n pages.drafts.intro: Everything you've written but not published — wherever you parked it. Mastodon has no drafts API, so each of these lives somewhere different.
+// i18n pages.drafts.write.close: Close
+// i18n pages.drafts.write.button: ✍ Write
+// i18n pages.drafts.filter.ariaLabel: Filter drafts by kind
+// i18n pages.drafts.chip.all: All
+// i18n pages.drafts.chip.local: 💾 Local
+// i18n pages.drafts.chip.parked: ⏳ Parked
+// i18n pages.drafts.chip.self: 🔒 Self
+// i18n pages.drafts.chip.paste: 📋 Paste
+// i18n pages.drafts.loading: Loading drafts…
+// i18n pages.drafts.empty.intro: Nothing in progress. A draft can live in four places:
+// i18n pages.drafts.empty.local: saved in this browser. Private and instant, but stays here.
+// i18n pages.drafts.empty.parked: a scheduled post dated far enough out that it never fires. Kept by the server, so it follows you.
+// i18n pages.drafts.empty.self: a post to nobody but you. Follows you too, but your instance admin can read it.
+// i18n pages.drafts.empty.paste: text parked at a paste service. Reachable anywhere via its link, and not private.
+// i18n pages.drafts.empty.tip: While composing, hit 💾 to save one — anything half-written is auto-kept for you anyway.
+// i18n pages.drafts.empty.noneOfKind: No drafts of that kind.
+// i18n pages.drafts.meta.local: 💾 local
+// i18n pages.drafts.meta.localTitle: Saved in this browser only
+// i18n pages.drafts.meta.parked: ⏳ parked
+// i18n pages.drafts.meta.scheduledTitle: Parked on the server as a far-future scheduled {{post}}
+// i18n pages.drafts.meta.until: until {{date}}
+// i18n pages.drafts.meta.selfTitle: A private {{post}} to yourself, held on the server
+// i18n pages.drafts.meta.pasteTitle: Parked at an external paste service
+// i18n pages.drafts.edit.blocked: Enable Pastebin in Settings → Feature flags to continue
+// i18n pages.drafts.edit.title: Open in the composer with a live Post button
+// i18n pages.drafts.edit.continue: Continue
+// i18n pages.drafts.edit.forPost: Edit for post
+// i18n pages.drafts.convert.ariaLabel: Convert this draft
+// i18n pages.drafts.convert.local: 💾 Copy to local drafts
+// i18n pages.drafts.convert.paste: 📋 Copy to a paste…
+// i18n pages.drafts.convert.schedule: ⏳ Park as a schedule…
+// i18n pages.drafts.convert.unpark: ↩ Unpark to a draft…
+// i18n pages.drafts.convert.note: Copies never remove the original. Unparking does — it asks first.
+// i18n pages.drafts.remove.fromList: Remove from this list
+// i18n pages.drafts.remove.draft: Remove draft
+// i18n pages.drafts.scheduled.title: Scheduled
+// i18n pages.drafts.scheduled.note: These are not drafts: they publish automatically at their set time, even with this browser closed.
+// i18n pages.drafts.scheduled.cancelTitle: Cancel scheduled {{post}}
+// i18n pages.drafts.cancel: Cancel
+// i18n pages.drafts.scheduled.cancelDialog.title: Cancel this scheduled {{post}}?
+// i18n pages.drafts.scheduled.cancelDialog.message: It will be deleted from the server and never published.
+// i18n pages.drafts.scheduled.cancelDialog.confirm: Cancel post
+// i18n pages.drafts.pasteDialog.title: Copy to a paste service
+// i18n pages.drafts.pasteDialog.description: Publishes a copy to an external service. Your {{kind}} stays exactly where it is.
+// i18n pages.drafts.pasteDialog.service: Service
+// i18n pages.drafts.pasteDialog.language: Language
+// i18n pages.drafts.pasteDialog.expiry: Expiry
+// i18n pages.drafts.pasteDialog.immutable: ⚠ {{provider}} links can't be edited or deleted once created.
+// i18n pages.drafts.pasteDialog.pasting: Pasting…
+// i18n pages.drafts.pasteDialog.create: Create paste
+// i18n pages.drafts.parkDialog.title: Park as a schedule
+// i18n pages.drafts.parkDialog.description: The server holds it until this date. Your {{kind}} stays exactly where it is.
+// i18n pages.drafts.parkDialog.publishAt: Publish at
+// i18n pages.drafts.parkDialog.hint: Anything more than 10 years out lists here as a draft rather than a scheduled post. Some servers refuse very distant dates — if this one does, pick a nearer one.
+// i18n pages.drafts.parkDialog.parking: Parking…
+// i18n pages.drafts.parkDialog.park: Park it
+// i18n pages.drafts.unparkDialog.title: Unpark to a draft?
+// i18n pages.drafts.unparkDialog.description: It comes back as a local draft in this browser, and the server stops holding it — so it will not publish itself on its parked date.
+// i18n pages.drafts.unparkDialog.note: This is the one conversion here that removes the original. Everything else copies.
+// i18n pages.drafts.unparkDialog.unparking: Unparking…
+// i18n pages.drafts.unparkDialog.unpark: Unpark it
+// i18n pages.drafts.kind.originalDraft: original draft
+// i18n pages.drafts.kind.parkedPost: parked post
+// i18n pages.drafts.kind.privateNote: private note
+// i18n pages.drafts.kind.paste: paste
+// i18n pages.drafts.notice.copiedLocal: Copied to local drafts. The {{kind}} is still here too.
+// i18n pages.drafts.notice.unparked: Unparked. It is a local draft now, and the server will not publish it.
+// i18n pages.drafts.notice.pasted: Pasted to {{provider}}. The {{kind}} is still here too.
+// i18n pages.drafts.notice.parked: Parked. The {{kind}} is still here too.
+// i18n pages.drafts.errors.unparkCancel: Saved as a local draft, but the parked post could not be cancelled on the server — it is still scheduled. Try removing it from the list below.
+// i18n pages.drafts.errors.emptyPaste: There is nothing to paste — this draft has no text.
+// i18n pages.drafts.errors.pastePersist: {{provider}} paste created ({{url}}). {{error}}
+// i18n pages.drafts.errors.pasteCreate: Couldn't create the {{provider}} paste — nothing was changed, your {{kind}} is untouched.
+// i18n pages.drafts.errors.invalidDate: That date could not be read. Pick a publish time.
+// i18n pages.drafts.errors.emptySchedule: There is nothing to schedule — this draft has no text.
+// i18n pages.drafts.errors.parkFailure: That publish time was refused{{detail}}. Try a nearer date — nothing was changed and your draft is untouched.
+// i18n pages.drafts.errors.removeScheduled: That parked post couldn't be cancelled on the server.
+// i18n pages.drafts.errors.removeSelf: That private note couldn't be deleted.
+// i18n pages.drafts.errors.cancelScheduled: That scheduled post couldn't be cancelled.
+// i18n pages.drafts.preview.mediaPost: (media post)
+// i18n pages.drafts.preview.emptyPost: (empty post)
+// i18n pages.drafts.remove.local.title: Delete this draft?
+// i18n pages.drafts.remove.local.message: It only exists in this browser — there's no getting it back.
+// i18n pages.drafts.remove.delete: Delete
+// i18n pages.drafts.remove.parked.title: Cancel this parked post?
+// i18n pages.drafts.remove.parked.message: It will be deleted from the server and never published.
+// i18n pages.drafts.remove.cancelPost: Cancel post
+// i18n pages.drafts.remove.self.title: Delete this private note?
+// i18n pages.drafts.remove.self.message: It is a real post on the server, visible only to you. Deleting it removes it for good.
+// i18n pages.drafts.remove.deletePost: Delete post
+// i18n pages.drafts.remove.paste.title: Forget this paste?
+// i18n pages.drafts.remove.paste.message: This only removes it from your list here. The paste itself stays at its provider — delete it there from the Pastes page, which has its edit key.
+// i18n pages.drafts.remove.forget: Forget
 @Component({
   selector: 'app-drafts-page',
-  imports: [Compose, ConfirmDialog, FormsModule, HumanTimePipe, RouterLink],
+  imports: [Compose, ConfirmDialog, FormsModule, HumanTimePipe, RouterLink, TranslocoPipe],
   templateUrl: './drafts-page.html',
   styleUrl: './drafts-page.css',
 })
 export class DraftsPage implements OnInit {
   /** post/tweet/florp vocabulary, per the Blue setting. */
   protected words = inject(Terminology).words;
+  private readonly transloco = inject(TranslocoService);
 
   protected sources = inject(DraftSources);
   private api = inject(Api);
@@ -162,11 +257,11 @@ export class DraftsPage implements OnInit {
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly chips: FilterChip[] = [
-    { id: 'all', label: 'All' },
-    { id: 'local', label: '💾 Local' },
-    { id: 'scheduled', label: '⏳ Parked' },
-    { id: 'self', label: '🔒 Self' },
-    { id: 'paste', label: '📋 Paste' },
+    { id: 'all', labelKey: 'pages.drafts.chip.all' },
+    { id: 'local', labelKey: 'pages.drafts.chip.local' },
+    { id: 'scheduled', labelKey: 'pages.drafts.chip.parked' },
+    { id: 'self', labelKey: 'pages.drafts.chip.self' },
+    { id: 'paste', labelKey: 'pages.drafts.chip.paste' },
   ];
 
   protected visible = computed(() => {
@@ -247,7 +342,11 @@ export class DraftsPage implements OnInit {
   protected convertToLocal(item: DraftItem): void {
     this.actionError.set(null);
     this.drafts.save(toSnapshot(item.source, this.prefs.defaultVisibility()));
-    this.flash(`Copied to local drafts. The ${kindNoun(item.kind)} is still here too.`);
+    this.flash(
+      this.transloco.translate('pages.drafts.notice.copiedLocal', {
+        kind: this.kindLabel(item.kind),
+      }),
+    );
   }
 
   /** Open the provider picker to publish a copy to a paste service. */
@@ -304,24 +403,36 @@ export class DraftsPage implements OnInit {
         this.sources.forgetScheduled(item.id);
         this.busy.set(false);
         this.pendingUnpark.set(null);
-        this.flash('Unparked. It is a local draft now, and the server will not publish it.');
+        this.flash(this.transloco.translate('pages.drafts.notice.unparked'));
       },
       error: () => {
         this.busy.set(false);
         this.pendingUnpark.set(null);
         // The draft is already saved, so say so rather than implying the
         // writing was lost along with the failed cancellation.
-        this.actionError.set(
-          'Saved as a local draft, but the parked post could not be cancelled on the server — ' +
-            'it is still scheduled. Try removing it from the list below.',
-        );
+        this.actionError.set(this.transloco.translate('pages.drafts.errors.unparkCancel'));
       },
     });
   }
 
   /** How to refer to a kind in dialog copy ("your private note stays where it is"). */
   protected kindLabel(kind: DraftKind): string {
-    return kindNoun(kind);
+    return this.transloco.translate(kindNoun(kind));
+  }
+
+  /** Translate a badge key while preserving provider/expiry metadata. */
+  protected badgeText(badge: string): string {
+    const [key, rawCount] = badge.split('|', 2);
+    if (key.startsWith('pages.drafts.')) {
+      return this.transloco.translate(key, rawCount === undefined ? {} : { count: rawCount });
+    }
+    return badge;
+  }
+
+  protected previewText(item: DraftItem): string {
+    return item.preview.startsWith('pages.drafts.preview.')
+      ? this.transloco.translate(item.preview)
+      : item.preview;
   }
 
   /** Selected paste provider's live metadata, for the picker's dependent fields. */
@@ -372,7 +483,7 @@ export class DraftsPage implements OnInit {
     const snapshot = toSnapshot(pending.item.source, this.prefs.defaultVisibility());
     const content = snapshot.segments.filter((s) => s.trim()).join('\n\n');
     if (!content.trim()) {
-      this.actionError.set('There is nothing to paste — this draft has no text.');
+      this.actionError.set(this.transloco.translate('pages.drafts.errors.emptyPaste'));
       return;
     }
     this.busy.set(true);
@@ -410,19 +521,28 @@ export class DraftsPage implements OnInit {
           const persistError = this.pastes.persistError();
           if (persistError) {
             this.actionError.set(
-              `${provider.label} paste created (${created.url}). ${persistError}`,
+              this.transloco.translate('pages.drafts.errors.pastePersist', {
+                provider: provider.label,
+                url: created.url,
+                error: persistError,
+              }),
             );
             return;
           }
           this.flash(
-            `Pasted to ${provider.label}. The ${kindNoun(pending.item.kind)} is still here too.`,
+            this.transloco.translate('pages.drafts.notice.pasted', {
+              provider: provider.label,
+              kind: this.kindLabel(pending.item.kind),
+            }),
           );
         },
         error: () => {
           this.busy.set(false);
           this.actionError.set(
-            `Couldn't create the ${provider.label} paste — nothing was changed, your ` +
-              `${kindNoun(pending.item.kind)} is untouched.`,
+            this.transloco.translate('pages.drafts.errors.pasteCreate', {
+              provider: provider.label,
+              kind: this.kindLabel(pending.item.kind),
+            }),
           );
         },
       });
@@ -442,13 +562,13 @@ export class DraftsPage implements OnInit {
     }
     const at = new Date(pending.at);
     if (Number.isNaN(at.getTime())) {
-      this.actionError.set('That date could not be read. Pick a publish time.');
+      this.actionError.set(this.transloco.translate('pages.drafts.errors.invalidDate'));
       return;
     }
     const snapshot = toSnapshot(pending.item.source, this.prefs.defaultVisibility());
     const text = snapshot.segments.filter((s) => s.trim()).join('\n\n');
     if (!text.trim()) {
-      this.actionError.set('There is nothing to schedule — this draft has no text.');
+      this.actionError.set(this.transloco.translate('pages.drafts.errors.emptySchedule'));
       return;
     }
     this.busy.set(true);
@@ -465,11 +585,19 @@ export class DraftsPage implements OnInit {
           this.busy.set(false);
           this.pendingPark.set(null);
           this.sources.load();
-          this.flash(`Parked. The ${kindNoun(pending.item.kind)} is still here too.`);
+          this.flash(
+            this.transloco.translate('pages.drafts.notice.parked', {
+              kind: this.kindLabel(pending.item.kind),
+            }),
+          );
         },
         error: (err: unknown) => {
           this.busy.set(false);
-          this.actionError.set(parkFailure(err));
+          this.actionError.set(
+            this.transloco.translate('pages.drafts.errors.parkFailure', {
+              detail: parkFailure(err),
+            }),
+          );
         },
       });
   }
@@ -490,7 +618,7 @@ export class DraftsPage implements OnInit {
    */
   protected askRemove(item: DraftItem): void {
     this.removeError.set(null);
-    this.pendingRemoval.set({ item, ...removalCopy(item) });
+    this.pendingRemoval.set({ item, ...removalCopy(item, (key) => this.transloco.translate(key)) });
   }
 
   protected confirmRemove(): void {
@@ -514,13 +642,14 @@ export class DraftsPage implements OnInit {
         this.api.cancelScheduledStatus(item.id).subscribe({
           next: () => this.sources.forgetScheduled(item.id),
           error: () =>
-            this.removeError.set("That parked post couldn't be cancelled on the server."),
+            this.removeError.set(this.transloco.translate('pages.drafts.errors.removeScheduled')),
         });
         return;
       case 'self':
         this.api.deleteStatus(item.id).subscribe({
           next: () => this.sources.forgetSelf(item.id),
-          error: () => this.removeError.set("That private note couldn't be deleted."),
+          error: () =>
+            this.removeError.set(this.transloco.translate('pages.drafts.errors.removeSelf')),
         });
         return;
     }
@@ -534,7 +663,8 @@ export class DraftsPage implements OnInit {
     }
     this.api.cancelScheduledStatus(sched.id).subscribe({
       next: () => this.sources.forgetScheduled(sched.id),
-      error: () => this.removeError.set("That scheduled post couldn't be cancelled."),
+      error: () =>
+        this.removeError.set(this.transloco.translate('pages.drafts.errors.cancelScheduled')),
     });
   }
 
@@ -543,7 +673,9 @@ export class DraftsPage implements OnInit {
     if (text.trim()) {
       return text.length > 140 ? `${text.slice(0, 140)}…` : text;
     }
-    return s.media_attachments.length ? '(media post)' : '(empty post)';
+    return s.media_attachments.length
+      ? this.transloco.translate('pages.drafts.preview.mediaPost')
+      : this.transloco.translate('pages.drafts.preview.emptyPost');
   }
 
   protected scheduledWhen(s: ScheduledStatus): string {
@@ -559,34 +691,34 @@ export class DraftsPage implements OnInit {
 }
 
 /** Confirm-dialog copy naming the real consequence, per kind. */
-function removalCopy(item: DraftItem): Omit<PendingRemoval, 'item'> {
+function removalCopy(
+  item: DraftItem,
+  translate: (key: string) => string,
+): Omit<PendingRemoval, 'item'> {
   switch (item.kind) {
     case 'local':
       return {
-        title: 'Delete this draft?',
-        message: "It only exists in this browser — there's no getting it back.",
-        confirmLabel: 'Delete',
+        title: translate('pages.drafts.remove.local.title'),
+        message: translate('pages.drafts.remove.local.message'),
+        confirmLabel: translate('pages.drafts.remove.delete'),
       };
     case 'scheduled':
       return {
-        title: 'Cancel this parked post?',
-        message: 'It will be deleted from the server and never published.',
-        confirmLabel: 'Cancel post',
+        title: translate('pages.drafts.remove.parked.title'),
+        message: translate('pages.drafts.remove.parked.message'),
+        confirmLabel: translate('pages.drafts.remove.cancelPost'),
       };
     case 'self':
       return {
-        title: 'Delete this private note?',
-        message:
-          'It is a real post on the server, visible only to you. Deleting it removes it for good.',
-        confirmLabel: 'Delete post',
+        title: translate('pages.drafts.remove.self.title'),
+        message: translate('pages.drafts.remove.self.message'),
+        confirmLabel: translate('pages.drafts.remove.deletePost'),
       };
     case 'paste':
       return {
-        title: 'Forget this paste?',
-        message:
-          'This only removes it from your list here. The paste itself stays at its provider — ' +
-          'delete it there from the Pastes page, which has its edit key.',
-        confirmLabel: 'Forget',
+        title: translate('pages.drafts.remove.paste.title'),
+        message: translate('pages.drafts.remove.paste.message'),
+        confirmLabel: translate('pages.drafts.remove.forget'),
       };
   }
 }

@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { PostTarget } from '../compose/compose';
-import { targetLabel } from '../compose/post-targets';
 import { TargetAvailabilitySource } from '../compose/target-availability';
 import { Status } from '../models';
 import { FocusTrap } from '../a11y/focus-trap';
@@ -19,9 +19,19 @@ export interface ShareContext {
 
 export interface ShareDestination {
   id: string;
-  label: string;
+  labelKey: string;
   buildUrl(context: ShareContext): string;
 }
+
+const POST_TARGET_LABEL_KEYS: Record<PostTarget, string> = {
+  fedi: 'shareDialog.destinations.mastodon',
+  bsky: 'shareDialog.destinations.bluesky',
+  both: 'shareDialog.destinations.mastodonAndBluesky',
+  paste: 'shareDialog.destinations.pasteService',
+  blog: 'shareDialog.destinations.mataroaBlog',
+  blogger: 'shareDialog.destinations.blogger',
+  hugo: 'shareDialog.destinations.hugoSite',
+};
 
 /** What the host should open the composer with. */
 export interface ComposeShareRequest {
@@ -123,12 +133,12 @@ function blueskyText(text: string, url: string): string {
 export const SHARE_DESTINATIONS: ShareDestination[] = [
   {
     id: 'reddit',
-    label: 'Reddit',
+    labelKey: 'shareDialog.destinations.reddit',
     buildUrl: ({ url, title }) => urlWithParams('https://www.reddit.com/submit', { url, title }),
   },
   {
     id: 'bluesky',
-    label: 'Bluesky',
+    labelKey: 'shareDialog.destinations.bluesky',
     buildUrl: ({ url, text }) =>
       urlWithParams('https://bsky.app/intent/compose', {
         text: blueskyText(text, url),
@@ -136,7 +146,7 @@ export const SHARE_DESTINATIONS: ShareDestination[] = [
   },
   {
     id: 'tumblr',
-    label: 'Tumblr',
+    labelKey: 'shareDialog.destinations.tumblr',
     buildUrl: ({ url, title, text }) =>
       urlWithParams('https://www.tumblr.com/widgets/share/tool', {
         canonicalUrl: url,
@@ -146,13 +156,13 @@ export const SHARE_DESTINATIONS: ShareDestination[] = [
   },
   {
     id: 'linkedin',
-    label: 'LinkedIn',
+    labelKey: 'shareDialog.destinations.linkedIn',
     buildUrl: ({ url }) =>
       urlWithParams('https://www.linkedin.com/sharing/share-offsite/', { url }),
   },
   {
     id: 'hacker-news',
-    label: 'Hacker News',
+    labelKey: 'shareDialog.destinations.hackerNews',
     buildUrl: ({ url, title }) =>
       urlWithParams('https://news.ycombinator.com/submitlink', { u: url, t: title }),
   },
@@ -168,9 +178,40 @@ export const SHARE_DESTINATIONS: ShareDestination[] = [
  */
 const QUOTE_CARRYING_INTENTS = new Set(['bluesky', 'tumblr']);
 
+// i18n shareDialog.closeDialog: Close share dialog
+// i18n shareDialog.heading.article: Share this article
+// i18n shareDialog.heading.elsewhere: Share elsewhere
+// i18n shareDialog.articleHint: Going out as <strong>{{host}}</strong>. Pick where to send it.
+// i18n shareDialog.chooseHint: Choose what to share, then where to send it.
+// i18n shareDialog.share: Share
+// i18n shareDialog.thisPost: This post
+// i18n shareDialog.linkedPage: Linked page (without the post wrapper)
+// i18n shareDialog.alsoRecord: Also record this on my blog
+// i18n shareDialog.recordHint: Queues a boost for your own site. Nothing is published until you say so.
+// i18n shareDialog.postIt: Post it
+// i18n shareDialog.postHint: Opens a composer. Nothing is posted until you press Post.
+// i18n shareDialog.sendItTo: Send it to
+// i18n shareDialog.sendHint: Opens the destination in a new tab.
+// i18n shareDialog.shareUsingDevice: Share using device…
+// i18n shareDialog.linkCopied: Link copied!
+// i18n shareDialog.copyLink: Copy link
+// i18n shareDialog.quoteDropped: Some of these take only a link — your highlight won’t travel.
+// i18n shareDialog.copyError: Couldn’t copy the link. Please try again.
+// i18n shareDialog.destinations.reddit: Reddit
+// i18n shareDialog.destinations.bluesky: Bluesky
+// i18n shareDialog.destinations.tumblr: Tumblr
+// i18n shareDialog.destinations.linkedIn: LinkedIn
+// i18n shareDialog.destinations.hackerNews: Hacker News
+// i18n shareDialog.destinations.mastodon: Mastodon
+// i18n shareDialog.destinations.mastodonAndBluesky: Mastodon and Bluesky
+// i18n shareDialog.destinations.pasteService: Paste service
+// i18n shareDialog.destinations.mataroaBlog: Mataroa blog
+// i18n shareDialog.destinations.blogger: Blogger
+// i18n shareDialog.destinations.hugoSite: Hugo site
+
 @Component({
   selector: 'app-share-dialog',
-  imports: [FocusTrap],
+  imports: [FocusTrap, TranslocoPipe],
   templateUrl: './share-dialog.html',
   styleUrl: './share-dialog.css',
 })
@@ -274,8 +315,8 @@ export class ShareDialog {
     this.posse.add('repost', this.status());
   }
 
-  protected label(target: PostTarget): string {
-    return targetLabel(target);
+  protected targetLabelKey(target: PostTarget): string {
+    return POST_TARGET_LABEL_KEYS[target];
   }
 
   protected targetUrl(): string {

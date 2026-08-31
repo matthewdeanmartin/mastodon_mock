@@ -13,7 +13,8 @@
   [class.on]="starred()"
   [attr.aria-pressed]="starred()"
   [attr.aria-label]="
-    starred() ? 'Remove ' + title() + ' from Read later' : 'Save ' + title() + ' to read later'
+    (starred() ? 'pages.rss.headline.removeFromReadLater' : 'pages.rss.headline.saveToReadLater')
+      | transloco: { title: title() }
   "
   (click)="toggleStar()"
 >

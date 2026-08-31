@@ -1,7 +1,12 @@
 import { Component, computed, inject, input, output } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { HumanTimePipe } from '../../../human-time.pipe';
 import { Status } from '../../../models';
 import { RssReadState } from '../../../providers/rss/rss-read-state';
+
+// i18n pages.rss.headline.removeFromReadLater: Remove {{title}} from Read later
+// i18n pages.rss.headline.saveToReadLater: Save {{title}} to read later
+// i18n pages.rss.headline.untitled: (untitled)
 
 /** Strip tags and collapse whitespace — a headline is text, not markup. */
 function plainText(html: string): string {
@@ -28,7 +33,7 @@ function plainText(html: string): string {
  */
 @Component({
   selector: 'app-headline-row',
-  imports: [HumanTimePipe],
+  imports: [HumanTimePipe, TranslocoPipe],
   templateUrl: './headline-row.html',
   styleUrl: './headline-row.css',
   host: {
@@ -38,6 +43,7 @@ function plainText(html: string): string {
 })
 export class HeadlineRow {
   private readState = inject(RssReadState);
+  private transloco = inject(TranslocoService);
 
   readonly status = input.required<Status>();
   readonly expanded = input(false);
@@ -61,7 +67,7 @@ export class HeadlineRow {
     const content = this.status().content;
     const strong = /<strong>(.*?)<\/strong>/s.exec(content);
     const text = plainText(strong ? strong[1] : content);
-    return text || '(untitled)';
+    return text || this.transloco.translate('pages.rss.headline.untitled');
   });
 
   /** The feed this came from. */

@@ -110,6 +110,16 @@ const MIGRATED = [
   'pages/settings/connections/blogger',
   'pages/settings/connections/openrouter',
   'pages/settings',
+  'status-card',
+  'pages/rss',
+  'pages/algo',
+  'pages/notifications',
+  'feed-analytics',
+  'shell',
+  'pages/drafts',
+  'pages/pastes',
+  'pages/links',
+  'share-dialog',
 ];
 
 /**
@@ -120,6 +130,16 @@ const MIGRATED = [
  * language — a brand name, a symbol, or a string the user never reads.
  */
 const ALLOWED = [
+  {
+    file: 'shell/shell.html',
+    contains: 'mawkingbird.com',
+    why: 'The product domain is a brand and navigation target, not interface prose.',
+  },
+  {
+    file: 'pages/rss/add-feed-dialog/add-feed-dialog.html',
+    contains: 'placeholder="https://example.com"',
+    why: 'An example URL showing the accepted input format, not interface prose.',
+  },
   {
     file: 'locale-picker/locale-picker.ts',
     contains: 'option.name',

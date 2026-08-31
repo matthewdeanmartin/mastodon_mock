@@ -1,12 +1,13 @@
 <div class="page-head">
-  <h2>Drafts</h2>
+  <h2>{{ 'pages.drafts.title' | transloco }}</h2>
   @if (featureFlags.enabled('write')) {
-    <a class="btn btn-outline btn-sm" routerLink="/write">Open in Write →</a>
+    <a class="btn btn-outline btn-sm" routerLink="/write">{{
+      'pages.drafts.openWrite' | transloco
+    }}</a>
   }
 </div>
 <p class="page-note">
-  Everything you've written but not published — wherever you parked it. Mastodon has no drafts API,
-  so each of these lives somewhere different.
+  {{ 'pages.drafts.intro' | transloco }}
 </p>
 
 <!-- Thoughtful posting's writing surface. Saves only: the post itself happens
@@ -16,15 +17,21 @@
     @if (writing()) {
       <app-compose [gateable]="true" (posted)="closeWriter()" />
       <button class="btn btn-outline btn-sm write-close" type="button" (click)="closeWriter()">
-        Close
+        {{ 'pages.drafts.write.close' | transloco }}
       </button>
     } @else {
-      <button class="btn write-btn" type="button" (click)="openWriter()">✍ Write</button>
+      <button class="btn write-btn" type="button" (click)="openWriter()">
+        {{ 'pages.drafts.write.button' | transloco }}
+      </button>
     }
   </div>
 }
 
-<div class="draft-chips" role="group" aria-label="Filter drafts by kind">
+<div
+  class="draft-chips"
+  role="group"
+  [attr.aria-label]="'pages.drafts.filter.ariaLabel' | transloco"
+>
   @for (chip of chips; track chip.id) {
     <button
       class="chip"
@@ -34,7 +41,7 @@
       [attr.aria-pressed]="filter() === chip.id"
       (click)="select(chip.id)"
     >
-      {{ chip.label }}
+      {{ chip.labelKey | transloco }}
       <span class="chip-count">{{ count(chip.id) }}</span>
     </button>
   }
@@ -57,60 +64,65 @@
 }
 
 @if (sources.loading() && !sources.items().length) {
-  <p class="muted center">Loading drafts…</p>
+  <p class="muted center">{{ 'pages.drafts.loading' | transloco }}</p>
 } @else if (!sources.items().length) {
   <div class="draft-empty muted">
-    <p>Nothing in progress. A draft can live in four places:</p>
+    <p>{{ 'pages.drafts.empty.intro' | transloco }}</p>
     <ul>
       <li>
-        <strong>💾 Local</strong> — saved in this browser. Private and instant, but stays here.
+        <strong>{{ 'pages.drafts.chip.local' | transloco }}</strong> —
+        {{ 'pages.drafts.empty.local' | transloco }}
       </li>
       <li>
-        <strong>⏳ Parked</strong> — a scheduled post dated far enough out that it never fires. Kept
-        by the server, so it follows you.
+        <strong>{{ 'pages.drafts.chip.parked' | transloco }}</strong> —
+        {{ 'pages.drafts.empty.parked' | transloco }}
       </li>
       <li>
-        <strong>🔒 Self</strong> — a post to nobody but you. Follows you too, but your instance
-        admin can read it.
+        <strong>{{ 'pages.drafts.chip.self' | transloco }}</strong> —
+        {{ 'pages.drafts.empty.self' | transloco }}
       </li>
       <li>
-        <strong>📋 Paste</strong> — text parked at a paste service. Reachable anywhere via its link,
-        and not private.
+        <strong>{{ 'pages.drafts.chip.paste' | transloco }}</strong> —
+        {{ 'pages.drafts.empty.paste' | transloco }}
       </li>
     </ul>
-    <p>While composing, hit 💾 to save one — anything half-written is auto-kept for you anyway.</p>
+    <p>{{ 'pages.drafts.empty.tip' | transloco }}</p>
   </div>
 } @else if (!visible().length) {
-  <p class="muted center">No drafts of that kind.</p>
+  <p class="muted center">{{ 'pages.drafts.empty.noneOfKind' | transloco }}</p>
 } @else {
   @for (item of visible(); track item.key) {
     <div class="draft-row">
       <div class="draft-main">
-        <div class="draft-text">{{ item.preview }}</div>
+        <div class="draft-text">{{ previewText(item) }}</div>
         <div class="draft-meta muted">
           @switch (item.kind) {
             @case ('local') {
-              <span class="draft-kind" title="Saved in this browser only">💾 local</span>
+              <span class="draft-kind" [title]="'pages.drafts.meta.localTitle' | transloco">{{
+                'pages.drafts.meta.local' | transloco
+              }}</span>
               <span>{{ item.at | humanTime }}</span>
             }
             @case ('scheduled') {
               <span
                 class="draft-kind"
-                [title]="'Parked on the server as a far-future scheduled ' + words().post"
-                >⏳ parked</span
+                [title]="'pages.drafts.meta.scheduledTitle' | transloco: { post: words().post }"
+                >{{ 'pages.drafts.meta.parked' | transloco }}</span
               >
-              <span>until {{ parkedWhen(item) }}</span>
+              <span>{{ 'pages.drafts.meta.until' | transloco: { date: parkedWhen(item) } }}</span>
             }
             @case ('self') {
               <span
                 class="draft-kind"
-                [title]="'A private ' + words().post + ' to yourself, held on the server'"
-                >🔒 self</span
+                [title]="'pages.drafts.meta.selfTitle' | transloco: { post: words().post }"
+                >{{ 'pages.drafts.chip.self' | transloco }}</span
               >
               <span>{{ item.at | humanTime }}</span>
             }
             @case ('paste') {
-              <span class="draft-kind" title="Parked at an external paste service">📋 paste</span>
+              <span class="draft-kind" [title]="'pages.drafts.meta.pasteTitle' | transloco">{{
+                'pages.drafts.chip.paste' | transloco
+              }}</span>
               <span>{{ item.at | humanTime }}</span>
             }
           }
@@ -118,7 +130,7 @@
             <span class="draft-visibility">· {{ item.visibility }}</span>
           }
           @for (b of item.badges; track b) {
-            <span class="draft-badge">{{ b }}</span>
+            <span class="draft-badge">{{ badgeText(b) }}</span>
           }
         </div>
       </div>
@@ -128,48 +140,65 @@
           type="button"
           [disabled]="blockedByFlag(item)"
           [title]="
-            blockedByFlag(item)
-              ? 'Enable Pastebin in Settings → Feature flags to continue'
-              : 'Open in the composer with a live Post button'
+            (blockedByFlag(item) ? 'pages.drafts.edit.blocked' : 'pages.drafts.edit.title')
+              | transloco
           "
           (click)="editForPost(item)"
         >
-          {{ item.kind === 'local' ? 'Continue' : 'Edit for post' }}
+          {{
+            (item.kind === 'local' ? 'pages.drafts.edit.continue' : 'pages.drafts.edit.forPost')
+              | transloco
+          }}
         </button>
         <!-- Conversions live behind ••• : four of them would not fit inline
              beside the preview. Same disclosure idiom as the status-card menu. -->
         <details class="row-menu">
-          <summary class="row-menu-summary" aria-label="Convert this draft">•••</summary>
+          <summary
+            class="row-menu-summary"
+            [attr.aria-label]="'pages.drafts.convert.ariaLabel' | transloco"
+          >
+            •••
+          </summary>
           <div class="row-menu-panel">
             @if (item.kind !== 'local') {
-              <button type="button" (click)="convertToLocal(item)">💾 Copy to local drafts</button>
+              <button type="button" (click)="convertToLocal(item)">
+                {{ 'pages.drafts.convert.local' | transloco }}
+              </button>
             }
             @if (item.kind !== 'paste' && featureFlags.enabled('pastebin')) {
-              <button type="button" (click)="askConvertToPaste(item)">📋 Copy to a paste…</button>
+              <button type="button" (click)="askConvertToPaste(item)">
+                {{ 'pages.drafts.convert.paste' | transloco }}
+              </button>
             }
             @if (item.kind !== 'scheduled' && !auth.isAnonymous) {
               <button type="button" (click)="askConvertToSchedule(item)">
-                ⏳ Park as a schedule…
+                {{ 'pages.drafts.convert.schedule' | transloco }}
               </button>
             }
             @if (item.kind === 'scheduled') {
               <!-- The one action here that removes its source, so it is asked
                    about and kept visually apart from the copies above it. -->
               <button type="button" class="menu-move" (click)="askUnpark(item)">
-                ↩ Unpark to a draft…
+                {{ 'pages.drafts.convert.unpark' | transloco }}
               </button>
             }
             <span class="menu-note muted">
-              Copies never remove the original. Unparking does — it asks first.
+              {{ 'pages.drafts.convert.note' | transloco }}
             </span>
           </div>
         </details>
         <button
           class="btn btn-outline btn-sm"
           type="button"
-          [title]="item.kind === 'paste' ? 'Remove from this list' : 'Remove draft'"
+          [title]="
+            (item.kind === 'paste' ? 'pages.drafts.remove.fromList' : 'pages.drafts.remove.draft')
+              | transloco
+          "
           (click)="askRemove(item)"
-          [attr.aria-label]="item.kind === 'paste' ? 'Remove from this list' : 'Remove draft'"
+          [attr.aria-label]="
+            (item.kind === 'paste' ? 'pages.drafts.remove.fromList' : 'pages.drafts.remove.draft')
+              | transloco
+          "
         >
           <span aria-hidden="true">🗑</span>
         </button>
@@ -179,10 +208,11 @@
 }
 
 @if (!auth.isAnonymous && sources.upcomingScheduled().length) {
-  <div class="page-head scheduled-head"><h2>Scheduled</h2></div>
+  <div class="page-head scheduled-head">
+    <h2>{{ 'pages.drafts.scheduled.title' | transloco }}</h2>
+  </div>
   <p class="page-note">
-    These are not drafts: they publish automatically at their set time, even with this browser
-    closed.
+    {{ 'pages.drafts.scheduled.note' | transloco }}
   </p>
 
   @for (s of sources.upcomingScheduled(); track s.id) {
@@ -195,13 +225,15 @@
             <span class="draft-visibility">· {{ s.params.visibility }}</span>
           }
           @if (s.params.spoiler_text) {
-            <span class="draft-badge">CW</span>
+            <span class="draft-badge">{{ 'pages.drafts.badges.cw' | transloco }}</span>
           }
           @if (s.params.poll) {
-            <span class="draft-badge">📊 poll</span>
+            <span class="draft-badge">{{ 'pages.drafts.badges.poll' | transloco }}</span>
           }
           @if (s.media_attachments.length) {
-            <span class="draft-badge">📎 {{ s.media_attachments.length }}</span>
+            <span class="draft-badge">{{
+              'pages.drafts.badges.attachments' | transloco: { count: s.media_attachments.length }
+            }}</span>
           }
         </div>
       </div>
@@ -210,9 +242,9 @@
           class="btn btn-outline btn-sm"
           type="button"
           (click)="pendingCancel.set(s)"
-          [title]="'Cancel scheduled ' + words().post"
+          [title]="'pages.drafts.scheduled.cancelTitle' | transloco: { post: words().post }"
         >
-          Cancel
+          {{ 'pages.drafts.cancel' | transloco }}
         </button>
       </div>
     </div>
@@ -221,9 +253,9 @@
 
 @if (pendingCancel()) {
   <app-confirm-dialog
-    [title]="'Cancel this scheduled ' + words().post + '?'"
-    message="It will be deleted from the server and never published."
-    confirmLabel="Cancel post"
+    [title]="'pages.drafts.scheduled.cancelDialog.title' | transloco: { post: words().post }"
+    [message]="'pages.drafts.scheduled.cancelDialog.message' | transloco"
+    [confirmLabel]="'pages.drafts.scheduled.cancelDialog.confirm' | transloco"
     (confirmed)="confirmCancel()"
     (cancelled)="pendingCancel.set(null)"
   />
@@ -249,15 +281,21 @@
     (click)="pendingPaste.set(null)"
     (keyup.escape)="pendingPaste.set(null)"
   ></div>
-  <div class="convert-dialog" role="dialog" aria-modal="true" aria-label="Copy to a paste service">
-    <h3>Copy to a paste service</h3>
+  <div
+    class="convert-dialog"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'pages.drafts.pasteDialog.title' | transloco"
+  >
+    <h3>{{ 'pages.drafts.pasteDialog.title' | transloco }}</h3>
     <p class="muted">
-      Publishes a copy to an external service. Your {{ kindLabel(pending.item.kind) }} stays exactly
-      where it is.
+      {{
+        'pages.drafts.pasteDialog.description' | transloco: { kind: kindLabel(pending.item.kind) }
+      }}
     </p>
 
     <label class="convert-field">
-      <span>Service</span>
+      <span>{{ 'pages.drafts.pasteDialog.service' | transloco }}</span>
       <select
         [ngModel]="pending.providerId"
         (ngModelChange)="onPasteProviderPick($event)"
@@ -270,7 +308,7 @@
     </label>
 
     <label class="convert-field">
-      <span>Language</span>
+      <span>{{ 'pages.drafts.pasteDialog.language' | transloco }}</span>
       <select
         [ngModel]="pending.language"
         (ngModelChange)="setPasteField('language', $event)"
@@ -283,7 +321,7 @@
     </label>
 
     <label class="convert-field">
-      <span>Expiry</span>
+      <span>{{ 'pages.drafts.pasteDialog.expiry' | transloco }}</span>
       <select
         [ngModel]="pending.expiry"
         (ngModelChange)="setPasteField('expiry', $event)"
@@ -297,13 +335,17 @@
 
     @if (pasteProvider(pending).immutable) {
       <p class="convert-warn">
-        ⚠ {{ pasteProvider(pending).label }} links can't be edited or deleted once created.
+        ⚠
+        {{
+          'pages.drafts.pasteDialog.immutable'
+            | transloco: { provider: pasteProvider(pending).label }
+        }}
       </p>
     }
 
     <div class="convert-actions">
       <button class="btn btn-outline btn-sm" type="button" (click)="pendingPaste.set(null)">
-        Cancel
+        {{ 'pages.drafts.cancel' | transloco }}
       </button>
       <button
         class="btn btn-sm"
@@ -311,7 +353,10 @@
         [disabled]="busy()"
         (click)="confirmConvertToPaste()"
       >
-        {{ busy() ? 'Pasting…' : 'Create paste' }}
+        {{
+          (busy() ? 'pages.drafts.pasteDialog.pasting' : 'pages.drafts.pasteDialog.create')
+            | transloco
+        }}
       </button>
     </div>
   </div>
@@ -327,15 +372,21 @@
     (click)="pendingPark.set(null)"
     (keyup.escape)="pendingPark.set(null)"
   ></div>
-  <div class="convert-dialog" role="dialog" aria-modal="true" aria-label="Park as a schedule">
-    <h3>Park as a schedule</h3>
+  <div
+    class="convert-dialog"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'pages.drafts.parkDialog.title' | transloco"
+  >
+    <h3>{{ 'pages.drafts.parkDialog.title' | transloco }}</h3>
     <p class="muted">
-      The server holds it until this date. Your {{ kindLabel(pending.item.kind) }} stays exactly
-      where it is.
+      {{
+        'pages.drafts.parkDialog.description' | transloco: { kind: kindLabel(pending.item.kind) }
+      }}
     </p>
 
     <label class="convert-field">
-      <span>Publish at</span>
+      <span>{{ 'pages.drafts.parkDialog.publishAt' | transloco }}</span>
       <input
         type="datetime-local"
         [ngModel]="pending.at"
@@ -344,13 +395,12 @@
       />
     </label>
     <p class="muted small">
-      Anything more than 10 years out lists here as a draft rather than a scheduled post. Some
-      servers refuse very distant dates — if this one does, pick a nearer one.
+      {{ 'pages.drafts.parkDialog.hint' | transloco }}
     </p>
 
     <div class="convert-actions">
       <button class="btn btn-outline btn-sm" type="button" (click)="pendingPark.set(null)">
-        Cancel
+        {{ 'pages.drafts.cancel' | transloco }}
       </button>
       <button
         class="btn btn-sm"
@@ -358,7 +408,9 @@
         [disabled]="busy()"
         (click)="confirmConvertToSchedule()"
       >
-        {{ busy() ? 'Parking…' : 'Park it' }}
+        {{
+          (busy() ? 'pages.drafts.parkDialog.parking' : 'pages.drafts.parkDialog.park') | transloco
+        }}
       </button>
     </div>
   </div>
@@ -374,20 +426,29 @@
     (click)="cancelUnpark()"
     (keyup.escape)="cancelUnpark()"
   ></div>
-  <div class="convert-dialog" role="dialog" aria-modal="true" aria-label="Unpark to a draft">
-    <h3>Unpark to a draft?</h3>
+  <div
+    class="convert-dialog"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'pages.drafts.unparkDialog.title' | transloco"
+  >
+    <h3>{{ 'pages.drafts.unparkDialog.title' | transloco }}</h3>
     <p class="muted">
-      It comes back as a local draft in this browser, and the server stops holding it — so it will
-      not publish itself on its parked date.
+      {{ 'pages.drafts.unparkDialog.description' | transloco }}
     </p>
     <p class="muted small">
-      This is the one conversion here that removes the original. Everything else copies.
+      {{ 'pages.drafts.unparkDialog.note' | transloco }}
     </p>
 
     <div class="convert-actions">
-      <button class="btn btn-outline btn-sm" type="button" (click)="cancelUnpark()">Cancel</button>
+      <button class="btn btn-outline btn-sm" type="button" (click)="cancelUnpark()">
+        {{ 'pages.drafts.cancel' | transloco }}
+      </button>
       <button class="btn btn-sm" type="button" [disabled]="busy()" (click)="confirmUnpark()">
-        {{ busy() ? 'Unparking…' : 'Unpark it' }}
+        {{
+          (busy() ? 'pages.drafts.unparkDialog.unparking' : 'pages.drafts.unparkDialog.unpark')
+            | transloco
+        }}
       </button>
     </div>
   </div>

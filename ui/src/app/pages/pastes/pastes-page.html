@@ -1,9 +1,11 @@
-<div class="page-head"><h2>Pastes</h2></div>
+<div class="page-head">
+  <h2>{{ 'pages.pastes.title' | transloco }}</h2>
+</div>
 <p class="page-note">
-  Paste links and edit keys are saved only in this browser. Clearing site data removes your ability
-  to edit or delete them. Short-link services (TinyURL) are permanent and public: those links cannot
-  be edited or deleted afterwards. Your use of each service is governed by its own terms — see
-  <a routerLink="/credits">Credits &amp; Privacy</a>.
+  {{ 'pages.pastes.note.a' | transloco }}
+  {{ 'pages.pastes.note.b' | transloco }}
+  <a routerLink="/credits">{{ 'pages.pastes.note.creditsPrivacy' | transloco }}</a
+  >.
 </p>
 
 <div class="paste-tabs" role="tablist">
@@ -13,7 +15,7 @@
     [attr.aria-selected]="tab() === 'mine'"
     (click)="selectTab('mine')"
   >
-    My Pastes
+    {{ 'pages.pastes.tabs.mine' | transloco }}
   </button>
   <button
     role="tab"
@@ -21,7 +23,7 @@
     [attr.aria-selected]="tab() === 'feeds'"
     (click)="selectTab('feeds')"
   >
-    Public Paste Feeds
+    {{ 'pages.pastes.tabs.feeds' | transloco }}
   </button>
 </div>
 
@@ -39,25 +41,23 @@
 
 @if (tab() === 'feeds') {
   <section class="feed-settings" aria-labelledby="paste-feeds-heading">
-    <h3 id="paste-feeds-heading">Public paste feeds</h3>
-    <p class="muted">
-      These feeds are optional. Following one adds its recent public pastes to Home. Feeds are per
-      account — following one here doesn't follow it for your other accounts.
-    </p>
+    <h3 id="paste-feeds-heading">{{ 'pages.pastes.feeds.heading' | transloco }}</h3>
+    <p class="muted">{{ 'pages.pastes.feeds.intro' | transloco }}</p>
 
     <!-- These hosts refuse cross-origin requests, so the proxy isn't a fallback
          for the unlucky few: it is the only way to read them at all. Still
          opt-in per feed, and still never switched on automatically. -->
     <p class="muted small proxy-summary">
       @if (proxyLabel(); as label) {
-        Paste feeds can be fetched through {{ label }}. Turn it on per feed below — the proxy will
-        see that feed's address and its contents.
+        {{ 'pages.pastes.feeds.proxyConfigured' | transloco: { label: label } }}
       } @else {
-        No CORS proxy is set up. These services block browser access, so their feeds can't be read
-        without one.
+        {{ 'pages.pastes.feeds.proxyMissing' | transloco }}
       }
       <a [routerLink]="['/settings/connections/cors-proxy']">
-        {{ proxyLabel() ? 'Change' : 'Set one up' }}
+        {{
+          (proxyLabel() ? 'pages.pastes.feeds.changeProxy' : 'pages.pastes.feeds.setupProxy')
+            | transloco
+        }}
       </a>
     </p>
 
@@ -66,28 +66,36 @@
         <div>
           <strong>{{ provider.label }}</strong>
           @if (usesProxy(provider)) {
-            <span class="proxy-badge" title="Fetched through your CORS proxy">via proxy</span>
+            <span class="proxy-badge" [title]="'pages.pastes.feeds.proxyTitle' | transloco">
+              {{ 'pages.pastes.feeds.viaProxy' | transloco }}
+            </span>
           }
           <div class="muted small">{{ provider.feedUrl }}</div>
           @if (needsKey(provider)) {
             <div class="muted small">
-              Needs a Pastepile key — there's nothing to list until your pastes are tagged with one.
+              {{ 'pages.pastes.feeds.needsKey' | transloco }}
             </div>
           }
         </div>
         <div class="feed-actions">
           @if (proxyLabel()) {
-            <label class="proxy-switch muted small" [title]="'Fetch through ' + proxyLabel()">
+            <label
+              class="proxy-switch muted small"
+              [title]="'pages.pastes.feeds.fetchThrough' | transloco: { label: proxyLabel() }"
+            >
               <input
                 type="checkbox"
                 [checked]="usesProxy(provider)"
                 (change)="toggleProxy(provider)"
               />
-              via proxy
+              {{ 'pages.pastes.feeds.viaProxy' | transloco }}
             </label>
           }
           <button class="btn btn-outline btn-sm" type="button" (click)="toggleFeed(provider)">
-            {{ isFollowing(provider) ? 'Unfollow' : 'Follow' }} {{ feedNoun(provider) }}
+            {{
+              (isFollowing(provider) ? 'pages.pastes.feeds.unfollow' : 'pages.pastes.feeds.follow')
+                | transloco: { noun: feedNoun(provider) }
+            }}
           </button>
         </div>
       </div>
@@ -97,53 +105,53 @@
          own paste". Free, no account — so this is a button, not a field that
          sends people looking for a signup page. -->
     <section class="pastepile-key" aria-labelledby="pastepile-key-heading">
-      <h4 id="pastepile-key-heading">Pastepile API key (optional)</h4>
+      <h4 id="pastepile-key-heading">{{ 'pages.pastes.key.heading' | transloco }}</h4>
       @if (pastepileKey.connected()) {
         <p class="muted small">
-          Pastes you create are tagged with your key
-          <code>{{ pastepileKey.prefix() }}…</code> ({{ pastepileKey.plan() }} plan), so they show
-          up in “My pastes” — unlisted ones included. Shared by every account in this browser.
+          {{ 'pages.pastes.key.createdIntro' | transloco }}
+          <code>{{ pastepileKey.prefix() }}…</code>
+          (<span>{{ 'pages.pastes.key.plan' | transloco: { plan: pastepileKey.plan() } }}</span
+          >),
+          {{ 'pages.pastes.key.createdDetails' | transloco }}
           @if (!pastepileKey.allowsNeverExpiry()) {
-            A free key can't create never-expiring pastes, so that option is hidden while it's in
-            use.
+            {{ 'pages.pastes.key.neverExpiry' | transloco }}
           }
         </p>
         <div class="feed-row">
-          <span class="muted small">A key is saved.</span>
+          <span class="muted small">{{ 'pages.pastes.key.saved' | transloco }}</span>
           <button
             class="btn btn-outline btn-sm"
             type="button"
             [disabled]="keyBusy()"
             (click)="removeKey()"
           >
-            {{ keyBusy() ? 'Removing…' : 'Revoke and remove key' }}
+            {{ (keyBusy() ? 'pages.pastes.key.removing' : 'pages.pastes.key.revoke') | transloco }}
           </button>
         </div>
       } @else {
         <p class="muted small">
-          Without a key, pastes are anonymous and you can't pick your own out of the public feed. A
-          key is free, needs no account, and makes your pastes listable under “My pastes”.
+          {{ 'pages.pastes.key.anonymous' | transloco }}
         </p>
         <button class="btn btn-sm" type="button" [disabled]="keyBusy()" (click)="generateKey()">
-          {{ keyBusy() ? 'Getting a key…' : 'Get a free key' }}
+          {{ (keyBusy() ? 'pages.pastes.key.getting' : 'pages.pastes.key.getFree') | transloco }}
         </button>
       }
     </section>
   </section>
 } @else {
   @if (!history.records().length) {
-    <p class="muted center">Pastes created in this browser will appear here.</p>
+    <p class="muted center">{{ 'pages.pastes.empty' | transloco }}</p>
   } @else {
     <div class="paste-list">
       @for (paste of history.records(); track paste.providerId + ':' + paste.slug) {
         <article class="paste-card">
           @if (editing() === paste.slug) {
             <label>
-              <span>Title</span>
+              <span>{{ 'pages.pastes.edit.title' | transloco }}</span>
               <input type="text" [ngModel]="editTitle()" (ngModelChange)="editTitle.set($event)" />
             </label>
             <label>
-              <span>Language</span>
+              <span>{{ 'pages.pastes.edit.language' | transloco }}</span>
               <select [ngModel]="editLanguage()" (ngModelChange)="editLanguage.set($event)">
                 @for (
                   language of providers.get(paste.providerId)?.languages ?? [];
@@ -154,7 +162,7 @@
               </select>
             </label>
             <label>
-              <span>Paste</span>
+              <span>{{ 'pages.pastes.edit.content' | transloco }}</span>
               <textarea
                 rows="12"
                 [ngModel]="editContent()"
@@ -168,16 +176,19 @@
                 [disabled]="busy() === paste.slug || !editContent().trim()"
                 (click)="save(paste)"
               >
-                {{ busy() === paste.slug ? 'Saving…' : 'Save changes' }}
+                {{
+                  (busy() === paste.slug ? 'pages.pastes.edit.saving' : 'pages.pastes.edit.save')
+                    | transloco
+                }}
               </button>
               <button class="btn btn-outline btn-sm" type="button" (click)="cancelEdit()">
-                Cancel
+                {{ 'pages.pastes.edit.cancel' | transloco }}
               </button>
             </div>
           } @else {
             <div class="paste-card-head">
               <div>
-                <h3>{{ paste.title || 'Untitled paste' }}</h3>
+                <h3>{{ paste.title || ('pages.pastes.untitled' | transloco) }}</h3>
                 <div class="muted small">
                   {{ paste.providerLabel }} · {{ paste.language }} · {{ paste.visibility }} ·
                   {{ paste.createdAt | humanTime }}
@@ -188,7 +199,7 @@
             <pre>{{ paste.content }}</pre>
             <div class="paste-actions">
               <a class="btn btn-sm" [href]="paste.url" target="_blank" rel="noopener noreferrer">
-                Open paste ↗
+                {{ 'pages.pastes.actions.open' | transloco }}
               </a>
               <a
                 class="btn btn-outline btn-sm"
@@ -196,40 +207,43 @@
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Raw ↗
+                {{ 'pages.pastes.actions.raw' | transloco }}
               </a>
               <button
                 class="btn btn-outline btn-sm"
                 type="button"
                 [class.active]="sharing() === paste.slug"
                 (click)="toggleShare(paste)"
-                [title]="words().Post + ' a link to this paste on Mastodon or Bluesky'"
+                [title]="'pages.pastes.actions.shareTitle' | transloco: { post: words().Post }"
               >
-                {{ sharing() === paste.slug ? 'Close share' : 'Share ↗' }}
+                {{
+                  (sharing() === paste.slug
+                    ? 'pages.pastes.actions.closeShare'
+                    : 'pages.pastes.actions.share'
+                  ) | transloco
+                }}
               </button>
               <button
                 class="btn btn-outline btn-sm"
                 type="button"
                 (click)="editForPost(paste)"
                 [title]="
-                  'Open in the composer with a live ' +
-                  words().Post +
-                  ' button — this paste stays put'
+                  'pages.pastes.actions.editForPostTitle' | transloco: { post: words().Post }
                 "
               >
-                Edit for post
+                {{ 'pages.pastes.actions.editForPost' | transloco: { post: words().post } }}
               </button>
               <button
                 class="btn btn-outline btn-sm"
                 type="button"
                 (click)="convertToDraft(paste)"
-                title="Copy into your local drafts — this paste stays put"
+                [title]="'pages.pastes.actions.toDraftTitle' | transloco"
               >
-                💾 To draft
+                {{ 'pages.pastes.actions.toDraft' | transloco }}
               </button>
               @if (!isImmutable(paste.providerId)) {
                 <button class="btn btn-outline btn-sm" type="button" (click)="beginEdit(paste)">
-                  Edit
+                  {{ 'pages.pastes.actions.edit' | transloco }}
                 </button>
                 <button
                   class="btn btn-outline btn-sm danger"
@@ -237,23 +251,24 @@
                   [disabled]="busy() === paste.slug"
                   (click)="delete(paste)"
                 >
-                  Delete remotely
+                  {{ 'pages.pastes.actions.deleteRemote' | transloco }}
                 </button>
               }
               <button class="btn btn-outline btn-sm" type="button" (click)="forget(paste)">
-                Forget link
+                {{ 'pages.pastes.actions.forget' | transloco }}
               </button>
             </div>
             @if (sharing() === paste.slug) {
               <div class="paste-share">
                 <p class="muted small">
-                  Share the link. The paste lives at {{ paste.providerLabel }} — the post below just
-                  points to it. Pick Mastodon or Bluesky in the composer.
+                  {{
+                    'pages.pastes.share.description' | transloco: { provider: paste.providerLabel }
+                  }}
                 </p>
                 <app-compose
                   [compact]="true"
                   [initialText]="shareText(paste)"
-                  placeholder="Say something about your paste…"
+                  [placeholder]="'pages.pastes.share.placeholder' | transloco"
                   (posted)="onShared()"
                 />
               </div>

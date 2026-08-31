@@ -13,6 +13,58 @@ import { JustMyServer } from '../../just-my-server';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { BlueskyTrends } from '../../providers/bluesky/bluesky-trends';
 import { networkSources } from '../network-sources';
+import { TranslocoPipe } from '@jsverse/transloco';
+
+// i18n shell.rail.endorsement: endorsement
+// i18n shell.rail.houseEndorsement: House endorsement
+// i18n shell.rail.hideAd: Hide this until you reload
+// i18n shell.rail.singleServerMode: Single Server Mode
+// i18n shell.rail.justMyServer: Just My Server
+// i18n shell.rail.justMyServerAria: Just My Server mode
+// i18n shell.rail.homeOnly: Home shows only people you follow on {{server}}. Remote boosts stay out.
+// i18n shell.rail.checkingFriends: Checking friends…
+// i18n shell.rail.updateMyServer: Update My Server list
+// i18n shell.rail.checkingGenerated: Checking for the generated list…
+// i18n shell.rail.updateBeforeEnable: Update the list before turning this mode on.
+// i18n shell.rail.updateResult: Added {{added}} · Removed {{removed}} · Already present {{alreadyPresent}} · Failed {{failed}}
+// i18n shell.rail.entryway: entryway
+// i18n shell.rail.selfHosted: self-hosted
+// i18n shell.rail.yourBluesky: Your Bluesky
+// i18n shell.rail.trendingBluesky: Trending on Bluesky
+// i18n shell.rail.fediverse: Fediverse
+// i18n shell.rail.news: News
+// i18n shell.rail.trendingPosts: Trending posts
+// i18n shell.rail.allFeeds: All feeds
+// i18n shell.rail.keepNetworkRunning: Keep the network running
+// i18n shell.rail.donateTo: 💙 Donate to {{server}}
+// i18n shell.rail.yourSearchServer: Your search server
+// i18n shell.rail.donateSearch: 🔍 Donate to {{server}}
+// i18n shell.rail.donateMastodon: 🐘 Donate to Mastodon
+// i18n shell.rail.activeThisMonth: {{count}} active this month
+// i18n shell.rail.feedsPostingTitle: Feeds, profiles and posting: {{server}}
+// i18n shell.rail.feedsPosting: Feeds & posting
+// i18n shell.rail.searchRunsOn: Search runs on {{server}}
+// i18n shell.rail.search: 🔍 Search
+// i18n shell.rail.announcements: 📣 Announcements
+// i18n shell.rail.new: new
+// i18n shell.rail.allRead: all read
+// i18n shell.rail.dismissAll: Dismiss all
+// i18n shell.rail.copyShareTitle: Copy a link that opens this server anonymously
+// i18n shell.rail.shareServer: Share this server
+// i18n shell.rail.shareDescription: This link opens Mawkingbird anonymously on {{server}}. Copy it to share — it won't take you anywhere.
+// i18n shell.rail.shareLinkAria: Shareable server link
+// i18n shell.rail.copy: Copy
+// i18n shell.rail.copied: Copied to clipboard.
+// i18n shell.rail.copyFailed: Couldn't copy automatically — select the text above and copy it manually.
+// i18n shell.rail.close: Close
+// i18n shell.rail.updateTitle: Update My Server list?
+// i18n shell.rail.user.one: user
+// i18n shell.rail.user.other: users
+// i18n shell.rail.updatePrompt: Add {{addCount}} {{addWord}} and remove {{removeCount}} {{removeWord}} so the list contains only friends on {{server}}?
+// i18n shell.rail.alreadyPresent: {{count}} already present. The list is <strong>{{title}}</strong>.
+// i18n shell.rail.cancel: Cancel
+// i18n shell.rail.updating: Updating…
+// i18n shell.rail.updateList: Update list
 
 /**
  * Right sidebar: house ads (inventory lives in house-ads.ts — edit that file to
@@ -23,7 +75,7 @@ import { networkSources } from '../network-sources';
  */
 @Component({
   selector: 'app-right-rail',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './right-rail.html',
   styleUrl: './right-rail.css',
 })

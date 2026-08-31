@@ -13,6 +13,35 @@ import { outboundLinks } from '../../../providers/article/article-target';
 import { PageDiagnostics } from '../../../page-diagnostics';
 import { firstValueFrom } from 'rxjs';
 import { Status } from '../../../models';
+import { TranslocoPipe } from '@jsverse/transloco';
+
+// i18n pages.rss.kits.startWithKit: Start with a kit
+// i18n pages.rss.kits.intro: One click subscribes you to a themed set of feeds, filed into its own folder. You can remove any of them later on the
+// i18n pages.rss.kits.page:  page.
+// i18n pages.rss.kits.feedCount.one: {{count}} feed
+// i18n pages.rss.kits.feedCount.other: {{count}} feeds
+// i18n pages.rss.kits.addingProgress: Adding {{done}}/{{total}}…
+// i18n pages.rss.kits.add: Add
+// i18n pages.rss.kits.tooLarge: Some kits are larger than your remaining subscription slots ({{remaining}} left of {{limit}}).
+// i18n pages.rss.kits.raiseLimit: Raise the limit to {{limit}}
+// i18n pages.rss.kits.toFitAll: to fit them all.
+// i18n pages.rss.kits.feedsFromFollowing: Feeds from people you follow
+// i18n pages.rss.kits.discoveryIntro: Checks the sites linked in your timeline for an RSS or Atom feed. Nothing is subscribed until you say so.
+// i18n pages.rss.kits.needsProxy: This needs a
+// i18n pages.rss.kits.browserFetch:  — the sites have to be fetched from your browser.
+// i18n pages.rss.kits.checkingSites: Checking sites…
+// i18n pages.rss.kits.lookForFeeds: Look for feeds
+// i18n pages.rss.kits.linkedBy: linked by &#64;{{via}}
+// i18n pages.rss.kits.adding: Adding…
+// i18n pages.rss.kits.noFeedsFound.one: No feeds found on the {{count}} site checked. Many sites don't declare one, and some block being read this way.
+// i18n pages.rss.kits.noFeedsFound.other: No feeds found on the {{count}} sites checked. Many sites don't declare one, and some block being read this way.
+// i18n pages.rss.kits.added.one: Added {{count}} feed.
+// i18n pages.rss.kits.added.other: Added {{count}} feeds.
+// i18n pages.rss.kits.alreadySubscribed: {{count}} already subscribed.
+// i18n pages.rss.kits.skipped: {{count}} skipped — you're at your
+// i18n pages.rss.kits.subscriptionLimit: subscription limit
+// i18n pages.rss.kits.couldntLoad: Couldn't load {{count}}: {{names}}.
+// i18n pages.rss.kits.usuallyNeed: These usually need a
 
 /**
  * The one-click starter kits offered on `/rss`.
@@ -24,7 +53,7 @@ import { Status } from '../../../models';
  */
 @Component({
   selector: 'app-rss-starter-kits-panel',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './rss-starter-kits-panel.html',
   styleUrl: './rss-starter-kits-panel.css',
 })

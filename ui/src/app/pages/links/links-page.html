@@ -1,33 +1,29 @@
 <div class="spage-head">
-  <h1>🔗 Links</h1>
-  <p>
-    Short links you have made. Create new ones with your connected shortener, and delete the ones
-    you no longer want redirecting.
-  </p>
+  <h1>{{ 'pages.links.title' | transloco }}</h1>
+  <p>{{ 'pages.links.intro' | transloco }}</p>
 </div>
 
 @if (blocked(); as reason) {
   <section class="setup-callout">
     <p>{{ reason }}</p>
     <a class="btn" [routerLink]="['/settings/connections/link-shortener']">
-      Set up a link shortener
+      {{ 'pages.links.setup' | transloco }}
     </a>
-    <p class="muted small">
-      TinyURL and is.gd work straight away with no account at all. Dub, Short.io, T.LY and Rebrandly
-      need a free or paid account, and can list and delete links afterwards.
-    </p>
+    <p class="muted small">{{ 'pages.links.setupProviders' | transloco }}</p>
   </section>
 } @else if (entry(); as service) {
   <form class="create-form" (ngSubmit)="create()">
-    <h2 class="section-title">New short link with {{ service.label }}</h2>
+    <h2 class="section-title">
+      {{ 'pages.links.newWith' | transloco: { service: service.label } }}
+    </h2>
 
     <label class="field">
-      <span class="field-label">Destination URL</span>
+      <span class="field-label">{{ 'pages.links.destination' | transloco }}</span>
       <input
         type="url"
         name="destination"
         autocomplete="off"
-        placeholder="https://example.com/the-long-url"
+        [placeholder]="'pages.links.destinationPlaceholder' | transloco"
         [ngModel]="destination()"
         (ngModelChange)="destination.set($event)"
       />
@@ -38,13 +34,14 @@
         @if (caps.customSlug) {
           <label class="field">
             <span class="field-label"
-              >Custom back-half <span class="muted small">(optional)</span></span
+              >{{ 'pages.links.customBackHalf' | transloco }}
+              <span class="muted small">{{ 'pages.links.optional' | transloco }}</span></span
             >
             <input
               type="text"
               name="slug"
               autocomplete="off"
-              placeholder="my-link"
+              [placeholder]="'pages.links.slugPlaceholder' | transloco"
               [ngModel]="slug()"
               (ngModelChange)="slug.set($event)"
             />
@@ -52,7 +49,10 @@
         }
         @if (caps.title) {
           <label class="field">
-            <span class="field-label">Title <span class="muted small">(optional)</span></span>
+            <span class="field-label"
+              >{{ 'pages.links.titleLabel' | transloco }}
+              <span class="muted small">{{ 'pages.links.optional' | transloco }}</span></span
+            >
             <input
               type="text"
               name="title"
@@ -64,7 +64,10 @@
         }
         @if (caps.description) {
           <label class="field">
-            <span class="field-label">Description <span class="muted small">(optional)</span></span>
+            <span class="field-label"
+              >{{ 'pages.links.description' | transloco }}
+              <span class="muted small">{{ 'pages.links.optional' | transloco }}</span></span
+            >
             <input
               type="text"
               name="description"
@@ -78,23 +81,23 @@
     }
 
     <button class="btn" type="submit" [disabled]="creating() || !destination().trim()">
-      {{ creating() ? 'Shortening…' : 'Shorten' }}
+      {{ (creating() ? 'pages.links.shortening' : 'pages.links.shorten') | transloco }}
     </button>
   </form>
 }
 
 <section class="list-head">
-  <h2 class="section-title">Your links</h2>
+  <h2 class="section-title">{{ 'pages.links.yourLinks' | transloco }}</h2>
   <form class="search-form" (ngSubmit)="reload()">
     <input
       type="search"
       name="linkSearch"
-      placeholder="Search links"
+      [placeholder]="'pages.links.searchPlaceholder' | transloco"
       [ngModel]="search()"
       (ngModelChange)="search.set($event)"
     />
     <button class="btn btn-outline" type="submit" [disabled]="loading()">
-      {{ loading() ? 'Loading…' : 'Search' }}
+      {{ (loading() ? 'pages.links.loading' : 'pages.links.search') | transloco }}
     </button>
   </form>
 </section>
@@ -107,10 +110,7 @@
 }
 
 @if (!loading() && !links().length) {
-  <p class="muted empty">
-    No links yet. Anything you shorten here — and any messages you have shared as a link from the
-    Pastes page — will show up in this list.
-  </p>
+  <p class="muted empty">{{ 'pages.links.empty' | transloco }}</p>
 }
 
 <ul class="link-list">
@@ -119,7 +119,7 @@
       @if (editing() === key(record)) {
         <form class="edit-form" (ngSubmit)="saveEdit(record)">
           <label class="field">
-            <span class="field-label">Destination URL</span>
+            <span class="field-label">{{ 'pages.links.destination' | transloco }}</span>
             <input
               type="url"
               name="editDestination"
@@ -129,7 +129,7 @@
           </label>
           @if (capabilities()?.title) {
             <label class="field">
-              <span class="field-label">Title</span>
+              <span class="field-label">{{ 'pages.links.titleLabel' | transloco }}</span>
               <input
                 type="text"
                 name="editTitle"
@@ -140,7 +140,7 @@
           }
           @if (capabilities()?.customSlug) {
             <label class="field">
-              <span class="field-label">Back-half</span>
+              <span class="field-label">{{ 'pages.links.backHalf' | transloco }}</span>
               <input
                 type="text"
                 name="editSlug"
@@ -150,8 +150,12 @@
             </label>
           }
           <div class="row-actions">
-            <button class="btn" type="submit" [disabled]="busyRow() === key(record)">Save</button>
-            <button class="btn btn-outline" type="button" (click)="cancelEdit()">Cancel</button>
+            <button class="btn" type="submit" [disabled]="busyRow() === key(record)">
+              {{ 'pages.links.save' | transloco }}
+            </button>
+            <button class="btn btn-outline" type="button" (click)="cancelEdit()">
+              {{ 'pages.links.cancel' | transloco }}
+            </button>
           </div>
         </form>
       } @else {
@@ -167,7 +171,7 @@
                  query string. Showing it raw would be a wall of percent-escapes,
                  so the row says what the link is instead. -->
             <span class="destination muted small">
-              A message you shared — the text is inside the link itself.
+              {{ 'pages.links.messageDestination' | transloco }}
             </span>
           } @else {
             <a
@@ -182,13 +186,15 @@
             <span class="origin">{{ record.provider }}</span>
             @if (isMessage(record)) {
               <span aria-hidden="true">·</span>
-              <span class="kind-tag">message</span>
+              <span class="kind-tag">{{ 'pages.links.message' | transloco }}</span>
             }
             <span aria-hidden="true">·</span>
             <span>{{ record.recordedAt | humanTime }}</span>
             @if (record.expiresAt) {
               <span aria-hidden="true">·</span>
-              <span>expires {{ record.expiresAt | humanTime }}</span>
+              <span>
+                {{ 'pages.links.expires' | transloco: { time: record.expiresAt | humanTime } }}
+              </span>
             }
           </span>
         </div>
@@ -197,25 +203,29 @@
           @if (readOnly(record)) {
             <span class="muted small">
               @if (isMessage(record)) {
-                Permanent — a shared message can't be edited
+                {{ 'pages.links.readOnly.message' | transloco }}
               } @else if (record.readOnly) {
-                Permanent — made without an account
+                {{ 'pages.links.readOnly.anonymous' | transloco }}
               } @else if (record.provider !== settings.activeId()) {
-                Switch to {{ record.provider }} to manage this
+                {{
+                  'pages.links.readOnly.switchProvider' | transloco: { provider: record.provider }
+                }}
               } @else {
-                This service can't edit or delete links
+                {{ 'pages.links.readOnly.unsupported' | transloco }}
               }
             </span>
           } @else if (confirmingDelete() === key(record)) {
-            <span class="muted small">Delete this link?</span>
-            <button class="btn btn-danger" type="button" (click)="remove(record)">Delete</button>
+            <span class="muted small">{{ 'pages.links.deleteConfirm' | transloco }}</span>
+            <button class="btn btn-danger" type="button" (click)="remove(record)">
+              {{ 'pages.links.delete' | transloco }}
+            </button>
             <button class="btn btn-outline" type="button" (click)="confirmingDelete.set(null)">
-              Keep
+              {{ 'pages.links.keep' | transloco }}
             </button>
           } @else {
             @if (canEdit(record)) {
               <button class="btn btn-outline" type="button" (click)="startEdit(record)">
-                Edit
+                {{ 'pages.links.edit' | transloco }}
               </button>
             }
             @if (canDelete(record)) {
@@ -224,7 +234,7 @@
                 type="button"
                 (click)="confirmingDelete.set(key(record))"
               >
-                Delete
+                {{ 'pages.links.delete' | transloco }}
               </button>
             }
           }

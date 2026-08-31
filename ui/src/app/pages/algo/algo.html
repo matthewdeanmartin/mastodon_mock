@@ -1,12 +1,16 @@
 <div class="algo-bar">
-  <div class="algo-chips" role="group" aria-label="Filter the Algo feed">
+  <div
+    class="algo-chips"
+    role="group"
+    [attr.aria-label]="'pages.algo.filter.ariaLabel' | transloco"
+  >
     <button
       type="button"
       class="btn btn-outline btn-sm"
       [class.active]="prefs.algoAudience() === 'all'"
       (click)="setAudience('all')"
     >
-      All
+      {{ 'pages.algo.filter.all' | transloco }}
     </button>
     <button
       type="button"
@@ -14,14 +18,11 @@
       [class.active]="prefs.algoAudience() === 'friends'"
       (click)="setAudience('friends')"
       [title]="
-        'Only ' +
-        words().posts +
-        ' written by people you follow — no ' +
-        words().boosts +
-        ', no hashtag finds'
+        'pages.algo.filter.friendsTitle'
+          | transloco: { posts: words().posts, boosts: words().boosts }
       "
     >
-      Friends
+      {{ 'pages.algo.filter.friends' | transloco }}
     </button>
     @if (prefs.algoAudience() === 'all') {
       <button
@@ -29,9 +30,9 @@
         class="btn btn-outline btn-sm"
         [class.active]="prefs.algoTags()"
         (click)="toggleTags()"
-        [title]="'Include popular recent ' + words().posts + ' from hashtags you follow'"
+        [title]="'pages.algo.filter.tagsTitle' | transloco: { posts: words().posts }"
       >
-        Tags
+        {{ 'pages.algo.filter.tags' | transloco }}
       </button>
     }
     <button
@@ -39,15 +40,9 @@
       class="btn btn-outline btn-sm"
       [class.active]="prefs.algoCalm()"
       (click)="toggleCalm()"
-      [title]="
-        'Hide ' +
-        words().posts +
-        ' that read as inflammatory: heated wording, quote-dunks, and ratioed ' +
-        words().posts +
-        ' (all detected on-device — no server involved)'
-      "
+      [title]="'pages.algo.filter.calmTitle' | transloco: { posts: words().posts }"
     >
-      😌 Calm
+      {{ 'pages.algo.filter.calm' | transloco }}
     </button>
     <app-feed-language-picker />
     <button
@@ -56,38 +51,50 @@
       [class.active]="linksView()"
       [attr.aria-pressed]="linksView()"
       (click)="toggleLinks()"
-      [title]="'Show only the link previews from these ranked ' + words().posts"
+      [title]="'pages.algo.filter.linksTitle' | transloco: { posts: words().posts }"
     >
-      🔗 Links
+      {{ 'pages.algo.filter.links' | transloco }}
     </button>
     <button
       type="button"
       class="btn btn-outline btn-sm"
       (click)="shuffle()"
       [disabled]="feed.loading()"
-      [title]="'Re-deal the same ' + words().posts + ' in a random order'"
+      [title]="'pages.algo.filter.shuffleTitle' | transloco: { posts: words().posts }"
     >
-      🔀 Shuffle
+      {{ 'pages.algo.filter.shuffle' | transloco }}
     </button>
     <button
       type="button"
       class="btn btn-outline btn-sm"
       (click)="refresh()"
       [disabled]="feed.loading()"
-      title="Rebuild the feed from fresh data"
+      [title]="'pages.algo.filter.refreshTitle' | transloco"
     >
-      🔄 Refresh
+      {{ 'pages.algo.filter.refresh' | transloco }}
     </button>
   </div>
   @if (feed.builtAt() !== null) {
     <p class="algo-meta muted small">
-      {{ feed.posts().length }} {{ words().posts }} from {{ feed.callsUsed() }}
-      {{ auth.isAnonymous ? 'public source loads' : 'API calls' }}
+      {{
+        'pages.algo.meta.summary'
+          | transloco
+            : {
+                count: feed.posts().length,
+                posts: words().posts,
+                calls: feed.callsUsed(),
+                callsLabel:
+                  (auth.isAnonymous
+                    ? 'pages.algo.meta.publicSourceLoads'
+                    : 'pages.algo.meta.apiCalls'
+                  ) | transloco,
+              }
+      }}
       @if (feed.hashtag(); as tag) {
-        · sampled #{{ tag }}
+        {{ 'pages.algo.meta.sampledHashtag' | transloco: { tag: tag } }}
       }
       @if (calmHidden(); as hidden) {
-        · calm mode hid {{ hidden }}
+        {{ 'pages.algo.meta.calmHidden' | transloco: { count: hidden } }}
       }
     </p>
   }
@@ -97,29 +104,33 @@
   <!-- A build is a dozen-odd sequential requests. Without a number moving under
        it, a first-time reader cannot tell this apart from a frozen page. -->
   <p class="muted center">
-    Gathering the good stuff…
+    {{ 'pages.algo.loading.gathering' | transloco }}
     @if (feed.callsUsed()) {
       <br />
-      <span class="small">{{ feed.callsUsed() }} of up to {{ maxCalls }} API calls</span>
+      <span class="small">
+        {{
+          'pages.algo.loading.progress' | transloco: { calls: feed.callsUsed(), maxCalls: maxCalls }
+        }}
+      </span>
     }
   </p>
 } @else if (feed.error()) {
-  <p class="muted center">Couldn’t build your Algo feed. Try refreshing.</p>
+  <p class="muted center">{{ 'pages.algo.error.build' | transloco }}</p>
 } @else if (!visible().length) {
   <div class="muted center">
-    <p>Nothing here yet — follow some people and hashtags, or RSS feeds, then refresh.</p>
+    <p>{{ 'pages.algo.empty.follow' | transloco }}</p>
     @if (auth.isAnonymous) {
-      <p class="small">Home and Algo only fetch when you ask them to.</p>
+      <p class="small">{{ 'pages.algo.empty.anonymous' | transloco }}</p>
     }
   </div>
 } @else if (linksView()) {
   @if (!links().length) {
     <div class="muted center">
-      <p>No link previews in these posts.</p>
-      <p class="small">Try All, Tags, or Refresh to widen the selection.</p>
+      <p>{{ 'pages.algo.links.empty' | transloco }}</p>
+      <p class="small">{{ 'pages.algo.links.widen' | transloco }}</p>
     </div>
   } @else {
-    <div class="algo-links" aria-label="Links from the Algo feed">
+    <div class="algo-links" [attr.aria-label]="'pages.algo.links.ariaLabel' | transloco">
       @for (link of links(); track link.status.id) {
         <article class="algo-link-card">
           <a
@@ -148,12 +159,26 @@
             </span>
           </a>
           <footer class="algo-link-meta muted small">
-            <span>{{ sourceLabel(link.post) }} · &#64;{{ link.status.account.acct }}</span>
+            <span
+              >{{ sourceLabelKey(link.post) | transloco }} · &#64;{{
+                link.status.account.acct
+              }}</span
+            >
             <span class="algo-link-engagement">
-              <span [attr.aria-label]="link.status.favourites_count + ' favourites'">
+              <span
+                [attr.aria-label]="
+                  'pages.algo.engagement.favourites'
+                    | transloco: { count: link.status.favourites_count }
+                "
+              >
                 ♥ {{ link.status.favourites_count }}
               </span>
-              <span [attr.aria-label]="link.status.reblogs_count + ' ' + words().boosts">
+              <span
+                [attr.aria-label]="
+                  'pages.algo.engagement.boosts'
+                    | transloco: { count: link.status.reblogs_count, boosts: words().boosts }
+                "
+              >
                 ↻ {{ link.status.reblogs_count }}
               </span>
             </span>
@@ -165,7 +190,7 @@
 } @else {
   @for (p of visible(); track p.status.id) {
     <div class="algo-item">
-      <p class="algo-source muted small">{{ sourceLabel(p) }}</p>
+      <p class="algo-source muted small">{{ sourceLabelKey(p) | transloco }}</p>
       <app-status-card
         [status]="p.status"
         (changed)="onChanged(p, $event)"

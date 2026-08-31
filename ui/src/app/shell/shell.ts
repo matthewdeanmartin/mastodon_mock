@@ -33,6 +33,86 @@ import { FirstRunChoice, FirstRunModal } from '../first-run/first-run-modal';
 import { PreviewSeed } from '../first-run/preview-seed';
 import { PlusBadgeEntitlement } from '../providers/account/plus-badge-entitlement';
 import { PLUS_PRICE_USD_PER_YEAR, visiblePlusBenefits } from '../plus-benefits';
+import { TranslocoService, TranslocoPipe } from '@jsverse/transloco';
+
+// i18n shell.testDeployment: Test deployment — nothing here is real. Payments use Stripe's sandbox and no money moves. The real app is at
+// i18n shell.deployment.canary: Canary
+// i18n shell.deployment.test: Test
+// i18n shell.skipToMain: Skip to main content
+// i18n shell.plan.state.checking: Checking…
+// i18n shell.plan.state.plus: Plus
+// i18n shell.plan.state.unavailable: Plan?
+// i18n shell.plan.state.free: Free
+// i18n shell.plan.badgePlusAria: Mawkingbird Plus active — show plan details
+// i18n shell.plan.badgeCheckingAria: Checking Mawkingbird plan — show plan details
+// i18n shell.plan.badgeUnavailableAria: Could not check Mawkingbird plan — show plan details
+// i18n shell.plan.badgeFreeAria: Mawkingbird Free — show what Plus adds
+// i18n shell.plan.ariaBenefits: Mawkingbird plan benefits
+// i18n shell.plan.activeName: Mawkingbird Plus
+// i18n shell.plan.freeName: Mawkingbird Free
+// i18n shell.plan.activeDescription: Thanks — your subscription is active. Here is what it is doing.
+// i18n shell.plan.checkingDescription: Checking your account before deciding which plan is active…
+// i18n shell.plan.unavailableDescription: The account service could not confirm your plan. Open the Plus page to retry.
+// i18n shell.plan.freeDescription: Free works without a subscription. Here is what Plus adds.
+// i18n shell.plan.close: Close plan details
+// i18n shell.plan.freeLabel: Free:
+// i18n shell.plan.plusLabel: Plus:
+// i18n shell.plan.subscriptionDetails: Subscription details and diagnostics
+// i18n shell.plan.seePlus: See the Plus page — ${{price}} a year
+// i18n shell.plus.readHere.label: Read articles without leaving
+// i18n shell.plus.readHere.free: A couple of full articles a day. Links always open in a new tab for free.
+// i18n shell.plus.readHere.plus: Open as many as you like, laid out to read, without losing your place.
+// i18n shell.plus.sameEverywhere.label: The same on your phone and your PC
+// i18n shell.plus.sameEverywhere.free: Everything you set up stays on this computer. Save a file to move it yourself.
+// i18n shell.plus.sameEverywhere.plus: Your feeds, lists and settings follow you to every device you sign in on.
+// i18n shell.nav.primary: Primary navigation
+// i18n shell.brandHome: {{brand}} home
+// i18n shell.nav.home: Home
+// i18n shell.nav.algo: Algo
+// i18n shell.nav.inbox: Inbox
+// i18n shell.nav.chat: Chat
+// i18n shell.nav.search: Search
+// i18n shell.nav.feeds: Feeds
+// i18n shell.nav.rss: RSS
+// i18n shell.nav.login: Login
+// i18n shell.nav.moreAria: More navigation
+// i18n shell.nav.more: More
+// i18n shell.menu.settings: Settings
+// i18n shell.menu.likes: Likes
+// i18n shell.menu.bookmarks: Bookmarks
+// i18n shell.menu.manageRss: Manage RSS feeds
+// i18n shell.menu.write: Write
+// i18n shell.menu.drafts: Drafts
+// i18n shell.menu.waitingToPublish: Waiting to publish
+// i18n shell.menu.pastes: Pastes
+// i18n shell.menu.links: Links
+// i18n shell.menu.findFriends: Find Friends
+// i18n shell.menu.invites: Invites
+// i18n shell.menu.analytics: Analytics
+// i18n shell.menu.observability: Observability
+// i18n shell.menu.docs: Docs
+// i18n shell.menu.canary: Canary ↗
+// i18n shell.menu.faults: Faults
+// i18n shell.menu.apiDocs: API Docs ↗
+// i18n shell.menu.admin: Admin
+// i18n shell.account.switch: Switch account
+// i18n shell.account.anonymous: Anonymous
+// i18n shell.account.saved: Saved account
+// i18n shell.account.addMastodon: + Add Mastodon account
+// i18n shell.account.addBluesky: + Add Bluesky account
+// i18n shell.account.exitAnonymous: Exit anonymous
+// i18n shell.account.logout: Log out
+// i18n shell.account.menuFor: Account menu for {{name}}
+// i18n shell.toast.removed: Removed that account. Nothing else changed.
+// i18n shell.toast.dismiss: Dismiss
+// i18n shell.dead.thatAccount: That account
+// i18n shell.dead.thisServer: this server
+// i18n shell.dead.title: Can't switch to {{name}}
+// i18n shell.dead.description: {{server}} rejected that account's saved session. This usually means it expired, or the access was revoked.
+// i18n shell.dead.note: You're still signed in as before — nothing has changed yet.
+// i18n shell.dead.reauthenticate: Reauthenticate
+// i18n shell.dead.remove: Remove account
+// i18n shell.dead.cancel: Cancel
 
 function isWideUrl(url: string): boolean {
   // /search goes rails-off wide so facets have room to live beside results.
@@ -62,12 +142,14 @@ function isWideUrl(url: string): boolean {
     NgOptimizedImage,
     LeaveDialog,
     FirstRunModal,
+    TranslocoPipe,
   ],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
 export class Shell implements OnInit {
   protected auth = inject(Auth);
+  private transloco = inject(TranslocoService);
   private bots = inject(BotPeers);
   private preview = inject(PreviewSeed);
 
@@ -131,6 +213,11 @@ export class Shell implements OnInit {
     visiblePlusBenefits((flag) => this.featureFlags.enabled(flag)),
   );
   protected readonly plusPriceUsd = PLUS_PRICE_USD_PER_YEAR;
+
+  protected benefitText(benefit: { id: string }, field: 'label' | 'free' | 'plus'): string {
+    const benefitKey = benefit.id.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+    return this.transloco.translate(`shell.plus.${benefitKey}.${field}`);
+  }
 
   /**
    * Whether the plan card is open.
@@ -330,14 +417,14 @@ export class Shell implements OnInit {
   protected deadSession = signal<AccountChoice | null>(null);
 
   /** Human label for the stuck account, for the dialog copy. */
-  protected deadSessionName = computed(() => {
+  protected deadSessionName = computed<string | null>(() => {
     const s = this.deadSession();
-    return s?.account?.display_name || s?.account?.username || 'That account';
+    return s?.account?.display_name || s?.account?.username || null;
   });
 
-  protected deadSessionServer = computed(() => {
+  protected deadSessionServer = computed<string | null>(() => {
     const s = this.deadSession();
-    return s?.server ? s.server.replace(/^https?:\/\//, '') : 'this server';
+    return s?.server ? s.server.replace(/^https?:\/\//, '') : null;
   });
 
   /**
@@ -386,7 +473,7 @@ export class Shell implements OnInit {
     }
     // removeSession only touches the active account if it *was* active; it isn't
     // here, so the current identity is untouched and no reload is needed.
-    this.showToast('Removed that account. Nothing else changed.');
+    this.showToast(this.transloco.translate('shell.toast.removed'));
   }
 
   /** Optional server links are discovered only when the user opens More. */

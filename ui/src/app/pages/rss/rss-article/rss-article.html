@@ -3,48 +3,53 @@
     @if (!result()) {
       @if (!available()) {
         <p class="muted small">
-          The full text of this item lives on the publisher's site. Fetching it needs a
-          <a routerLink="/settings/rss">CORS proxy</a>.
+          {{ 'pages.rss.article.fullTextNeedsProxy' | transloco }}
+          <a routerLink="/settings/rss">{{ 'pages.rss.article.corsProxy' | transloco }}</a
+          >{{ 'pages.rss.period' | transloco }}
         </p>
       } @else if (!quota.allowed()) {
         <p class="muted small">
-          That's both of today's free articles. Mawkingbird Plus lifts the limit.
+          {{ 'pages.rss.article.quotaReached' | transloco }}
         </p>
       } @else {
         <button class="btn btn-sm" type="button" [disabled]="expanding()" (click)="expand()">
           @if (expanding()) {
-            Fetching article…
+            {{ 'pages.rss.article.fetching' | transloco }}
           } @else {
-            📄 Fetch full article
+            {{ 'pages.rss.article.fetchFull' | transloco }}
           }
         </button>
         @if (quota.remaining() === 1) {
-          <span class="muted small quota">One free article left today</span>
+          <span class="muted small quota">{{ 'pages.rss.article.oneFreeLeft' | transloco }}</span>
         }
       }
       <!-- Announced separately: without it a screen-reader user presses the
            button, hears nothing, and has no idea a fetch is under way. -->
       @if (expanding()) {
-        <span class="visually-hidden" role="status">Fetching article, please wait.</span>
+        <span class="visually-hidden" role="status">{{
+          'pages.rss.article.fetchingPleaseWait' | transloco
+        }}</span>
       }
     } @else if (failure(); as diagnosis) {
       <p class="muted small">
-        Couldn't read the full article ({{ diagnosis }}).
-        <a [href]="status().url" target="_blank" rel="noopener noreferrer">Open the original ↗</a>
+        {{ 'pages.rss.article.couldntRead' | transloco: { diagnosis: diagnosis } }}
+        <a [href]="status().url" target="_blank" rel="noopener noreferrer">{{
+          'pages.rss.article.openOriginal' | transloco
+        }}</a>
       </p>
     } @else {
       <article class="article-body" [innerHTML]="pageHtml()"></article>
 
       @if (pageCount() > 1) {
-        <nav class="pager" aria-label="Article pages">
+        <nav class="pager" [attr.aria-label]="'pages.rss.article.pages' | transloco">
           <button class="btn btn-sm" type="button" [disabled]="!canPrev()" (click)="prevPage()">
-            ‹ Previous
+            {{ 'pages.rss.article.previous' | transloco }}
           </button>
-          <span class="muted small" role="status"
-            >Page {{ pageNumber() }} of {{ pageCount() }}</span
-          >
+          <span class="muted small" role="status">{{
+            'pages.rss.article.pageOf' | transloco: { page: pageNumber(), total: pageCount() }
+          }}</span>
           <button class="btn btn-sm" type="button" [disabled]="!canNext()" (click)="nextPage()">
-            Next ›
+            {{ 'pages.rss.article.next' | transloco }}
           </button>
         </nav>
       }
@@ -52,8 +57,10 @@
       <!-- Offered after the article, where someone has actually read the thing.
            Highlight a passage first and it travels as a quote. -->
       <p class="share-line">
-        <button class="btn btn-sm" type="button" (click)="openShare()">Share this ↗</button>
-        <span class="muted small">Highlight a passage first to quote it.</span>
+        <button class="btn btn-sm" type="button" (click)="openShare()">
+          {{ 'pages.rss.article.share' | transloco }}
+        </button>
+        <span class="muted small">{{ 'pages.rss.article.highlightFirst' | transloco }}</span>
       </p>
     }
   </div>

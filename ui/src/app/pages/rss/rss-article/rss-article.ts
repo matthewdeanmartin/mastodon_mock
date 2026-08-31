@@ -1,4 +1,5 @@
 import { Component, computed, ElementRef, inject, input, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { Router } from '@angular/router';
 import { ComposeShareRequest, ShareDialog } from '../../../share-dialog/share-dialog';
@@ -13,6 +14,22 @@ import { renderMarkdown } from '../../../providers/article/markdown-render';
 import { PageDiagnostics } from '../../../page-diagnostics';
 import { Status } from '../../../models';
 import { paginateMarkdown } from '../article-pages';
+
+// i18n pages.rss.article.fullTextNeedsProxy: The full text of this item lives on the publisher's site. Fetching it needs a
+// i18n pages.rss.article.corsProxy: CORS proxy
+// i18n pages.rss.article.quotaReached: That's both of today's free articles. Mawkingbird Plus lifts the limit.
+// i18n pages.rss.article.fetching: Fetching article…
+// i18n pages.rss.article.fetchFull: 📄 Fetch full article
+// i18n pages.rss.article.oneFreeLeft: One free article left today
+// i18n pages.rss.article.fetchingPleaseWait: Fetching article, please wait.
+// i18n pages.rss.article.couldntRead: Couldn't read the full article ({{diagnosis}}).
+// i18n pages.rss.article.openOriginal: Open the original ↗
+// i18n pages.rss.article.pages: Article pages
+// i18n pages.rss.article.previous: ‹ Previous
+// i18n pages.rss.article.pageOf: Page {{page}} of {{total}}
+// i18n pages.rss.article.next: Next ›
+// i18n pages.rss.article.share: Share this ↗
+// i18n pages.rss.article.highlightFirst: Highlight a passage first to quote it.
 
 /**
  * The full text of an RSS item, fetched on demand and shown a page at a time.
@@ -39,7 +56,7 @@ import { paginateMarkdown } from '../article-pages';
  */
 @Component({
   selector: 'app-rss-article',
-  imports: [RouterLink, ShareDialog],
+  imports: [RouterLink, ShareDialog, TranslocoPipe],
   templateUrl: './rss-article.html',
   styleUrl: './rss-article.css',
 })

@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { ALGO_MAX_CALLS, AlgoFeed, AlgoPost, AlgoSource } from '../../algo-feed';
 import { AlgoAudience, ClientPrefs } from '../../client-prefs';
 import { CalmVerdicts } from '../../calm-verdicts';
@@ -12,15 +13,50 @@ import { Auth } from '../../auth';
 import { Terminology } from '../../terminology';
 
 const SOURCE_LABELS: Record<AlgoSource, string> = {
-  mutual: 'Top post from a mutual',
-  boost: 'Boosted into your feed',
-  original: 'Top post from your feed',
-  hashtag: 'From a hashtag you follow',
-  rss: 'From an RSS feed you follow',
+  mutual: 'pages.algo.source.mutual',
+  boost: 'pages.algo.source.boost',
+  original: 'pages.algo.source.original',
+  hashtag: 'pages.algo.source.hashtag',
+  rss: 'pages.algo.source.rss',
 };
 
 /** Friends means posts *authored* by follows — boosts and hashtag finds are not it. */
 const FRIEND_SOURCES: readonly AlgoSource[] = ['mutual', 'original'];
+
+// i18n pages.algo.filter.ariaLabel: Filter the Algo feed
+// i18n pages.algo.filter.all: All
+// i18n pages.algo.filter.friends: Friends
+// i18n pages.algo.filter.friendsTitle: Only {{posts}} written by people you follow — no {{boosts}}, no hashtag finds
+// i18n pages.algo.filter.tags: Tags
+// i18n pages.algo.filter.tagsTitle: Include popular recent {{posts}} from hashtags you follow
+// i18n pages.algo.filter.calm: 😌 Calm
+// i18n pages.algo.filter.calmTitle: Hide {{posts}} that read as inflammatory: heated wording, quote-dunks, and ratioed {{posts}} (all detected on-device — no server involved)
+// i18n pages.algo.filter.links: 🔗 Links
+// i18n pages.algo.filter.linksTitle: Show only the link previews from these ranked {{posts}}
+// i18n pages.algo.filter.shuffle: 🔀 Shuffle
+// i18n pages.algo.filter.shuffleTitle: Re-deal the same {{posts}} in a random order
+// i18n pages.algo.filter.refresh: 🔄 Refresh
+// i18n pages.algo.filter.refreshTitle: Rebuild the feed from fresh data
+// i18n pages.algo.meta.summary: {{count}} {{posts}} from {{calls}} {{callsLabel}}
+// i18n pages.algo.meta.publicSourceLoads: public source loads
+// i18n pages.algo.meta.apiCalls: API calls
+// i18n pages.algo.meta.sampledHashtag: · sampled #{{tag}}
+// i18n pages.algo.meta.calmHidden: · calm mode hid {{count}}
+// i18n pages.algo.loading.gathering: Gathering the good stuff…
+// i18n pages.algo.loading.progress: {{calls}} of up to {{maxCalls}} API calls
+// i18n pages.algo.error.build: Couldn’t build your Algo feed. Try refreshing.
+// i18n pages.algo.empty.follow: Nothing here yet — follow some people and hashtags, or RSS feeds, then refresh.
+// i18n pages.algo.empty.anonymous: Home and Algo only fetch when you ask them to.
+// i18n pages.algo.links.empty: No link previews in these posts.
+// i18n pages.algo.links.widen: Try All, Tags, or Refresh to widen the selection.
+// i18n pages.algo.links.ariaLabel: Links from the Algo feed
+// i18n pages.algo.engagement.favourites: {{count}} favourites
+// i18n pages.algo.engagement.boosts: {{count}} {{boosts}}
+// i18n pages.algo.source.mutual: Top post from a mutual
+// i18n pages.algo.source.boost: Boosted into your feed
+// i18n pages.algo.source.original: Top post from your feed
+// i18n pages.algo.source.hashtag: From a hashtag you follow
+// i18n pages.algo.source.rss: From an RSS feed you follow
 
 interface AlgoLink {
   post: AlgoPost;
@@ -36,7 +72,7 @@ interface AlgoLink {
  */
 @Component({
   selector: 'app-algo',
-  imports: [StatusCard, FeedLanguagePicker],
+  imports: [StatusCard, FeedLanguagePicker, TranslocoPipe],
   templateUrl: './algo.html',
   styleUrl: './algo.css',
 })
@@ -151,7 +187,7 @@ export class Algo implements OnInit {
     this.feed.ensureBuilt();
   }
 
-  sourceLabel(post: AlgoPost): string {
+  sourceLabelKey(post: AlgoPost): string {
     return SOURCE_LABELS[post.source];
   }
 

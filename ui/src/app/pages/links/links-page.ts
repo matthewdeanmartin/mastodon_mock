@@ -2,6 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { CorsProxy } from '../../providers/cors-proxy/cors-proxy';
 import { CorsProxyEntry } from '../../providers/cors-proxy/cors-proxy-catalog';
@@ -14,6 +15,54 @@ import { ShortenerSettings } from '../../providers/shortener/shortener-settings'
 import { ProxyConsentRequired } from '../../providers/shortener/shortener-transport';
 import { assertValidDestination } from '../../providers/shortener/shortener-provider';
 import { PageDiagnostics } from '../../page-diagnostics';
+
+// i18n pages.links.title: 🔗 Links
+// i18n pages.links.intro: Short links you have made. Create new ones with your connected shortener, and delete the ones you no longer want redirecting.
+// i18n pages.links.setup: Set up a link shortener
+// i18n pages.links.setupProviders: TinyURL and is.gd work straight away with no account at all. Dub, Short.io, T.LY and Rebrandly need a free or paid account, and can list and delete links afterwards.
+// i18n pages.links.newWith: New short link with {{service}}
+// i18n pages.links.destination: Destination URL
+// i18n pages.links.destinationPlaceholder: https://example.com/the-long-url
+// i18n pages.links.customBackHalf: Custom back-half
+// i18n pages.links.optional: (optional)
+// i18n pages.links.slugPlaceholder: my-link
+// i18n pages.links.titleLabel: Title
+// i18n pages.links.description: Description
+// i18n pages.links.shortening: Shortening…
+// i18n pages.links.shorten: Shorten
+// i18n pages.links.yourLinks: Your links
+// i18n pages.links.searchPlaceholder: Search links
+// i18n pages.links.loading: Loading…
+// i18n pages.links.search: Search
+// i18n pages.links.empty: No links yet. Anything you shorten here — and any messages you have shared as a link from the Pastes page — will show up in this list.
+// i18n pages.links.backHalf: Back-half
+// i18n pages.links.save: Save
+// i18n pages.links.cancel: Cancel
+// i18n pages.links.messageDestination: A message you shared — the text is inside the link itself.
+// i18n pages.links.message: message
+// i18n pages.links.expires: expires {{time}}
+// i18n pages.links.readOnly.message: Permanent — a shared message can't be edited
+// i18n pages.links.readOnly.anonymous: Permanent — made without an account
+// i18n pages.links.readOnly.switchProvider: Switch to {{provider}} to manage this
+// i18n pages.links.readOnly.unsupported: This service can't edit or delete links
+// i18n pages.links.deleteConfirm: Delete this link?
+// i18n pages.links.delete: Delete
+// i18n pages.links.keep: Keep
+// i18n pages.links.edit: Edit
+// i18n pages.links.notice.created: Created {{url}}
+// i18n pages.links.notice.updated: Link updated.
+// i18n pages.links.notice.deleted: Link deleted. It will stop redirecting immediately.
+// i18n pages.links.error.load: Couldn't load your links.
+// i18n pages.links.error.invalidDestination: That destination URL is not valid.
+// i18n pages.links.error.create: Couldn't create that link.
+// i18n pages.links.error.update: Couldn't update that link.
+// i18n pages.links.error.delete: Couldn't delete that link.
+// i18n pages.links.serviceFallback: This service
+// i18n pages.links.error.proxySetup: {{service}} doesn't answer web browsers directly. Set up a CORS proxy under Settings → Connections, then try again.
+// i18n pages.links.error.proxyDeclined: Not sent through {{proxy}}. The direct attempt also failed. Retry later, or choose a different CORS proxy in Settings.
+// i18n pages.links.blocked.none: No link shortener is connected yet.
+// i18n pages.links.blocked.key: Add your {{provider}} {{credential}} to start shortening links.
+// i18n pages.links.blocked.domain: {{provider}} needs the short domain from your account before it can create links.
 
 /**
  * The Links page: everything this browser has shortened, and a form to add more.
@@ -40,7 +89,7 @@ import { PageDiagnostics } from '../../page-diagnostics';
  */
 @Component({
   selector: 'app-links-page',
-  imports: [FormsModule, RouterLink, HumanTimePipe, ProxyConsentDialog],
+  imports: [FormsModule, RouterLink, HumanTimePipe, ProxyConsentDialog, TranslocoPipe],
   templateUrl: './links-page.html',
   styleUrl: './links-page.css',
 })
@@ -50,6 +99,7 @@ export class LinksPage implements OnInit {
   private consent = inject(ShortenerProxyConsent);
   private proxy = inject(CorsProxy);
   private diagnostics = inject(PageDiagnostics);
+  private transloco = inject(TranslocoService);
 
   protected readonly links = signal<ShortLinkRecord[]>([]);
   protected readonly loading = signal(false);
@@ -94,7 +144,22 @@ export class LinksPage implements OnInit {
   protected readonly entry = computed(() => shortenerEntry(this.settings.activeId()) ?? null);
 
   /** Why the page cannot shorten anything yet, or null when it can. */
-  protected readonly blocked = computed(() => this.settings.blockedReason());
+  protected readonly blocked = computed(() => {
+    const entry = this.settings.chosen();
+    if (!entry) {
+      return this.transloco.translate('pages.links.blocked.none');
+    }
+    if (entry.keyPolicy === 'required' && !this.settings.hasKey(entry.id)) {
+      return this.transloco.translate('pages.links.blocked.key', {
+        provider: entry.label,
+        credential: entry.keyLabel,
+      });
+    }
+    if (entry.domainRequired && !this.settings.domain(entry.id)) {
+      return this.transloco.translate('pages.links.blocked.domain', { provider: entry.label });
+    }
+    return null;
+  });
 
   ngOnInit(): void {
     void this.reload();
@@ -151,7 +216,7 @@ export class LinksPage implements OnInit {
     } catch (error: unknown) {
       this.diagnostics.error('Links', 'load:error', error);
       if (!this.offerConsent(error, () => this.reload())) {
-        this.error.set(describeError(error, "Couldn't load your links."));
+        this.error.set(describeError(error, this.transloco.translate('pages.links.error.load')));
       }
     } finally {
       this.loading.set(false);
@@ -169,7 +234,9 @@ export class LinksPage implements OnInit {
       this.diagnostics.warn('Links', 'user:invalid-destination', {
         reason: error instanceof Error ? error.message : 'invalid',
       });
-      this.error.set(describeError(error, 'That destination URL is not valid.'));
+      this.error.set(
+        describeError(error, this.transloco.translate('pages.links.error.invalidDestination')),
+      );
       return;
     }
 
@@ -192,12 +259,14 @@ export class LinksPage implements OnInit {
       this.slug.set('');
       this.title.set('');
       this.description.set('');
-      this.notice.set(`Created ${link.shortUrl}`);
+      this.notice.set(
+        this.transloco.translate('pages.links.notice.created', { url: link.shortUrl }),
+      );
       await this.reload();
     } catch (error: unknown) {
       this.diagnostics.error('Links', 'create:error', error);
       if (!this.offerConsent(error, () => this.create())) {
-        this.error.set(describeError(error, "Couldn't create that link."));
+        this.error.set(describeError(error, this.transloco.translate('pages.links.error.create')));
       }
     } finally {
       this.creating.set(false);
@@ -232,12 +301,12 @@ export class LinksPage implements OnInit {
         }),
       );
       this.editing.set(null);
-      this.notice.set('Link updated.');
+      this.notice.set(this.transloco.translate('pages.links.notice.updated'));
       await this.reload();
     } catch (error: unknown) {
       this.diagnostics.error('Links', 'update:error', error);
       if (!this.offerConsent(error, () => this.saveEdit(record))) {
-        this.error.set(describeError(error, "Couldn't update that link."));
+        this.error.set(describeError(error, this.transloco.translate('pages.links.error.update')));
       }
     } finally {
       this.busyRow.set(null);
@@ -251,12 +320,12 @@ export class LinksPage implements OnInit {
     this.error.set(null);
     try {
       await firstValueFrom(this.registry.delete(record.providerId));
-      this.notice.set('Link deleted. It will stop redirecting immediately.');
+      this.notice.set(this.transloco.translate('pages.links.notice.deleted'));
       await this.reload();
     } catch (error: unknown) {
       this.diagnostics.error('Links', 'delete:error', error);
       if (!this.offerConsent(error, () => this.remove(record))) {
-        this.error.set(describeError(error, "Couldn't delete that link."));
+        this.error.set(describeError(error, this.transloco.translate('pages.links.error.delete')));
       }
     } finally {
       this.busyRow.set(null);
@@ -275,8 +344,9 @@ export class LinksPage implements OnInit {
     const proxy = this.proxy.entry();
     if (error.noProxyConfigured || !entry || !proxy) {
       this.error.set(
-        `${entry?.label ?? 'This service'} doesn't answer web browsers directly. Set up a CORS ` +
-          `proxy under Settings → Connections, then try again.`,
+        this.transloco.translate('pages.links.error.proxySetup', {
+          service: entry?.label ?? this.transloco.translate('pages.links.serviceFallback'),
+        }),
       );
       return true;
     }
@@ -303,8 +373,7 @@ export class LinksPage implements OnInit {
     this.pendingAction = null;
     if (prompt) {
       this.error.set(
-        `Not sent through ${prompt.proxy.label}. The direct attempt also failed. Retry later, or ` +
-          `choose a different CORS proxy in Settings.`,
+        this.transloco.translate('pages.links.error.proxyDeclined', { proxy: prompt.proxy.label }),
       );
     }
   }

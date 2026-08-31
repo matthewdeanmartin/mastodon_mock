@@ -586,6 +586,10 @@
   opacity: 0.8;
 }
 
+.toast-close::before {
+  content: '×';
+}
+
 .toast-close:hover {
   opacity: 1;
 }

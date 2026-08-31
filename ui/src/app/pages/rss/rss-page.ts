@@ -15,6 +15,44 @@ import { ClientPrefs, RssDensity } from '../../client-prefs';
 import { HeadlineRow } from './headline-row/headline-row';
 import { SeenWhenScrolled } from './seen-when-scrolled';
 import { RssArticle } from './rss-article/rss-article';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+
+// i18n pages.rss.subscriptions: Subscriptions
+// i18n pages.rss.title: 📡 RSS
+// i18n pages.rss.pasteLink: Paste a link
+// i18n pages.rss.done: Done
+// i18n pages.rss.starterKits: Starter kits
+// i18n pages.rss.allItems: All items
+// i18n pages.rss.unsorted: Unsorted
+// i18n pages.rss.feedOff: · off
+// i18n pages.rss.itemCount.one: · {{count}} item
+// i18n pages.rss.itemCount.other: · {{count}} items
+// i18n pages.rss.noFeedsYet: No feeds yet — try
+// i18n pages.rss.starterKit: a starter kit
+// i18n pages.rss.noFeedsAdd: , add one above, or
+// i18n pages.rss.importOpml: import an OPML file
+// i18n pages.rss.period: .
+// i18n pages.rss.manageHint: To remove feeds, import OPML, or route one through a proxy, see
+// i18n pages.rss.manageFeeds: Manage RSS feeds
+// i18n pages.rss.openAsProfile: Open as profile
+// i18n pages.rss.filter: Filter
+// i18n pages.rss.all: All
+// i18n pages.rss.readLater: Read later
+// i18n pages.rss.density: Density
+// i18n pages.rss.full: Full
+// i18n pages.rss.headlines: Headlines
+// i18n pages.rss.markReadCount: Mark {{count}} read
+// i18n pages.rss.couldntLoadFeed: Couldn't load {{feed}}.
+// i18n pages.rss.couldntLoadFeeds: Couldn't load {{count}} feeds.
+// i18n pages.rss.checkInSettings: Check them in settings
+// i18n pages.rss.corsWarning:  — a feed that fails here usually needs a CORS proxy.
+// i18n pages.rss.loadingItems: Loading items…
+// i18n pages.rss.saved: ★ Saved
+// i18n pages.rss.markUnread: Mark unread
+// i18n pages.rss.markRead: Mark read
+// i18n pages.rss.nothingSaved: Nothing saved for later yet.
+// i18n pages.rss.nothingToRead: Nothing to read here.
+// i18n pages.rss.subscribeToRead: Subscribe to a feed to start reading.
 
 /** A URL's hostname, or null when it isn't a parseable absolute URL. */
 function hostOf(url: string): string | null {
@@ -80,12 +118,14 @@ interface RailGroup {
     HeadlineRow,
     SeenWhenScrolled,
     RssArticle,
+    TranslocoPipe,
   ],
   templateUrl: './rss-page.html',
   styleUrl: './rss-page.css',
 })
 export class RssPage {
   private diagnostics = inject(PageDiagnostics);
+  private transloco = inject(TranslocoService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private rss = inject(RssProvider);
@@ -138,9 +178,9 @@ export class RssPage {
     const sel = this.selection();
     switch (sel.kind) {
       case 'all':
-        return 'All items';
+        return this.transloco.translate('pages.rss.allItems');
       case 'unfiled':
-        return 'Unsorted';
+        return this.transloco.translate('pages.rss.unsorted');
       case 'folder':
         return sel.name;
       case 'feed':

@@ -129,8 +129,8 @@ describe('draft item adapters', () => {
     expect(item.key).toBe('local:d1');
     expect(item.preview).toBe('first real one');
     expect(item.visibility).toBe('private');
-    expect(item.badges).toContain('🧵 thread of 2');
-    expect(item.badges).toContain('CW');
+    expect(item.badges).toContain('pages.drafts.badges.thread|2');
+    expect(item.badges).toContain('pages.drafts.badges.cw');
   });
 
   it('labels a paste-target local draft with Title rather than CW', () => {
@@ -146,9 +146,9 @@ describe('draft item adapters', () => {
       pasteProviderId: 'rentry',
     };
     const badges = localDraftItem(draft).badges;
-    expect(badges).toContain('Title');
+    expect(badges).toContain('pages.drafts.badges.title');
     expect(badges).toContain('📋 rentry');
-    expect(badges).not.toContain('CW');
+    expect(badges).not.toContain('pages.drafts.badges.cw');
   });
 
   it('falls back to a descriptive preview for an empty poll draft', () => {
@@ -161,7 +161,7 @@ describe('draft item adapters', () => {
       visibility: 'public',
       poll: { options: ['a', 'b'], multiple: false, expiresIn: 3600 },
     };
-    expect(localDraftItem(draft).preview).toBe('(poll draft)');
+    expect(localDraftItem(draft).preview).toBe('pages.drafts.preview.pollDraft');
   });
 
   it('sorts a parked schedule by its publish date', () => {

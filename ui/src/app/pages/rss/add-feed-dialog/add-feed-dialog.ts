@@ -1,4 +1,5 @@
 import { Component, computed, inject, output, signal } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -11,6 +12,28 @@ import { FeedCandidate } from '../../../providers/rss/feed-ranking';
 import { PasteResolve, PasteResolution } from '../../../providers/rss/paste-resolve';
 import { RssAddFeed } from '../../../providers/rss/rss-add-feed';
 import { PageDiagnostics } from '../../../page-diagnostics';
+
+// i18n pages.rss.addFeed.pasteLink: Paste a link
+// i18n pages.rss.addFeed.intro: A site, a feed, or a fediverse handle — paste whatever you have and Mockingbird works out the rest.
+// i18n pages.rss.addFeed.tryAgainVia: Try again via {{proxy}}
+// i18n pages.rss.addFeed.didYouMean: Did you mean
+// i18n pages.rss.addFeed.question: ?
+// i18n pages.rss.addFeed.followingDone: Following ✓
+// i18n pages.rss.addFeed.following: Following…
+// i18n pages.rss.addFeed.follow: Follow
+// i18n pages.rss.addFeed.viewProfile: View their profile
+// i18n pages.rss.addFeed.followingNeedsAccount: Following needs an account. You can subscribe to their posts by RSS instead:
+// i18n pages.rss.addFeed.subscribeByRss: Subscribe by RSS
+// i18n pages.rss.addFeed.or: Or
+// i18n pages.rss.addFeed.subscribeByRssInstead: subscribe by RSS instead
+// i18n pages.rss.addFeed.ifRatherRead: , if you would rather read them than follow them.
+// i18n pages.rss.addFeed.sitePublishesFeeds: That site publishes {{count}} feeds. This one looks right:
+// i18n pages.rss.cancel: Cancel
+// i18n pages.rss.addFeed.checking: Checking…
+// i18n pages.rss.addFeed.subscribe: Subscribe
+// i18n pages.rss.addFeed.looking: Looking…
+// i18n pages.rss.addFeed.continue: Continue
+// i18n pages.rss.addFeed.couldNotFollow: Could not follow that account.
 
 /**
  * "Paste a link" — the front door to subscribing.
@@ -37,7 +60,7 @@ import { PageDiagnostics } from '../../../page-diagnostics';
  */
 @Component({
   selector: 'app-add-feed-dialog',
-  imports: [FormsModule, FocusTrap],
+  imports: [FormsModule, FocusTrap, TranslocoPipe],
   templateUrl: './add-feed-dialog.html',
   styleUrl: './add-feed-dialog.css',
 })
@@ -49,6 +72,7 @@ export class AddFeedDialog {
   private auth = inject(Auth);
   protected proxySettings = inject(CorsProxySettings);
   private diagnostics = inject(PageDiagnostics);
+  private transloco = inject(TranslocoService);
 
   readonly closed = output<void>();
   /** Emitted once a feed is actually subscribed, so the host can refresh. */
@@ -160,7 +184,11 @@ export class AddFeedDialog {
       this.diagnostics.info('RSS', 'paste:followed', { acct: account.acct });
       this.followed.set(true);
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Could not follow that account.');
+      this.error.set(
+        err instanceof Error
+          ? err.message
+          : this.transloco.translate('pages.rss.addFeed.couldNotFollow'),
+      );
     } finally {
       this.following.set(false);
     }

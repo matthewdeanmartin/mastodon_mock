@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { TranslocoService } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Drafts } from '../../drafts';
@@ -34,12 +35,15 @@ const SELF_SCAN_LIMIT = 40;
  * identity at all) must still see its local drafts and pastes without issuing a
  * single authenticated request.
  */
+// i18n pages.drafts.errors.loadScheduled: Scheduled posts couldn't be loaded, so any parked ones are missing.
+// i18n pages.drafts.errors.loadSelf: Your recent posts couldn't be loaded, so private notes to yourself are missing.
 @Injectable({ providedIn: 'root' })
 export class DraftSources {
   private api = inject(Api);
   private auth = inject(Auth);
   private drafts = inject(Drafts);
   private pastes = inject(PasteHistory);
+  private transloco = inject(TranslocoService);
 
   /** Every scheduled post the server returned, parked or not. */
   private readonly scheduled = signal<ScheduledStatus[]>([]);
@@ -112,10 +116,7 @@ export class DraftSources {
         settle();
       },
       error: () => {
-        this.fail(
-          'scheduled',
-          "Scheduled posts couldn't be loaded, so any parked ones are missing.",
-        );
+        this.fail('scheduled', this.transloco.translate('pages.drafts.errors.loadScheduled'));
         settle();
       },
     });
@@ -133,10 +134,7 @@ export class DraftSources {
         settle();
       },
       error: () => {
-        this.fail(
-          'self',
-          "Your recent posts couldn't be loaded, so private notes to yourself are missing.",
-        );
+        this.fail('self', this.transloco.translate('pages.drafts.errors.loadSelf'));
         settle();
       },
     });

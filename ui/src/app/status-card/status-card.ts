@@ -12,6 +12,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { FormsModule } from '@angular/forms';
 import { NgOptimizedImage } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -85,6 +86,128 @@ import {
 } from '../providers/anonymous/anonymous-route-ref';
 
 const QUOTE_POLICIES = ['public', 'followers', 'nobody'] as const;
+
+// i18n statusCard.filtered: Filtered: {{titles}}
+// i18n statusCard.showAnyway: Show anyway
+// i18n statusCard.pinned: Pinned
+// i18n statusCard.followersOnly: Followers-only {{post}}
+// i18n statusCard.source: Source
+// i18n statusCard.visibility: Visibility
+// i18n statusCard.postedVia: via {{name}}
+// i18n statusCard.cancel: Cancel
+// i18n statusCard.saving: Saving…
+// i18n statusCard.save: Save
+// i18n statusCard.showMore: Show more
+// i18n statusCard.showLess: Show less
+// i18n statusCard.translatedVia: Translated via {{provider}}
+// i18n statusCard.translatedViaAutomatic: Translated via {{provider}} · automatic
+// i18n statusCard.aiTranslationNote: Translated into {{target}} by {{model}} · machine translation, so treat the wording as approximate
+// i18n statusCard.aiTranslation: AI translation
+// i18n statusCard.showSensitiveContent: Show sensitive content
+// i18n statusCard.quotedPostUnavailable: Quoted post is unavailable.
+// i18n statusCard.translating: Translating…
+// i18n statusCard.useAiTranslation: Use AI translation
+// i18n statusCard.votes: {{count}} votes
+// i18n statusCard.vote: Vote
+// i18n statusCard.pollResult: {{percent}}% · {{count}} votes
+// i18n statusCard.countLabel: {{count}} {{label}}
+// i18n statusCard.closed: Closed
+// i18n statusCard.revokeQuotePermission: Revoke quote permission
+// i18n statusCard.viewImage: View image{{description}}
+// i18n statusCard.viewImageNoDescription: View image {{number}} (no description provided)
+// i18n statusCard.noDescriptionProvided: No description provided
+// i18n statusCard.sensitiveContent: ⚠️ Sensitive content — click to view
+// i18n statusCard.replies: replies
+// i18n statusCard.repliesTitle: Replies
+// i18n statusCard.reply: Reply
+// i18n statusCard.readThreadAsArticle: Read thread as article
+// i18n statusCard.readArticleAndComments: Read article and comments
+// i18n statusCard.viewThread: View thread
+// i18n statusCard.recorded: Recorded
+// i18n statusCard.quote: Quote
+// i18n statusCard.shareElsewhere: Share elsewhere
+// i18n statusCard.shareElsewhereEllipsis: Share elsewhere…
+// i18n statusCard.boostFromBlog: Remove boost from my blog
+// i18n statusCard.recordBoostOnBlog: Record a boost on my blog
+// i18n statusCard.share: Share
+// i18n statusCard.favourites: favourites
+// i18n statusCard.favourited: Favourited
+// i18n statusCard.likes: likes
+// i18n statusCard.favouritesTitle: Favourites
+// i18n statusCard.likesTitle: Likes
+// i18n statusCard.favouritedBy: Favourited by
+// i18n statusCard.favouritedByCount: {{count}} Favourited by
+// i18n statusCard.openOnNitter: Open on {{host}}, a tracker-free front-end for Twitter
+// i18n statusCard.favourite: Favourite
+// i18n statusCard.undoFavourite: Undo favourite
+// i18n statusCard.likeFromBlogRecord: Remove this like from your blog record
+// i18n statusCard.recordLikeOnBlog: Record a like on your blog
+// i18n statusCard.removeBookmark: Remove bookmark
+// i18n statusCard.bookmark: Bookmark
+// i18n statusCard.deleteAndBoost: Delete & {{boost}}
+// i18n statusCard.moreActions: More {{post}} actions
+// i18n statusCard.reportedTitle: Reported
+// i18n statusCard.boostFromBlogRecord: Remove this boost from your blog record
+// i18n statusCard.openOriginalTitle: Open on the original site
+// i18n statusCard.openOriginal: ↗ Open original
+// i18n statusCard.translate: Translate
+// i18n statusCard.translateWithAi: Translate with AI
+// i18n statusCard.editHistory: Edit history
+// i18n statusCard.pin: Pin
+// i18n statusCard.muteThread: Mute thread
+// i18n statusCard.whoCanQuote: Who can quote
+// i18n statusCard.edit: Edit
+// i18n statusCard.delete: Delete
+// i18n statusCard.saveAsTodo: Save as to-do
+// i18n statusCard.openPostOriginal: Open post on original site ↗
+// i18n statusCard.openProfileOriginal: Open profile on original site ↗
+// i18n statusCard.reported: 🚩 reported
+// i18n statusCard.muteThisPost: Mute this post
+// i18n statusCard.unblock: Unblock
+// i18n statusCard.unmute: Unmute
+// i18n statusCard.muteAccountFor: Mute @{{acct}} for…
+// i18n statusCard.blockAccount: Block @{{acct}}
+// i18n statusCard.reportPost: Report post
+// i18n statusCard.postDeletedDiscard: Post deleted — edit below and repost, or
+// i18n statusCard.discard: discard
+// i18n statusCard.editAndRepost: Edit and repost
+// i18n statusCard.postYourReply: Post your reply
+// i18n statusCard.addComment: Add a comment
+// i18n statusCard.translateWith: Translate with
+// i18n statusCard.yourServer: Your server
+// i18n statusCard.freeAlreadySetUp: Free, already set up
+// i18n statusCard.spendsOpenrouterCredits: Spends OpenRouter credits
+// i18n statusCard.alwaysUseThis: Always use this, and stop asking
+// i18n statusCard.aiTranslationDescription: Translation here is done by an AI model of your choosing, through OpenRouter — your key, your browser, your account. Nothing is sent to a Mawkingbird server, because there isn't one.
+// i18n statusCard.connectOpenrouter: Connect OpenRouter
+// i18n statusCard.notNow: Not now
+// i18n statusCard.policyPublic: public
+// i18n statusCard.policyFollowers: followers
+// i18n statusCard.policyNobody: nobody
+// i18n statusCard.boostQuoteOrShare: Boost, quote or share
+// i18n statusCard.removeThisBoostFromBlog: Remove this boost from your blog record
+// i18n statusCard.recordBoostOnBlogShort: Record a boost on your blog
+// i18n statusCard.shareThisArticle: Share this article
+// i18n statusCard.shareDefault: Share
+// i18n statusCard.oneHour: 1 hour
+// i18n statusCard.oneDay: 1 day
+// i18n statusCard.sevenDays: 7 days
+// i18n statusCard.forever: forever
+// i18n statusCard.mutedServerFailed: Muted locally, but the server mute failed.
+// i18n statusCard.blockedServerFailed: Blocked locally, but the server block failed.
+// i18n statusCard.deletePostConfirm: Delete this post?
+// i18n statusCard.deleteRedraftConfirm: Delete this post and re-draft it?
+// i18n statusCard.todoSaved: Saved as a to-do in your drafts. Nothing was posted.
+// i18n statusCard.actionFailureBluesky: Couldn't {{verb}} on Bluesky — your link may have expired. Re-link in Settings → Connections.
+// i18n statusCard.actionFailure: Couldn't {{verb}} — try again.
+// i18n statusCard.externalLinkSaved: External link saved to Raindrop.io.
+// i18n statusCard.postSavedToRaindrop: Post saved to Raindrop.io.
+// i18n statusCard.raindropBookmarkFailed: Raindrop.io couldn't save that bookmark.
+// i18n statusCard.serverTranslateFailedWithAi: Your server couldn't translate this. Try AI translation instead.
+// i18n statusCard.serverTranslateFailed: Your server couldn't translate this post.
+// i18n statusCard.sameLanguage: This post already looks like {{target}}, so translating it would return the same text. You can turn this check off in Settings → Internationalization.
+// i18n statusCard.translationLimit: You've used today's {{engine}} translation limit ({{limit}}). It resets at midnight, or you can raise it in Settings → Internationalization.
+// i18n statusCard.modelTranslateFailed: The model couldn't translate this.
 
 /**
  * Everything on a card that owns its own clicks.
@@ -201,6 +324,7 @@ function compactContentLinks(content: string, embeddedPostUrl: string | null): s
     ShareDialog,
     BookmarkProviderDialog,
     PreviewCardComponent,
+    TranslocoPipe,
   ],
   templateUrl: './status-card.html',
   styleUrl: './status-card.css',
@@ -229,6 +353,7 @@ export class StatusCard {
   private blueskySession = inject(BlueskySession);
   private raindrop = inject(RaindropSession);
   private server = inject(Server);
+  private transloco = inject(TranslocoService);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
@@ -255,6 +380,8 @@ export class StatusCard {
 
   /** post/boost vs tweet/retweet wording, per the Mockingbird Blue preference. */
   protected words = inject(Terminology).words;
+  /** Internal POSSE queue value; not interface text. */
+  protected readonly repostKind: PosseKind = 'repost';
 
   /**
    * The card renders as nothing when the viewer hid this specific post ("mute
@@ -405,22 +532,24 @@ export class StatusCard {
   /** Label and tooltip for the 🔁 control, which changes with what it will do. */
   protected readonly shareButtonLabel = computed(() => {
     if (this.shareMenuIsUseful()) {
-      return 'Boost, quote or share';
+      return this.transloco.translate('statusCard.boostQuoteOrShare');
     }
     switch (this.soleShareAction()) {
       case 'boost':
         return this.display.reblogged ? this.words().UndoBoost : this.words().Boost;
       case 'quote':
-        return 'Quote';
+        return this.transloco.translate('statusCard.quote');
       case 'posse':
-        return this.posseQueued('repost')
-          ? 'Remove this boost from your blog record'
-          : 'Record a boost on your blog';
+        return this.transloco.translate(
+          this.posseQueued('repost')
+            ? 'statusCard.removeThisBoostFromBlog'
+            : 'statusCard.recordBoostOnBlogShort',
+        );
       case 'share':
         // Names the dialog it opens, because it opens it on the first press.
-        return 'Share this article';
+        return this.transloco.translate('statusCard.shareThisArticle');
       default:
-        return 'Share';
+        return this.transloco.translate('statusCard.shareDefault');
     }
   });
 
@@ -548,6 +677,11 @@ export class StatusCard {
   }
 
   protected readonly quotePolicies = QUOTE_POLICIES;
+
+  protected quotePolicyLabel(policy: (typeof QUOTE_POLICIES)[number]): string {
+    const suffix = policy[0].toUpperCase() + policy.slice(1);
+    return this.transloco.translate(`statusCard.policy${suffix}`);
+  }
 
   protected showReport = signal(false);
   protected reported = signal(false);
@@ -690,10 +824,10 @@ export class StatusCard {
 
   /** Mute duration presets for the ••• menu (seconds; null = indefinite). */
   protected readonly muteDurations: { label: string; seconds: number | null }[] = [
-    { label: '1 hour', seconds: 3600 },
-    { label: '1 day', seconds: 86400 },
-    { label: '7 days', seconds: 604800 },
-    { label: 'forever', seconds: null },
+    { label: 'statusCard.oneHour', seconds: 3600 },
+    { label: 'statusCard.oneDay', seconds: 86400 },
+    { label: 'statusCard.sevenDays', seconds: 604800 },
+    { label: 'statusCard.forever', seconds: null },
   ];
 
   /** Hide this post locally for 30 days (there is no server-side per-post hide). */
@@ -713,7 +847,7 @@ export class StatusCard {
     this.localMod.mute(this.display.account, seconds);
     if (this.capabilities.canManageRelationships && !this.foreign) {
       this.api.muteAccount(this.display.account.id, seconds ?? undefined).subscribe({
-        error: () => this.actionError.set('Muted locally, but the server mute failed.'),
+        error: () => this.actionError.set(this.transloco.translate('statusCard.mutedServerFailed')),
       });
     }
   }
@@ -728,7 +862,8 @@ export class StatusCard {
     this.localMod.block(this.display.account);
     if (this.capabilities.canManageRelationships && !this.foreign) {
       this.api.block(this.display.account.id).subscribe({
-        error: () => this.actionError.set('Blocked locally, but the server block failed.'),
+        error: () =>
+          this.actionError.set(this.transloco.translate('statusCard.blockedServerFailed')),
       });
     }
   }
@@ -769,7 +904,7 @@ export class StatusCard {
 
   remove(event: Event): void {
     event.stopPropagation();
-    if (!confirm('Delete this post?')) {
+    if (!confirm(this.transloco.translate('statusCard.deletePostConfirm'))) {
       return;
     }
     if (this.display.provider === 'bluesky') {
@@ -811,7 +946,7 @@ export class StatusCard {
       quotedStatusId: this.display.id,
       target: 'fedi',
     });
-    this.actionNotice.set('Saved as a to-do in your drafts. Nothing was posted.');
+    this.actionNotice.set(this.transloco.translate('statusCard.todoSaved'));
     setTimeout(() => this.actionNotice.set(null), 4000);
   }
 
@@ -830,7 +965,7 @@ export class StatusCard {
    */
   deleteAndRedraft(event: Event): void {
     event.stopPropagation();
-    if (!confirm('Delete this post and re-draft it?')) {
+    if (!confirm(this.transloco.translate('statusCard.deleteRedraftConfirm'))) {
       return;
     }
     this.api.getStatusSource(this.display.id).subscribe((src) => {
@@ -1494,8 +1629,8 @@ export class StatusCard {
 
   private actionFailureMessage(verb: string): string {
     return this.display.provider === 'bluesky'
-      ? `Couldn't ${verb} on Bluesky — your link may have expired. Re-link in Settings → Connections.`
-      : `Couldn't ${verb} — try again.`;
+      ? this.transloco.translate('statusCard.actionFailureBluesky', { verb })
+      : this.transloco.translate('statusCard.actionFailure', { verb });
   }
 
   toggleBookmark(event: Event): void {
@@ -1526,14 +1661,16 @@ export class StatusCard {
         this.actionBusy.set(false);
         this.actionNotice.set(
           choice === 'raindrop-link'
-            ? 'External link saved to Raindrop.io.'
-            : 'Post saved to Raindrop.io.',
+            ? this.transloco.translate('statusCard.externalLinkSaved')
+            : this.transloco.translate('statusCard.postSavedToRaindrop'),
         );
       })
       .catch((error: unknown) => {
         this.actionBusy.set(false);
         this.actionError.set(
-          error instanceof Error ? error.message : "Raindrop.io couldn't save that bookmark.",
+          error instanceof Error
+            ? error.message
+            : this.transloco.translate('statusCard.raindropBookmarkFailed'),
         );
       });
   }
@@ -1622,8 +1759,8 @@ export class StatusCard {
         // dead-ending on a button that did nothing.
         this.translateError.set(
           this.openrouter.connected()
-            ? "Your server couldn't translate this. Try AI translation instead."
-            : "Your server couldn't translate this post.",
+            ? this.transloco.translate('statusCard.serverTranslateFailedWithAi')
+            : this.transloco.translate('statusCard.serverTranslateFailed'),
         );
       },
     });
@@ -1668,18 +1805,14 @@ export class StatusCard {
   /** Explains a refusal, and says how to override it — never a dead end. */
   private sameLanguageMessage(): string {
     const target = languageName(this.aiTranslate.targetLanguage());
-    return (
-      `This post already looks like ${target}, so translating it would return the same text. ` +
-      `You can turn this check off in Settings → Internationalization.`
-    );
+    return this.transloco.translate('statusCard.sameLanguage', { target });
   }
 
   private limitMessage(engine: TranslationEngine): string {
-    return (
-      `You've used today's ${ENGINE_LABELS[engine]} translation limit ` +
-      `(${this.usage.hardLimit(engine)}). It resets at midnight, or you can raise it in ` +
-      `Settings → Internationalization.`
-    );
+    return this.transloco.translate('statusCard.translationLimit', {
+      engine: ENGINE_LABELS[engine],
+      limit: this.usage.hardLimit(engine),
+    });
   }
 
   /**
@@ -1782,7 +1915,9 @@ export class StatusCard {
       this.aiTranslation.set(await this.aiTranslate.translateHtml(this.display.content));
     } catch (error: unknown) {
       this.translateError.set(
-        error instanceof Error ? error.message : "The model couldn't translate this.",
+        error instanceof Error
+          ? error.message
+          : this.transloco.translate('statusCard.modelTranslateFailed'),
       );
     } finally {
       this.aiTranslating.set(false);

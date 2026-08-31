@@ -1,36 +1,65 @@
 <div class="analytics">
   @if (loading()) {
-    <p class="muted center">Sampling the last {{ sampleSize() }} {{ words().posts }}…</p>
+    <p class="muted center">
+      {{ 'feedAnalytics.loading' | transloco: { count: sampleSize(), posts: words().posts } }}
+    </p>
   } @else if (error()) {
-    <p class="muted center">Couldn't sample this feed — try again later.</p>
+    <p class="muted center">{{ 'feedAnalytics.error' | transloco }}</p>
   } @else if (!posts().length) {
-    <p class="muted center">Nothing to analyze — this feed has no posts yet.</p>
+    <p class="muted center">{{ 'feedAnalytics.empty' | transloco }}</p>
   } @else {
     <div class="sample-note muted">
       <span>
         @if (paged()) {
-          Analytics for the <strong>{{ posts().length }} {{ words().posts }} sampled</strong> from
-          this {{ report().meta.feedType }} feed ({{ report().meta.feedQuery }}) — not the whole
-          feed. Spans {{ sampleSpan() }}, collected {{ report().meta.collectedAt | humanTime }} in
-          {{ report().meta.apiCalls }} API {{ report().meta.apiCalls === 1 ? 'call' : 'calls' }}.
+          <span
+            [innerHTML]="
+              'feedAnalytics.sample.paged'
+                | transloco
+                  : {
+                      count: posts().length,
+                      posts: words().posts,
+                      feedType: report().meta.feedType,
+                      query: report().meta.feedQuery,
+                      span: sampleSpan(),
+                      collectedAt: (report().meta.collectedAt | humanTime),
+                      calls: report().meta.apiCalls,
+                      callsLabel: apiCallLabel(report().meta.apiCalls),
+                    }
+            "
+          ></span>
         } @else {
           <!-- A synthetic feed has no cursor that would reproduce the merge, so
                the sample is exactly what the page has already loaded. -->
-          Analytics for the
-          <strong>{{ posts().length }} {{ words().posts }} currently loaded</strong> in this
-          {{ report().meta.feedType }} feed ({{ report().meta.feedQuery }}) — not the whole feed.
-          Spans {{ sampleSpan() }}. Load more posts in the feed to widen it.
+          <span
+            [innerHTML]="
+              'feedAnalytics.sample.supplied'
+                | transloco
+                  : {
+                      count: posts().length,
+                      posts: words().posts,
+                      feedType: report().meta.feedType,
+                      query: report().meta.feedQuery,
+                      span: sampleSpan(),
+                    }
+            "
+          ></span>
         }
       </span>
       @if (paged()) {
-        <span class="sample-controls" role="group" aria-label="Sample size">
-          <span>Sample:</span>
+        <span
+          class="sample-controls"
+          role="group"
+          [attr.aria-label]="'feedAnalytics.sample.sizeAria' | transloco"
+        >
+          <span>{{ 'feedAnalytics.sample.label' | transloco }}</span>
           @for (n of sampleChoices; track n) {
             <button
               type="button"
               class="load-more-btn"
               [class.active]="sampleSize() === n"
-              [title]="'Sample ' + n + ' ' + words().posts"
+              [title]="
+                'feedAnalytics.sample.optionTitle' | transloco: { count: n, posts: words().posts }
+              "
               (click)="setSampleSize(n)"
             >
               {{ n }}
@@ -39,9 +68,9 @@
           <button
             type="button"
             class="load-more-btn"
-            title="Collect a fresh sample"
+            [title]="'feedAnalytics.sample.refresh' | transloco"
             (click)="refresh()"
-            aria-label="Collect a fresh sample"
+            [attr.aria-label]="'feedAnalytics.sample.refresh' | transloco"
           >
             <span aria-hidden="true">↻</span>
           </button>
@@ -52,67 +81,74 @@
     @if (report().highlights.length) {
       <ul class="highlights">
         @for (line of report().highlights; track line) {
-          <li>{{ line }}</li>
+          <li>{{ highlightText(line) }}</li>
         }
       </ul>
     }
 
     <div class="tiles">
       <div class="tile">
-        <span class="tile-label muted">Posts analyzed</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.postsAnalyzed' | transloco }}</span>
         <span class="tile-value">{{ report().composition.total }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Unique authors</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.uniqueAuthors' | transloco }}</span>
         <span class="tile-value">{{ report().accounts.uniqueAuthors }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Instances</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.instances' | transloco }}</span>
         <span class="tile-value">{{ report().instances.uniqueInstances }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Top 5 authors' share</span>
+        <span class="tile-label muted">{{
+          'feedAnalytics.tiles.topAuthorsShare' | transloco
+        }}</span>
         <span class="tile-value">{{ pct(report().accounts.top5Share) }}%</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Replies</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.replies' | transloco }}</span>
         <span class="tile-value">{{ pct(report().conversations.replyShare) }}%</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">With media</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.withMedia' | transloco }}</span>
         <span class="tile-value">{{ pct(report().media.mediaShare) }}%</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">With links</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.withLinks' | transloco }}</span>
         <span class="tile-value">{{ pct(report().links.linkShare) }}%</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Avg. favourites</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.avgFavourites' | transloco }}</span>
         <span class="tile-value">{{ report().engagement.avgFavourites }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">No engagement</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.noEngagement' | transloco }}</span>
         <span class="tile-value">{{ pct(report().engagement.zeroEngagementShare) }}%</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Median post age</span>
+        <span class="tile-label muted">{{ 'feedAnalytics.tiles.medianPostAge' | transloco }}</span>
         <span class="tile-value">
-          {{ report().recency.medianAgeHours }}<small class="muted">h</small>
+          {{ report().recency.medianAgeHours
+          }}<small class="muted">{{ 'feedAnalytics.units.hour' | transloco }}</small>
         </span>
       </div>
     </div>
 
     <!-- Composition ------------------------------------------------------- -->
     <section class="section">
-      <h2>Feed composition</h2>
-      <p class="muted small">
-        What kind of posts make up the sample. Categories overlap — a post can be a reply with media
-        and a link.
-      </p>
+      <h2>{{ 'feedAnalytics.composition.title' | transloco }}</h2>
+      <p class="muted small">{{ 'feedAnalytics.composition.description' | transloco }}</p>
       <div class="share-list">
         @for (row of compositionRows(); track row.label) {
-          <div class="share-row" [title]="row.label + ': ' + row.count + ' ' + words().posts">
-            <span class="share-name">{{ row.label }}</span>
+          <div
+            class="share-row"
+            [title]="
+              'feedAnalytics.composition.rowTitle'
+                | transloco
+                  : { label: (row.label | transloco), count: row.count, posts: words().posts }
+            "
+          >
+            <span class="share-name">{{ row.label | transloco }}</span>
             <span class="share-track">
               <span class="share-bar" [style.width.%]="pct(row.share)"></span>
             </span>
@@ -121,13 +157,19 @@
         }
       </div>
       <p class="muted small footnote">
-        Post length averages {{ report().composition.avgLength }} characters (median
-        {{ report().composition.medianLength }}).
+        {{
+          'feedAnalytics.composition.length'
+            | transloco
+              : {
+                  average: report().composition.avgLength,
+                  median: report().composition.medianLength,
+                }
+        }}
       </p>
 
-      <h3 class="chart-title muted">Declared languages</h3>
+      <h3 class="chart-title muted">{{ 'feedAnalytics.composition.languages' | transloco }}</h3>
       <div class="share-list">
-        @for (row of visible('lang', report().composition.languages); track row.key) {
+        @for (row of visible(tableKeys.lang, report().composition.languages); track row.key) {
           <div class="share-row">
             <span class="share-name">{{ langName(row.key) }}</span>
             <span class="share-track">
@@ -140,7 +182,10 @@
       @if (report().composition.languages.length > previewRows) {
         <button type="button" class="link-btn" (click)="toggleExpanded('lang')">
           {{
-            isExpanded('lang') ? 'Show fewer' : 'Show all ' + report().composition.languages.length
+            isExpanded(tableKeys.lang)
+              ? ('feedAnalytics.composition.showFewer' | transloco)
+              : ('feedAnalytics.composition.showAll'
+                | transloco: { count: report().composition.languages.length })
           }}
         </button>
       }
@@ -148,40 +193,58 @@
 
     <!-- Accounts ---------------------------------------------------------- -->
     <section class="section">
-      <h2>Who is in this feed</h2>
-      <p class="muted small">
-        Authors of the sampled content. For a boost, that's whoever wrote the original, not whoever
-        boosted it.
-      </p>
+      <h2>{{ 'feedAnalytics.accounts.title' | transloco }}</h2>
+      <p class="muted small">{{ 'feedAnalytics.accounts.description' | transloco }}</p>
       <div class="stat-grid">
-        <span>Posts per author</span><strong>{{ report().accounts.postsPerAuthor }}</strong>
-        <span>Top 5 authors</span
-        ><strong>{{ pct(report().accounts.top5Share) }}% of the feed</strong>
-        <span>Top 10 authors</span
-        ><strong>{{ pct(report().accounts.top10Share) }}% of the feed</strong>
-        <span>Authors appearing once</span
+        <span>{{ 'feedAnalytics.accounts.postsPerAuthor' | transloco }}</span
+        ><strong>{{ report().accounts.postsPerAuthor }}</strong>
+        <span>{{ 'feedAnalytics.accounts.topFive' | transloco }}</span
+        ><strong>{{
+          'feedAnalytics.accounts.shareOfFeed'
+            | transloco: { share: pct(report().accounts.top5Share) }
+        }}</strong>
+        <span>{{ 'feedAnalytics.accounts.topTen' | transloco }}</span
+        ><strong>{{
+          'feedAnalytics.accounts.shareOfFeed'
+            | transloco: { share: pct(report().accounts.top10Share) }
+        }}</strong>
+        <span>{{ 'feedAnalytics.accounts.appearingOnce' | transloco }}</span
         ><strong>{{ pct(report().accounts.singletonAuthorShare) }}%</strong>
-        <span>Bots</span>
+        <span>{{ 'feedAnalytics.accounts.bots' | transloco }}</span>
         <strong>
-          {{ report().accounts.botAuthors }} of {{ report().accounts.uniqueAuthors }} authors,
-          {{ report().accounts.postsFromBots }} {{ words().posts }}
+          {{
+            'feedAnalytics.accounts.authors'
+              | transloco
+                : {
+                    bots: report().accounts.botAuthors,
+                    total: report().accounts.uniqueAuthors,
+                    posts: report().accounts.postsFromBots,
+                    postsWord: words().posts,
+                  }
+          }}
         </strong>
         @if (report().accounts.followedAuthors !== null) {
-          <span>Followed by you</span>
+          <span>{{ 'feedAnalytics.accounts.followedByYou' | transloco }}</span>
           <strong>
-            {{ report().accounts.followedAuthors }} followed,
-            {{ report().accounts.unfollowedAuthors }} not
+            {{
+              'feedAnalytics.accounts.followed'
+                | transloco
+                  : {
+                      followed: report().accounts.followedAuthors,
+                      unfollowed: report().accounts.unfollowedAuthors,
+                    }
+            }}
           </strong>
         }
         @if (report().accounts.mutedOrFilteredPosts) {
-          <span>Muted or filtered</span>
+          <span>{{ 'feedAnalytics.accounts.mutedOrFiltered' | transloco }}</span>
           <strong>{{ report().accounts.mutedOrFilteredPosts }} {{ words().posts }}</strong>
         }
       </div>
 
-      <h3 class="chart-title muted">Top authors</h3>
+      <h3 class="chart-title muted">{{ 'feedAnalytics.accounts.topAuthors' | transloco }}</h3>
       <div class="share-list">
-        @for (row of visible('authors', report().accounts.authors); track row.account.id) {
+        @for (row of visible(tableKeys.authors, report().accounts.authors); track row.account.id) {
           <a class="share-row linked" [routerLink]="['/accounts', row.account.id]">
             <img
               class="row-avatar"
@@ -204,15 +267,21 @@
       @if (report().accounts.authors.length > previewRows) {
         <button type="button" class="link-btn" (click)="toggleExpanded('authors')">
           {{
-            isExpanded('authors') ? 'Show fewer' : 'Show all ' + report().accounts.authors.length
+            isExpanded(tableKeys.authors)
+              ? ('feedAnalytics.composition.showFewer' | transloco)
+              : ('feedAnalytics.composition.showAll'
+                | transloco: { count: report().accounts.authors.length })
           }}
         </button>
       }
 
       @if (report().accounts.boosters.length) {
-        <h3 class="chart-title muted">Who boosted things in</h3>
+        <h3 class="chart-title muted">{{ 'feedAnalytics.accounts.boostedIn' | transloco }}</h3>
         <div class="share-list">
-          @for (row of visible('boosters', report().accounts.boosters); track row.account.id) {
+          @for (
+            row of visible(tableKeys.boosters, report().accounts.boosters);
+            track row.account.id
+          ) {
             <div class="share-row">
               <span class="share-name">&#64;{{ row.account.acct }}</span>
               <span class="share-track">
@@ -227,14 +296,20 @@
 
     <!-- Instances --------------------------------------------------------- -->
     <section class="section">
-      <h2>Instances</h2>
+      <h2>{{ 'feedAnalytics.instances.title' | transloco }}</h2>
       <p class="muted small">
-        Where the sampled posts were written. {{ report().instances.localPosts }} local,
-        {{ report().instances.remotePosts }} remote —
-        {{ report().instances.diversityPer100 }} unique instances per 100 posts.
+        {{
+          'feedAnalytics.instances.description'
+            | transloco
+              : {
+                  local: report().instances.localPosts,
+                  remote: report().instances.remotePosts,
+                  diversity: report().instances.diversityPer100,
+                }
+        }}
       </p>
       <div class="share-list">
-        @for (row of visible('instances', report().instances.instances); track row.key) {
+        @for (row of visible(tableKeys.instances, report().instances.instances); track row.key) {
           <div class="share-row">
             <span class="share-name">{{ row.key }}</span>
             <span class="share-track">
@@ -247,9 +322,10 @@
       @if (report().instances.instances.length > previewRows) {
         <button type="button" class="link-btn" (click)="toggleExpanded('instances')">
           {{
-            isExpanded('instances')
-              ? 'Show fewer'
-              : 'Show all ' + report().instances.instances.length
+            isExpanded(tableKeys.instances)
+              ? ('feedAnalytics.composition.showFewer' | transloco)
+              : ('feedAnalytics.composition.showAll'
+                | transloco: { count: report().instances.instances.length })
           }}
         </button>
       }
@@ -257,24 +333,35 @@
 
     <!-- Hashtags ---------------------------------------------------------- -->
     <section class="section">
-      <h2>Topics and hashtags</h2>
+      <h2>{{ 'feedAnalytics.hashtags.title' | transloco }}</h2>
       @if (!report().hashtags.uniqueTags) {
-        <p class="muted small">No hashtags in the sample.</p>
+        <p class="muted small">{{ 'feedAnalytics.hashtags.empty' | transloco }}</p>
       } @else {
         <p class="muted small">
-          {{ pct(report().hashtags.hashtagShare) }}% of posts carry a hashtag;
-          {{ report().hashtags.uniqueTags }} distinct
-          {{ report().hashtags.uniqueTags === 1 ? 'tag' : 'tags' }}, about
-          {{ report().hashtags.topicDiversity }} of them carrying the weight.
-          {{ report().hashtags.sharedTags.length }} used by more than one author.
+          {{
+            'feedAnalytics.hashtags.summary'
+              | transloco
+                : {
+                    share: pct(report().hashtags.hashtagShare),
+                    count: report().hashtags.uniqueTags,
+                    tagWord:
+                      report().hashtags.uniqueTags === 1
+                        ? ('feedAnalytics.hashtags.tag.one' | transloco)
+                        : ('feedAnalytics.hashtags.tag.other' | transloco),
+                    diversity: report().hashtags.topicDiversity,
+                    shared: report().hashtags.sharedTags.length,
+                  }
+          }}
         </p>
         <div class="share-list">
-          @for (row of visible('tags', report().hashtags.tags); track row.key) {
+          @for (row of visible(tableKeys.tags, report().hashtags.tags); track row.key) {
             <a class="share-row linked" [routerLink]="['/tags', row.key]">
               <span class="share-name">
                 #{{ row.key }}
                 @if (row.dominatedBy; as owner) {
-                  <small class="muted">— mostly &#64;{{ owner.acct }}</small>
+                  <small class="muted">{{
+                    'feedAnalytics.hashtags.mostly' | transloco: { account: owner.acct }
+                  }}</small>
                 }
               </span>
               <span class="share-track">
@@ -282,21 +369,32 @@
               </span>
               <span class="share-value muted">
                 {{ row.count }} · {{ row.authors }}
-                {{ row.authors === 1 ? 'author' : 'authors' }}
+                {{
+                  row.authors === 1
+                    ? ('feedAnalytics.hashtags.author.one' | transloco)
+                    : ('feedAnalytics.hashtags.author.other' | transloco)
+                }}
               </span>
             </a>
           }
         </div>
         @if (report().hashtags.tags.length > previewRows) {
           <button type="button" class="link-btn" (click)="toggleExpanded('tags')">
-            {{ isExpanded('tags') ? 'Show fewer' : 'Show all ' + report().hashtags.tags.length }}
+            {{
+              isExpanded(tableKeys.tags)
+                ? ('feedAnalytics.composition.showFewer' | transloco)
+                : ('feedAnalytics.composition.showAll'
+                  | transloco: { count: report().hashtags.tags.length })
+            }}
           </button>
         }
 
         @if (report().hashtags.pairs.length) {
-          <h3 class="chart-title muted">Tags that travel together</h3>
+          <h3 class="chart-title muted">
+            {{ 'feedAnalytics.hashtags.travelTogether' | transloco }}
+          </h3>
           <div class="chips">
-            @for (pair of visible('pairs', report().hashtags.pairs); track pair.a + pair.b) {
+            @for (pair of visible(tableKeys.tags, report().hashtags.pairs); track pair.a + pair.b) {
               <span class="chip"
                 >#{{ pair.a }} + #{{ pair.b }} <small>×{{ pair.count }}</small></span
               >
@@ -308,17 +406,23 @@
 
     <!-- Links ------------------------------------------------------------- -->
     <section class="section">
-      <h2>Links and domains</h2>
+      <h2>{{ 'feedAnalytics.links.title' | transloco }}</h2>
       @if (!report().links.uniqueDomains) {
-        <p class="muted small">No external links in the sample.</p>
+        <p class="muted small">{{ 'feedAnalytics.links.empty' | transloco }}</p>
       } @else {
         <p class="muted small">
-          {{ pct(report().links.linkShare) }}% of posts link out, across
-          {{ report().links.uniqueDomains }} domains. {{ report().links.internalLinks }} links point
-          back into the fediverse.
+          {{
+            'feedAnalytics.links.summary'
+              | transloco
+                : {
+                    share: pct(report().links.linkShare),
+                    domains: report().links.uniqueDomains,
+                    internal: report().links.internalLinks,
+                  }
+          }}
         </p>
         <div class="share-list">
-          @for (row of visible('domains', report().links.domains); track row.key) {
+          @for (row of visible(tableKeys.domains, report().links.domains); track row.key) {
             <div class="share-row">
               <span class="share-name">{{ row.key }}</span>
               <span class="share-track">
@@ -326,31 +430,48 @@
               </span>
               <span class="share-value muted">
                 {{ row.count }} · {{ row.authors }}
-                {{ row.authors === 1 ? 'author' : 'authors' }}
+                {{
+                  row.authors === 1
+                    ? ('feedAnalytics.hashtags.author.one' | transloco)
+                    : ('feedAnalytics.hashtags.author.other' | transloco)
+                }}
               </span>
             </div>
           }
         </div>
         @if (report().links.domains.length > previewRows) {
           <button type="button" class="link-btn" (click)="toggleExpanded('domains')">
-            {{ isExpanded('domains') ? 'Show fewer' : 'Show all ' + report().links.domains.length }}
+            {{
+              isExpanded(tableKeys.domains)
+                ? ('feedAnalytics.composition.showFewer' | transloco)
+                : ('feedAnalytics.composition.showAll'
+                  | transloco: { count: report().links.domains.length })
+            }}
           </button>
         }
 
         @if (report().links.repeatedUrls.length) {
-          <h3 class="chart-title muted">Repeated links</h3>
+          <h3 class="chart-title muted">{{ 'feedAnalytics.links.repeated' | transloco }}</h3>
           <p class="muted small">
-            {{ report().links.crossAuthorUrls }} of these were posted by more than one account.
+            {{
+              'feedAnalytics.links.crossAuthor'
+                | transloco: { count: report().links.crossAuthorUrls }
+            }}
           </p>
           <ul class="plain-list">
-            @for (row of visible('urls', report().links.repeatedUrls); track row.url) {
+            @for (row of visible(tableKeys.urls, report().links.repeatedUrls); track row.url) {
               <li>
                 <a [href]="row.url" target="_blank" rel="noopener noreferrer">{{
                   shortUrl(row.url)
                 }}</a>
                 <small class="muted">
-                  ×{{ row.count }} from {{ row.authors }}
-                  {{ row.authors === 1 ? 'account' : 'accounts' }}
+                  ×{{ row.count }}
+                  {{
+                    row.authors === 1
+                      ? ('feedAnalytics.links.fromAccounts.one' | transloco: { count: row.authors })
+                      : ('feedAnalytics.links.fromAccounts.other'
+                        | transloco: { count: row.authors })
+                  }}
                 </small>
               </li>
             }
@@ -358,11 +479,11 @@
         }
 
         @if (report().links.linkHeavyAuthors.length) {
-          <h3 class="chart-title muted">Link-heavy accounts</h3>
-          <p class="muted small">Most of what these accounts posted carried a link.</p>
+          <h3 class="chart-title muted">{{ 'feedAnalytics.links.heavyAccounts' | transloco }}</h3>
+          <p class="muted small">{{ 'feedAnalytics.links.heavyDescription' | transloco }}</p>
           <div class="chips">
             @for (
-              row of visible('linkers', report().links.linkHeavyAuthors);
+              row of visible(tableKeys.linkers, report().links.linkHeavyAuthors);
               track row.account.id
             ) {
               <a class="chip" [routerLink]="['/accounts', row.account.id]">
@@ -376,21 +497,26 @@
 
     <!-- Media ------------------------------------------------------------- -->
     <section class="section">
-      <h2>Media</h2>
+      <h2>{{ 'feedAnalytics.media.title' | transloco }}</h2>
       @if (!report().media.attachments) {
-        <p class="muted small">No media in the sample.</p>
+        <p class="muted small">{{ 'feedAnalytics.media.empty' | transloco }}</p>
       } @else {
         <p class="muted small">
-          {{ pct(report().media.mediaShare) }}% of posts carry media —
-          {{ report().media.attachments }} attachments in total.
-          {{ report().media.undescribed }} lack a description ({{
-            pct(report().media.fullyDescribedShare)
-          }}% of media posts describe everything they attach).
+          {{
+            'feedAnalytics.media.summary'
+              | transloco
+                : {
+                    share: pct(report().media.mediaShare),
+                    attachments: report().media.attachments,
+                    undescribed: report().media.undescribed,
+                    describedShare: pct(report().media.fullyDescribedShare),
+                  }
+          }}
         </p>
         <div class="share-list">
           @for (row of report().media.byType; track row.key) {
             <div class="share-row">
-              <span class="share-name">{{ row.key }}</span>
+              <span class="share-name">{{ mediaTypeLabel(row.key) }}</span>
               <span class="share-track">
                 <span class="share-bar" [style.width.%]="pct(row.share)"></span>
               </span>
@@ -399,9 +525,12 @@
           }
         </div>
         @if (report().media.topMediaAuthors.length) {
-          <h3 class="chart-title muted">Most media posted</h3>
+          <h3 class="chart-title muted">{{ 'feedAnalytics.media.mostPosted' | transloco }}</h3>
           <div class="chips">
-            @for (row of visible('media', report().media.topMediaAuthors); track row.account.id) {
+            @for (
+              row of visible(tableKeys.media, report().media.topMediaAuthors);
+              track row.account.id
+            ) {
               <a class="chip" [routerLink]="['/accounts', row.account.id]">
                 &#64;{{ row.account.acct }} <small>{{ row.count }}</small>
               </a>
@@ -413,34 +542,61 @@
 
     <!-- Engagement -------------------------------------------------------- -->
     <section class="section">
-      <h2>Engagement</h2>
-      <p class="muted small">
-        Counts already attached to the sampled posts — no extra requests, and remote counts are
-        whatever this server has seen.
-      </p>
+      <h2>{{ 'feedAnalytics.engagement.title' | transloco }}</h2>
+      <p class="muted small">{{ 'feedAnalytics.engagement.description' | transloco }}</p>
       <div class="stat-grid">
-        <span>Favourites</span>
+        <span>{{ 'feedAnalytics.engagement.favourites' | transloco }}</span>
         <strong>
-          {{ report().engagement.avgFavourites }} avg ·
-          {{ report().engagement.medianFavourites }} median
+          {{
+            'feedAnalytics.engagement.avgMedian'
+              | transloco
+                : {
+                    average: report().engagement.avgFavourites,
+                    median: report().engagement.medianFavourites,
+                  }
+          }}
         </strong>
-        <span>Boosts</span>
+        <span>{{ 'feedAnalytics.engagement.boosts' | transloco }}</span>
         <strong>
-          {{ report().engagement.avgBoosts }} avg · {{ report().engagement.medianBoosts }} median
+          {{
+            'feedAnalytics.engagement.avgMedian'
+              | transloco
+                : {
+                    average: report().engagement.avgBoosts,
+                    median: report().engagement.medianBoosts,
+                  }
+          }}
         </strong>
-        <span>Replies</span>
+        <span>{{ 'feedAnalytics.engagement.replies' | transloco }}</span>
         <strong>
-          {{ report().engagement.avgReplies }} avg · {{ report().engagement.medianReplies }} median
+          {{
+            'feedAnalytics.engagement.avgMedian'
+              | transloco
+                : {
+                    average: report().engagement.avgReplies,
+                    median: report().engagement.medianReplies,
+                  }
+          }}
         </strong>
-        <span>No visible engagement</span>
-        <strong>{{ pct(report().engagement.zeroEngagementShare) }}% of posts</strong>
+        <span>{{ 'feedAnalytics.engagement.noVisible' | transloco }}</span>
+        <strong>{{
+          'feedAnalytics.engagement.shareOfPosts'
+            | transloco: { share: pct(report().engagement.zeroEngagementShare) }
+        }}</strong>
       </div>
 
-      <h3 class="chart-title muted">Average engagement by post type</h3>
+      <h3 class="chart-title muted">{{ 'feedAnalytics.engagement.byType' | transloco }}</h3>
       <div class="share-list">
         @for (slice of report().engagement.slices; track slice.label) {
-          <div class="share-row" [title]="slice.posts + ' ' + words().posts">
-            <span class="share-name">{{ slice.label }}</span>
+          <div
+            class="share-row"
+            [title]="
+              'feedAnalytics.composition.rowTitle'
+                | transloco
+                  : { label: metricLabel(slice.label), count: slice.posts, posts: words().posts }
+            "
+          >
+            <span class="share-name">{{ metricLabel(slice.label) }}</span>
             <span class="share-track">
               <span
                 class="share-bar"
@@ -453,7 +609,7 @@
       </div>
 
       @if (report().engagement.topPosts.length) {
-        <h3 class="chart-title muted">Most engaged posts</h3>
+        <h3 class="chart-title muted">{{ 'feedAnalytics.engagement.mostEngaged' | transloco }}</h3>
         @for (s of report().engagement.topPosts; track s.id; let i = $index) {
           <div class="top-post">
             <span class="rank" aria-hidden="true">{{ i + 1 }}</span>
@@ -467,32 +623,36 @@
 
     <!-- Conversations ----------------------------------------------------- -->
     <section class="section">
-      <h2>Conversations</h2>
-      <p class="muted small">
-        Inferred from reply links already present in the sample — no conversation contexts were
-        fetched, so threads reaching outside the sample are only partly visible.
-      </p>
+      <h2>{{ 'feedAnalytics.conversations.title' | transloco }}</h2>
+      <p class="muted small">{{ 'feedAnalytics.conversations.description' | transloco }}</p>
       <div class="stat-grid">
-        <span>Replies</span>
+        <span>{{ 'feedAnalytics.engagement.replies' | transloco }}</span>
         <strong>
           {{ report().conversations.replies }} {{ words().posts }} ({{
             pct(report().conversations.replyShare)
           }}%)
         </strong>
-        <span>Distinct conversations</span>
+        <span>{{ 'feedAnalytics.conversations.distinct' | transloco }}</span>
         <strong>{{ report().conversations.distinctConversations }}</strong>
-        <span>With more than one sampled post</span>
+        <span>{{ 'feedAnalytics.conversations.multiple' | transloco }}</span>
         <strong>{{ report().conversations.multiPostConversations }}</strong>
-        <span>Sampled posts per conversation</span>
+        <span>{{ 'feedAnalytics.conversations.postsPer' | transloco }}</span>
         <strong>{{ report().conversations.avgPostsPerConversation }}</strong>
-        <span>Inside long reply chains</span>
-        <strong>{{ pct(report().conversations.longChainShare) }}% of the feed</strong>
+        <span>{{ 'feedAnalytics.conversations.longChains' | transloco }}</span>
+        <strong>
+          {{
+            'feedAnalytics.conversations.shareOfFeed'
+              | transloco: { share: pct(report().conversations.longChainShare) }
+          }}
+        </strong>
       </div>
       @if (report().conversations.topParticipants.length) {
-        <h3 class="chart-title muted">Most involved in conversations</h3>
+        <h3 class="chart-title muted">
+          {{ 'feedAnalytics.conversations.mostInvolved' | transloco }}
+        </h3>
         <div class="chips">
           @for (
-            row of visible('participants', report().conversations.topParticipants);
+            row of visible(tableKeys.participants, report().conversations.topParticipants);
             track row.account.id
           ) {
             <a class="chip" [routerLink]="['/accounts', row.account.id]">
@@ -505,17 +665,35 @@
 
     <!-- Recency ----------------------------------------------------------- -->
     <section class="section">
-      <h2>Timing</h2>
+      <h2>{{ 'feedAnalytics.timing.title' | transloco }}</h2>
       <p class="muted small">
-        Newest post {{ report().recency.newestAgeHours }}h old, oldest
-        {{ report().recency.oldestAgeHours }}h — the sample spans {{ sampleSpan() }}. Times are your
-        local clock.
+        {{
+          'feedAnalytics.timing.description'
+            | transloco
+              : {
+                  newest: report().recency.newestAgeHours,
+                  oldest: report().recency.oldestAgeHours,
+                  span: sampleSpan(),
+                }
+        }}
       </p>
 
-      <h3 class="chart-title muted">By hour of day</h3>
-      <div class="bars labelled" role="img" [attr.aria-label]="words().Posts + ' per hour of day'">
+      <h3 class="chart-title muted">{{ 'feedAnalytics.timing.byHour' | transloco }}</h3>
+      <div
+        class="bars labelled"
+        role="img"
+        [attr.aria-label]="
+          'feedAnalytics.timing.postsPerHour' | transloco: { posts: words().Posts }
+        "
+      >
         @for (count of report().recency.byHour; track $index) {
-          <div class="bar-col" [title]="$index + ':00 — ' + count + ' ' + words().posts">
+          <div
+            class="bar-col"
+            [title]="
+              'feedAnalytics.timing.hourTitle'
+                | transloco: { hour: $index, count: count, posts: words().posts }
+            "
+          >
             <div class="bar" [style.height.%]="(count / hourPeak()) * 100"></div>
             <span class="bar-label muted">{{ $index % 3 === 0 ? $index : '' }}</span>
           </div>
@@ -523,10 +701,22 @@
       </div>
 
       @if (report().recency.byDay.length) {
-        <h3 class="chart-title muted">By day</h3>
-        <div class="bars labelled" role="img" [attr.aria-label]="words().Posts + ' per day'">
+        <h3 class="chart-title muted">{{ 'feedAnalytics.timing.byDay' | transloco }}</h3>
+        <div
+          class="bars labelled"
+          role="img"
+          [attr.aria-label]="
+            'feedAnalytics.timing.postsPerDay' | transloco: { posts: words().Posts }
+          "
+        >
           @for (day of report().recency.byDay; track day.dayIso) {
-            <div class="bar-col" [title]="day.label + ': ' + day.posts + ' ' + words().posts">
+            <div
+              class="bar-col"
+              [title]="
+                'feedAnalytics.timing.dayTitle'
+                  | transloco: { day: day.label, count: day.posts, posts: words().posts }
+              "
+            >
               <div class="bar" [style.height.%]="(day.posts / dayPeak()) * 100"></div>
               <span class="bar-label muted">{{ day.label }}</span>
             </div>
@@ -535,19 +725,27 @@
       }
 
       <p class="muted small footnote">
-        {{ pct(report().recency.busiestHourShare) }}% of the sample landed in its single busiest
-        hour.
+        {{
+          'feedAnalytics.timing.busiest'
+            | transloco: { share: pct(report().recency.busiestHourShare) }
+        }}
         @if (report().recency.bursts) {
-          {{ report().recency.bursts }} posting
-          {{ report().recency.bursts === 1 ? 'burst' : 'bursts' }} detected (5+ posts within 15
-          minutes).
+          {{
+            report().recency.bursts === 1
+              ? ('feedAnalytics.timing.bursts.one' | transloco: { count: report().recency.bursts })
+              : ('feedAnalytics.timing.bursts.other'
+                | transloco: { count: report().recency.bursts })
+          }}
         } @else {
-          No posting bursts detected.
+          {{ 'feedAnalytics.timing.noBursts' | transloco }}
         }
       </p>
       @if (report().recency.burstAuthors.length) {
         <div class="chips">
-          @for (row of visible('bursts', report().recency.burstAuthors); track row.account.id) {
+          @for (
+            row of visible(tableKeys.bursts, report().recency.burstAuthors);
+            track row.account.id
+          ) {
             <a class="chip" [routerLink]="['/accounts', row.account.id]">
               &#64;{{ row.account.acct }} <small>{{ row.count }}</small>
             </a>
@@ -558,25 +756,24 @@
 
     <!-- Concentration ----------------------------------------------------- -->
     <section class="section">
-      <h2>Concentration and diversity</h2>
+      <h2>{{ 'feedAnalytics.concentration.title' | transloco }}</h2>
       <p class="muted small">
-        How much of the feed the biggest single category holds in each dimension. "Effective count"
-        is how many categories the feed behaves as if it had — 1 means a monoculture.
+        {{ 'feedAnalytics.concentration.description' | transloco }}
       </p>
       <table class="conc-table">
         <thead>
           <tr>
-            <th>Dimension</th>
-            <th>Largest</th>
-            <th class="num">Its share</th>
-            <th class="num">Effective</th>
-            <th class="num">Total</th>
+            <th>{{ 'feedAnalytics.concentration.dimension' | transloco }}</th>
+            <th>{{ 'feedAnalytics.concentration.largest' | transloco }}</th>
+            <th class="num">{{ 'feedAnalytics.concentration.share' | transloco }}</th>
+            <th class="num">{{ 'feedAnalytics.concentration.effective' | transloco }}</th>
+            <th class="num">{{ 'feedAnalytics.concentration.total' | transloco }}</th>
           </tr>
         </thead>
         <tbody>
           @for (row of report().concentration; track row.label) {
             <tr>
-              <td>{{ row.label }}</td>
+              <td>{{ dimensionLabel(row.label) }}</td>
               <td class="ellipsis">{{ concLargest(row) }}</td>
               <td class="num">{{ pct(row.largestShare) }}%</td>
               <td class="num">{{ row.effectiveCount }}</td>

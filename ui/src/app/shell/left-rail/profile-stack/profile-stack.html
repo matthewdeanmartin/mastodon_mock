@@ -5,7 +5,9 @@
         type="button"
         class="peek"
         (click)="select(peek.key)"
-        [attr.aria-label]="'Show ' + peek.network + ' profile for ' + peek.displayName"
+        [attr.aria-label]="
+          'shell.profile.show' | transloco: { network: peek.network, name: peek.displayName }
+        "
       >
         <span class="peek-badge" aria-hidden="true">{{ peek.badge }}</span>
         @if (peek.avatar) {
@@ -31,7 +33,7 @@
         <span class="profile-network muted">
           <span aria-hidden="true">{{ card.badge }}</span> {{ card.network }}
           @if (card.active) {
-            <span class="active-pill">active</span>
+            <span class="active-pill">{{ 'shell.profile.active' | transloco }}</span>
           }
         </span>
         <span class="profile-name">
@@ -64,15 +66,17 @@
           </div>
         }
         @if (card.link) {
-          <a class="profile-link" [routerLink]="card.link">View profile →</a>
+          <a class="profile-link" [routerLink]="card.link">{{
+            'shell.profile.viewProfile' | transloco
+          }}</a>
         } @else if (card.href) {
           <a class="profile-link" [href]="card.href" target="_blank" rel="noopener">
-            View on {{ card.network }} →
+            {{ 'shell.profile.viewOn' | transloco: { network: card.network } }}
           </a>
         }
         @if (card.switchTo) {
           <button type="button" class="btn btn-outline switch-btn" (click)="switchToLocal()">
-            Switch to this account
+            {{ 'shell.profile.switch' | transloco }}
           </button>
         }
       </div>

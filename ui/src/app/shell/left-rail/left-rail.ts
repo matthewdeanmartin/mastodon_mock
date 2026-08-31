@@ -10,6 +10,14 @@ import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
 import { AnonymousAccount } from '../../providers/anonymous/anonymous-account';
 import { ProfileStack } from './profile-stack/profile-stack';
 import { FollowState } from '../../follow-state';
+import { TranslocoPipe } from '@jsverse/transloco';
+
+// i18n shell.left.whoToFollow: Who to follow
+// i18n shell.left.following: Following
+// i18n shell.left.follow: Follow
+// i18n shell.left.boostedByNetwork: {{boosted}} by people across the network
+// i18n shell.left.findPeople: Find people to follow →
+// i18n shell.left.trendsForYou: Trends for you
 
 interface SuggestionCandidate {
   account: Account;
@@ -33,7 +41,7 @@ function accountKey(account: Account): string {
  */
 @Component({
   selector: 'app-left-rail',
-  imports: [RouterLink, AccountHoverCard, ProfileStack],
+  imports: [RouterLink, AccountHoverCard, ProfileStack, TranslocoPipe],
   templateUrl: './left-rail.html',
   styleUrl: './left-rail.css',
 })

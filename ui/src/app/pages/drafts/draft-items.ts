@@ -39,6 +39,7 @@ export interface DraftItem {
   preview: string;
   /** Visibility to display, or null where the kind has no meaningful one. */
   visibility: string | null;
+  /** Translation keys; dynamic provider metadata remains display text. */
   badges: string[];
   /** The underlying record, for the actions that need it. */
   source: DraftSource;
@@ -64,6 +65,19 @@ export const PARKED_SCHEDULE_YEARS = 10;
  * Older ones remain exactly where they were, in Conversations.
  */
 export const SELF_DRAFT_MAX_AGE_DAYS = 30;
+
+// i18n pages.drafts.badges.thread: 🧵 thread of {{count}}
+// i18n pages.drafts.badges.title: Title
+// i18n pages.drafts.badges.cw: CW
+// i18n pages.drafts.badges.bsky: 🦋 bsky
+// i18n pages.drafts.badges.poll: 📊 poll
+// i18n pages.drafts.badges.reply: ↩ reply
+// i18n pages.drafts.badges.quote: ❝ quote
+// i18n pages.drafts.badges.attachments: 📎 {{count}}
+// i18n pages.drafts.badges.burn: 🔥 burn
+// i18n pages.drafts.preview.pollDraft: (poll draft)
+// i18n pages.drafts.preview.emptyDraft: (empty draft)
+// i18n pages.drafts.preview.emptyPaste: (empty paste)
 
 const PREVIEW_CHARS = 140;
 
@@ -114,10 +128,10 @@ export function localDraftItem(draft: Draft): DraftItem {
   const filled = draft.segments.filter((s) => s.trim());
   const badges: string[] = [];
   if (filled.length > 1) {
-    badges.push(`🧵 thread of ${filled.length}`);
+    badges.push(`pages.drafts.badges.thread|${filled.length}`);
   }
   if (draft.spoilerText) {
-    badges.push(draft.target === 'paste' ? 'Title' : 'CW');
+    badges.push(draft.target === 'paste' ? 'pages.drafts.badges.title' : 'pages.drafts.badges.cw');
   }
   // A local draft *aimed* at a paste service hasn't been pasted yet — it is
   // still local. The badge says where it's headed.
@@ -125,23 +139,26 @@ export function localDraftItem(draft: Draft): DraftItem {
     badges.push(`📋 ${draft.pasteProviderId ?? 'paste'}`);
   }
   if (draft.target === 'bsky' || draft.target === 'both') {
-    badges.push('🦋 bsky');
+    badges.push('pages.drafts.badges.bsky');
   }
   if (draft.poll) {
-    badges.push('📊 poll');
+    badges.push('pages.drafts.badges.poll');
   }
   if (draft.inReplyToId) {
-    badges.push('↩ reply');
+    badges.push('pages.drafts.badges.reply');
   }
   if (draft.quotedStatusId) {
-    badges.push('❝ quote');
+    badges.push('pages.drafts.badges.quote');
   }
   return {
     key: `local:${draft.id}`,
     kind: 'local',
     id: draft.id,
     at: draft.updatedAt,
-    preview: truncate(filled[0] ?? '', draft.poll ? '(poll draft)' : '(empty draft)'),
+    preview: truncate(
+      filled[0] ?? '',
+      draft.poll ? 'pages.drafts.preview.pollDraft' : 'pages.drafts.preview.emptyDraft',
+    ),
     visibility: draft.visibility,
     badges,
     source: { kind: 'local', draft },
@@ -151,13 +168,13 @@ export function localDraftItem(draft: Draft): DraftItem {
 export function scheduledDraftItem(scheduled: ScheduledStatus): DraftItem {
   const badges: string[] = [];
   if (scheduled.params.spoiler_text) {
-    badges.push('CW');
+    badges.push('pages.drafts.badges.cw');
   }
   if (scheduled.params.poll) {
-    badges.push('📊 poll');
+    badges.push('pages.drafts.badges.poll');
   }
   if (scheduled.media_attachments.length) {
-    badges.push(`📎 ${scheduled.media_attachments.length}`);
+    badges.push(`pages.drafts.badges.attachments|${scheduled.media_attachments.length}`);
   }
   return {
     key: `scheduled:${scheduled.id}`,
@@ -168,7 +185,9 @@ export function scheduledDraftItem(scheduled: ScheduledStatus): DraftItem {
     at: scheduled.scheduled_at,
     preview: truncate(
       scheduled.params.text ?? '',
-      scheduled.media_attachments.length ? '(media post)' : '(empty post)',
+      scheduled.media_attachments.length
+        ? 'pages.drafts.preview.mediaPost'
+        : 'pages.drafts.preview.emptyPost',
     ),
     visibility: scheduled.params.visibility ?? null,
     badges,
@@ -179,20 +198,20 @@ export function scheduledDraftItem(scheduled: ScheduledStatus): DraftItem {
 export function selfDraftItem(status: Status): DraftItem {
   const badges: string[] = [];
   if (status.spoiler_text) {
-    badges.push('CW');
+    badges.push('pages.drafts.badges.cw');
   }
   if (status.poll) {
-    badges.push('📊 poll');
+    badges.push('pages.drafts.badges.poll');
   }
   if (status.media_attachments.length) {
-    badges.push(`📎 ${status.media_attachments.length}`);
+    badges.push(`pages.drafts.badges.attachments|${status.media_attachments.length}`);
   }
   return {
     key: `self:${status.id}`,
     kind: 'self',
     id: status.id,
     at: status.created_at,
-    preview: truncate(stripHtml(status.content), '(empty post)'),
+    preview: truncate(stripHtml(status.content), 'pages.drafts.preview.emptyPost'),
     visibility: status.visibility,
     badges,
     source: { kind: 'self', status },
@@ -202,20 +221,20 @@ export function selfDraftItem(status: Status): DraftItem {
 export function pasteDraftItem(record: PasteRecord): DraftItem {
   const badges: string[] = [`📋 ${record.providerLabel}`];
   if (record.title?.trim()) {
-    badges.push('Title');
+    badges.push('pages.drafts.badges.title');
   }
   if (record.language && record.language !== 'plaintext') {
     badges.push(record.language);
   }
   if (record.expiry && record.expiry !== 'never') {
-    badges.push(record.expiry === 'burn' ? '🔥 burn' : `⌛ ${record.expiry}`);
+    badges.push(record.expiry === 'burn' ? 'pages.drafts.badges.burn' : `⌛ ${record.expiry}`);
   }
   return {
     key: `paste:${record.slug}`,
     kind: 'paste',
     id: record.slug,
     at: record.createdAt,
-    preview: truncate(record.title?.trim() || record.content, '(empty paste)'),
+    preview: truncate(record.title?.trim() || record.content, 'pages.drafts.preview.emptyPaste'),
     visibility: record.visibility ?? null,
     badges,
     source: { kind: 'paste', record },
