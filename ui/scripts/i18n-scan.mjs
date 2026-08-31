@@ -69,7 +69,25 @@ export function textNodes(text) {
     }
     emit(cursor, raw.length);
   };
+  // A comment is skipped *before* the tag walk reaches it, not merely when a
+  // run is emitted. The tag regex tolerates quoted attribute values, so a lone
+  // apostrophe inside a comment ("the group's own aria-label") sends its
+  // `'[^']*'` alternation hunting for the next apostrophe — swallowing every
+  // real tag in between and hiding whole sections of the file from the scanner.
+  // That silently under-reports a directory rather than failing, which is the
+  // worst way for this tool to be wrong: it looks finished. Found in
+  // account-analytics.html, where it hid ~14KB of strings.
+  const commentAt = (off) =>
+    skip.find(([a, b], i) => i >= 0 && off >= a && off < b && text.startsWith('<!--', a));
   while ((m = tag.exec(text))) {
+    const comment = commentAt(m.index);
+    if (comment) {
+      // Treat the whole comment as consumed; resume scanning after it.
+      if (comment[0] > last) pushRun(last, comment[0]);
+      last = comment[1];
+      tag.lastIndex = comment[1];
+      continue;
+    }
     if (m.index > last) pushRun(last, m.index);
     last = tag.lastIndex;
   }

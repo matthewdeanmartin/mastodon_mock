@@ -2,32 +2,50 @@
   @switch (state()) {
     @case ('idle') {
       <button class="btn btn-outline" type="button" (click)="startSearch()">
-        {{ startLabel() }}
+        {{ startText() }}
       </button>
     }
     @case ('searching') {
       <div class="searching-row">
         <span class="spinner" aria-hidden="true"></span>
         <span>
-          Looking for an available server…
-          <span class="muted small">{{ tried() }} tried</span>
+          {{ 'serverDiscovery.searching.label' | transloco }}
+          <span class="muted small">{{
+            'serverDiscovery.searching.tried' | transloco: { count: tried() }
+          }}</span>
         </span>
-        <button class="text-button" type="button" (click)="cancel()">Cancel</button>
+        <button class="text-button" type="button" (click)="cancel()">
+          {{ 'serverDiscovery.searching.cancel' | transloco }}
+        </button>
       </div>
       @if (directorySource() === 'bundled') {
-        <p class="muted small source-note">Using the bundled Mastodon server directory.</p>
+        <p class="muted small source-note">
+          {{ 'serverDiscovery.searching.bundledNote' | transloco }}
+        </p>
       }
     }
     @case ('found') {
       @if (candidate(); as server) {
         <div class="candidate">
           <strong>
-            {{ server.domain }} is {{ server.degraded ? 'available but degraded' : 'available' }}
+            {{
+              (server.degraded
+                ? 'serverDiscovery.candidate.availableDegraded'
+                : 'serverDiscovery.candidate.available'
+              ) | transloco: { domain: server.domain }
+            }}
           </strong>
           @if (server.degraded) {
             <span class="degraded small">
-              Images will not load because {{ server.mediaHost || 'its media server' }} is blocked
-              or down.
+              {{
+                'serverDiscovery.candidate.degradedNote'
+                  | transloco
+                    : {
+                        mediaHost:
+                          server.mediaHost ||
+                          ('serverDiscovery.candidate.itsMediaServer' | transloco),
+                      }
+              }}
             </span>
           }
           <span class="muted small">
@@ -45,9 +63,11 @@
             <p>{{ server.description }}</p>
           }
           <div class="candidate-actions">
-            <button class="btn" type="button" (click)="useCandidate()">Use this server</button>
+            <button class="btn" type="button" (click)="useCandidate()">
+              {{ 'serverDiscovery.candidate.use' | transloco }}
+            </button>
             <button class="btn btn-outline" type="button" (click)="startSearch(false)">
-              Keep looking
+              {{ 'serverDiscovery.candidate.keepLooking' | transloco }}
             </button>
           </div>
         </div>
@@ -55,9 +75,11 @@
     }
     @case ('exhausted') {
       <p class="muted small">
-        Couldn’t find an available server right now. Your current server has not changed.
+        {{ 'serverDiscovery.exhausted.note' | transloco }}
       </p>
-      <button class="btn btn-outline" type="button" (click)="startSearch()">Search again</button>
+      <button class="btn btn-outline" type="button" (click)="startSearch()">
+        {{ 'serverDiscovery.exhausted.retry' | transloco }}
+      </button>
     }
   }
   <label class="degraded-option small">
@@ -66,6 +88,6 @@
       [checked]="acceptDegraded()"
       (change)="acceptDegraded.set($any($event.target).checked)"
     />
-    Accept degraded servers with blocked or down CDNs
+    {{ 'serverDiscovery.acceptDegraded.label' | transloco }}
   </label>
 </div>

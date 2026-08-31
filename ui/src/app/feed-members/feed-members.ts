@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { AuthorRow, feedAuthors, pct } from '../feed-metrics';
@@ -33,9 +34,23 @@ const MAX_RESOLVED_AUTHORS = 80;
  * one feed costs two independent samples — deliberate, since each tab is
  * lazily mounted and neither should depend on the other having been opened.
  */
+// i18n feedMembers.loading: Looking at who's posting…
+// i18n feedMembers.error: Couldn't sample this feed — try again later.
+// i18n feedMembers.empty: Nobody has posted here yet.
+// i18n feedMembers.summary.one: The {{accountCount}} account that wrote the {{postCount}} {{posts}} sampled from this feed. There's no membership list for a feed like this — these are just the people posting in it right now.
+// i18n feedMembers.summary.other: The {{accountCount}} accounts that wrote the {{postCount}} {{posts}} sampled from this feed. There's no membership list for a feed like this — these are just the people posting in it right now.
+// i18n feedMembers.sample.sizeAria: Sample size
+// i18n feedMembers.sample.label: Sample:
+// i18n feedMembers.sample.optionTitle: Sample {{count}} {{posts}}
+// i18n feedMembers.sample.refresh: Look again
+// i18n feedMembers.botTag.title: This account is marked as automated
+// i18n feedMembers.botTag.label: bot
+// i18n feedMembers.share.title: {{pct}}% of the sampled posts
+// i18n feedMembers.postCount.one: {{count}} {{posts}}
+// i18n feedMembers.postCount.other: {{count}} {{posts}}
 @Component({
   selector: 'app-feed-members',
-  imports: [RouterLink, FollowButton],
+  imports: [RouterLink, FollowButton, TranslocoPipe],
   templateUrl: './feed-members.html',
   styleUrl: './feed-members.css',
 })

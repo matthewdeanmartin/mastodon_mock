@@ -109,7 +109,7 @@
   @if (changingServer()) {
     <app-server-discovery
       [currentServer]="connector.server() ?? ''"
-      startLabel="Find a server"
+      [startLabel]="'settings.connections.mastodon.findAServer' | transloco"
       (selected)="chooseServer($event)"
     />
     <p>

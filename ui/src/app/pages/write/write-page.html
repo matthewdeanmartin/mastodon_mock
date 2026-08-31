@@ -748,11 +748,11 @@
                 (click)="setWizardScheduleAt('')"
                 [aria-label]="'pages.write.aria.clearScheduled' | transloco"
               >
-                Clear
+                {{ 'pages.write.clear' | transloco }}
               </button>
               @if (!canScheduleSelectedTarget()) {
                 <span class="muted small">
-                  Scheduling applies to a single Mastodon {{ words().post }}.
+                  {{ 'pages.write.scheduleSingleTarget' | transloco: { post: words().post } }}
                 </span>
               }
             }
@@ -762,10 +762,10 @@
               [disabled]="!hasContent()"
               (click)="save()"
             >
-              Save draft
+              {{ 'pages.write.saveDraft' | transloco }}
             </button>
             <button class="btn btn-sm" type="button" [disabled]="!hasContent()" (click)="publish()">
-              Publish →
+              {{ 'pages.write.publish' | transloco }}
             </button>
           </div>
 

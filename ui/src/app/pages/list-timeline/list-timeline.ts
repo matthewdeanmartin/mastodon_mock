@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { describeHttpError, PageDiagnostics, statusOf } from '../../page-diagnostics';
 import { Account, Status } from '../../models';
@@ -26,6 +27,30 @@ import { JUST_MY_SERVER_LIST_PREFIX, serverOnlyStatuses } from '../../just-my-se
 /** Posts per request when sampling the list — Mastodon's cap. */
 const SAMPLE_PAGE_SIZE = 40;
 
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n listTimeline.fallbackTitle: List
+// i18n listTimeline.converting: Converting…
+// i18n listTimeline.convertToCollection: Convert to collection
+// i18n listTimeline.tabs.posts: Posts
+// i18n listTimeline.tabs.members: Members
+// i18n listTimeline.tabs.analytics: Analytics
+// i18n listTimeline.loading: Loading…
+// i18n listTimeline.noStatuses: No statuses in this list yet.
+// i18n listTimeline.loadMore: Load more
+// i18n listTimeline.addPeopleByName: Add people by name
+// i18n listTimeline.unfollowEveryone: Unfollow everyone
+// i18n listTimeline.noMembers: No members in this list yet. Add people from the menu on their profile, or with “Add people by name” above.
+// i18n listTimeline.removeFromList: Remove from list
+// i18n listTimeline.removeFromListConfirmTitle: Remove from list?
+// i18n listTimeline.removeFromListConfirmMessage: Remove @{{acct}} from "{{title}}"?
+// i18n listTimeline.remove: Remove
+// i18n listTimeline.memberRemoveError: Couldn't remove @{{acct}}. {{detail}} They are still on the list.
+// i18n listTimeline.convertError: Could not convert this list.
+// i18n listTimeline.conversionSummary: Converted to {{target}}: {{parts}}.
+// i18n listTimeline.conversionPart.added: {{count}} added
+// i18n listTimeline.conversionPart.existing: {{count}} already present
+// i18n listTimeline.conversionPart.skipped: {{count}} skipped
+// i18n listTimeline.collection: collection
 @Component({
   selector: 'app-list-timeline',
   imports: [
@@ -36,6 +61,7 @@ const SAMPLE_PAGE_SIZE = 40;
     FeedAnalytics,
     BulkActionsDialog,
     BulkProgress,
+    TranslocoPipe,
   ],
   templateUrl: './list-timeline.html',
   styleUrl: './list-timeline.css',
@@ -45,6 +71,7 @@ export class ListTimeline implements OnInit {
   private diagnostics = inject(PageDiagnostics);
   private route = inject(ActivatedRoute);
   private converter = inject(ListCollectionConverter);
+  private transloco = inject(TranslocoService);
   protected auth = inject(Auth);
   private anonymousFollows = inject(AnonymousFollows);
   private anonymousLists = inject(AnonymousLists);
@@ -78,7 +105,7 @@ export class ListTimeline implements OnInit {
    */
   protected feedSource = computed<FeedSource>(() => {
     const id = this.listId();
-    const name = this.title() || 'List';
+    const name = this.title() || this.transloco.translate<string>('listTimeline.fallbackTitle');
     if (this.auth.isAnonymous) {
       return { type: 'list', query: name, posts: this.statuses() };
     }
@@ -126,7 +153,7 @@ export class ListTimeline implements OnInit {
     this.anonymousFeed = null;
     if (this.auth.isAnonymous) {
       const list = this.anonymousLists.get(id);
-      this.title.set(list?.title ?? 'List');
+      this.title.set(list?.title ?? this.transloco.translate<string>('listTimeline.fallbackTitle'));
       const memberKeys = new Set(list?.memberKeys ?? []);
       const follows = this.anonymousFollows
         .follows()
@@ -230,7 +257,7 @@ export class ListTimeline implements OnInit {
 
   protected readonly bulkTarget = computed<BulkTarget>(() => ({
     listId: this.listId(),
-    listTitle: this.title() || 'List',
+    listTitle: this.title() || this.transloco.translate<string>('listTimeline.fallbackTitle'),
   }));
 
   constructor() {
@@ -319,7 +346,10 @@ export class ListTimeline implements OnInit {
           status: statusOf(error),
         });
         this.memberError.set(
-          `Couldn't remove @${account.acct}. ${describeHttpError(error)} They are still on the list.`,
+          this.transloco.translate<string>('listTimeline.memberRemoveError', {
+            acct: account.acct,
+            detail: describeHttpError(error),
+          }),
         );
       },
     });
@@ -356,25 +386,35 @@ export class ListTimeline implements OnInit {
       next: (result) => {
         this.converting.set(false);
         this.conversionMessage.set(
-          conversionSummary('collection', result.added, result.existing, result.failed),
+          this.conversionSummary(result.added, result.existing, result.failed),
         );
       },
       error: () => {
         this.converting.set(false);
-        this.conversionMessage.set('Could not convert this list.');
+        this.conversionMessage.set(this.transloco.translate<string>('listTimeline.convertError'));
       },
     });
   }
-}
 
-function conversionSummary(
-  target: string,
-  added: number,
-  existing: number,
-  failed: number,
-): string {
-  const parts = [`${added} added`];
-  if (existing) parts.push(`${existing} already present`);
-  if (failed) parts.push(`${failed} skipped`);
-  return `Converted to ${target}: ${parts.join(', ')}.`;
+  private conversionSummary(added: number, existing: number, failed: number): string {
+    const parts = [
+      this.transloco.translate<string>('listTimeline.conversionPart.added', { count: added }),
+    ];
+    if (existing) {
+      parts.push(
+        this.transloco.translate<string>('listTimeline.conversionPart.existing', {
+          count: existing,
+        }),
+      );
+    }
+    if (failed) {
+      parts.push(
+        this.transloco.translate<string>('listTimeline.conversionPart.skipped', { count: failed }),
+      );
+    }
+    return this.transloco.translate<string>('listTimeline.conversionSummary', {
+      target: this.transloco.translate<string>('listTimeline.collection'),
+      parts: parts.join(', '),
+    });
+  }
 }

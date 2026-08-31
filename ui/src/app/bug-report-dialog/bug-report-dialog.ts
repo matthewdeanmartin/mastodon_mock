@@ -1,5 +1,6 @@
 import { Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { BugReport } from '../bug-report';
 import { ErrorLog } from '../error-log';
 import { FocusTrap } from '../a11y/focus-trap';
@@ -14,9 +15,22 @@ import { PageDiagnostics } from '../page-diagnostics';
  * the final submit on GitHub. The technical details are shown in full before
  * anything leaves, and the recent-errors section is opt-out.
  */
+// i18n bugReport.title: Report a bug
+// i18n bugReport.intro: This builds a report you can file or paste yourself. Nothing is sent automatically — you'll review it, then either copy it or open a prefilled GitHub issue.
+// i18n bugReport.whatHappened: What happened?
+// i18n bugReport.descriptionPlaceholder: What were you doing, and what went wrong?
+// i18n bugReport.includeErrors.one: Include the {{count}} most recent error captured in this tab
+// i18n bugReport.includeErrors.other: Include the {{count}} most recent errors captured in this tab
+// i18n bugReport.includeDiagnostics: Include up to 100 recent diagnostic entries from this tab
+// i18n bugReport.toggle.hide: Hide exactly what will be included
+// i18n bugReport.toggle.show: Show exactly what will be included
+// i18n bugReport.close: Close
+// i18n bugReport.copied: Copied ✓
+// i18n bugReport.copyReport: Copy report
+// i18n bugReport.openGithubIssue: Open GitHub issue
 @Component({
   selector: 'app-bug-report-dialog',
-  imports: [FocusTrap, FormsModule],
+  imports: [FocusTrap, FormsModule, TranslocoPipe],
   templateUrl: './bug-report-dialog.html',
   styleUrl: './bug-report-dialog.css',
 })

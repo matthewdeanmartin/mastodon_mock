@@ -15,6 +15,10 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 /** English source strings; see scripts/extract-i18n.mjs. */
 // i18n bulk.stop: Stop
 // i18n bulk.dismiss: Dismiss
+// i18n bulk.progress.remaining: {{time}} left
+// i18n bulk.progress.changed: {{count}} changed
+// i18n bulk.progress.alreadyCorrect: {{count}} already correct
+// i18n bulk.progress.failed: {{count}} failed
 // i18n bulk.rateLimited: Rate limited — resuming in {{secs}}s
 @Component({
   selector: 'app-bulk-progress',

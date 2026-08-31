@@ -1,13 +1,14 @@
 @if (!bundle()) {
   <p class="muted center small">
-    That bundle isn't in this browser. <a routerLink="/feeds">Back to feeds</a>
+    {{ 'tagBundle.notFound' | transloco }}
+    <a routerLink="/feeds">{{ 'tagBundle.backToFeeds' | transloco }}</a>
   </p>
 } @else {
   <div class="page-head">
     <h1>{{ bundle()!.title }}</h1>
     <p class="muted small">
-      Tag bundle · kept in this browser ·
-      {{ bundle()!.tags.length }} of {{ maxTags }} tags
+      {{ 'tagBundle.headerPrefix' | transloco }}
+      {{ 'tagBundle.tagCount' | transloco: { count: bundle()!.tags.length, max: maxTags } }}
     </p>
   </div>
 
@@ -19,13 +20,13 @@
           type="button"
           class="chip-x"
           (click)="removeTag(t)"
-          [attr.aria-label]="'Remove #' + t"
+          [attr.aria-label]="'tagBundle.removeTag' | transloco: { tag: t }"
         >
           ×
         </button>
       </span>
     } @empty {
-      <p class="muted small">No tags yet — add one below to build the feed.</p>
+      <p class="muted small">{{ 'tagBundle.noTagsYet' | transloco }}</p>
     }
   </div>
 
@@ -35,7 +36,7 @@
       [ngModel]="newTag()"
       (ngModelChange)="newTag.set($event)"
       (keyup.enter)="addTag()"
-      placeholder="Add a hashtag…"
+      [placeholder]="'tagBundle.addPlaceholder' | transloco"
       [disabled]="store.isFull(bundle()!.id)"
     />
     <button
@@ -43,14 +44,13 @@
       (click)="addTag()"
       [disabled]="!newTag().trim() || store.isFull(bundle()!.id)"
     >
-      Add
+      {{ 'tagBundle.add' | transloco }}
     </button>
   </div>
 
   @if (store.isFull(bundle()!.id)) {
     <p class="muted small bundle-note">
-      Full at {{ maxTags }} tags. Each tag is one request every time this feed opens, so the cap
-      keeps a bundle from hammering the server.
+      {{ 'tagBundle.fullAt' | transloco: { max: maxTags } }}
     </p>
   }
 
@@ -60,7 +60,7 @@
 
   <div class="tabs">
     <button type="button" class="tab" [class.active]="tab() === 'posts'" (click)="tab.set('posts')">
-      Posts
+      {{ 'tagBundle.tabPosts' | transloco }}
     </button>
     <button
       type="button"
@@ -68,19 +68,19 @@
       [class.active]="tab() === 'members'"
       (click)="tab.set('members')"
     >
-      People
+      {{ 'tagBundle.tabPeople' | transloco }}
     </button>
   </div>
 
   @if (loading()) {
-    <p class="muted center small">Loading…</p>
+    <p class="muted center small">{{ 'tagBundle.loading' | transloco }}</p>
   } @else if (tab() === 'posts') {
     @if (!statuses().length) {
       <p class="muted center small">
         @if (!bundle()!.tags.length) {
-          Add a tag to see posts.
+          {{ 'tagBundle.addATag' | transloco }}
         } @else {
-          No recent posts in these tags.
+          {{ 'tagBundle.noRecentPosts' | transloco }}
         }
       </p>
     } @else {
@@ -90,11 +90,10 @@
     }
   } @else {
     <p class="muted small bundle-note">
-      Everyone who wrote a post in this feed. A bundle has no real membership, so this is whoever is
-      posting in these tags right now.
+      {{ 'tagBundle.membersNote' | transloco }}
     </p>
     @if (!members().length) {
-      <p class="muted center small">Nobody yet.</p>
+      <p class="muted center small">{{ 'tagBundle.nobodyYet' | transloco }}</p>
     } @else {
       @for (m of members(); track m.id) {
         <a class="list-row" [routerLink]="['/accounts', m.id]">

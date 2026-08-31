@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   DatabaseInfo,
   IndexedDbReport,
@@ -39,15 +40,58 @@ import { RemoteStorageUsage } from '../../observability/remote-storage-usage';
  *
  * Everything here is a live scan of this browser. Nothing is sent anywhere.
  */
+// i18n storageDiagnostics.title: Storage Diagnostics
+// i18n storageDiagnostics.intro: What this app is keeping on this device, and how much room the browser will give it. Every figure here is a live scan of this browser — nothing on this page is sent anywhere.
+// i18n storageDiagnostics.backToObservability: ← Observability
+// i18n storageDiagnostics.localHeading: Local storage
+// i18n storageDiagnostics.refresh: Refresh
+// i18n storageDiagnostics.tileKeys: keys
+// i18n storageDiagnostics.tileTotalSize: total size
+// i18n storageDiagnostics.tileLargestKey: largest key
+// i18n storageDiagnostics.localNote: This is where the app actually keeps its data — settings, feeds, lists and the metrics behind the Observability page. Deleting a key here is immediate and permanent; the app will rebuild what it can and forget the rest.
+// i18n storageDiagnostics.colKey: Key
+// i18n storageDiagnostics.colSize: Size
+// i18n storageDiagnostics.colChars: Chars
+// i18n storageDiagnostics.deleteKeyAriaLabel: Delete {{key}}
+// i18n storageDiagnostics.delete: Delete
+// i18n storageDiagnostics.localEmpty: Local storage is empty.
+// i18n storageDiagnostics.remoteHeading: Remote storage
+// i18n storageDiagnostics.remotePlan: {{tier}} plan
+// i18n storageDiagnostics.remoteUsed: used on the profile service
+// i18n storageDiagnostics.remoteAllowance: allowance
+// i18n storageDiagnostics.remoteBarAriaLabel: Remote storage: {{label}}
+// i18n storageDiagnostics.remoteNote: {{label}} — as counted by the profile service itself, read {{when}}. The figure updates whenever settings sync talks to the service, so it can lag a recent change until the next sync.
+// i18n storageDiagnostics.remoteEmpty: Nothing synced from this browser yet. Turn on settings sync to store settings on the profile service and see the figure here.
+// i18n storageDiagnostics.idbHeading: IndexedDB &amp; quota
+// i18n storageDiagnostics.idbNote: This app keeps its data in local storage, not IndexedDB — so an entry here is something else on this origin. The quota figure covers <em>all</em> browser storage for this site, which is what the browser actually checks before evicting anything.
+// i18n storageDiagnostics.idbPersistent: Storage is persistent: this origin is exempt from automatic eviction.
+// i18n storageDiagnostics.colDatabase: Database
+// i18n storageDiagnostics.colVersion: Version
+// i18n storageDiagnostics.colObjectStores: Object stores
+// i18n storageDiagnostics.colRecords: Records
+// i18n storageDiagnostics.idbEmpty: No IndexedDB databases on this origin.
+// i18n storageDiagnostics.scanning: Scanning…
+// i18n storageDiagnostics.keyNoteApiMetrics: API metrics
+// i18n storageDiagnostics.keyNoteRouteLog: route log
+// i18n storageDiagnostics.keyNoteMockingbird: Mockingbird
+// i18n storageDiagnostics.keyNoteSession: session
+// i18n storageDiagnostics.deleteConfirm: Delete localStorage key "{{key}}"? This can’t be undone.
+// i18n storageDiagnostics.remoteWhenNever: never
+// i18n storageDiagnostics.quotaUnavailable: Storage usage unavailable in this browser.
+// i18n storageDiagnostics.quotaUsed: {{used}} used
+// i18n storageDiagnostics.quotaUsedOfTotal: {{used}} of {{total}}{{pct}}
+// i18n storageDiagnostics.noObjectStores: no object stores
 @Component({
   selector: 'app-storage-diagnostics',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './storage-diagnostics.html',
   styleUrls: ['../observability/diagnostics-shared.css', './storage-diagnostics.css'],
 })
 export class StorageDiagnostics {
   protected readonly formatBytes = formatBytes;
   protected readonly totalRecords = totalRecords;
+
+  private readonly transloco = inject(TranslocoService);
 
   constructor() {
     void this.refreshIndexedDb();
@@ -64,22 +108,25 @@ export class StorageDiagnostics {
   /** Human label for a known key, so the list isn't just opaque slugs. */
   keyNote(key: string): string {
     if (key.startsWith('mockingbird_api_metrics:')) {
-      return 'API metrics';
+      return this.transloco.translate<string>('storageDiagnostics.keyNoteApiMetrics');
     }
     if (key === 'mockingbird_route_log') {
-      return 'route log';
+      return this.transloco.translate<string>('storageDiagnostics.keyNoteRouteLog');
     }
     if (key.startsWith('mockingbird_')) {
-      return 'Mockingbird';
+      return this.transloco.translate<string>('storageDiagnostics.keyNoteMockingbird');
     }
     if (key.startsWith('mastodon_mock_')) {
-      return 'session';
+      return this.transloco.translate<string>('storageDiagnostics.keyNoteSession');
     }
     return '';
   }
 
   deleteKey(entry: StorageEntry): void {
-    if (!confirm(`Delete localStorage key "${entry.key}"? This can’t be undone.`)) {
+    const message = this.transloco.translate<string>('storageDiagnostics.deleteConfirm', {
+      key: entry.key,
+    });
+    if (!confirm(message)) {
       return;
     }
     localStorage.removeItem(entry.key);
@@ -117,7 +164,9 @@ export class StorageDiagnostics {
   /** When the figure was read, so a stale number is visibly stale. */
   protected remoteWhen(): string {
     const u = this.remote();
-    return u?.at ? new Date(u.at).toLocaleString() : 'never';
+    return u?.at
+      ? new Date(u.at).toLocaleString()
+      : this.transloco.translate<string>('storageDiagnostics.remoteWhenNever');
   }
 
   // --------------------------------------------------------------- IndexedDB
@@ -138,14 +187,18 @@ export class StorageDiagnostics {
   protected quotaLabel(): string {
     const q = this.idb()?.quota;
     if (!q || q.usage === null) {
-      return 'Storage usage unavailable in this browser.';
+      return this.transloco.translate<string>('storageDiagnostics.quotaUnavailable');
     }
     const used = formatBytes(q.usage);
     if (q.quota === null) {
-      return `${used} used`;
+      return this.transloco.translate<string>('storageDiagnostics.quotaUsed', { used });
     }
     const pct = q.ratio === null ? '' : ` (${(q.ratio * 100).toFixed(1)}%)`;
-    return `${used} of ${formatBytes(q.quota)}${pct}`;
+    return this.transloco.translate<string>('storageDiagnostics.quotaUsedOfTotal', {
+      used,
+      total: formatBytes(q.quota),
+      pct,
+    });
   }
 
   protected storeSummary(db: DatabaseInfo): string {
@@ -153,7 +206,7 @@ export class StorageDiagnostics {
       return db.error;
     }
     if (!db.stores.length) {
-      return 'no object stores';
+      return this.transloco.translate<string>('storageDiagnostics.noObjectStores');
     }
     return db.stores.map((s) => `${s.name} (${s.count ?? '?'})`).join(', ');
   }

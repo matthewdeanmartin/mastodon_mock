@@ -1,27 +1,32 @@
 @if (!embedded()) {
-  <h1 class="page-title">Offsite directories</h1>
+  <h1 class="page-title">{{ 'pages.offsiteDirectories.title' | transloco }}</h1>
 }
 <p class="muted">
-  Other people have built good ways to find fediverse accounts. These all live on other sites and
-  open in a new tab — bring handles back here and paste them into
-  <a routerLink="/search">search</a> to follow, or
-  <a routerLink="/settings/import-export">import a follow list</a> in Settings.
+  {{ 'pages.offsiteDirectories.intro.a' | transloco }}
+  <a routerLink="/search">{{ 'pages.offsiteDirectories.searchLink' | transloco }}</a>
+  {{ 'pages.offsiteDirectories.intro.b' | transloco }}
+  <a routerLink="/settings/import-export">{{
+    'pages.offsiteDirectories.importLink' | transloco
+  }}</a>
+  {{ 'pages.offsiteDirectories.intro.c' | transloco }}
 </p>
 
 <section class="card">
-  <h2 class="card-title">Browse directories</h2>
+  <h2 class="card-title">{{ 'pages.offsiteDirectories.browseTitle' | transloco }}</h2>
   <div class="card-body">
     <!-- Your own server's directory first: it's the one that needs no new tab and
          whose accounts you can follow without leaving the page. -->
     <a class="dir-link" routerLink="/directory">
-      <strong>This server's directory</strong>
+      <strong>{{ 'pages.offsiteDirectories.thisServer.name' | transloco }}</strong>
       <span class="muted small">
-        Members who opted into discovery — browse by recently active or recently joined.
+        {{ 'pages.offsiteDirectories.thisServer.desc' | transloco }}
       </span>
     </a>
     <a class="dir-link" href="https://fedi.directory/" target="_blank" rel="noopener noreferrer">
-      <strong>fedi.directory ↗</strong>
-      <span class="muted small">Hand-curated, interesting accounts by topic.</span>
+      <strong>{{ 'pages.offsiteDirectories.fediDirectory.name' | transloco }}</strong>
+      <span class="muted small">{{
+        'pages.offsiteDirectories.fediDirectory.desc' | transloco
+      }}</span>
     </a>
     <a
       class="dir-link"
@@ -29,8 +34,10 @@
       target="_blank"
       rel="noopener noreferrer"
     >
-      <strong>fediverse.info ↗</strong>
-      <span class="muted small">Opt-in people directory, browsable by hashtag.</span>
+      <strong>{{ 'pages.offsiteDirectories.fediverseInfo.name' | transloco }}</strong>
+      <span class="muted small">{{
+        'pages.offsiteDirectories.fediverseInfo.desc' | transloco
+      }}</span>
     </a>
     <a
       class="dir-link"
@@ -38,16 +45,15 @@
       target="_blank"
       rel="noopener noreferrer"
     >
-      <strong>Followgraph ↗</strong>
+      <strong>{{ 'pages.offsiteDirectories.followgraph.name' | transloco }}</strong>
       <span class="muted small">
-        Finds people your friends follow but you don't — the highest-yield source once you already
-        follow a few of the right people.
+        {{ 'pages.offsiteDirectories.followgraph.desc' | transloco }}
       </span>
     </a>
     <a class="dir-link" href="https://fedidevs.com/" target="_blank" rel="noopener noreferrer">
-      <strong>FediDevs ↗</strong>
+      <strong>{{ 'pages.offsiteDirectories.fediDevs.name' | transloco }}</strong>
       <span class="muted small">
-        Developer-centric: people who build things, by language and topic.
+        {{ 'pages.offsiteDirectories.fediDevs.desc' | transloco }}
       </span>
     </a>
     <a
@@ -56,8 +62,10 @@
       target="_blank"
       rel="noopener noreferrer"
     >
-      <strong>YouTuber Finder ↗</strong>
-      <span class="muted small">YouTubers who also post on the fediverse.</span>
+      <strong>{{ 'pages.offsiteDirectories.youtuberFinder.name' | transloco }}</strong>
+      <span class="muted small">{{
+        'pages.offsiteDirectories.youtuberFinder.desc' | transloco
+      }}</span>
     </a>
     <!-- Trunk last: it is the oldest of these and the most uneven, so it is the
          one to try after the others have not turned anything up. -->
@@ -67,22 +75,23 @@
       target="_blank"
       rel="noopener noreferrer"
     >
-      <strong>Trunk ↗</strong>
-      <span class="muted small">Opt-in lists by interest, maintained by volunteers.</span>
+      <strong>{{ 'pages.offsiteDirectories.trunk.name' | transloco }}</strong>
+      <span class="muted small">{{ 'pages.offsiteDirectories.trunk.desc' | transloco }}</span>
     </a>
     @if (embedded()) {
       <a class="invite-people-link" routerLink="/invites">
         <span aria-hidden="true">📣</span>
         <span>
-          <strong>Can’t find them?</strong>
-          <span class="muted small">Maybe you need to invite them to join Mastodon.</span>
+          <strong>{{ 'pages.offsiteDirectories.cantFindTitle' | transloco }}</strong>
+          <span class="muted small">{{ 'pages.offsiteDirectories.cantFindDesc' | transloco }}</span>
         </span>
         <span aria-hidden="true">→</span>
       </a>
     }
     <p class="muted small">
-      Also try <a routerLink="/search">search</a> — paste any handle or profile URL to find an
-      account — and check profiles for a “featured” section: accounts they vouch for.
+      {{ 'pages.offsiteDirectories.alsoTry.a' | transloco }}
+      <a routerLink="/search">{{ 'pages.offsiteDirectories.searchLink' | transloco }}</a>
+      {{ 'pages.offsiteDirectories.alsoTry.b' | transloco }}
     </p>
   </div>
 </section>

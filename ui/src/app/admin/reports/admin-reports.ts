@@ -1,11 +1,26 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { AdminApi } from '../admin-api';
 import { AdminReport } from '../../models';
 
+// i18n adminReports.tabs.open: Open
+// i18n adminReports.tabs.resolved: Resolved
+// i18n adminReports.loading: Loading…
+// i18n adminReports.empty.open: No open reports.
+// i18n adminReports.empty.resolved: No resolved reports.
+// i18n adminReports.item.against: against
+// i18n adminReports.item.by: by @{{username}}
+// i18n adminReports.statusCount.one: {{count}} reported status
+// i18n adminReports.statusCount.other: {{count}} reported statuses
+// i18n adminReports.item.assignedTo: assigned to @{{username}}
+// i18n adminReports.actions.assignToMe: Assign to me
+// i18n adminReports.actions.reopen: Reopen
+// i18n adminReports.actions.resolve: Resolve
+
 @Component({
   selector: 'app-admin-reports',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './admin-reports.html',
   styleUrl: './admin-reports.css',
 })

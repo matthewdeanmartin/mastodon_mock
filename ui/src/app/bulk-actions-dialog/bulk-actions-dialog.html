@@ -106,7 +106,7 @@
              reloading the page, which is a poor answer for someone with 50,000
              friends who has changed their mind. -->
         <button class="btn btn-outline" type="button" (click)="stopCounting()">
-          Stop counting
+          {{ 'bulk.stopCounting' | transloco }}
         </button>
       } @else if (planCancelled()) {
         <button class="btn btn-outline" type="button" (click)="cancelled.emit()">

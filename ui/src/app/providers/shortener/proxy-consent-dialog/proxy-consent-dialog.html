@@ -14,97 +14,100 @@
     (keyup)="$event.stopPropagation()"
   >
     @if (!carriesCredential()) {
-      <h3 id="consent-title">Send this link through {{ proxy().label }}?</h3>
+      <h3 id="consent-title">
+        {{ 'shortener.proxyConsent.titleNoCredential' | transloco: { proxy: proxy().label } }}
+      </h3>
     } @else if (selfHosted()) {
-      <h3 id="consent-title">Send your {{ shortener().label }} key through your own proxy?</h3>
+      <h3 id="consent-title">
+        {{ 'shortener.proxyConsent.titleSelfHosted' | transloco: { shortener: shortener().label } }}
+      </h3>
     } @else {
       <h3 id="consent-title" class="warn">
-        {{ proxy().label }} will be able to read your {{ shortener().label }} key
+        {{
+          'shortener.proxyConsent.titleWarn'
+            | transloco: { proxy: proxy().label, shortener: shortener().label }
+        }}
       </h3>
     }
 
     <div id="consent-body">
       @if (carriesCredential()) {
         <p>
-          {{ shortener().label }}'s API refuses to answer web browsers directly, so Mawkingbird
-          cannot reach it from this page. The only way to use it here is to route the request
-          through the CORS proxy you have configured&nbsp;— and the request carries your
-          {{ shortener().keyLabel }}.
+          {{
+            'shortener.proxyConsent.bodyCarriesCredential'
+              | transloco: { shortener: shortener().label, keyLabel: shortener().keyLabel }
+          }}
         </p>
       } @else {
         <p>
-          The browser could not reach {{ shortener().label }} directly. Retrying through
-          {{ proxy().label }} would let its operator see the destination URL you are shortening. No
-          {{ shortener().label }} account or API key is involved, but Mawkingbird still needs your
-          permission before sending the URL to another service.
+          {{
+            'shortener.proxyConsent.bodyNoCredential'
+              | transloco: { shortener: shortener().label, proxy: proxy().label }
+          }}
         </p>
         <p class="links">
           <a [href]="proxy().homepage" target="_blank" rel="noopener noreferrer">
-            About {{ proxy().label }}
+            {{ 'shortener.proxyConsent.aboutProxy' | transloco: { proxy: proxy().label } }}
           </a>
           <span aria-hidden="true">·</span>
           <a [href]="shortener().privacyUrl" target="_blank" rel="noopener noreferrer">
-            {{ shortener().label }}'s privacy policy
+            {{
+              'shortener.proxyConsent.shortenerPrivacyPolicy'
+                | transloco: { shortener: shortener().label }
+            }}
           </a>
         </p>
       }
 
       @if (carriesCredential() && selfHosted()) {
-        <p>
-          Your proxy is <strong>your own server</strong>. Your key goes to a machine you run, so
-          nothing is being disclosed to anyone else. Just make sure the template you configured
-          points where you think it does.
-        </p>
+        <p [innerHTML]="'shortener.proxyConsent.selfHostedBody' | transloco"></p>
       } @else if (carriesCredential()) {
         <section class="who">
-          <h4>Who you would be trusting</h4>
+          <h4>{{ 'shortener.proxyConsent.whoHeading' | transloco }}</h4>
           <p class="operator">{{ proxy().label }}</p>
           <p class="pitch">{{ proxy().pitch }}</p>
           <p class="links">
             <a [href]="proxy().homepage" target="_blank" rel="noopener noreferrer">
-              Their website
+              {{ 'shortener.proxyConsent.theirWebsite' | transloco }}
             </a>
             <span aria-hidden="true">·</span>
             <a [href]="shortener().privacyUrl" target="_blank" rel="noopener noreferrer">
-              {{ shortener().label }}'s privacy policy
+              {{
+                'shortener.proxyConsent.shortenerPrivacyPolicy'
+                  | transloco: { shortener: shortener().label }
+              }}
             </a>
           </p>
-          <p class="hint">
-            Read their terms before you decide. A CORS proxy is a machine-in-the-middle by design:
-            it sees every request it relays, including the headers.
-          </p>
+          <p class="hint">{{ 'shortener.proxyConsent.readTermsHint' | transloco }}</p>
         </section>
 
         <section class="risk">
-          <h4>What could go wrong</h4>
-          <p>
-            If {{ proxy().label }} logged or misused what passes through it, whoever holds your key
-            could:
-          </p>
+          <h4>{{ 'shortener.proxyConsent.riskHeading' | transloco }}</h4>
+          <p>{{ 'shortener.proxyConsent.riskIntro' | transloco: { proxy: proxy().label } }}</p>
           <ul>
-            <li>Create short links on your {{ shortener().label }} account, pointing anywhere</li>
-            <li>Delete or re-point the links you have already made</li>
-            <li>Read the list of links in your account, and their destinations</li>
+            <li>
+              {{
+                'shortener.proxyConsent.riskCreateLinks'
+                  | transloco: { shortener: shortener().label }
+              }}
+            </li>
+            <li>{{ 'shortener.proxyConsent.riskDeleteLinks' | transloco }}</li>
+            <li>{{ 'shortener.proxyConsent.riskReadLinks' | transloco }}</li>
           </ul>
-          <p>
-            Links made with your key carry your domain and your reputation. A rogue or breached
-            proxy could use that to send people somewhere you would never send them.
-          </p>
+          <p>{{ 'shortener.proxyConsent.riskReputation' | transloco }}</p>
         </section>
 
         <section class="scope">
-          <h4>What this does not cover</h4>
+          <h4>{{ 'shortener.proxyConsent.scopeHeading' | transloco }}</h4>
           <p>
-            Only your {{ shortener().label }} key. Mawkingbird still refuses to send your Mastodon
-            session, or any other connected account, through a proxy. If you would rather not take
-            this risk, you can run
+            {{ 'shortener.proxyConsent.scopeIntro' | transloco: { shortener: shortener().label } }}
             <a
               href="https://developers.cloudflare.com/workers/"
               target="_blank"
               rel="noopener noreferrer"
-              >your own proxy</a
+              >{{ 'shortener.proxyConsent.runYourOwnProxy' | transloco }}</a
             >
-            and select it under CORS proxy instead.
+            {{ 'shortener.proxyConsent.scopeOutro' | transloco }}
           </p>
         </section>
       }
@@ -112,7 +115,7 @@
 
     <div class="consent-actions">
       <button class="btn btn-outline" type="button" (click)="cancelled.emit()">
-        No, don't send it
+        {{ 'shortener.proxyConsent.decline' | transloco }}
       </button>
       <button
         class="btn"
@@ -121,11 +124,11 @@
         (click)="accepted.emit()"
       >
         @if (!carriesCredential()) {
-          Use {{ proxy().label }}
+          {{ 'shortener.proxyConsent.useProxy' | transloco: { proxy: proxy().label } }}
         } @else if (selfHosted()) {
-          Use my proxy
+          {{ 'shortener.proxyConsent.useMyProxy' | transloco }}
         } @else {
-          I accept the risk
+          {{ 'shortener.proxyConsent.acceptRisk' | transloco }}
         }
       </button>
     </div>

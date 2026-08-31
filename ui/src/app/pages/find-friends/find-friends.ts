@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Auth } from '../../auth';
 import { contactPickerAvailable } from '../settings/import-export/contact-picker';
 
@@ -29,9 +30,34 @@ import { contactPickerAvailable } from '../settings/import-export/contact-picker
  * for demotion — following someone found there means reading a handle
  * elsewhere, coming back, and searching for it by hand.
  */
+// i18n pages.findFriends.heading: Find Friends
+// i18n pages.findFriends.intro: Every way this app can help you find people to follow, in one place.
+// i18n pages.findFriends.starterKits.title: Starter kits
+// i18n pages.findFriends.starterKits.desc: Follow a whole set of accounts at once — the fastest way to get a timeline worth reading.
+// i18n pages.findFriends.bundledCollections.title: Bundled collections
+// i18n pages.findFriends.bundledCollections.desc: Real collections curated by other people, shipped with the app because Mastodon can't search for collections yet.
+// i18n pages.findFriends.interestsHeading: Search for something you're interested in
+// i18n pages.findFriends.interestsSub: Posts mentioning a topic, so you can follow whoever is actually talking about it.
+// i18n pages.findFriends.searchAnything.title: Search posts for anything else
+// i18n pages.findFriends.searchAnything.desc: Type your own subject and see who is posting about it.
+// i18n pages.findFriends.advancedHeading: Advanced
+// i18n pages.findFriends.advancedSub: Useful once you know who you're looking for, or you're bringing follows from somewhere else.
+// i18n pages.findFriends.searchByName.title: Search for people by name
+// i18n pages.findFriends.searchByName.desc: Find accounts by name, bio or the things they post about.
+// i18n pages.findFriends.profileDirectory.title: Profile directory
+// i18n pages.findFriends.profileDirectory.desc: Browse the accounts your instance publishes in its opt-in directory.
+// i18n pages.findFriends.offsiteDirectories.title: Offsite directories
+// i18n pages.findFriends.offsiteDirectories.desc: Directories other people run. These open elsewhere — you'll need to come back and search for any handle you find.
+// i18n pages.findFriends.contacts.title: Look for your contacts
+// i18n pages.findFriends.contacts.descPicker: Pick people from your phone's contacts and see who has an account. Distinctive names work best; common ones will need a second look.
+// i18n pages.findFriends.contacts.descUpload: Upload a contacts export and see who has an account. Distinctive names work best; common ones will need a second look.
+// i18n pages.findFriends.importFollowList.title: Import a follow list
+// i18n pages.findFriends.importFollowList.desc: Bring your follows over from another instance, or from a Twitter archive. Works signed out too — follows are kept in this browser.
+// i18n pages.findFriends.invite.title: Invite people here
+// i18n pages.findFriends.invite.desc: Prewritten posts for inviting the people you already know to join you.
 @Component({
   selector: 'app-find-friends',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './find-friends.html',
   styleUrl: './find-friends.css',
 })

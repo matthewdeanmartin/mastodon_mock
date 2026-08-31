@@ -71,7 +71,7 @@
   <textarea
     [ngModel]="text()"
     (ngModelChange)="text.set($event)"
-    [placeholder]="placeholder()"
+    [placeholder]="placeholderText()"
     [rows]="compact() ? 2 : 3"
     (focus)="onBoxFocus(0, $event)"
     (keydown)="onBoxKeydown($event)"

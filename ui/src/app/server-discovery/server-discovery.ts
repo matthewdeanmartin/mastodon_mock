@@ -1,6 +1,35 @@
-import { Component, inject, input, OnDestroy, OnInit, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  inject,
+  input,
+  OnDestroy,
+  OnInit,
+  output,
+  signal,
+} from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MastodonServers, ServerSuggestion } from '../mastodon-servers';
 import { probeServerAvailability } from '../server-availability';
+
+// i18n serverDiscovery.start: Find another server
+// i18n serverDiscovery.searching.label: Looking for an available server…
+// i18n serverDiscovery.searching.tried: {{count}} tried
+// i18n serverDiscovery.searching.cancel: Cancel
+// i18n serverDiscovery.searching.bundledNote: Using the bundled Mastodon server directory.
+// i18n serverDiscovery.candidate.available: {{domain}} is available
+// i18n serverDiscovery.candidate.availableDegraded: {{domain}} is available but degraded
+// i18n serverDiscovery.candidate.degradedNote: Images will not load because {{mediaHost}} is blocked or down.
+// i18n serverDiscovery.candidate.itsMediaServer: its media server
+// i18n serverDiscovery.candidate.use: Use this server
+// i18n serverDiscovery.candidate.keepLooking: Keep looking
+// i18n serverDiscovery.exhausted.note: Couldn’t find an available server right now. Your current server has not changed.
+// i18n serverDiscovery.exhausted.retry: Search again
+// i18n serverDiscovery.acceptDegraded.label: Accept degraded servers with blocked or down CDNs
+// i18n serverDiscovery.sizeLabel.veryLarge: very large
+// i18n serverDiscovery.sizeLabel.large: large
+// i18n serverDiscovery.sizeLabel.midSize: mid-size
+// i18n serverDiscovery.sizeLabel.cozy: cozy
 
 type DiscoveryState = 'idle' | 'searching' | 'found' | 'exhausted';
 
@@ -13,15 +42,25 @@ export interface DiscoveredServer extends ServerSuggestion {
 /** Finds a CORS-accessible Mastodon instance without depending on the live directory. */
 @Component({
   selector: 'app-server-discovery',
-  imports: [],
+  imports: [TranslocoPipe],
   templateUrl: './server-discovery.html',
   styleUrl: './server-discovery.css',
 })
 export class ServerDiscovery implements OnDestroy, OnInit {
   private readonly directory = inject(MastodonServers);
+  private readonly transloco = inject(TranslocoService);
 
   readonly currentServer = input('');
-  readonly startLabel = input('Find another server');
+  /**
+   * The button's text. Empty means "use the default", which is a translation
+   * key rather than an English literal — an `input()` default is evaluated
+   * before any injection context exists, so it cannot call `translate()`
+   * itself. Callers that pass their own label are unaffected.
+   */
+  readonly startLabel = input('');
+  protected readonly startText = computed(
+    () => this.startLabel() || this.transloco.translate<string>('serverDiscovery.start'),
+  );
   /**
    * Begin hunting on mount instead of waiting for a click.
    *
@@ -111,10 +150,10 @@ export class ServerDiscovery implements OnDestroy, OnInit {
   }
 
   protected sizeLabel(users: number): string {
-    if (users >= 100_000) return 'very large';
-    if (users >= 10_000) return 'large';
-    if (users >= 1_000) return 'mid-size';
-    if (users > 0) return 'cozy';
+    if (users >= 100_000) return this.transloco.translate('serverDiscovery.sizeLabel.veryLarge');
+    if (users >= 10_000) return this.transloco.translate('serverDiscovery.sizeLabel.large');
+    if (users >= 1_000) return this.transloco.translate('serverDiscovery.sizeLabel.midSize');
+    if (users > 0) return this.transloco.translate('serverDiscovery.sizeLabel.cozy');
     return '';
   }
 

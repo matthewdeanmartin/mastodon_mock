@@ -14,6 +14,7 @@ import {
 } from '../../../../providers/mastodon/mastodon-connector';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 
+// i18n settings.connections.mastodon.findAServer: Find a server
 // i18n settings.connections.mastodon.title: 🐘 Mastodon
 // i18n settings.connections.mastodon.intro: Read Mastodon alongside Bluesky — Explore, trending posts and hashtag timelines. You can do that without a Mastodon account, or sign in to one you already have.
 // i18n settings.connections.mastodon.anonymousActiveBefore: You're browsing anonymously, which already reads a Mastodon server — change it in

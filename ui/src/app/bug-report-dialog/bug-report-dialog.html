@@ -15,17 +15,14 @@
     (click)="$event.stopPropagation()"
     (keyup)="$event.stopPropagation()"
   >
-    <h3 id="bug-title">Report a bug</h3>
-    <p class="muted intro">
-      This builds a report you can file or paste yourself. Nothing is sent automatically — you'll
-      review it, then either copy it or open a prefilled GitHub issue.
-    </p>
+    <h3 id="bug-title">{{ 'bugReport.title' | transloco }}</h3>
+    <p class="muted intro">{{ 'bugReport.intro' | transloco }}</p>
 
-    <label class="field-label" for="bug-desc">What happened?</label>
+    <label class="field-label" for="bug-desc">{{ 'bugReport.whatHappened' | transloco }}</label>
     <textarea
       id="bug-desc"
       rows="4"
-      placeholder="What were you doing, and what went wrong?"
+      placeholder="{{ 'bugReport.descriptionPlaceholder' | transloco }}"
       [ngModel]="description()"
       (ngModelChange)="description.set($event)"
     ></textarea>
@@ -37,7 +34,12 @@
           [ngModel]="includeErrors()"
           (ngModelChange)="includeErrors.set($event)"
         />
-        Include the {{ errorLog.entries().length }} most recent error(s) captured in this tab
+        {{
+          (errorLog.entries().length === 1
+            ? 'bugReport.includeErrors.one'
+            : 'bugReport.includeErrors.other'
+          ) | transloco: { count: errorLog.entries().length }
+        }}
       </label>
     }
 
@@ -48,23 +50,29 @@
           [ngModel]="includeDiagnostics()"
           (ngModelChange)="includeDiagnostics.set($event)"
         />
-        Include up to 100 recent diagnostic entries from this tab
+        {{ 'bugReport.includeDiagnostics' | transloco }}
       </label>
     }
 
     <button class="link-btn" type="button" (click)="showDetails.set(!showDetails())">
-      {{ showDetails() ? 'Hide' : 'Show' }} exactly what will be included
+      {{
+        (showDetails() ? 'bugReport.toggle.hide' : 'bugReport.toggle.show') | transloco
+      }}
     </button>
     @if (showDetails()) {
       <pre class="preview">{{ preview() }}</pre>
     }
 
     <div class="actions">
-      <button class="btn btn-outline" type="button" (click)="closed.emit()">Close</button>
-      <button class="btn btn-outline" type="button" (click)="copy()">
-        {{ copied() ? 'Copied ✓' : 'Copy report' }}
+      <button class="btn btn-outline" type="button" (click)="closed.emit()">
+        {{ 'bugReport.close' | transloco }}
       </button>
-      <button class="btn" type="button" (click)="openGithub()">Open GitHub issue</button>
+      <button class="btn btn-outline" type="button" (click)="copy()">
+        {{ (copied() ? 'bugReport.copied' : 'bugReport.copyReport') | transloco }}
+      </button>
+      <button class="btn" type="button" (click)="openGithub()">
+        {{ 'bugReport.openGithubIssue' | transloco }}
+      </button>
     </div>
   </div>
 </div>

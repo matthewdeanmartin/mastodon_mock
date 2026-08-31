@@ -1,4 +1,9 @@
-<button class="ld-backdrop" type="button" aria-label="Close" (click)="close()"></button>
+<button
+  class="ld-backdrop"
+  type="button"
+  [attr.aria-label]="'leaveDialog.close' | transloco"
+  (click)="close()"
+></button>
 <!-- Escape is already handled by the component's own document keydown listener,
      so the trap only manages focus here (appFocusTrapCloseOnEscape="false"). -->
 <section
@@ -12,14 +17,21 @@
   <div class="ld-head">
     <h2 id="ld-title">
       @if (isAnonymous()) {
-        Leave Anonymous?
+        {{ 'leaveDialog.leaveAnonymous' | transloco }}
       } @else {
-        Log out of {{ who() }}?
+        {{ 'leaveDialog.logOutOf' | transloco: { who: who() } }}
       }
       <!-- `who()` already resolves to the Bluesky handle: the identity is adapted
            into a normal Account, so no third title is needed here. -->
     </h2>
-    <button class="icon-close" type="button" aria-label="Close" (click)="close()">×</button>
+    <button
+      class="icon-close"
+      type="button"
+      [attr.aria-label]="'leaveDialog.close' | transloco"
+      (click)="close()"
+    >
+      ×
+    </button>
   </div>
 
   <!-- Ordered least to most destructive, and each says what survives rather than
@@ -27,14 +39,14 @@
        are kept" is the part that lets someone choose confidently. -->
   <div class="ld-options">
     <button class="ld-option" type="button" (click)="leave()">
-      <span class="ld-option-title">Return to the login page</span>
+      <span class="ld-option-title">{{ 'leaveDialog.returnToLogin' | transloco }}</span>
       <span class="muted small">
         @if (isAnonymous()) {
-          Your follows, lists and settings stay in this browser.
+          {{ 'leaveDialog.stayAnonymous' | transloco }}
         } @else if (isBluesky()) {
-          Your Bluesky account stays saved in this browser, so signing back in is one click.
+          {{ 'leaveDialog.stayBluesky' | transloco }}
         } @else {
-          Your saved accounts and settings stay in this browser.
+          {{ 'leaveDialog.stayDefault' | transloco }}
         }
       </span>
     </button>
@@ -45,23 +57,22 @@
          have, on a button that sounds like it erases the data they do. -->
     @if (!isBluesky()) {
       <button class="ld-option ld-option-primary" type="button" (click)="deleteAnonymous()">
-        <span class="ld-option-title">Delete anonymous data, then leave</span>
+        <span class="ld-option-title">{{
+          'leaveDialog.deleteAnonymousThenLeave' | transloco
+        }}</span>
         <span class="muted small">
-          Follows, local lists, saved posts and followed hashtags from browsing without an account.
-          Any signed-in accounts you have saved are kept.
+          {{ 'leaveDialog.deleteAnonymousDetail' | transloco }}
         </span>
       </button>
     }
 
     <button class="ld-option ld-option-danger" type="button" (click)="deleteEverything()">
-      <span class="ld-option-title">Remove all browser data, then leave</span>
+      <span class="ld-option-title">{{ 'leaveDialog.removeAllThenLeave' | transloco }}</span>
       <span class="muted small">
         @if (isBluesky()) {
-          Your saved Bluesky sign-in, plus every other saved account, connection and setting. Your
-          Bluesky account itself is untouched — but you'll need your app password to return. This
-          can't be undone.
+          {{ 'leaveDialog.removeAllDetailBluesky' | transloco }}
         } @else {
-          Everything above, plus every saved account, connection and setting. This can't be undone.
+          {{ 'leaveDialog.removeAllDetailDefault' | transloco }}
         }
       </span>
     </button>
@@ -70,19 +81,20 @@
   <div class="ld-actions">
     <button class="btn btn-outline" type="button" (click)="downloadBackup()">
       @if (exported()) {
-        ✓ Backup downloaded
+        ✓ {{ 'leaveDialog.backupDownloaded' | transloco }}
       } @else {
-        Download my data first
+        {{ 'leaveDialog.downloadFirst' | transloco }}
       }
     </button>
-    <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
+    <button class="btn btn-outline" type="button" (click)="close()">
+      {{ 'leaveDialog.cancel' | transloco }}
+    </button>
   </div>
 
   @if (exportError(); as msg) {
     <p class="ld-error" role="alert">{{ msg }}</p>
   }
   <p class="muted small">
-    The backup holds your follows, lists, saved posts and settings. It never includes passwords or
-    access tokens — you will sign in again on a new browser.
+    {{ 'leaveDialog.backupNote' | transloco }}
   </p>
 </section>

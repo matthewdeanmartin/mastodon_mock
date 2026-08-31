@@ -173,6 +173,8 @@ import { Terminology } from '../../../../terminology';
 // i18n settings.connections.twitter.refresh.upToDate: Everything is up to date
 // i18n settings.connections.twitter.saveAndTest: Save and test
 // i18n settings.connections.twitter.services: Services
+// i18n settings.connections.twitter.spend.creditsLeft: credits left · about {{count}} refreshes
+// i18n settings.connections.twitter.spend.hardLimit: You have reached today's limit of {{count}} requests. It resets at midnight, or you can raise it below.
 // i18n settings.connections.twitter.spend.past.a: Past
 // i18n settings.connections.twitter.spend.past.b: requests today. Nothing is blocked — this is just a heads-up that you are spending more than a usual day's reading.
 // i18n settings.connections.twitter.spend.remaining: left before today's limit

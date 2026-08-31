@@ -1,15 +1,18 @@
 @if (loading()) {
-  <div class="page-head">Collection</div>
-  <p class="muted center">Loading…</p>
+  <div class="page-head">{{ 'pages.collection.title' | transloco }}</div>
+  <p class="muted center">{{ 'pages.collection.loading' | transloco }}</p>
 } @else if (error()) {
-  <div class="page-head">Collection</div>
+  <div class="page-head">{{ 'pages.collection.title' | transloco }}</div>
   <p class="muted center">{{ error() }}</p>
 } @else if (data(); as d) {
   <div class="page-head page-head-actions">
     <span>{{ d.collection.name }}</span>
     @if (!shipped()) {
       <button class="btn btn-outline btn-sm" [disabled]="converting()" (click)="convertToList()">
-        {{ converting() ? 'Converting…' : 'Convert to list' }}
+        {{
+          (converting() ? 'pages.collection.converting' : 'pages.collection.convertToList')
+            | transloco
+        }}
       </button>
     }
   </div>
@@ -23,15 +26,20 @@
     }
     <p class="muted small">
       @if (curator(); as c) {
-        Curated by
+        {{ 'pages.collection.curatedBy' | transloco }}
         <a [routerLink]="['/accounts', c.id]">{{ c.display_name || c.username }}</a>
         ·
       }
-      {{ d.collection.item_count }} member{{ d.collection.item_count === 1 ? '' : 's' }}
+      {{
+        (d.collection.item_count === 1
+          ? 'pages.collection.memberCount.one'
+          : 'pages.collection.memberCount.other'
+        ) | transloco: { count: d.collection.item_count }
+      }}
     </p>
     @if (shipped(); as kit) {
       <a class="muted small" [href]="kit.url" target="_blank" rel="noopener">
-        Open original on its home server ↗
+        {{ 'pages.collection.openOriginal' | transloco }}
       </a>
     }
     <div class="coll-actions">
@@ -43,7 +51,12 @@
            resolving itself first. -->
       @if (canFollow() && !shipped() && members().length) {
         <button class="btn btn-outline" [disabled]="bulk.running()" (click)="askFollowAll()">
-          {{ bulk.running() ? 'Working…' : 'Follow everyone in this collection' }}
+          {{
+            (bulk.running()
+              ? 'pages.collection.workingFollowAll'
+              : 'pages.collection.followEveryone'
+            ) | transloco
+          }}
         </button>
       }
       <!-- Shipped kits follow through the importer instead: their ids are
@@ -57,22 +70,30 @@
           (click)="followAllShipped()"
         >
           @if (importer.running()) {
-            Following… {{ kitFollowDone() }}/{{ members().length }}
+            {{
+              'pages.collection.followingProgress'
+                | transloco: { done: kitFollowDone(), total: members().length }
+            }}
           } @else if (kitFollowDone() === members().length) {
-            Followed {{ kitFollowed() }} of {{ members().length }}
+            {{
+              'pages.collection.followedSummary'
+                | transloco: { followed: kitFollowed(), total: members().length }
+            }}
           } @else {
-            Follow everyone in this collection
+            {{ 'pages.collection.followEveryone' | transloco }}
           }
         </button>
       }
       @if (isOwner()) {
-        <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
+        <button class="btn btn-outline" (click)="showBulk.set(true)">
+          {{ 'pages.collection.addPeopleByName' | transloco }}
+        </button>
         <button class="btn btn-outline danger" (click)="showDeleteConfirm.set(true)">
-          Delete collection
+          {{ 'pages.collection.deleteCollection' | transloco }}
         </button>
       } @else if (myItem()) {
         <button class="btn btn-outline danger" (click)="revokeSelf()">
-          Remove me from this collection
+          {{ 'pages.collection.removeMe' | transloco }}
         </button>
       }
     </div>
@@ -83,13 +104,19 @@
 
   @if (!shipped()) {
     <div class="tabs">
-      <button class="tab" [class.active]="tab() === 'feed'" (click)="setTab('feed')">Feed</button>
+      <button class="tab" [class.active]="tab() === 'feed'" (click)="setTab('feed')">
+        {{ 'pages.collection.tabFeed' | transloco }}
+      </button>
       <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
-        Members
+        {{ 'pages.collection.tabMembers' | transloco }}
       </button>
     </div>
   } @else {
-    <div class="tabs" role="tablist" aria-label="Bundled collection sections">
+    <div
+      class="tabs"
+      role="tablist"
+      [attr.aria-label]="'pages.collection.bundledSectionsAriaLabel' | transloco"
+    >
       <button
         class="tab"
         type="button"
@@ -98,7 +125,7 @@
         [attr.aria-selected]="tab() === 'members'"
         (click)="setTab('members')"
       >
-        Collection
+        {{ 'pages.collection.tabCollection' | transloco }}
       </button>
       <button
         class="tab"
@@ -108,7 +135,7 @@
         [attr.aria-selected]="tab() === 'feed'"
         (click)="setTab('feed')"
       >
-        Posts
+        {{ 'pages.collection.tabPosts' | transloco }}
       </button>
     </div>
 
@@ -118,9 +145,9 @@
            reader's choice and nothing loads until they ask. -->
       <div class="sample-box">
         <label class="sample-field">
-          Sample of
+          {{ 'pages.collection.sampleOf' | transloco }}
           <select
-            aria-label="How many members to sample"
+            [attr.aria-label]="'pages.collection.sampleSizeAriaLabel' | transloco"
             [value]="sampleSize()"
             (change)="setSampleSize($any($event.target).value)"
           >
@@ -128,19 +155,26 @@
               <option [value]="n">{{ n }}</option>
             }
           </select>
-          members
+          {{ 'pages.collection.membersSuffix' | transloco }}
         </label>
         <button class="btn btn-outline btn-sm" [disabled]="feedLoading()" (click)="loadSample()">
-          {{ feedLoading() ? 'Loading…' : sampled() ? 'Sample again' : 'Show me some posts' }}
+          {{
+            (feedLoading()
+              ? 'pages.collection.loading'
+              : sampled()
+                ? 'pages.collection.sampleAgain'
+                : 'pages.collection.showMePosts'
+            ) | transloco
+          }}
         </button>
-        <span class="muted small">One request per member, picked at random.</span>
+        <span class="muted small">{{ 'pages.collection.sampleHint' | transloco }}</span>
       </div>
 
       @if (feedLoading()) {
-        <p class="muted center">Loading posts…</p>
+        <p class="muted center">{{ 'pages.collection.loadingPosts' | transloco }}</p>
       } @else if (sampled()) {
         @if (!feed().length) {
-          <p class="muted center">No recent posts from the members sampled.</p>
+          <p class="muted center">{{ 'pages.collection.noSampledPosts' | transloco }}</p>
         } @else {
           @for (s of feed(); track s.id; let i = $index) {
             <app-status-card
@@ -149,7 +183,9 @@
               (deleted)="onDeleted($event)"
             />
           }
-          <div class="sample-rule muted small">—— end of sample ——</div>
+          <div class="sample-rule muted small">
+            {{ 'pages.collection.endOfSample' | transloco }}
+          </div>
         }
       }
     }
@@ -157,9 +193,9 @@
 
   @if (tab() === 'feed' && !shipped()) {
     @if (feedLoading()) {
-      <p class="muted center">Loading feed…</p>
+      <p class="muted center">{{ 'pages.collection.loadingFeed' | transloco }}</p>
     } @else if (!feed().length) {
-      <p class="muted center">No recent posts from this collection's members.</p>
+      <p class="muted center">{{ 'pages.collection.noMemberPosts' | transloco }}</p>
     } @else {
       @for (s of feed(); track s.id; let i = $index) {
         <app-status-card
@@ -177,10 +213,10 @@
           [ngModel]="query()"
           (ngModelChange)="query.set($event)"
           (keyup.enter)="search()"
-          placeholder="Search accounts to add…"
+          [attr.placeholder]="'pages.collection.searchAccountsPlaceholder' | transloco"
         />
         <button class="btn" [disabled]="!query().trim() || searching()" (click)="search()">
-          Search
+          {{ 'pages.collection.search' | transloco }}
         </button>
       </div>
       @for (a of results(); track a.id) {
@@ -199,13 +235,15 @@
               <span class="acct muted">&#64;{{ a.acct }}</span>
             </span>
           </a>
-          <button class="btn btn-outline" (click)="addMember(a)">Add</button>
+          <button class="btn btn-outline" (click)="addMember(a)">
+            {{ 'pages.collection.add' | transloco }}
+          </button>
         </div>
       }
     }
 
     @if (!members().length) {
-      <p class="muted center">No members in this collection yet.</p>
+      <p class="muted center">{{ 'pages.collection.noMembersYet' | transloco }}</p>
     } @else {
       @for (m of members(); track m.itemId) {
         <div class="member-row">
@@ -217,7 +255,7 @@
             <ng-container *ngTemplateOutlet="memberIdentity; context: { $implicit: m.account }" />
           </a>
           @if (m.state === 'pending') {
-            <span class="muted small">pending</span>
+            <span class="muted small">{{ 'pages.collection.pending' | transloco }}</span>
           }
           <!-- The point of a collection is that these are people worth
                following, so the follow control belongs on the row. Absent for
@@ -233,9 +271,9 @@
           @if (isOwner()) {
             <button
               class="del"
-              title="Remove from collection"
+              [attr.title]="'pages.collection.removeFromCollection' | transloco"
               (click)="memberToRemove.set(m)"
-              aria-label="Remove from collection"
+              [attr.aria-label]="'pages.collection.removeFromCollection' | transloco"
             >
               <span aria-hidden="true">✕</span>
             </button>
@@ -269,18 +307,23 @@
   }
   @if (showDeleteConfirm()) {
     <app-confirm-dialog
-      title="Delete this collection?"
-      [message]="'“' + d.collection.name + '” will be permanently deleted. This cannot be undone.'"
-      confirmLabel="Delete collection"
+      [title]="'pages.collection.deleteCollectionConfirmTitle' | transloco"
+      [message]="
+        'pages.collection.deleteCollectionConfirmMessage' | transloco: { name: d.collection.name }
+      "
+      [confirmLabel]="'pages.collection.deleteCollection' | transloco"
       (confirmed)="remove()"
       (cancelled)="showDeleteConfirm.set(false)"
     />
   }
   @if (memberToRemove(); as m) {
     <app-confirm-dialog
-      title="Remove from collection?"
-      [message]="'Remove @' + m.account.acct + ' from “' + d.collection.name + '”?'"
-      confirmLabel="Remove"
+      [title]="'pages.collection.removeFromCollectionConfirmTitle' | transloco"
+      [message]="
+        'pages.collection.removeFromCollectionConfirmMessage'
+          | transloco: { acct: m.account.acct, name: d.collection.name }
+      "
+      [confirmLabel]="'pages.collection.remove' | transloco"
       (confirmed)="removeMember(m)"
       (cancelled)="memberToRemove.set(null)"
     />

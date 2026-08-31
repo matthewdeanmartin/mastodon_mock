@@ -3,6 +3,7 @@ import { catchError, forkJoin, of } from 'rxjs';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, CollectionWithAccounts, Status } from '../../models';
@@ -57,6 +58,56 @@ interface Member {
  * statuses — the API has no collection timeline endpoint, so the feed is
  * synthesized in the browser (same client-side-only constraint as elsewhere).
  */
+// i18n pages.collection.title: Collection
+// i18n pages.collection.loading: Loading…
+// i18n pages.collection.converting: Converting…
+// i18n pages.collection.convertToList: Convert to list
+// i18n pages.collection.curatedBy: Curated by
+// i18n pages.collection.memberCount.one: {{count}} member
+// i18n pages.collection.memberCount.other: {{count}} members
+// i18n pages.collection.openOriginal: Open original on its home server ↗
+// i18n pages.collection.workingFollowAll: Working…
+// i18n pages.collection.followEveryone: Follow everyone in this collection
+// i18n pages.collection.followingProgress: Following… {{done}}/{{total}}
+// i18n pages.collection.followedSummary: Followed {{followed}} of {{total}}
+// i18n pages.collection.addPeopleByName: Add people by name
+// i18n pages.collection.deleteCollection: Delete collection
+// i18n pages.collection.removeMe: Remove me from this collection
+// i18n pages.collection.tabFeed: Feed
+// i18n pages.collection.tabMembers: Members
+// i18n pages.collection.bundledSectionsAriaLabel: Bundled collection sections
+// i18n pages.collection.tabCollection: Collection
+// i18n pages.collection.tabPosts: Posts
+// i18n pages.collection.sampleOf: Sample of
+// i18n pages.collection.sampleSizeAriaLabel: How many members to sample
+// i18n pages.collection.membersSuffix: members
+// i18n pages.collection.sampleAgain: Sample again
+// i18n pages.collection.showMePosts: Show me some posts
+// i18n pages.collection.sampleHint: One request per member, picked at random.
+// i18n pages.collection.loadingPosts: Loading posts…
+// i18n pages.collection.noSampledPosts: No recent posts from the members sampled.
+// i18n pages.collection.endOfSample: —— end of sample ——
+// i18n pages.collection.loadingFeed: Loading feed…
+// i18n pages.collection.noMemberPosts: No recent posts from this collection's members.
+// i18n pages.collection.searchAccountsPlaceholder: Search accounts to add…
+// i18n pages.collection.search: Search
+// i18n pages.collection.add: Add
+// i18n pages.collection.noMembersYet: No members in this collection yet.
+// i18n pages.collection.pending: pending
+// i18n pages.collection.removeFromCollection: Remove from collection
+// i18n pages.collection.deleteCollectionConfirmTitle: Delete this collection?
+// i18n pages.collection.deleteCollectionConfirmMessage: “{{name}}” will be permanently deleted. This cannot be undone.
+// i18n pages.collection.removeFromCollectionConfirmTitle: Remove from collection?
+// i18n pages.collection.removeFromCollectionConfirmMessage: Remove @{{acct}} from “{{name}}”?
+// i18n pages.collection.remove: Remove
+// i18n pages.collection.errorNotFound: Collection not found (this server may not support collections).
+// i18n pages.collection.errorLoadFailed: Could not load this collection.
+// i18n pages.collection.convertPartAdded: {{count}} added
+// i18n pages.collection.convertPartExisting: {{count}} already present
+// i18n pages.collection.convertPartFailed: {{count}} skipped
+// i18n pages.collection.convertNeedsFollowHint: Most servers only keep accounts you follow in a list — use “Follow everyone in this collection” first, then convert again.
+// i18n pages.collection.convertedSummary: Converted to list: {{parts}}.{{hint}}
+// i18n pages.collection.convertFailed: Could not convert this collection.
 @Component({
   selector: 'app-collection',
   imports: [
@@ -70,6 +121,7 @@ interface Member {
     BulkActionsDialog,
     BulkProgress,
     AvatarFallback,
+    TranslocoPipe,
   ],
   // Component-scoped, so a bulk follow started here tracks this collection only.
   providers: [ImportFollows],
@@ -82,6 +134,7 @@ export class CollectionPage implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private converter = inject(ListCollectionConverter);
+  private transloco = inject(TranslocoService);
   protected follows = inject(FollowState);
   protected bulk = inject(BulkActions);
   private feedResolver = inject(ListFeedResolver);
@@ -345,9 +398,11 @@ export class CollectionPage implements OnInit {
       error: (err) => {
         this.loading.set(false);
         this.error.set(
-          err?.status === 404
-            ? 'Collection not found (this server may not support collections).'
-            : 'Could not load this collection.',
+          this.transloco.translate<string>(
+            err?.status === 404
+              ? 'pages.collection.errorNotFound'
+              : 'pages.collection.errorLoadFailed',
+          ),
         );
       },
     });
@@ -534,21 +589,44 @@ export class CollectionPage implements OnInit {
     this.converter.convertCollectionToList(d).subscribe({
       next: (result) => {
         this.converting.set(false);
-        const parts = [`${result.added} added`];
-        if (result.existing) parts.push(`${result.existing} already present`);
-        if (result.failed) parts.push(`${result.failed} skipped`);
+        const parts = [
+          this.transloco.translate<string>('pages.collection.convertPartAdded', {
+            count: result.added,
+          }),
+        ];
+        if (result.existing) {
+          parts.push(
+            this.transloco.translate<string>('pages.collection.convertPartExisting', {
+              count: result.existing,
+            }),
+          );
+        }
+        if (result.failed) {
+          parts.push(
+            this.transloco.translate<string>('pages.collection.convertPartFailed', {
+              count: result.failed,
+            }),
+          );
+        }
         // The common failure, and the one that made this look broken: most
         // servers only keep accounts you follow in a list, so a collection of
         // strangers converts to an empty one. Name the cause and the fix — the
         // button that does it is directly above this message.
         const hint = result.needsFollow
-          ? ' Most servers only keep accounts you follow in a list — use “Follow everyone in this collection” first, then convert again.'
+          ? ' ' + this.transloco.translate<string>('pages.collection.convertNeedsFollowHint')
           : '';
-        this.conversionMessage.set(`Converted to list: ${parts.join(', ')}.${hint}`);
+        this.conversionMessage.set(
+          this.transloco.translate<string>('pages.collection.convertedSummary', {
+            parts: parts.join(', '),
+            hint,
+          }),
+        );
       },
       error: () => {
         this.converting.set(false);
-        this.conversionMessage.set('Could not convert this collection.');
+        this.conversionMessage.set(
+          this.transloco.translate<string>('pages.collection.convertFailed'),
+        );
       },
     });
   }

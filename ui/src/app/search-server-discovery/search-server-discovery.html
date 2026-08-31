@@ -2,33 +2,49 @@
   @switch (state()) {
     @case ('idle') {
       <button class="btn btn-outline" type="button" (click)="startSearch()">
-        {{ startLabel() }}
+        {{ startText() }}
       </button>
       <p class="muted small sd-note">
-        Checks randomly selected servers for one that answers search anonymously — both accounts and
-        posts. Nothing changes until you approve one.
+        {{ 'searchServerDiscovery.idle.note' | transloco }}
       </p>
     }
     @case ('searching') {
       <div class="sd-searching">
         <span class="spinner" aria-hidden="true"></span>
         <span>
-          Looking for a server that allows search…
-          <span class="muted small">{{ tried() }} tried</span>
+          {{ 'searchServerDiscovery.searching.label' | transloco }}
+          <span class="muted small">{{
+            'searchServerDiscovery.searching.tried' | transloco: { count: tried() }
+          }}</span>
         </span>
-        <button class="text-button" type="button" (click)="cancel()">Cancel</button>
+        <button class="text-button" type="button" (click)="cancel()">
+          {{ 'searchServerDiscovery.searching.cancel' | transloco }}
+        </button>
       </div>
       @if (directorySource() === 'bundled') {
-        <p class="muted small sd-note">Using the bundled Mastodon server directory.</p>
+        <p class="muted small sd-note">
+          {{ 'searchServerDiscovery.searching.bundledNote' | transloco }}
+        </p>
       }
     }
     @case ('found') {
       @if (candidate(); as server) {
         <div class="sd-candidate">
-          <strong>{{ server.domain }} allows anonymous search</strong>
+          <strong>
+            {{
+              'searchServerDiscovery.candidate.allowsSearch' | transloco: { domain: server.domain }
+            }}
+          </strong>
           <span class="muted small">
-            Found {{ server.accounts }} accounts and {{ server.statuses }} {{ words().posts }} for
-            the test queries.
+            {{
+              'searchServerDiscovery.candidate.found'
+                | transloco
+                  : {
+                      accounts: server.accounts,
+                      statuses: server.statuses,
+                      posts: words().posts,
+                    }
+            }}
           </span>
           <span class="muted small">
             @if (server.category) {
@@ -43,10 +59,10 @@
           }
           <div class="sd-actions">
             <button class="btn" type="button" (click)="useCandidate()">
-              Use this search server
+              {{ 'searchServerDiscovery.candidate.use' | transloco }}
             </button>
             <button class="btn btn-outline" type="button" (click)="startSearch(false)">
-              Keep looking
+              {{ 'searchServerDiscovery.candidate.keepLooking' | transloco }}
             </button>
           </div>
         </div>
@@ -54,10 +70,11 @@
     }
     @case ('exhausted') {
       <p class="muted small">
-        Couldn’t find a server that allows anonymous search right now. Your search server has not
-        changed.
+        {{ 'searchServerDiscovery.exhausted.note' | transloco }}
       </p>
-      <button class="btn btn-outline" type="button" (click)="startSearch()">Search again</button>
+      <button class="btn btn-outline" type="button" (click)="startSearch()">
+        {{ 'searchServerDiscovery.exhausted.retry' | transloco }}
+      </button>
     }
   }
 
@@ -76,10 +93,14 @@
 
   @if (rejectCount()) {
     <p class="muted small sd-rejects">
-      Skipping {{ rejectCount() }} server{{ rejectCount() === 1 ? '' : 's' }} already checked and
-      rejected.
+      {{
+        (rejectCount() === 1
+          ? 'searchServerDiscovery.rejects.skipping.one'
+          : 'searchServerDiscovery.rejects.skipping.other'
+        ) | transloco: { count: rejectCount() }
+      }}
       <button class="text-button" type="button" (click)="forgetRejects()">
-        Forget them and re-check
+        {{ 'searchServerDiscovery.rejects.forget' | transloco }}
       </button>
     </p>
   }

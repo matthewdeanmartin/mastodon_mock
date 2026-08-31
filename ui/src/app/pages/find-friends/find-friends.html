@@ -1,7 +1,7 @@
-<div class="page-head">Find Friends</div>
+<div class="page-head">{{ 'pages.findFriends.heading' | transloco }}</div>
 
 <p class="intro muted small">
-  Every way this app can help you find people to follow, in one place.
+  {{ 'pages.findFriends.intro' | transloco }}
 </p>
 
 <!--
@@ -16,17 +16,16 @@
   dead end for someone who does not, so it moved under Advanced.
 -->
 <a class="doc-row" routerLink="/bundled-starter-kits">
-  <span class="doc-title">Starter kits</span>
+  <span class="doc-title">{{ 'pages.findFriends.starterKits.title' | transloco }}</span>
   <span class="muted small">
-    Follow a whole set of accounts at once — the fastest way to get a timeline worth reading.
+    {{ 'pages.findFriends.starterKits.desc' | transloco }}
   </span>
 </a>
 
 <a class="doc-row" routerLink="/bundled-collections">
-  <span class="doc-title">Bundled collections</span>
+  <span class="doc-title">{{ 'pages.findFriends.bundledCollections.title' | transloco }}</span>
   <span class="muted small">
-    Real collections curated by other people, shipped with the app because Mastodon can't search for
-    collections yet.
+    {{ 'pages.findFriends.bundledCollections.desc' | transloco }}
   </span>
 </a>
 
@@ -38,9 +37,9 @@
   would I even type", which is the question that stops people at an empty
   search field.
 -->
-<h2 class="ff-heading">Search for something you're interested in</h2>
+<h2 class="ff-heading">{{ 'pages.findFriends.interestsHeading' | transloco }}</h2>
 <p class="muted small ff-sub">
-  Posts mentioning a topic, so you can follow whoever is actually talking about it.
+  {{ 'pages.findFriends.interestsSub' | transloco }}
 </p>
 
 <div class="ff-interests">
@@ -52,8 +51,8 @@
 </div>
 
 <a class="doc-row" routerLink="/search" [queryParams]="{ type: 'statuses' }">
-  <span class="doc-title">Search posts for anything else</span>
-  <span class="muted small">Type your own subject and see who is posting about it.</span>
+  <span class="doc-title">{{ 'pages.findFriends.searchAnything.title' | transloco }}</span>
+  <span class="muted small">{{ 'pages.findFriends.searchAnything.desc' | transloco }}</span>
 </a>
 
 <!--
@@ -62,28 +61,27 @@
   the right set of tools for someone who knows what they want, and a wall for
   someone who does not.
 -->
-<h2 class="ff-heading">Advanced</h2>
+<h2 class="ff-heading">{{ 'pages.findFriends.advancedHeading' | transloco }}</h2>
 <p class="muted small ff-sub">
-  Useful once you know who you're looking for, or you're bringing follows from somewhere else.
+  {{ 'pages.findFriends.advancedSub' | transloco }}
 </p>
 
 <a class="doc-row" routerLink="/search">
-  <span class="doc-title">Search for people by name</span>
-  <span class="muted small">Find accounts by name, bio or the things they post about.</span>
+  <span class="doc-title">{{ 'pages.findFriends.searchByName.title' | transloco }}</span>
+  <span class="muted small">{{ 'pages.findFriends.searchByName.desc' | transloco }}</span>
 </a>
 
 <a class="doc-row" routerLink="/directory">
-  <span class="doc-title">Profile directory</span>
+  <span class="doc-title">{{ 'pages.findFriends.profileDirectory.title' | transloco }}</span>
   <span class="muted small">
-    Browse the accounts your instance publishes in its opt-in directory.
+    {{ 'pages.findFriends.profileDirectory.desc' | transloco }}
   </span>
 </a>
 
 <a class="doc-row" routerLink="/offsite-directories">
-  <span class="doc-title">Offsite directories</span>
+  <span class="doc-title">{{ 'pages.findFriends.offsiteDirectories.title' | transloco }}</span>
   <span class="muted small">
-    Directories other people run. These open elsewhere — you'll need to come back and search for any
-    handle you find.
+    {{ 'pages.findFriends.offsiteDirectories.desc' | transloco }}
   </span>
 </a>
 
@@ -94,29 +92,26 @@
   the most to gain from it.
 -->
 <a class="doc-row" routerLink="/settings/import-export" fragment="contacts">
-  <span class="doc-title">Look for your contacts</span>
+  <span class="doc-title">{{ 'pages.findFriends.contacts.title' | transloco }}</span>
   <span class="muted small">
     @if (canPickContacts) {
-      Pick people from your phone's contacts and see who has an account. Distinctive names work
-      best; common ones will need a second look.
+      {{ 'pages.findFriends.contacts.descPicker' | transloco }}
     } @else {
-      Upload a contacts export and see who has an account. Distinctive names work best; common ones
-      will need a second look.
+      {{ 'pages.findFriends.contacts.descUpload' | transloco }}
     }
   </span>
 </a>
 
 <a class="doc-row" routerLink="/settings/import-export">
-  <span class="doc-title">Import a follow list</span>
+  <span class="doc-title">{{ 'pages.findFriends.importFollowList.title' | transloco }}</span>
   <span class="muted small">
-    Bring your follows over from another instance, or from a Twitter archive. Works signed out too —
-    follows are kept in this browser.
+    {{ 'pages.findFriends.importFollowList.desc' | transloco }}
   </span>
 </a>
 
 <a class="doc-row" routerLink="/invites">
-  <span class="doc-title">Invite people here</span>
+  <span class="doc-title">{{ 'pages.findFriends.invite.title' | transloco }}</span>
   <span class="muted small">
-    Prewritten posts for inviting the people you already know to join you.
+    {{ 'pages.findFriends.invite.desc' | transloco }}
   </span>
 </a>

@@ -1,13 +1,17 @@
 <div class="subtabs">
   @for (s of statuses; track s) {
-    <button class="subtab" [class.active]="status() === s" (click)="setStatus(s)">{{ s }}</button>
+    <button class="subtab" [class.active]="status() === s" (click)="setStatus(s)">
+      {{ statusLabelFor(s) }}
+    </button>
   }
 </div>
 
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'adminAccounts.loading' | transloco }}</p>
 } @else if (!accounts().length) {
-  <p class="muted center">No {{ status() }} accounts.</p>
+  <p class="muted center">
+    {{ 'adminAccounts.empty' | transloco: { status: statusLabel() } }}
+  </p>
 } @else {
   @for (a of accounts(); track a.id) {
     <div class="admin-row">
@@ -22,26 +26,38 @@
       </div>
       <div class="actions">
         @if (status() === 'pending') {
-          <button class="op" (click)="approve(a)">Approve</button>
-          <button class="op warn" (click)="reject(a)">Reject</button>
+          <button class="op" (click)="approve(a)">{{ 'adminAccounts.actions.approve' | transloco }}</button>
+          <button class="op warn" (click)="reject(a)">{{ 'adminAccounts.actions.reject' | transloco }}</button>
         }
-        <button class="op" (click)="unsensitive(a)">Unsensitive</button>
+        <button class="op" (click)="unsensitive(a)">
+          {{ 'adminAccounts.actions.unsensitive' | transloco }}
+        </button>
         @if (a.silenced) {
-          <button class="op" (click)="unsilence(a)">Unsilence</button>
+          <button class="op" (click)="unsilence(a)">
+            {{ 'adminAccounts.actions.unsilence' | transloco }}
+          </button>
         } @else {
-          <button class="op warn" (click)="moderate(a, 'silence')">Silence</button>
+          <button class="op warn" (click)="moderate(a, 'silence')">
+            {{ 'adminAccounts.actions.silence' | transloco }}
+          </button>
         }
         @if (a.suspended) {
-          <button class="op" (click)="unsuspend(a)">Unsuspend</button>
+          <button class="op" (click)="unsuspend(a)">
+            {{ 'adminAccounts.actions.unsuspend' | transloco }}
+          </button>
         } @else {
-          <button class="op warn" (click)="moderate(a, 'suspend')">Suspend</button>
+          <button class="op warn" (click)="moderate(a, 'suspend')">
+            {{ 'adminAccounts.actions.suspend' | transloco }}
+          </button>
         }
         @if (a.disabled) {
-          <button class="op" (click)="enable(a)">Enable</button>
+          <button class="op" (click)="enable(a)">{{ 'adminAccounts.actions.enable' | transloco }}</button>
         } @else {
-          <button class="op warn" (click)="moderate(a, 'disable')">Disable</button>
+          <button class="op warn" (click)="moderate(a, 'disable')">
+            {{ 'adminAccounts.actions.disable' | transloco }}
+          </button>
         }
-        <button class="op warn" (click)="remove(a)">Delete</button>
+        <button class="op warn" (click)="remove(a)">{{ 'adminAccounts.actions.delete' | transloco }}</button>
       </div>
     </div>
   }

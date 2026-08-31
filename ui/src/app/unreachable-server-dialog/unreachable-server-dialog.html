@@ -23,7 +23,7 @@
     <app-server-discovery
       [autoStart]="true"
       [currentServer]="attemptedServer()"
-      startLabel="Find a server I can read"
+      [startLabel]="'unreachableServer.findAServerICanRead' | transloco"
       (selected)="selected.emit($event)"
     />
 

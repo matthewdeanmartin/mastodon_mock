@@ -1,32 +1,35 @@
-<div class="page-head">Waiting to publish</div>
+<div class="page-head">{{ 'posse.head' | transloco }}</div>
 
 <p class="page-note">
-  Likes, boosts and replies recorded for your own site. They stay here until you publish them, so a
-  session of reading is one commit rather than twenty.
+  {{ 'posse.note' | transloco }}
 </p>
 
 @if (!settings.connected()) {
   <p class="page-note">
-    <strong>No Hugo blog is connected.</strong>
-    <a [routerLink]="['/settings/connections/hugo']">Connect one</a> to publish these.
+    <strong>{{ 'posse.notConnected' | transloco }}</strong>
+    <a [routerLink]="['/settings/connections/hugo']">{{ 'posse.connectOne' | transloco }}</a>
+    {{ 'posse.toPublishThese' | transloco }}
   </p>
 }
 
 @if (queue.isEmpty()) {
   <div class="center muted">
-    <p>Nothing is waiting.</p>
+    <p>{{ 'posse.empty' | transloco }}</p>
     <p class="small">
-      With
-      <a [routerLink]="['/settings/connections/hugo']">Record interactions on my blog</a>
-      switched on, the posts you like and boost are collected here — then published to your own site
-      in one go.
+      {{ 'posse.emptyHint.a' | transloco }}
+      <a [routerLink]="['/settings/connections/hugo']">{{
+        'posse.emptyHint.recordToggle' | transloco
+      }}</a>
+      {{ 'posse.emptyHint.b' | transloco }}
     </p>
   </div>
 } @else {
   <div class="posse-actions">
-    <span class="posse-count"> {{ queue.count() }} waiting </span>
+    <span class="posse-count">
+      {{ 'posse.waiting' | transloco: { count: queue.count() } }}
+    </span>
     <button class="btn" type="button" (click)="publishAll()" [disabled]="!canPublish()">
-      {{ publishing() ? 'Publishing…' : 'Publish all' }}
+      {{ (publishing() ? 'posse.publishing' : 'posse.publishAll') | transloco }}
     </button>
   </div>
 
@@ -49,7 +52,9 @@
           }
           <span class="muted small">
             {{ entry.queuedAt | date: 'medium' }} ·
-            <a [href]="entry.targetUrl" target="_blank" rel="noopener noreferrer"> Original ↗ </a>
+            <a [href]="entry.targetUrl" target="_blank" rel="noopener noreferrer">
+              {{ 'posse.original' | transloco }}
+            </a>
           </span>
         </span>
         <button
@@ -57,9 +62,9 @@
           type="button"
           (click)="remove(entry)"
           [disabled]="publishing()"
-          [attr.aria-label]="'Remove this ' + entry.kind"
+          [attr.aria-label]="removeLabel(entry)"
         >
-          Remove
+          {{ 'posse.remove' | transloco }}
         </button>
       </li>
     }
@@ -77,21 +82,19 @@
   <!-- The gap between commit and deliverable is a real wait, not a hang: a
        webmention's source URL does not exist until Actions has rebuilt. -->
   <p class="muted small building-note" role="status">
-    Recorded. Waiting for your site to rebuild before letting anyone know — a webmention points at a
-    page that has to exist first.
+    {{ 'posse.building' | transloco }}
   </p>
 }
 @if (notifying() || deliveries().length) {
   <div class="delivery-results">
     <h2 class="section-head">
-      Letting the other sites know
+      {{ 'posse.notifyHeading' | transloco }}
       @if (notifying()) {
-        <span class="muted small">checking…</span>
+        <span class="muted small">{{ 'posse.checking' | transloco }}</span>
       }
     </h2>
     <p class="muted small">
-      Most sites cannot be notified — Mastodon and Bluesky use their own systems and have no
-      webmention endpoint. That is expected, and your records are published either way.
+      {{ 'posse.notifyNote' | transloco }}
     </p>
     <ul class="delivery-list">
       @for (report of deliveries(); track report.targetUrl) {
@@ -99,16 +102,17 @@
           <span class="delivery-state">
             @switch (report.state) {
               @case ('delivered') {
-                <span class="delivery-tick" aria-hidden="true">✓</span> Notified
+                <span class="delivery-tick" aria-hidden="true">✓</span>
+                {{ 'posse.notified' | transloco }}
               }
               @case ('no-endpoint') {
-                <span class="muted">No endpoint</span>
+                <span class="muted">{{ 'posse.noEndpoint' | transloco }}</span>
               }
               @case ('unsupported') {
-                <span class="muted">Can't send</span>
+                <span class="muted">{{ 'posse.cantSend' | transloco }}</span>
               }
               @default {
-                <span class="delivery-refused">Refused</span>
+                <span class="delivery-refused">{{ 'posse.refused' | transloco }}</span>
               }
             }
           </span>
@@ -126,7 +130,7 @@
             </span>
             @if (report.endpoint) {
               <span class="muted small delivery-detail">
-                via <code>{{ report.endpoint }}</code>
+                {{ 'posse.via' | transloco }} <code>{{ report.endpoint }}</code>
               </span>
             }
           </span>

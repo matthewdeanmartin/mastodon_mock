@@ -14,85 +14,69 @@
     (keyup)="$event.stopPropagation()"
   >
     @if (selfHosted()) {
-      <h3 id="consent-title">Send your {{ source().label }} key through your own proxy?</h3>
+      <h3 id="consent-title">
+        {{ 'twitter.consent.titleSelfHosted' | transloco: { source: source().label } }}
+      </h3>
     } @else {
       <h3 id="consent-title" class="warn">
-        {{ proxy().label }} will be able to read your {{ source().label }} key
+        {{
+          'twitter.consent.titleWarn' | transloco: { proxy: proxy().label, source: source().label }
+        }}
       </h3>
     }
 
     <div id="consent-body">
       <p>
-        {{ source().label }} refuses to answer web browsers at all&nbsp;— you just saw that test
-        fail. Mawkingbird has no server of its own, so the only way to read tweets here is to route
-        every request through the CORS proxy you configured, and those requests carry your API key.
+        {{ 'twitter.consent.intro' | transloco: { source: source().label } }}
       </p>
 
       @if (selfHosted()) {
-        <p>
-          Your proxy is <strong>your own server</strong>. Your key and your reading go to a machine
-          you run, so nothing is being disclosed to anyone else. Just make sure the template you
-          configured points where you think it does.
-        </p>
+        <p [innerHTML]="'twitter.consent.selfHostedBody' | transloco"></p>
       } @else {
         <section class="who">
-          <h4>Who you would be trusting</h4>
+          <h4>{{ 'twitter.consent.whoHeading' | transloco }}</h4>
           <p class="operator">{{ proxy().label }}</p>
           <p class="pitch">{{ proxy().pitch }}</p>
           <p class="links">
             <a [href]="proxy().homepage" target="_blank" rel="noopener noreferrer">
-              Their website
+              {{ 'twitter.consent.theirWebsite' | transloco }}
             </a>
             <span aria-hidden="true">·</span>
             <a [href]="source().homepage" target="_blank" rel="noopener noreferrer">
-              About {{ source().label }}
+              {{ 'twitter.consent.aboutSource' | transloco: { source: source().label } }}
             </a>
           </p>
-          <p class="hint">
-            Read their terms before you decide. A CORS proxy is a machine-in-the-middle by design:
-            it sees every request it relays, including the headers.
-          </p>
+          <p class="hint">{{ 'twitter.consent.readTermsHint' | transloco }}</p>
         </section>
 
         <section class="risk">
-          <h4>What could go wrong</h4>
-          <p>
-            If {{ proxy().label }} logged or misused what passes through it, whoever holds your key
-            could:
-          </p>
+          <h4>{{ 'twitter.consent.riskHeading' | transloco }}</h4>
+          <p>{{ 'twitter.consent.riskIntro' | transloco: { proxy: proxy().label } }}</p>
           <ul>
-            <li>
-              <strong>Spend your credits.</strong> {{ source().label }} bills per request, so a
-              stolen key draws down the balance you paid for until you notice and rotate it.
-            </li>
-            <li>Look up any public Twitter account, post or search using your account's quota</li>
+            <li
+              [innerHTML]="
+                'twitter.consent.riskSpendCredits' | transloco: { source: source().label }
+              "
+            ></li>
+            <li>{{ 'twitter.consent.riskLookup' | transloco }}</li>
           </ul>
-          <p>
-            And separately from the key itself: because <em>every</em> X request goes through the
-            proxy, its operator can see
-            <strong>which accounts you read and what you search for</strong>. That is your reading
-            history, not something you published.
-          </p>
+          <p [innerHTML]="'twitter.consent.riskReadingHistory' | transloco"></p>
         </section>
 
         <section class="scope">
-          <h4>What this does not cover</h4>
+          <h4>{{ 'twitter.consent.scopeHeading' | transloco }}</h4>
           <p>
-            Only your {{ source().label }} key and the Twitter content you look up. Mawkingbird
-            still refuses to send your Mastodon session, your Bluesky account, or any other
-            connected service through a proxy. No Twitter account password or session cookie is
-            involved&nbsp;— this app never asks for one, and reading public Twitter data does not
-            require it.
+            {{ 'twitter.consent.scopeBody' | transloco: { source: source().label } }}
           </p>
           <p>
-            If you would rather not take this risk, you can run
+            {{ 'twitter.consent.scopeRunOwnIntro' | transloco }}
             <a
               href="https://developers.cloudflare.com/workers/"
               target="_blank"
               rel="noopener noreferrer"
-              >your own proxy</a
+              >{{ 'twitter.consent.runYourOwnProxy' | transloco }}</a
             >
-            and select it under CORS proxy instead.
+            {{ 'twitter.consent.scopeRunOwnOutro' | transloco }}
           </p>
         </section>
       }
@@ -100,7 +84,7 @@
 
     <div class="consent-actions">
       <button class="btn btn-outline" type="button" (click)="cancelled.emit()">
-        No, don't send it
+        {{ 'twitter.consent.decline' | transloco }}
       </button>
       <button
         class="btn"
@@ -109,9 +93,9 @@
         (click)="accepted.emit()"
       >
         @if (selfHosted()) {
-          Use my proxy
+          {{ 'twitter.consent.useMyProxy' | transloco }}
         } @else {
-          I accept the risk
+          {{ 'twitter.consent.acceptRisk' | transloco }}
         }
       </button>
     </div>

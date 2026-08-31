@@ -11,7 +11,7 @@ import {
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom, switchMap } from 'rxjs';
 import { Api } from '../api';
 import { PageDiagnostics } from '../page-diagnostics';
@@ -352,6 +352,7 @@ function dragHasFiles(event: DragEvent): boolean {
 // i18n compose.cancelEdit: Cancel edit
 // i18n compose.dismissBuildStatus: Dismiss build status
 // i18n compose.replyMentionHint: 💬 The leading <strong>&#64;handle</strong> notifies them of your reply. Remove it to reply without sending a mention notification.
+// i18n compose.placeholder: What is happening?
 // i18n compose.threadPostPlaceholder: Post {{index}} of the thread
 // i18n compose.removeFromThread: Remove this {{noun}} from the thread
 // i18n compose.choicePlaceholder: Choice {{index}}
@@ -442,6 +443,7 @@ function dragHasFiles(event: DragEvent): boolean {
 })
 export class Compose implements OnDestroy {
   private api = inject(Api);
+  private transloco = inject(TranslocoService);
   protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
   private linkShortening = inject(LinkShortening);
@@ -481,7 +483,17 @@ export class Compose implements OnDestroy {
   readonly inReplyToId = input<string | undefined>(undefined);
   /** When set, the composed status quotes this status id. */
   readonly quotedStatusId = input<string | undefined>(undefined);
-  readonly placeholder = input('What is happening?');
+  /**
+   * The box's prompt. Empty means "use the default", which is a translation key
+   * rather than an English literal: an `input()` default is evaluated before an
+   * injection context exists, so it cannot call `translate()` itself. Home,
+   * Drafts and Conversations rely on this default; the reply and paste
+   * composers pass their own already-translated text.
+   */
+  readonly placeholder = input('');
+  protected readonly placeholderText = computed(
+    () => this.placeholder() || this.transloco.translate<string>('compose.placeholder'),
+  );
   /** Optional pre-seeded body (e.g. @mentions for a direct reply). */
   readonly initialText = input('');
   /**

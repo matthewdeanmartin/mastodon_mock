@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Observable } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -8,6 +9,22 @@ import { StatusCard } from '../../status-card/status-card';
 import { authorsOf, ServerFeedKind } from '../../lists/list-source';
 import { serverFeedDef } from '../../lists/server-feeds';
 import { JustMyServer } from '../../just-my-server';
+
+// i18n pagesServerFeed.shortcuts.serverFriends: 👥 Server Friends
+// i18n pagesServerFeed.loading: Loading…
+// i18n pagesServerFeed.news.empty: No trending news right now.
+// i18n pagesServerFeed.tabs.posts: Posts
+// i18n pagesServerFeed.tabs.members: Members
+// i18n pagesServerFeed.posts.empty: Nothing here right now.
+// i18n pagesServerFeed.posts.loading: Loading…
+// i18n pagesServerFeed.posts.loadMore: Load more
+// i18n pagesServerFeed.members.empty: No authors yet — load some posts first.
+// i18n pagesServerFeed.members.summary.one: Members are the {{count}} distinct author of the posts loaded so far. Load more posts to discover more.
+// i18n pagesServerFeed.members.summary.other: Members are the {{count}} distinct authors of the posts loaded so far. Load more posts to discover more.
+// i18n pagesServerFeed.title.fallback: Feed
+// i18n pagesServerFeed.notice.newsLoadError: Could not load news links.
+// i18n pagesServerFeed.notice.signInRequired: Sign in to view this timeline. Anonymous sessions can only browse Trending and News.
+// i18n pagesServerFeed.notice.loadError: Could not load this feed.
 
 /**
  * A built-in server feed presented as a list. Two content shapes:
@@ -22,13 +39,14 @@ import { JustMyServer } from '../../just-my-server';
  */
 @Component({
   selector: 'app-server-feed',
-  imports: [RouterLink, StatusCard],
+  imports: [RouterLink, StatusCard, TranslocoPipe],
   templateUrl: './server-feed.html',
   styleUrl: './server-feed.css',
 })
 export class ServerFeed implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
+  private transloco = inject(TranslocoService);
   protected auth = inject(Auth);
   protected justMyServer = inject(JustMyServer);
 
@@ -42,7 +60,9 @@ export class ServerFeed implements OnInit {
   protected tab = signal<'posts' | 'members'>('posts');
 
   protected def = computed(() => serverFeedDef(this.feed()));
-  protected title = computed(() => this.def()?.title ?? 'Feed');
+  protected title = computed(
+    () => this.def()?.title ?? this.transloco.translate('pagesServerFeed.title.fallback'),
+  );
   protected isLinks = computed(() => this.def()?.content === 'links');
   protected showServerFriendsShortcut = computed(
     () => this.feed() === 'local' && this.justMyServer.effectiveEnabled(),
@@ -95,7 +115,7 @@ export class ServerFeed implements OnInit {
         },
         error: () => {
           this.loading.set(false);
-          this.notice.set('Could not load news links.');
+          this.notice.set(this.transloco.translate('pagesServerFeed.notice.newsLoadError'));
         },
       });
       return;
@@ -105,9 +125,7 @@ export class ServerFeed implements OnInit {
     this.exhausted.set(this.feed() === 'trending');
     if (this.def()?.authRequired && this.auth.isAnonymous) {
       this.loading.set(false);
-      this.notice.set(
-        'Sign in to view this timeline. Anonymous sessions can only browse Trending and News.',
-      );
+      this.notice.set(this.transloco.translate('pagesServerFeed.notice.signInRequired'));
       return;
     }
     this.loading.set(true);
@@ -119,7 +137,7 @@ export class ServerFeed implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.notice.set('Could not load this feed.');
+        this.notice.set(this.transloco.translate('pagesServerFeed.notice.loadError'));
       },
     });
   }

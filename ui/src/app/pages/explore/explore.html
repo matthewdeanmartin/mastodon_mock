@@ -2,10 +2,10 @@
   <!-- ===== Left: server intro ===== -->
   <aside class="intro">
     @if (instance(); as inst) {
-      <p class="intro-lede">
-        <strong>{{ inst.domain }}</strong> is one of the many independent Mastodon servers you can
-        use to participate in the fediverse.
-      </p>
+      <p
+        class="intro-lede"
+        [innerHTML]="'pages.explore.introLede' | transloco: { domain: inst.domain }"
+      ></p>
       <div class="intro-banner" aria-hidden="true">
         <span>{{ inst.title }}</span>
       </div>
@@ -14,7 +14,7 @@
       }
       <dl class="intro-stats">
         <div>
-          <dt>Administered by</dt>
+          <dt>{{ 'pages.explore.administeredBy' | transloco }}</dt>
           <dd>
             @if (inst.contact.account; as admin) {
               <a [routerLink]="['/accounts', admin.id]" class="admin">
@@ -25,19 +25,24 @@
                 </span>
               </a>
             } @else {
-              <span class="muted">{{ inst.contact.email || 'the server staff' }}</span>
+              <span class="muted">{{
+                inst.contact.email || ('pages.explore.theServerStaff' | transloco)
+              }}</span>
             }
           </dd>
         </div>
         <div>
-          <dt>Server stats</dt>
-          <dd>
-            <strong>{{ inst.usage.users.active_month.toLocaleString() }}</strong> active users
-          </dd>
+          <dt>{{ 'pages.explore.serverStats' | transloco }}</dt>
+          <dd
+            [innerHTML]="
+              'pages.explore.activeUsers'
+                | transloco: { count: inst.usage.users.active_month.toLocaleString() }
+            "
+          ></dd>
         </div>
       </dl>
     } @else {
-      <p class="muted">Loading server info…</p>
+      <p class="muted">{{ 'pages.explore.loadingServerInfo' | transloco }}</p>
     }
   </aside>
 
@@ -47,7 +52,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M3 17l6-6 4 4 7-7M14 8h6v6" />
       </svg>
-      <h1>Trending</h1>
+      <h1>{{ 'pages.explore.trending' | transloco }}</h1>
     </header>
 
     <div class="feed-tabs" role="tablist">
@@ -57,7 +62,7 @@
         [attr.aria-selected]="tab() === 'posts'"
         (click)="selectTab('posts')"
       >
-        Posts
+        {{ 'pages.explore.tabs.posts' | transloco }}
       </button>
       <button
         role="tab"
@@ -65,15 +70,15 @@
         [attr.aria-selected]="tab() === 'hashtags'"
         (click)="selectTab('hashtags')"
       >
-        Hashtags
+        {{ 'pages.explore.tabs.hashtags' | transloco }}
       </button>
     </div>
 
     @if (tab() === 'posts') {
       @if (loadingPosts()) {
-        <p class="muted pad">Loading trending posts…</p>
+        <p class="muted pad">{{ 'pages.explore.loadingPosts' | transloco }}</p>
       } @else if (!posts().length) {
-        <p class="muted pad">Nothing trending yet — seed some sample data to populate this.</p>
+        <p class="muted pad">{{ 'pages.explore.noTrendingPosts' | transloco }}</p>
       } @else {
         @for (status of posts(); track status.id) {
           <article class="post">
@@ -106,25 +111,34 @@
               </div>
             }
             <div class="post-meta muted">
-              <span>{{ status.replies_count }} replies</span>
-              <span>{{ status.reblogs_count }} {{ words().boosts }}</span>
-              <span>{{ status.favourites_count }} favourites</span>
+              <span>{{
+                'pages.explore.repliesCount' | transloco: { count: status.replies_count }
+              }}</span>
+              <span>{{
+                'pages.explore.boostsCount'
+                  | transloco: { count: status.reblogs_count, boosts: words().boosts }
+              }}</span>
+              <span>{{
+                'pages.explore.favouritesCount' | transloco: { count: status.favourites_count }
+              }}</span>
             </div>
           </article>
         }
       }
     } @else {
       @if (loadingTags()) {
-        <p class="muted pad">Loading trending hashtags…</p>
+        <p class="muted pad">{{ 'pages.explore.loadingHashtags' | transloco }}</p>
       } @else if (!tags().length) {
-        <p class="muted pad">No trending hashtags yet.</p>
+        <p class="muted pad">{{ 'pages.explore.noTrendingHashtags' | transloco }}</p>
       } @else {
         <ul class="tag-list">
           @for (tag of tags(); track tag.id) {
             <li>
               <a [routerLink]="['/tags', tag.name]" class="tag">
                 <span class="tag-name">#{{ tag.name }}</span>
-                <span class="tag-uses muted">{{ tagUses(tag).toLocaleString() }} recent uses</span>
+                <span class="tag-uses muted">{{
+                  'pages.explore.recentUses' | transloco: { count: tagUses(tag).toLocaleString() }
+                }}</span>
               </a>
             </li>
           }
@@ -140,17 +154,22 @@
       <span class="brand-name">{{ instance()?.title || 'mastodon_mock' }}</span>
     </div>
 
-    <p class="cta-blurb"><strong>The best way to keep up with what's happening.</strong></p>
+    <p class="cta-blurb">
+      <strong>{{ 'pages.explore.cta.headline' | transloco }}</strong>
+    </p>
     <p class="cta-blurb muted">
-      Follow anyone across the fediverse and see it all in chronological order. No algorithms, ads,
-      or clickbait in sight.
+      {{ 'pages.explore.cta.blurb' | transloco }}
     </p>
 
     @if (auth.isAuthenticated) {
-      <a class="btn btn-primary" routerLink="/home">Back to your timeline</a>
+      <a class="btn btn-primary" routerLink="/home">{{
+        'pages.explore.cta.backToTimeline' | transloco
+      }}</a>
     } @else {
-      <a class="btn btn-primary" href="login">Create account</a>
-      <a class="btn btn-outline" href="login">Login</a>
+      <a class="btn btn-primary" href="login">{{
+        'pages.explore.cta.createAccount' | transloco
+      }}</a>
+      <a class="btn btn-outline" href="login">{{ 'pages.explore.cta.login' | transloco }}</a>
     }
   </aside>
 </div>

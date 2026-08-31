@@ -1,7 +1,7 @@
 import { Component, computed, inject, Injector, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { PlusSession } from '../../../providers/account/plus-session';
 import { authDebug } from '../../../providers/account/auth-debug';
 import { MawkingbirdSession } from '../../../providers/account/mawkingbird-session';
@@ -44,6 +44,10 @@ import { ArticleReadingTally } from '../../../providers/article/article-reading-
  * lands on the account service, which sets a cookie and redirects back here
  * already signed in. There is nothing to unpack from the URL.
  */
+// i18n settings.plus.sync.drifted: This browser and the saved data for {{account}} do not match. Syncing uploads shared settings and this active account's enabled collections; it does not change any other Mastodon account.
+// i18n settings.plus.tally.articlesRead: Articles you've read in Mawkingbird
+// i18n settings.plus.vault.wrongPassphrase: That passphrase did not open the vault.
+// i18n settings.plus.vault.passphraseChanged: Passphrase changed on this encrypted store.
 // i18n settings.plus.account.auth.email: Confirmed email address
 // i18n settings.plus.account.auth.full: Full account
 // i18n settings.plus.account.cancelledUntil: — cancelled, yours until
@@ -205,6 +209,7 @@ import { ArticleReadingTally } from '../../../providers/article/article-reading-
 })
 export class SettingsMawkingbirdPlus implements OnInit {
   protected session = inject(MawkingbirdSession);
+  private readonly transloco = inject(TranslocoService);
   protected plus = inject(PlusSession);
   private proxy = inject(CorsProxySettings);
   protected features = inject(PlusFeatures);
@@ -573,7 +578,10 @@ export class SettingsMawkingbirdPlus implements OnInit {
         this.vaultPassphrase.set('');
         await this.syncExistingVaultKeys();
       } else {
-        this.vaultMessage.set(this.vault.notice() ?? 'That passphrase did not open the vault.');
+        this.vaultMessage.set(
+          this.vault.notice() ??
+            this.transloco.translate<string>('settings.plus.vault.wrongPassphrase'),
+        );
       }
     } finally {
       this.vaultBusy.set(false);
@@ -640,7 +648,9 @@ export class SettingsMawkingbirdPlus implements OnInit {
     this.vaultMessage.set(null);
     try {
       const problem = await this.vault.changePassphrase(this.vaultNextPassphrase());
-      this.vaultMessage.set(problem ?? 'Passphrase changed on this encrypted store.');
+      this.vaultMessage.set(
+        problem ?? this.transloco.translate<string>('settings.plus.vault.passphraseChanged'),
+      );
       if (!problem) {
         this.vaultNextPassphrase.set('');
       }

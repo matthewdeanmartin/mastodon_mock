@@ -1,7 +1,21 @@
 import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Server } from '../../server';
 import { AppFooter } from '../../shell/app-footer/app-footer';
+
+// i18n pagesWelcomeBack.eyebrow: Almost there
+// i18n pagesWelcomeBack.heading: Create your account on <strong>{{server}}</strong>
+// i18n pagesWelcomeBack.lead: Your account is created on the server itself — a client like this should never handle your email or password. That means <strong>{{server}}</strong> won't send you back here automatically. Here's the two-step plan:
+// i18n pagesWelcomeBack.step1.title: Bookmark this page
+// i18n pagesWelcomeBack.step1.body: Press <kbd>{{hint}}</kbd> now so you can find your way back after signing up. This is the page you'll return to.
+// i18n pagesWelcomeBack.step2.title: Sign up on {{server}}
+// i18n pagesWelcomeBack.step2.body: We'll open its sign-up page in a new tab. Finish creating and confirming your account there, then come back to this tab.
+// i18n pagesWelcomeBack.step2.open: Open {{server}} sign-up ↗
+// i18n pagesWelcomeBack.done.prompt: Account created and confirmed? Come back here and sign in:
+// i18n pagesWelcomeBack.done.signIn: I'm signed up — sign in
+// i18n pagesWelcomeBack.helper.stillChoosing: Still choosing a server?
+// i18n pagesWelcomeBack.helper.browse: Browse servers on joinmastodon.org ↗
 
 /**
  * The "come back and sign in" landing page for brand-new users.
@@ -15,7 +29,7 @@ import { AppFooter } from '../../shell/app-footer/app-footer';
  */
 @Component({
   selector: 'app-welcome-back',
-  imports: [AppFooter],
+  imports: [AppFooter, TranslocoPipe],
   templateUrl: './welcome-back.html',
   styleUrl: './welcome-back.css',
 })

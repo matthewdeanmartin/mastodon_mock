@@ -1,12 +1,14 @@
 <div class="page-head page-head-actions">
-  <span>{{ title() || 'List' }}</span>
+  <span>{{ title() || ('listTimeline.fallbackTitle' | transloco) }}</span>
   @if (!auth.isAnonymous) {
     <button
       class="btn btn-outline btn-sm"
       [disabled]="converting()"
       (click)="convertToCollection()"
     >
-      {{ converting() ? 'Converting…' : 'Convert to collection' }}
+      {{
+        (converting() ? 'listTimeline.converting' : 'listTimeline.convertToCollection') | transloco
+      }}
     </button>
   }
 </div>
@@ -22,12 +24,14 @@
 }
 
 <div class="tabs">
-  <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Posts</button>
+  <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">
+    {{ 'listTimeline.tabs.posts' | transloco }}
+  </button>
   <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
-    Members
+    {{ 'listTimeline.tabs.members' | transloco }}
   </button>
   <button class="tab" [class.active]="tab() === 'analytics'" (click)="setTab('analytics')">
-    Analytics
+    {{ 'listTimeline.tabs.analytics' | transloco }}
   </button>
 </div>
 
@@ -36,9 +40,9 @@
   <app-feed-analytics [source]="feedSource()" />
 } @else if (tab() === 'posts') {
   @if (loading()) {
-    <p class="muted center">Loading…</p>
+    <p class="muted center">{{ 'listTimeline.loading' | transloco }}</p>
   } @else if (!displayedStatuses().length) {
-    <p class="muted center">No statuses in this list yet.</p>
+    <p class="muted center">{{ 'listTimeline.noStatuses' | transloco }}</p>
   } @else {
     @for (s of displayedStatuses(); track s.id) {
       <app-status-card
@@ -49,13 +53,15 @@
     }
     @if (!exhausted()) {
       <button class="btn btn-outline more" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ loadingMore() ? 'Loading…' : 'Load more' }}
+        {{ (loadingMore() ? 'listTimeline.loading' : 'listTimeline.loadMore') | transloco }}
       </button>
     }
   }
 } @else {
   <div class="members-actions">
-    <button class="btn btn-outline" (click)="showBulk.set(true)">Add people by name</button>
+    <button class="btn btn-outline" (click)="showBulk.set(true)">
+      {{ 'listTimeline.addPeopleByName' | transloco }}
+    </button>
     <!-- Whole-list follow changes. Signed-in only: an Anonymous list is a local
          set of follows, with no server relationships to change.
 
@@ -72,7 +78,7 @@
         [disabled]="bulkRunning() || !members().length"
         (click)="askBulk('list-unfollow')"
       >
-        Unfollow everyone
+        {{ 'listTimeline.unfollowEveryone' | transloco }}
       </button>
     }
   </div>
@@ -81,11 +87,10 @@
     <p class="member-error" role="alert">{{ message }}</p>
   }
   @if (membersLoading()) {
-    <p class="muted center">Loading…</p>
+    <p class="muted center">{{ 'listTimeline.loading' | transloco }}</p>
   } @else if (!members().length) {
     <p class="muted center">
-      No members in this list yet. Add people from the menu on their profile, or with “Add people by
-      name” above.
+      {{ 'listTimeline.noMembers' | transloco }}
     </p>
   } @else {
     @for (a of members(); track a.id) {
@@ -105,9 +110,9 @@
         </a>
         <button
           class="del"
-          title="Remove from list"
+          [title]="'listTimeline.removeFromList' | transloco"
           (click)="memberToRemove.set(a)"
-          aria-label="Remove from list"
+          [attr.aria-label]="'listTimeline.removeFromList' | transloco"
         >
           <span aria-hidden="true">✕</span>
         </button>
@@ -127,9 +132,11 @@
 }
 @if (memberToRemove(); as a) {
   <app-confirm-dialog
-    title="Remove from list?"
-    [message]="'Remove @' + a.acct + ' from “' + title() + '”?'"
-    confirmLabel="Remove"
+    [title]="'listTimeline.removeFromListConfirmTitle' | transloco"
+    [message]="
+      'listTimeline.removeFromListConfirmMessage' | transloco: { acct: a.acct, title: title() }
+    "
+    [confirmLabel]="'listTimeline.remove' | transloco"
     (confirmed)="removeMember(a)"
     (cancelled)="memberToRemove.set(null)"
   />

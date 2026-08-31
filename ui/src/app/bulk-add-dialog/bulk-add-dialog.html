@@ -9,7 +9,7 @@
     class="dialog"
     role="dialog"
     aria-modal="true"
-    aria-label="Add people by name"
+    [attr.aria-label]="'bulkAdd.dialogAria' | transloco"
     tabindex="-1"
     appFocusTrap
     (dismissed)="closed.emit()"
@@ -17,16 +17,20 @@
     (keyup)="$event.stopPropagation()"
   >
     <h3>
-      Add people to
-      {{ targetKind() === 'list' ? 'list' : 'collection' }}
       @if (targetName()) {
-        <span class="target-name">“{{ targetName() }}”</span>
+        {{
+          (targetKind() === 'list' ? 'bulkAdd.heading.list' : 'bulkAdd.heading.collection')
+            | transloco: { name: targetName() }
+        }}
+      } @else {
+        {{
+          targetKind() === 'list'
+            ? ('bulkAdd.heading.listNoName' | transloco)
+            : ('bulkAdd.heading.collectionNoName' | transloco)
+        }}
       }
     </h3>
-    <p class="muted small">
-      Paste handles separated by commas, spaces, or line breaks. Each is resolved and added, one
-      after another.
-    </p>
+    <p class="muted small">{{ 'bulkAdd.instructions' | transloco }}</p>
 
     <textarea
       class="bulk-handles"
@@ -38,10 +42,17 @@
 
     <div class="dialog-actions">
       <button class="btn btn-outline" (click)="closed.emit()">
-        {{ results().length ? 'Done' : 'Cancel' }}
+        {{ (results().length ? 'bulkAdd.done' : 'bulkAdd.cancel') | transloco }}
       </button>
       <button class="btn" [disabled]="busy() || !count()" (click)="add()">
-        {{ busy() ? 'Adding…' : 'Add ' + count() + ' ' + (count() === 1 ? 'person' : 'people') }}
+        @if (busy()) {
+          {{ 'bulkAdd.adding' | transloco }}
+        } @else {
+          {{
+            (count() === 1 ? 'bulkAdd.addCount.one' : 'bulkAdd.addCount.other')
+              | transloco: { count: count() }
+          }}
+        }
       </button>
     </div>
 
@@ -50,7 +61,7 @@
         @for (r of results(); track $index) {
           <li [class]="'result-' + r.status">
             <span class="result-handle">{{ r.handle }}</span>
-            <span class="result-status">{{ r.status }}</span>
+            <span class="result-status">{{ statusLabel(r.status) }}</span>
           </li>
         }
       </ul>

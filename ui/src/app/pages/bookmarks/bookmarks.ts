@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Status } from '../../models';
@@ -21,10 +22,37 @@ type LibraryView = 'all' | 'authors' | 'hashtags' | 'media';
 
 const PAGE_SIZE = 20;
 
+// i18n pages.bookmarks.provider: Bookmark provider
+// i18n pages.bookmarks.native: Native
+// i18n pages.bookmarks.raindrop: Raindrop
+// i18n pages.bookmarks.filterLabel: Filter bookmarks
+// i18n pages.bookmarks.filter: Filter
+// i18n pages.bookmarks.clear: Clear
+// i18n pages.bookmarks.loading: Loading…
+// i18n pages.bookmarks.nativeFolders: Native synthetic folders
+// i18n pages.bookmarks.emptyNative: You haven't bookmarked anything here.
+// i18n pages.bookmarks.noFilterMatch: No bookmarks on this page match that filter.
+// i18n pages.bookmarks.emptyGroup: Nothing here.
+// i18n pages.bookmarks.raindropFolders: Raindrop folders
+// i18n pages.bookmarks.all: All
+// i18n pages.bookmarks.emptyRaindrop: No Raindrop bookmarks in this folder.
+// i18n pages.bookmarks.pagesNav: Bookmark pages
+// i18n pages.bookmarks.first: First
+// i18n pages.bookmarks.previous: Previous
+// i18n pages.bookmarks.next: Next
+// i18n pages.bookmarks.filterHint.native: Filters only the {{count}} Native bookmarks on this page.
+// i18n pages.bookmarks.filterHint.raindrop: Sent to Raindrop.io; text and Raindrop search operators are supported.
+// i18n pages.bookmarks.groupHeading: {{label}} ({{count}})
+// i18n pages.bookmarks.moving: Moving…
+// i18n pages.bookmarks.moveToRaindrop: Move to Raindrop
+// i18n pages.bookmarks.moveToNative: Move to Native
+// i18n pages.bookmarks.pageNumber: Page {{page}}
+// i18n pages.bookmarks.placeholder.native: Words or author on this page
+// i18n pages.bookmarks.placeholder.raindrop: Search Raindrop
 /** A bounded, two-provider bookmark library with client-side shelves for Native. */
 @Component({
   selector: 'app-bookmarks',
-  imports: [StatusCard],
+  imports: [StatusCard, TranslocoPipe],
   templateUrl: './bookmarks.html',
   styleUrl: './bookmarks.css',
 })

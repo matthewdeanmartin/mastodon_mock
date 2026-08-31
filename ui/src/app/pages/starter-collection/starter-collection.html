@@ -2,7 +2,7 @@
 
 <section class="intro">
   <div>
-    <h1>A timeline in one click</h1>
+    <h1>{{ 'starterCollection.heading' | transloco }}</h1>
     <p class="muted">{{ kit.blurb }}</p>
   </div>
   <button
@@ -11,16 +11,25 @@
     (click)="followAll()"
   >
     @if (importer.running()) {
-      Following… {{ completed() }}/{{ accounts.length }}
+      {{
+        'starterCollection.followingProgress'
+          | transloco: { completed: completed(), total: accounts.length }
+      }}
     } @else if (completed() === accounts.length) {
-      Followed {{ followed() }} accounts
+      {{
+        (followed() === 1 ? 'starterCollection.followed.one' : 'starterCollection.followed.other')
+          | transloco: { count: followed() }
+      }}
     } @else {
-      Follow all {{ accounts.length }}
+      {{ 'starterCollection.followAll' | transloco: { count: accounts.length } }}
     }
   </button>
 </section>
 
-<div class="members" [attr.aria-label]="kit.title + ' accounts'">
+<div
+  class="members"
+  [attr.aria-label]="'starterCollection.membersAria' | transloco: { title: kit.title }"
+>
   @for (item of accounts; track item.handle) {
     <div class="member">
       <button
@@ -33,23 +42,23 @@
         <span class="muted">&#64;{{ item.handle }}</span>
       </button>
       @if (opening() === item.handle) {
-        <span class="muted small">Opening…</span>
+        <span class="muted small">{{ 'starterCollection.opening' | transloco }}</span>
       } @else {
         @switch (status(item.handle)) {
           @case ('resolving') {
-            <span class="muted small">Looking up…</span>
+            <span class="muted small">{{ 'starterCollection.lookingUp' | transloco }}</span>
           }
           @case ('following') {
-            <span class="muted small">Following…</span>
+            <span class="muted small">{{ 'starterCollection.followingRow' | transloco }}</span>
           }
           @case ('followed') {
-            <span class="success small">Following ✓</span>
+            <span class="success small">{{ 'starterCollection.followingDone' | transloco }}</span>
           }
           @case ('not_found') {
-            <span class="muted small">Not found</span>
+            <span class="muted small">{{ 'starterCollection.notFound' | transloco }}</span>
           }
           @case ('failed') {
-            <span class="muted small">Could not follow</span>
+            <span class="muted small">{{ 'starterCollection.couldNotFollow' | transloco }}</span>
           }
         }
       }
@@ -58,7 +67,6 @@
 </div>
 
 <p class="muted small note">
-  Anonymous follows use the collection’s built-in account snapshot immediately. Signed-in follows
-  are resolved by your server before the real follow request is sent.
-  <a routerLink="/find-friends">Find friends another way</a>.
+  {{ 'starterCollection.note' | transloco }}
+  <a routerLink="/find-friends">{{ 'starterCollection.findFriends' | transloco }}</a>.
 </p>

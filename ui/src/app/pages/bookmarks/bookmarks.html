@@ -1,14 +1,14 @@
 @if (raindrop.connected()) {
-  <nav class="tabs provider-tabs" aria-label="Bookmark provider">
+  <nav class="tabs provider-tabs" [aria-label]="'pages.bookmarks.provider' | transloco">
     <button class="tab" [class.active]="provider() === 'native'" (click)="selectProvider('native')">
-      Native
+      {{ 'pages.bookmarks.native' | transloco }}
     </button>
     <button
       class="tab"
       [class.active]="provider() === 'raindrop'"
       (click)="selectProvider('raindrop')"
     >
-      Raindrop
+      {{ 'pages.bookmarks.raindrop' | transloco }}
     </button>
   </nav>
 }
@@ -21,36 +21,42 @@
 }
 
 <form class="bookmark-filter" role="search" (submit)="applyFilter($event)">
-  <label for="bookmark-filter-input">Filter bookmarks</label>
+  <label for="bookmark-filter-input">{{ 'pages.bookmarks.filterLabel' | transloco }}</label>
   <div class="filter-controls">
     <input
       id="bookmark-filter-input"
       type="search"
       [value]="filterDraft()"
-      [placeholder]="provider() === 'native' ? 'Words or author on this page' : 'Search Raindrop'"
+      [placeholder]="
+        provider() === 'native'
+          ? ('pages.bookmarks.placeholder.native' | transloco)
+          : ('pages.bookmarks.placeholder.raindrop' | transloco)
+      "
       (input)="filterDraft.set($any($event.target).value)"
     />
     <button class="btn" type="submit" [disabled]="provider() === 'raindrop' && raindropLoading()">
-      Filter
+      {{ 'pages.bookmarks.filter' | transloco }}
     </button>
     @if (filterDraft() || (provider() === 'native' ? nativeFilter() : raindropFilter())) {
-      <button class="btn btn-outline" type="button" (click)="clearFilter()">Clear</button>
+      <button class="btn btn-outline" type="button" (click)="clearFilter()">
+        {{ 'pages.bookmarks.clear' | transloco }}
+      </button>
     }
   </div>
   <span class="muted small">
     @if (provider() === 'native') {
-      Filters only the {{ statuses().length }} Native bookmarks on this page.
+      {{ 'pages.bookmarks.filterHint.native' | transloco: { count: statuses().length } }}
     } @else {
-      Sent to Raindrop.io; text and Raindrop search operators are supported.
+      {{ 'pages.bookmarks.filterHint.raindrop' | transloco }}
     }
   </span>
 </form>
 
 @if (provider() === 'native') {
   @if (loading()) {
-    <p class="muted center">Loading…</p>
+    <p class="muted center">{{ 'pages.bookmarks.loading' | transloco }}</p>
   } @else {
-    <nav class="tabs folder-tabs" aria-label="Native synthetic folders">
+    <nav class="tabs folder-tabs" [aria-label]="'pages.bookmarks.nativeFolders' | transloco">
       @for (v of views; track v.id) {
         <button class="tab" [class.active]="view() === v.id" (click)="view.set(v.id)">
           {{ v.label }}
@@ -59,16 +65,21 @@
     </nav>
 
     @if (!statuses().length) {
-      <p class="muted center">You haven't bookmarked anything here.</p>
+      <p class="muted center">{{ 'pages.bookmarks.emptyNative' | transloco }}</p>
     } @else if (!filteredStatuses().length) {
-      <p class="muted center">No bookmarks on this page match that filter.</p>
+      <p class="muted center">{{ 'pages.bookmarks.noFilterMatch' | transloco }}</p>
     } @else {
       @for (group of groups(); track group.label) {
         @if (group.label && view() !== 'all') {
-          <h3 class="page-head">{{ group.label }} ({{ group.statuses.length }})</h3>
+          <h3 class="page-head">
+            {{
+              'pages.bookmarks.groupHeading'
+                | transloco: { label: group.label, count: group.statuses.length }
+            }}
+          </h3>
         }
         @if (!group.statuses.length) {
-          <p class="muted center">Nothing here.</p>
+          <p class="muted center">{{ 'pages.bookmarks.emptyGroup' | transloco }}</p>
         }
         @for (s of group.statuses; track s.id) {
           <app-status-card [status]="s" (changed)="onChanged($event)" (deleted)="onDeleted($event)">
@@ -79,7 +90,12 @@
                   [disabled]="busy() !== null"
                   (click)="moveNativeToRaindrop(s)"
                 >
-                  {{ busy() === 'native:' + s.id ? 'Moving…' : 'Move to Raindrop' }}
+                  {{
+                    (busy() === 'native:' + s.id
+                      ? 'pages.bookmarks.moving'
+                      : 'pages.bookmarks.moveToRaindrop'
+                    ) | transloco
+                  }}
                 </button>
               </div>
             }
@@ -89,13 +105,13 @@
     }
   }
 } @else {
-  <nav class="tabs folder-tabs" aria-label="Raindrop folders">
+  <nav class="tabs folder-tabs" [aria-label]="'pages.bookmarks.raindropFolders' | transloco">
     <button
       class="tab"
       [class.active]="raindropCollection() === 0"
       (click)="selectRaindropCollection(0)"
     >
-      All
+      {{ 'pages.bookmarks.all' | transloco }}
     </button>
     @for (collection of collections(); track collection._id) {
       <button
@@ -109,9 +125,9 @@
   </nav>
 
   @if (raindropLoading()) {
-    <p class="muted center">Loading…</p>
+    <p class="muted center">{{ 'pages.bookmarks.loading' | transloco }}</p>
   } @else if (!raindropBookmarks().length) {
-    <p class="muted center">No Raindrop bookmarks in this folder.</p>
+    <p class="muted center">{{ 'pages.bookmarks.emptyRaindrop' | transloco }}</p>
   } @else {
     <div class="raindrop-list">
       @for (bookmark of raindropBookmarks(); track bookmark._id) {
@@ -133,7 +149,12 @@
             [disabled]="busy() !== null"
             (click)="moveRaindropToNative(bookmark)"
           >
-            {{ busy() === 'raindrop:' + bookmark._id ? 'Moving…' : 'Move to Native' }}
+            {{
+              (busy() === 'raindrop:' + bookmark._id
+                ? 'pages.bookmarks.moving'
+                : 'pages.bookmarks.moveToNative'
+              ) | transloco
+            }}
           </button>
         </article>
       }
@@ -142,30 +163,33 @@
 }
 
 @if (!loading() && (provider() === 'native' || !raindropLoading())) {
-  <nav class="pager" aria-label="Bookmark pages">
+  <nav class="pager" [aria-label]="'pages.bookmarks.pagesNav' | transloco">
     <button
       class="btn btn-outline"
       [disabled]="provider() === 'native' ? nativePage() === 0 : raindropPage() === 0"
       (click)="firstPage()"
     >
-      First
+      {{ 'pages.bookmarks.first' | transloco }}
     </button>
     <button
       class="btn btn-outline"
       [disabled]="provider() === 'native' ? nativePage() === 0 : raindropPage() === 0"
       (click)="previousPage()"
     >
-      Previous
+      {{ 'pages.bookmarks.previous' | transloco }}
     </button>
     <span class="muted small">
-      Page {{ (provider() === 'native' ? nativePage() : raindropPage()) + 1 }}
+      {{
+        'pages.bookmarks.pageNumber'
+          | transloco: { page: (provider() === 'native' ? nativePage() : raindropPage()) + 1 }
+      }}
     </span>
     <button
       class="btn btn-outline"
       [disabled]="loadingMore() || (provider() === 'native' ? exhausted() : !raindropHasNext())"
       (click)="nextPage()"
     >
-      {{ loadingMore() ? 'Loading…' : 'Next' }}
+      {{ (loadingMore() ? 'pages.bookmarks.loading' : 'pages.bookmarks.next') | transloco }}
     </button>
   </nav>
 }

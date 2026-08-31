@@ -1,7 +1,7 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { MockApi } from '../../mock-api';
 import { Auth } from '../../auth';
@@ -55,6 +55,7 @@ const ACCESS_SCOPES: Record<OAuthAccess, string> = {
   read: 'read',
 };
 
+// i18n pages.login.seedFailed: Seeding failed.
 // i18n pages.login.access.full.label: Full access
 // i18n pages.login.access.full.hint: Read, post, reply, follow — everything the app does.
 // i18n pages.login.access.read.label: Read only
@@ -157,6 +158,7 @@ type ServerStatus = 'idle' | 'checking' | 'ok' | 'degraded' | 'unreachable';
 })
 export class Login implements OnInit, OnDestroy {
   private api = inject(Api);
+  private readonly transloco = inject(TranslocoService);
   private mockApi = inject(MockApi);
   private auth = inject(Auth);
   private router = inject(Router);
@@ -645,7 +647,9 @@ export class Login implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.seeding.set(false);
-        this.seedMessage.set(err?.error?.detail ?? 'Seeding failed.');
+        this.seedMessage.set(
+          err?.error?.detail ?? this.transloco.translate<string>('pages.login.seedFailed'),
+        );
       },
     });
   }

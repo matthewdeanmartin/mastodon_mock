@@ -1,26 +1,32 @@
 @if (loading()) {
-  <p class="muted center">Looking at who's posting…</p>
+  <p class="muted center">{{ 'feedMembers.loading' | transloco }}</p>
 } @else if (error()) {
-  <p class="muted center">Couldn't sample this feed — try again later.</p>
+  <p class="muted center">{{ 'feedMembers.error' | transloco }}</p>
 } @else if (!authors().length) {
-  <p class="muted center">Nobody has posted here yet.</p>
+  <p class="muted center">{{ 'feedMembers.empty' | transloco }}</p>
 } @else {
   <div class="sample-note muted">
     <span>
       <!-- Emergent membership, not a roster: say so plainly. -->
-      The {{ authors().length }} {{ authors().length === 1 ? 'account' : 'accounts' }} that wrote
-      the {{ posts().length }} {{ words().posts }} sampled from this feed. There's no membership
-      list for a feed like this — these are just the people posting in it right now.
+      {{
+        (authors().length === 1 ? 'feedMembers.summary.one' : 'feedMembers.summary.other')
+          | transloco
+            : {
+                accountCount: authors().length,
+                postCount: posts().length,
+                posts: words().posts,
+              }
+      }}
     </span>
     @if (paged()) {
-      <span class="sample-controls" role="group" aria-label="Sample size">
-        <span>Sample:</span>
+      <span class="sample-controls" role="group" [attr.aria-label]="'feedMembers.sample.sizeAria' | transloco">
+        <span>{{ 'feedMembers.sample.label' | transloco }}</span>
         @for (n of sampleChoices; track n) {
           <button
             type="button"
             class="sample-btn"
             [class.active]="sampleSize() === n"
-            [title]="'Sample ' + n + ' ' + words().posts"
+            [title]="'feedMembers.sample.optionTitle' | transloco: { count: n, posts: words().posts }"
             (click)="setSampleSize(n)"
           >
             {{ n }}
@@ -29,9 +35,9 @@
         <button
           type="button"
           class="sample-btn"
-          title="Look again"
+          [title]="'feedMembers.sample.refresh' | transloco"
           (click)="refresh()"
-          aria-label="Look again"
+          [attr.aria-label]="'feedMembers.sample.refresh' | transloco"
         >
           <span aria-hidden="true">↻</span>
         </button>
@@ -53,14 +59,22 @@
           <span class="name">
             {{ row.account.display_name || row.account.username }}
             @if (row.account.bot) {
-              <span class="bot-tag" title="This account is marked as automated">bot</span>
+              <span class="bot-tag" [title]="'feedMembers.botTag.title' | transloco">{{
+                'feedMembers.botTag.label' | transloco
+              }}</span>
             }
           </span>
           <span class="acct muted">&#64;{{ row.account.acct }}</span>
         </span>
       </a>
-      <span class="share muted" [title]="pct(row.share) + '% of the sampled posts'">
-        {{ row.count }} {{ row.count === 1 ? words().post : words().posts }}
+      <span
+        class="share muted"
+        [title]="'feedMembers.share.title' | transloco: { pct: pct(row.share) }"
+      >
+        {{
+          (row.count === 1 ? 'feedMembers.postCount.one' : 'feedMembers.postCount.other')
+            | transloco: { count: row.count, posts: row.count === 1 ? words().post : words().posts }
+        }}
         <small>{{ pct(row.share) }}%</small>
       </span>
       <!-- This list used to resolve follow state and then do nothing with it

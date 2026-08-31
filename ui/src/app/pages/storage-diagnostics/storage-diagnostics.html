@@ -1,45 +1,48 @@
 <div class="obs-page">
   <div class="obs-head">
-    <h1>Storage Diagnostics</h1>
+    <h1>{{ 'storageDiagnostics.title' | transloco }}</h1>
     <p class="muted">
-      What this app is keeping on this device, and how much room the browser will give it. Every
-      figure here is a live scan of this browser — nothing on this page is sent anywhere.
+      {{ 'storageDiagnostics.intro' | transloco }}
     </p>
     <nav class="page-menu">
-      <a class="page-menu-link" routerLink="/observability">← Observability</a>
+      <a class="page-menu-link" routerLink="/observability">{{
+        'storageDiagnostics.backToObservability' | transloco
+      }}</a>
     </nav>
   </div>
 
   <!-- ========================== Local storage ============================ -->
   <section class="obs-section">
     <div class="section-head">
-      <h2>Local storage</h2>
+      <h2>{{ 'storageDiagnostics.localHeading' | transloco }}</h2>
       <div class="section-actions">
-        <button class="btn btn-outline btn-sm" (click)="refreshStorage()">Refresh</button>
+        <button class="btn btn-outline btn-sm" (click)="refreshStorage()">
+          {{ 'storageDiagnostics.refresh' | transloco }}
+        </button>
       </div>
     </div>
 
     <div class="tiles">
       <div class="tile">
         <div class="tile-value">{{ storage().entries.length }}</div>
-        <div class="tile-label muted">keys</div>
+        <div class="tile-label muted">{{ 'storageDiagnostics.tileKeys' | transloco }}</div>
       </div>
       <div class="tile">
         <div class="tile-value">{{ formatBytes(storage().totalBytes) }}</div>
-        <div class="tile-label muted">total size</div>
+        <div class="tile-label muted">{{ 'storageDiagnostics.tileTotalSize' | transloco }}</div>
       </div>
       @if (biggest(); as b) {
         <div class="tile">
           <div class="tile-value">{{ formatBytes(b.bytes) }}</div>
-          <div class="tile-label muted" [title]="b.key">largest key</div>
+          <div class="tile-label muted" [title]="b.key">
+            {{ 'storageDiagnostics.tileLargestKey' | transloco }}
+          </div>
         </div>
       }
     </div>
 
     <p class="muted small section-note">
-      This is where the app actually keeps its data — settings, feeds, lists and the metrics behind
-      the Observability page. Deleting a key here is immediate and permanent; the app will rebuild
-      what it can and forget the rest.
+      {{ 'storageDiagnostics.localNote' | transloco }}
     </p>
 
     @if (storage().entries.length) {
@@ -47,9 +50,9 @@
         <table class="obs-table">
           <thead>
             <tr>
-              <th>Key</th>
-              <th class="num">Size</th>
-              <th class="num">Chars</th>
+              <th>{{ 'storageDiagnostics.colKey' | transloco }}</th>
+              <th class="num">{{ 'storageDiagnostics.colSize' | transloco }}</th>
+              <th class="num">{{ 'storageDiagnostics.colChars' | transloco }}</th>
               <th class="actions-col"></th>
             </tr>
           </thead>
@@ -68,9 +71,11 @@
                   <button
                     class="btn btn-outline btn-sm danger"
                     (click)="deleteKey(entry)"
-                    [attr.aria-label]="'Delete ' + entry.key"
+                    [attr.aria-label]="
+                      'storageDiagnostics.deleteKeyAriaLabel' | transloco: { key: entry.key }
+                    "
                   >
-                    Delete
+                    {{ 'storageDiagnostics.delete' | transloco }}
                   </button>
                 </td>
               </tr>
@@ -79,7 +84,7 @@
         </table>
       </div>
     } @else {
-      <p class="muted center">Local storage is empty.</p>
+      <p class="muted center">{{ 'storageDiagnostics.localEmpty' | transloco }}</p>
     }
   </section>
 
@@ -89,10 +94,12 @@
        computed on this side would only be a worse copy of it. -->
   <section class="obs-section">
     <div class="section-head">
-      <h2>Remote storage</h2>
+      <h2>{{ 'storageDiagnostics.remoteHeading' | transloco }}</h2>
       @if (remote(); as r) {
         <div class="section-actions">
-          <span class="tier-tag" [attr.data-tier]="r.tier">{{ r.tier }} plan</span>
+          <span class="tier-tag" [attr.data-tier]="r.tier">{{
+            'storageDiagnostics.remotePlan' | transloco: { tier: r.tier }
+          }}</span>
         </div>
       }
     </div>
@@ -100,11 +107,13 @@
       <div class="tiles">
         <div class="tile">
           <div class="tile-value">{{ formatBytes(r.used) }}</div>
-          <div class="tile-label muted">used on the profile service</div>
+          <div class="tile-label muted">{{ 'storageDiagnostics.remoteUsed' | transloco }}</div>
         </div>
         <div class="tile">
           <div class="tile-value">{{ formatBytes(r.limit) }}</div>
-          <div class="tile-label muted">allowance</div>
+          <div class="tile-label muted">
+            {{ 'storageDiagnostics.remoteAllowance' | transloco }}
+          </div>
         </div>
       </div>
       <!-- `!== null`, not a truthiness check: an empty account is a ratio of 0,
@@ -114,21 +123,22 @@
         <div
           class="quota-bar"
           role="img"
-          [attr.aria-label]="'Remote storage: ' + remoteLabel()"
+          [attr.aria-label]="
+            'storageDiagnostics.remoteBarAriaLabel' | transloco: { label: remoteLabel() }
+          "
           [title]="remoteLabel()"
         >
           <div class="quota-fill" [style.width.%]="(remoteRatio() ?? 0) * 100"></div>
         </div>
       }
       <p class="muted small section-note">
-        {{ remoteLabel() }} — as counted by the profile service itself, read {{ remoteWhen() }}. The
-        figure updates whenever settings sync talks to the service, so it can lag a recent change
-        until the next sync.
+        {{
+          'storageDiagnostics.remoteNote' | transloco: { label: remoteLabel(), when: remoteWhen() }
+        }}
       </p>
     } @else {
       <p class="muted center">
-        Nothing synced from this browser yet. Turn on settings sync to store settings on the profile
-        service and see the figure here.
+        {{ 'storageDiagnostics.remoteEmpty' | transloco }}
       </p>
     }
   </section>
@@ -136,7 +146,7 @@
   <!-- ============================= IndexedDB ============================= -->
   <section class="obs-section">
     <div class="section-head">
-      <h2>IndexedDB &amp; quota</h2>
+      <h2 [innerHTML]="'storageDiagnostics.idbHeading' | transloco"></h2>
       <div class="section-actions">
         <span class="muted small">{{ quotaLabel() }}</span>
         <button
@@ -144,19 +154,18 @@
           (click)="refreshIndexedDb()"
           [disabled]="idbLoading()"
         >
-          {{ idbLoading() ? 'Scanning…' : 'Refresh' }}
+          {{
+            (idbLoading() ? 'storageDiagnostics.scanning' : 'storageDiagnostics.refresh')
+              | transloco
+          }}
         </button>
       </div>
     </div>
-    <p class="muted small section-note">
-      This app keeps its data in local storage, not IndexedDB — so an entry here is something else
-      on this origin. The quota figure covers <em>all</em> browser storage for this site, which is
-      what the browser actually checks before evicting anything.
-    </p>
+    <p class="muted small section-note" [innerHTML]="'storageDiagnostics.idbNote' | transloco"></p>
     @if (idb(); as report) {
       @if (report.quota.persisted) {
         <p class="muted small">
-          Storage is persistent: this origin is exempt from automatic eviction.
+          {{ 'storageDiagnostics.idbPersistent' | transloco }}
         </p>
       }
       @if (!report.supported) {
@@ -166,10 +175,10 @@
           <table class="obs-table">
             <thead>
               <tr>
-                <th>Database</th>
-                <th class="num">Version</th>
-                <th>Object stores</th>
-                <th class="num">Records</th>
+                <th>{{ 'storageDiagnostics.colDatabase' | transloco }}</th>
+                <th class="num">{{ 'storageDiagnostics.colVersion' | transloco }}</th>
+                <th>{{ 'storageDiagnostics.colObjectStores' | transloco }}</th>
+                <th class="num">{{ 'storageDiagnostics.colRecords' | transloco }}</th>
               </tr>
             </thead>
             <tbody>
@@ -187,10 +196,10 @@
           </table>
         </div>
       } @else {
-        <p class="muted center">No IndexedDB databases on this origin.</p>
+        <p class="muted center">{{ 'storageDiagnostics.idbEmpty' | transloco }}</p>
       }
     } @else {
-      <p class="muted center">Scanning…</p>
+      <p class="muted center">{{ 'storageDiagnostics.scanning' | transloco }}</p>
     }
   </section>
 </div>

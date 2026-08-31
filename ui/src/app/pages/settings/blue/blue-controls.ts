@@ -70,6 +70,12 @@ import { TranslocoPipe } from '@jsverse/transloco';
 // i18n settings.blue.typography.hint: Applies to reader mode on threads and, when feed reader is on, to every timeline.
 // i18n settings.blue.feed: Feed
 // i18n settings.blue.feedReader: Reader mode for feeds (reader typography, no pictures)
+// i18n settings.blue.reader.fontSize: Font size ({{size}}px)
+// i18n settings.blue.reader.lineHeight: Line spacing ({{value}})
+// i18n settings.blue.reader.letterSpacing: Letter spacing ({{size}}px)
+// i18n settings.blue.reader.wordSpacing: Word spacing ({{size}}px)
+// i18n settings.blue.feedMin: Minimum feed size ({{count}} {{posts}})
+// i18n settings.blue.feedMax: Maximum feed size ({{count}} {{posts}})
 // i18n settings.blue.showImages: Show images in feeds (off replaces pictures with a 🖼️ chip)
 // i18n settings.blue.minPosts.hint: Auto-loads more until the feed holds at least this many posts (or the timeline runs out).
 // i18n settings.blue.maxPosts.hint: “You’ve had enough for now.” Load more is disabled once the feed reaches this size; it lifts after about an hour or when you reload.

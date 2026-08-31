@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { InstanceInfo, Status, Tag } from '../../models';
@@ -12,9 +13,31 @@ type ExploreTab = 'posts' | 'hashtags';
  * intro, trending posts/hashtags, and sign-in calls to action. Served with anonymous
  * access (no auth guard); trends + instance metadata are public endpoints.
  */
+// i18n pages.explore.introLede: <strong>{{domain}}</strong> is one of the many independent Mastodon servers you can use to participate in the fediverse.
+// i18n pages.explore.theServerStaff: the server staff
+// i18n pages.explore.administeredBy: Administered by
+// i18n pages.explore.serverStats: Server stats
+// i18n pages.explore.activeUsers: <strong>{{count}}</strong> active users
+// i18n pages.explore.loadingServerInfo: Loading server info…
+// i18n pages.explore.trending: Trending
+// i18n pages.explore.tabs.posts: Posts
+// i18n pages.explore.tabs.hashtags: Hashtags
+// i18n pages.explore.loadingPosts: Loading trending posts…
+// i18n pages.explore.noTrendingPosts: Nothing trending yet — seed some sample data to populate this.
+// i18n pages.explore.repliesCount: {{count}} replies
+// i18n pages.explore.boostsCount: {{count}} {{boosts}}
+// i18n pages.explore.favouritesCount: {{count}} favourites
+// i18n pages.explore.loadingHashtags: Loading trending hashtags…
+// i18n pages.explore.noTrendingHashtags: No trending hashtags yet.
+// i18n pages.explore.recentUses: {{count}} recent uses
+// i18n pages.explore.cta.headline: The best way to keep up with what's happening.
+// i18n pages.explore.cta.blurb: Follow anyone across the fediverse and see it all in chronological order. No algorithms, ads, or clickbait in sight.
+// i18n pages.explore.cta.backToTimeline: Back to your timeline
+// i18n pages.explore.cta.createAccount: Create account
+// i18n pages.explore.cta.login: Login
 @Component({
   selector: 'app-explore',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './explore.html',
   styleUrl: './explore.css',
 })

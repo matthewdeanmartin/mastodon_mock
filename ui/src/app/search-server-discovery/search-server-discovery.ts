@@ -1,4 +1,5 @@
-import { Component, inject, input, OnDestroy, output, signal } from '@angular/core';
+import { Component, computed, inject, input, OnDestroy, output, signal } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MastodonServers, ServerSuggestion } from '../mastodon-servers';
 import {
   isTagsOnly,
@@ -8,6 +9,26 @@ import {
 } from '../search-server-probe';
 import { rejectReason, SearchServerRejects } from '../search-server-rejects';
 import { Terminology } from '../terminology';
+
+// i18n searchServerDiscovery.start: Find a search server
+// i18n searchServerDiscovery.idle.note: Checks randomly selected servers for one that answers search anonymously — both accounts and posts. Nothing changes until you approve one.
+// i18n searchServerDiscovery.searching.label: Looking for a server that allows search…
+// i18n searchServerDiscovery.searching.tried: {{count}} tried
+// i18n searchServerDiscovery.searching.cancel: Cancel
+// i18n searchServerDiscovery.searching.bundledNote: Using the bundled Mastodon server directory.
+// i18n searchServerDiscovery.candidate.allowsSearch: {{domain}} allows anonymous search
+// i18n searchServerDiscovery.candidate.found: Found {{accounts}} accounts and {{statuses}} {{posts}} for the test queries.
+// i18n searchServerDiscovery.candidate.use: Use this search server
+// i18n searchServerDiscovery.candidate.keepLooking: Keep looking
+// i18n searchServerDiscovery.exhausted.note: Couldn’t find a server that allows anonymous search right now. Your search server has not changed.
+// i18n searchServerDiscovery.exhausted.retry: Search again
+// i18n searchServerDiscovery.rejects.skipping.one: Skipping {{count}} server already checked and rejected.
+// i18n searchServerDiscovery.rejects.skipping.other: Skipping {{count}} servers already checked and rejected.
+// i18n searchServerDiscovery.rejects.forget: Forget them and re-check
+// i18n searchServerDiscovery.sizeLabel.veryLarge: very large
+// i18n searchServerDiscovery.sizeLabel.large: large
+// i18n searchServerDiscovery.sizeLabel.midSize: mid-size
+// i18n searchServerDiscovery.sizeLabel.cozy: cozy
 
 type DiscoveryState = 'idle' | 'searching' | 'found' | 'exhausted';
 
@@ -47,7 +68,7 @@ const VISIBLE_ATTEMPTS = 6;
  */
 @Component({
   selector: 'app-search-server-discovery',
-  imports: [],
+  imports: [TranslocoPipe],
   templateUrl: './search-server-discovery.html',
   styleUrl: './search-server-discovery.css',
 })
@@ -57,10 +78,20 @@ export class SearchServerDiscovery implements OnDestroy {
 
   private readonly directory = inject(MastodonServers);
   private readonly rejects = inject(SearchServerRejects);
+  private readonly transloco = inject(TranslocoService);
 
   /** Excluded from the hunt — usually the server already in use for search. */
   readonly currentServer = input('');
-  readonly startLabel = input('Find a search server');
+  /**
+   * The button's text. Empty means "use the default", which is a translation
+   * key rather than an English literal — an `input()` default is evaluated
+   * before any injection context exists, so it cannot call `translate()`
+   * itself. Callers that pass their own label are unaffected.
+   */
+  readonly startLabel = input('');
+  protected readonly startText = computed(
+    () => this.startLabel() || this.transloco.translate<string>('searchServerDiscovery.start'),
+  );
   readonly selected = output<string>();
 
   protected readonly state = signal<DiscoveryState>('idle');
@@ -142,10 +173,11 @@ export class SearchServerDiscovery implements OnDestroy {
   }
 
   protected sizeLabel(users: number): string {
-    if (users >= 100_000) return 'very large';
-    if (users >= 10_000) return 'large';
-    if (users >= 1_000) return 'mid-size';
-    if (users > 0) return 'cozy';
+    if (users >= 100_000)
+      return this.transloco.translate('searchServerDiscovery.sizeLabel.veryLarge');
+    if (users >= 10_000) return this.transloco.translate('searchServerDiscovery.sizeLabel.large');
+    if (users >= 1_000) return this.transloco.translate('searchServerDiscovery.sizeLabel.midSize');
+    if (users > 0) return this.transloco.translate('searchServerDiscovery.sizeLabel.cozy');
     return '';
   }
 

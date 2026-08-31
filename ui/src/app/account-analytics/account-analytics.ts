@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Observable } from 'rxjs';
 import { Api, AccountStatusesOptions } from '../api';
 import { AnonymousPublicApi } from '../providers/anonymous/anonymous-public-api';
@@ -43,6 +44,90 @@ const MAX_PAGES = 5;
 /** Extra pages a user may request via "get more posts", each = one API call. */
 const LOAD_MORE_CHOICES = [1, 3, 5, 10] as const;
 
+// i18n accountAnalytics.crunching: Crunching the last 100 posts…
+// i18n accountAnalytics.loadError: Couldn't load posts — try again later.
+// i18n accountAnalytics.empty: Nothing to analyze yet — no posts found.
+// i18n accountAnalytics.basedOnLast: Based on the last {{count}} {{posts}}, boosts excluded.
+// i18n accountAnalytics.sampleGoesBack: The sample goes back {{time}}.
+// i18n accountAnalytics.reachEstimated: Reach is estimated, not measured — a cheap peek.
+// i18n accountAnalytics.getMorePosts.aria: Get more {{posts}}
+// i18n accountAnalytics.fetchingMore: Fetching more…
+// i18n accountAnalytics.getMorePostsLabel: Get more posts:
+// i18n accountAnalytics.fetchPages.one: Fetch {{count}} more page ({{count}} API call)
+// i18n accountAnalytics.fetchPages.other: Fetch {{count}} more pages ({{count}} API calls)
+// i18n accountAnalytics.postedToday: Posted today.
+// i18n accountAnalytics.lastPosted.one: Last posted {{count}} day ago.
+// i18n accountAnalytics.lastPosted.other: Last posted {{count}} days ago.
+// i18n accountAnalytics.postsInWindow: {{last30}} {{posts}} in the last 30 days, {{last90}} in the last 90.
+// i18n accountAnalytics.xOfY: {{x}} of {{y}}
+// i18n accountAnalytics.characters: characters
+// i18n accountAnalytics.tiles.postsAnalyzed: Posts analyzed
+// i18n accountAnalytics.tiles.favourites: Favourites
+// i18n accountAnalytics.tiles.boosts: Boosts
+// i18n accountAnalytics.tiles.repliesReceived: Replies received
+// i18n accountAnalytics.tiles.engagementsPerPost: Engagements per post
+// i18n accountAnalytics.tiles.repliesGiven: Replies given
+// i18n accountAnalytics.tiles.shortestPost: Shortest post
+// i18n accountAnalytics.tiles.longestPost: Longest post
+// i18n accountAnalytics.tiles.postsPerDay: Posts per day
+// i18n accountAnalytics.tiles.followers: Followers
+// i18n accountAnalytics.tiles.following: Following
+// i18n accountAnalytics.tiles.estReachTotal: Est. reach (total)
+// i18n accountAnalytics.tiles.estReachPerPost: Est. reach / post
+// i18n accountAnalytics.tiles.liveliness: Liveliness
+// i18n accountAnalytics.tiles.recentPostsPerDay: Recent posts / day
+// i18n accountAnalytics.audience.heading: Effective friends &amp; followers
+// i18n accountAnalytics.audience.explain: How much of the audience is still posting. Counts marked ~ are estimated from a partial scan.
+// i18n accountAnalytics.audience.friends: Friends
+// i18n accountAnalytics.audience.effectiveFriends: Effective friends
+// i18n accountAnalytics.audience.zombieFriends: Zombie friends
+// i18n accountAnalytics.audience.dormant: Dormant
+// i18n accountAnalytics.audience.lowCadence: Low-cadence
+// i18n accountAnalytics.audience.drizzlers: drizzlers
+// i18n accountAnalytics.audience.followers: Followers
+// i18n accountAnalytics.audience.effectiveFollowers: Effective followers
+// i18n accountAnalytics.audience.zombieFollowers: Zombie followers
+// i18n accountAnalytics.audience.scanAgain: Scan again
+// i18n accountAnalytics.audience.explainCta: A follower count includes everyone who ever clicked follow. This walks the list and works out how many are still posting — the only thing on this page that costs more than a few requests, so it asks first.
+// i18n accountAnalytics.audience.cta: Get effective friends/followers
+// i18n accountAnalytics.pctOf: {{pct}}% of {{total}}
+// i18n accountAnalytics.zombieRate: {{pct}}% zombie rate
+// i18n accountAnalytics.ofScannedRead: of {{scanned}} read
+// i18n accountAnalytics.whenTheyPost.heading: When they post
+// i18n accountAnalytics.whenTheyPost.explain: Posting activity over time (posting times, not location). Estimated reach in each bucket.
+// i18n accountAnalytics.byWeek: By week
+// i18n accountAnalytics.byMonth: By month
+// i18n accountAnalytics.byWeekday: By day of week
+// i18n accountAnalytics.postsPerWeek.aria: {{posts}} per week
+// i18n accountAnalytics.postsPerMonth.aria: {{posts}} per month
+// i18n accountAnalytics.postsPerWeekday.aria: {{posts}} per weekday
+// i18n accountAnalytics.barTitle: {{label}}: {{count}} {{posts}}, ~{{reach}} reach
+// i18n accountAnalytics.weekdayBarTitle: {{label}}: {{count}} {{posts}}
+// i18n accountAnalytics.languages.heading: Languages
+// i18n accountAnalytics.languages.explain: Inferred from the sample's text and each post's declared language — script, accents and common words, not a full model. A rough read.
+// i18n accountAnalytics.langTitle: {{lang}} ~{{pct}}%
+// i18n accountAnalytics.topFollower.heading: Top follower
+// i18n accountAnalytics.topFollower.explain: The follower with the biggest audience of their own.
+// i18n accountAnalytics.followersCount: {{count}} followers
+// i18n accountAnalytics.talksToMost.heading: Talks to most
+// i18n accountAnalytics.talksToMost.explain: Who they reply to most often in the sample — replies to themselves don't count.
+// i18n accountAnalytics.replyCount.one: {{count}} reply
+// i18n accountAnalytics.replyCount.other: {{count}} replies
+// i18n accountAnalytics.topics.heading: What they post about
+// i18n accountAnalytics.hashtagsAndLinks: Hashtags and link destinations across the sample, counted once per {{post}}.
+// i18n accountAnalytics.topics.topHashtags: Top hashtags
+// i18n accountAnalytics.topics.topLinkDomains: Top link domains
+// i18n accountAnalytics.topPosts.heading: Top posts
+// i18n accountAnalytics.topPosts.empty: No engagement on recent posts yet.
+// i18n accountAnalytics.topPosts.explain: Most engaged posts (favourites + boosts + replies).
+// i18n accountAnalytics.calendar.heading: Posting calendar
+// i18n accountAnalytics.heatmapCaption: One square per day, darker means more posts. Covers only the {{days}} days the sample spans — {{activeDays}} of them had posts. Fetch more posts above to stretch it further back.
+// i18n accountAnalytics.dayTitle.one: {{label}}: {{count}} post
+// i18n accountAnalytics.dayTitle.other: {{label}}: {{count}} posts
+// i18n accountAnalytics.less: Less
+// i18n accountAnalytics.more: More
+// i18n accountAnalytics.busiestDay: Busiest day: {{count}} {{posts}}
+// i18n accountAnalytics.heatmapSummary: Posting calendar: {{count}} posts across {{days}} days, {{activeDays}} of which had posts. Busiest day: {{peak}}.
 /**
  * Rudimentary Twitter-style analytics for any account, deliberately cheap:
  * everything is computed from the account's last ~100 posts (3 API calls) plus
@@ -53,7 +138,7 @@ const LOAD_MORE_CHOICES = [1, 3, 5, 10] as const;
  */
 @Component({
   selector: 'app-account-analytics',
-  imports: [RouterLink, StatusCard, HumanTimePipe, EffectiveAudienceDialog],
+  imports: [RouterLink, StatusCard, HumanTimePipe, EffectiveAudienceDialog, TranslocoPipe],
   templateUrl: './account-analytics.html',
   styleUrl: './account-analytics.css',
 })
@@ -63,6 +148,7 @@ export class AccountAnalytics implements OnInit {
 
   private api = inject(Api);
   private anonymousPublic = inject(AnonymousPublicApi);
+  private transloco = inject(TranslocoService);
 
   /** The account to analyze. */
   readonly account = input.required<Account>();
@@ -405,7 +491,12 @@ export class AccountAnalytics implements OnInit {
   /** The grid is decorative per-cell; this sentence is what screen readers get. */
   protected heatmapSummary = computed(() => {
     const map = this.heatmap();
-    return `Posting calendar: ${this.posts().length} posts across ${map.days} days, ${map.activeDays} of which had posts. Busiest day: ${map.peak}.`;
+    return this.transloco.translate<string>('accountAnalytics.heatmapSummary', {
+      count: this.posts().length,
+      days: map.days,
+      activeDays: map.activeDays,
+      peak: map.peak,
+    });
   });
 
   /** Compact display for tile values: 12,345 → 12.3K. */

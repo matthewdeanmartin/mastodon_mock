@@ -616,9 +616,10 @@
           }
           @if (diagnostics.drifted()) {
             <p role="status">
-              This browser and the saved data for {{ diagnostics.activeAccountLabel() }} do not
-              match. Syncing uploads shared settings and this active account's enabled collections;
-              it does not change any other Mastodon account.
+              {{
+                'settings.plus.sync.drifted'
+                  | transloco: { account: diagnostics.activeAccountLabel() }
+              }}
             </p>
             <!--
               The reason is shown *before* the press, not after it. A "Sync now"
@@ -675,7 +676,7 @@
           <tbody>
             <tr>
               <th scope="row">
-                Articles you've read in Mawkingbird
+                {{ 'settings.plus.tally.articlesRead' | transloco }}
                 @if (tally.localOnly()) {
                   <span class="muted small">{{
                     'settings.plus.usage.countedHere' | transloco

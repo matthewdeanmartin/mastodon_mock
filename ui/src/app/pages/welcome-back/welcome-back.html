@@ -1,38 +1,31 @@
 <div class="wb-wrap">
   <div class="wb-card">
-    <p class="eyebrow muted">Almost there</p>
-    <h1>
-      Create your account on <strong>{{ serverHost() }}</strong>
-    </h1>
+    <p class="eyebrow muted">{{ 'pagesWelcomeBack.eyebrow' | transloco }}</p>
+    <h1 [innerHTML]="'pagesWelcomeBack.heading' | transloco: { server: serverHost() }"></h1>
 
-    <p class="lead">
-      Your account is created on the server itself — a client like this should never handle your
-      email or password. That means <strong>{{ serverHost() }}</strong> won't send you back here
-      automatically. Here's the two-step plan:
-    </p>
+    <p class="lead" [innerHTML]="'pagesWelcomeBack.lead' | transloco: { server: serverHost() }"></p>
 
     <ol class="steps">
       <li>
         <span class="step-num">1</span>
         <div>
-          <h2>Bookmark this page</h2>
-          <p class="muted">
-            Press <kbd>{{ bookmarkHint }}</kbd> now so you can find your way back after signing up.
-            This is the page you'll return to.
-          </p>
+          <h2>{{ 'pagesWelcomeBack.step1.title' | transloco }}</h2>
+          <p
+            class="muted"
+            [innerHTML]="'pagesWelcomeBack.step1.body' | transloco: { hint: bookmarkHint }"
+          ></p>
         </div>
       </li>
       <li>
         <span class="step-num">2</span>
         <div>
-          <h2>Sign up on {{ serverHost() }}</h2>
+          <h2>{{ 'pagesWelcomeBack.step2.title' | transloco: { server: serverHost() } }}</h2>
           <p class="muted">
-            We'll open its sign-up page in a new tab. Finish creating and confirming your account
-            there, then come back to this tab.
+            {{ 'pagesWelcomeBack.step2.body' | transloco }}
           </p>
           @if (signupUrl(); as url) {
             <a class="btn btn-outline" [href]="url" target="_blank" rel="noopener">
-              Open {{ serverHost() }} sign-up ↗
+              {{ 'pagesWelcomeBack.step2.open' | transloco: { server: serverHost() } }}
             </a>
           }
         </div>
@@ -40,14 +33,16 @@
     </ol>
 
     <div class="done">
-      <p>Account created and confirmed? Come back here and sign in:</p>
-      <button class="btn btn-hero" (click)="goSignIn()">I'm signed up — sign in</button>
+      <p>{{ 'pagesWelcomeBack.done.prompt' | transloco }}</p>
+      <button class="btn btn-hero" (click)="goSignIn()">
+        {{ 'pagesWelcomeBack.done.signIn' | transloco }}
+      </button>
     </div>
 
     <p class="muted small helper">
-      Still choosing a server?
+      {{ 'pagesWelcomeBack.helper.stillChoosing' | transloco }}
       <a href="https://joinmastodon.org/servers" target="_blank" rel="noopener">
-        Browse servers on joinmastodon.org ↗
+        {{ 'pagesWelcomeBack.helper.browse' | transloco }}
       </a>
     </p>
   </div>

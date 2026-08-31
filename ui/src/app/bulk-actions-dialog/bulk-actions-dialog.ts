@@ -27,6 +27,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
  * The host owns open/closed state and reacts to (confirmed).
  */
 /** English source strings; see scripts/extract-i18n.mjs. */
+// i18n bulk.stopCounting: Stop counting
 // i18n bulk.atLeast: at least
 // i18n bulk.summary.reblogs.noneOn: Nothing to do — retweets are already on for everyone you follow.
 // i18n bulk.summary.reblogs.noneOff: Nothing to do — retweets are already off for everyone you follow.

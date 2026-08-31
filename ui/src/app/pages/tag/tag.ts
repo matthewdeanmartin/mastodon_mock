@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { Status, Tag as TagEntity } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
@@ -19,9 +20,29 @@ import { Terminology } from '../../terminology';
 /** Posts per request when sampling the tag — Mastodon's cap. */
 const SAMPLE_PAGE_SIZE = 40;
 
+// i18n pages.tag.following: Following
+// i18n pages.tag.follow: Follow
+// i18n pages.tag.featured: Featured
+// i18n pages.tag.feature: Feature
+// i18n pages.tag.inBundles.one: In {{count}} bundle
+// i18n pages.tag.inBundles.other: In {{count}} bundles
+// i18n pages.tag.addToBundle: Add to bundle
+// i18n pages.tag.full: · full
+// i18n pages.tag.noBundlesYet: No bundles yet — name one below.
+// i18n pages.tag.newBundleName: New bundle name
+// i18n pages.tag.createAndAdd: Create &amp; add
+// i18n pages.tag.tabs.feed: Feed
+// i18n pages.tag.tabs.members: Members
+// i18n pages.tag.tabs.analytics: Analytics
+// i18n pages.tag.loading: Loading…
+// i18n pages.tag.noStatuses: No statuses tagged #{{tag}}.
+// i18n pages.tag.myPosts: My {{posts}}
+// i18n pages.tag.mine.summary: {{visible}} of the {{total}} loaded {{posts}}. Load more to search further back.
+// i18n pages.tag.mine.none: None of the {{total}} loaded {{posts}} are yours.
+// i18n pages.tag.loadMore: Load more
 @Component({
   selector: 'app-tag',
-  imports: [StatusCard, FeedAnalytics, FeedMembers, FormsModule],
+  imports: [StatusCard, FeedAnalytics, FeedMembers, FormsModule, TranslocoPipe],
   templateUrl: './tag.html',
   styleUrl: './tag.css',
 })

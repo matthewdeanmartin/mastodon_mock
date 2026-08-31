@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, Injector, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { HugoSettings } from '../../providers/hugo/hugo-settings';
 import { PossePublish } from '../../providers/hugo/posse-publish';
 import { PosseEntry, PosseQueue } from '../../providers/hugo/posse-queue';
@@ -25,9 +26,45 @@ interface DeliveryReport {
  * `/posse` in the main routes rather than under settings. The badge in the
  * shell is what makes sure nothing sits here forgotten.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n posse.head: Waiting to publish
+// i18n posse.note: Likes, boosts and replies recorded for your own site. They stay here until you publish them, so a session of reading is one commit rather than twenty.
+// i18n posse.notConnected: No Hugo blog is connected.
+// i18n posse.connectOne: Connect one
+// i18n posse.toPublishThese: to publish these.
+// i18n posse.empty: Nothing is waiting.
+// i18n posse.emptyHint.a: With
+// i18n posse.emptyHint.recordToggle: Record interactions on my blog
+// i18n posse.emptyHint.b: switched on, the posts you like and boost are collected here — then published to your own site in one go.
+// i18n posse.waiting: {{count}} waiting
+// i18n posse.publishing: Publishing…
+// i18n posse.publishAll: Publish all
+// i18n posse.kind.like: Liked
+// i18n posse.kind.repost: Boosted
+// i18n posse.kind.reply: Replied to
+// i18n posse.removeThisLike: Remove this like
+// i18n posse.removeThisRepost: Remove this repost
+// i18n posse.removeThisReply: Remove this reply
+// i18n posse.original: Original ↗
+// i18n posse.remove: Remove
+// i18n posse.building: Recorded. Waiting for your site to rebuild before letting anyone know — a webmention points at a page that has to exist first.
+// i18n posse.notifyHeading: Letting the other sites know
+// i18n posse.checking: checking…
+// i18n posse.notifyNote: Most sites cannot be notified — Mastodon and Bluesky use their own systems and have no webmention endpoint. That is expected, and your records are published either way.
+// i18n posse.notified: Notified
+// i18n posse.noEndpoint: No endpoint
+// i18n posse.cantSend: Can't send
+// i18n posse.refused: Refused
+// i18n posse.via: via
+// i18n posse.recorded.one: Recorded {{count}} interaction to {{path}}.
+// i18n posse.recorded.other: Recorded {{count}} interactions to {{path}}.
+// i18n posse.alreadyRecorded.one: That {{count}} interaction was already recorded.
+// i18n posse.alreadyRecorded.other: Those {{count}} interactions were already recorded.
+// i18n posse.publishError: Couldn't record these to your blog.
+// i18n posse.buildFailed: Your site build failed, so the pages these link to do not exist yet. Nothing was sent — fix the build and publish again.
 @Component({
   selector: 'app-posse-page',
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, TranslocoPipe],
   templateUrl: './posse-page.html',
   styleUrl: './posse-page.css',
 })
@@ -39,6 +76,7 @@ export class PossePage {
   private readonly deployWatch = inject(HugoDeployWatch);
   private readonly injector = inject(Injector);
   private readonly diagnostics = inject(PageDiagnostics);
+  private readonly transloco = inject(TranslocoService);
 
   protected readonly publishing = signal(false);
   /** Waiting for the site to rebuild, so the source pages exist. */
@@ -72,11 +110,22 @@ export class PossePage {
   protected label(entry: PosseEntry): string {
     switch (entry.kind) {
       case 'like':
-        return 'Liked';
+        return this.transloco.translate<string>('posse.kind.like');
       case 'repost':
-        return 'Boosted';
+        return this.transloco.translate<string>('posse.kind.repost');
       case 'reply':
-        return 'Replied to';
+        return this.transloco.translate<string>('posse.kind.reply');
+    }
+  }
+
+  protected removeLabel(entry: PosseEntry): string {
+    switch (entry.kind) {
+      case 'like':
+        return this.transloco.translate<string>('posse.removeThisLike');
+      case 'repost':
+        return this.transloco.translate<string>('posse.removeThisRepost');
+      case 'reply':
+        return this.transloco.translate<string>('posse.removeThisReply');
     }
   }
 
@@ -107,8 +156,14 @@ export class PossePage {
       const count = result.publishedIds.length;
       this.notice.set(
         result.commitSha
-          ? `Recorded ${count} interaction${count === 1 ? '' : 's'} to ${result.path}.`
-          : `Those ${count} interaction${count === 1 ? '' : 's'} were already recorded.`,
+          ? this.transloco.translate<string>(
+              count === 1 ? 'posse.recorded.one' : 'posse.recorded.other',
+              { count, path: result.path },
+            )
+          : this.transloco.translate<string>(
+              count === 1 ? 'posse.alreadyRecorded.one' : 'posse.alreadyRecorded.other',
+              { count },
+            ),
       );
       // Published is the durable part and it is now done. Notifying the other
       // sites is a courtesy on top, and its failure never retracts any of that.
@@ -118,7 +173,9 @@ export class PossePage {
     } catch (error: unknown) {
       this.diagnostics.error('POSSE', 'publish:error', error, { queued: published.length });
       this.error.set(
-        error instanceof Error ? error.message : "Couldn't record these to your blog.",
+        error instanceof Error
+          ? error.message
+          : this.transloco.translate<string>('posse.publishError'),
       );
     } finally {
       this.publishing.set(false);
@@ -152,9 +209,7 @@ export class PossePage {
       this.deployWatch.watch(commitSha);
       const state = await this.settledDeployState();
       if (state === 'failed') {
-        this.error.set(
-          'Your site build failed, so the pages these link to do not exist yet. Nothing was sent — fix the build and publish again.',
-        );
+        this.error.set(this.transloco.translate<string>('posse.buildFailed'));
         return false;
       }
       return true;

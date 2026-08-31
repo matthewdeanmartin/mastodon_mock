@@ -45,6 +45,8 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 // i18n settings.config.sync.onNothing: Syncing — nothing saved yet.
 // i18n settings.config.sync.onSince: Syncing — last saved {{when}}.
 // i18n settings.config.conflict.aria: Settings conflict
+// i18n settings.config.remoteStable: Remote configuration fetched twice and verified stable.
+// i18n settings.config.syncOff: Sync is off on this browser.
 // i18n settings.config.conflict: Your settings changed on another device, and this browser also has unsaved changes.
 // i18n settings.config.conflict.differ: These preferences differ:
 // i18n settings.config.conflict.useOther: Use the other device's
@@ -351,7 +353,9 @@ export class SettingsConfig {
       const result = await this.sync.fetchStable(this.remoteUrl().trim());
       this.remoteResult.set(result);
       this.previewConfig(result.config);
-      this.message.set(result.warning ?? 'Remote configuration fetched twice and verified stable.');
+      this.message.set(
+        result.warning ?? this.transloco.translate<string>('settings.config.remoteStable'),
+      );
     } catch (error: unknown) {
       this.diagnostics.error('Config', 'remote:fetch-error', error);
       this.remoteResult.set(null);
@@ -592,7 +596,9 @@ export class SettingsConfig {
         );
         return;
       case 'not-syncing':
-        this.syncMessage.set(whenNothingToDo ?? 'Sync is off on this browser.');
+        this.syncMessage.set(
+          whenNothingToDo ?? this.transloco.translate<string>('settings.config.syncOff'),
+        );
         return;
       case 'read-only':
       case 'failed':

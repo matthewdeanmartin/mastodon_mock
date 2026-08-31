@@ -1,4 +1,4 @@
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { VaultBridge } from '../../../../providers/vault/vault-bridge';
 
@@ -36,6 +36,7 @@ import { PageDiagnostics } from '../../../../page-diagnostics';
  * The OAuth round trip lands back here (see `pages/openrouter-callback`), so
  * this page also reads the `?openrouter=` result.
  */
+// i18n settings.connections.openrouter.authFailed: OpenRouter authorization failed.
 // i18n settings.connections.openrouter.back: ‹ All connections
 // i18n settings.connections.openrouter.cancel: Cancel
 // i18n settings.connections.openrouter.checking: Checking…
@@ -92,6 +93,7 @@ import { PageDiagnostics } from '../../../../page-diagnostics';
 })
 export class ConnectionOpenRouter implements OnInit {
   private diagnostics = inject(PageDiagnostics);
+  private readonly transloco = inject(TranslocoService);
   protected openrouter = inject(OpenRouterSession);
   protected models = inject(OpenRouterModels);
   protected choice = inject(OpenRouterModelChoice);
@@ -141,7 +143,8 @@ export class ConnectionOpenRouter implements OnInit {
       this.notice.set('OpenRouter connected.');
     } else if (result === 'error') {
       this.error.set(
-        this.route.snapshot.queryParamMap.get('message') ?? 'OpenRouter authorization failed.',
+        this.route.snapshot.queryParamMap.get('message') ??
+          this.transloco.translate<string>('settings.connections.openrouter.authFailed'),
       );
     }
     if (result) {

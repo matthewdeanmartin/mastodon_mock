@@ -1,5 +1,6 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { concatMap, from, Observable, of, throwError } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { Api } from '../api';
@@ -23,9 +24,23 @@ interface BulkResult {
  * collection whose page hosts this dialog). Paste one handle, a CSV, or one
  * handle per line; each is resolved via search and added sequentially.
  */
+// i18n bulkAdd.dialogAria: Add people by name
+// i18n bulkAdd.heading.list: Add people to list “{{name}}”
+// i18n bulkAdd.heading.collection: Add people to collection “{{name}}”
+// i18n bulkAdd.heading.listNoName: Add people to list
+// i18n bulkAdd.heading.collectionNoName: Add people to collection
+// i18n bulkAdd.instructions: Paste handles separated by commas, spaces, or line breaks. Each is resolved and added, one after another.
+// i18n bulkAdd.done: Done
+// i18n bulkAdd.cancel: Cancel
+// i18n bulkAdd.adding: Adding…
+// i18n bulkAdd.addCount.one: Add {{count}} person
+// i18n bulkAdd.addCount.other: Add {{count}} people
+// i18n bulkAdd.status.added: added
+// i18n bulkAdd.status.notfound: notfound
+// i18n bulkAdd.status.error: error
 @Component({
   selector: 'app-bulk-add-dialog',
-  imports: [FocusTrap, FormsModule],
+  imports: [FocusTrap, FormsModule, TranslocoPipe],
   templateUrl: './bulk-add-dialog.html',
   styleUrl: './bulk-add-dialog.css',
 })
@@ -37,6 +52,7 @@ export class BulkAddDialog {
   private anonymousFollows = inject(AnonymousFollows);
   private anonymousLists = inject(AnonymousLists);
   private anonymousPublic = inject(AnonymousPublicApi);
+  private transloco = inject(TranslocoService);
 
   readonly targetId = input.required<string>();
   readonly targetKind = input.required<'list' | 'collection'>();

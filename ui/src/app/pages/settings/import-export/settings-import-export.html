@@ -143,9 +143,10 @@
   <section id="import-tags" class="friend-section">
     <h2>{{ 'settings.importExport.tags.importTitle' | transloco }}</h2>
     <p class="muted small">
-      Paste hashtags, one per line or separated by commas — with or without the
-      <code>#</code>. Tag page URLs like <code>https://mastodon.social/tags/caturday</code> work
-      too. Each one is followed in turn, and shows up in your Home timeline.
+      {{ 'settings.importExport.tags.importHint.a' | transloco }}
+      <code>#</code>{{ 'settings.importExport.tags.importHint.b' | transloco }}
+      <code>https://mastodon.social/tags/caturday</code>
+      {{ 'settings.importExport.tags.importHint.c' | transloco }}
     </p>
     <textarea
       rows="6"
@@ -157,7 +158,7 @@
     ></textarea>
     <div class="import-actions">
       <label class="btn btn-outline file-btn">
-        Upload list…
+        {{ 'settings.importExport.tags.uploadList' | transloco }}
         <input type="file" accept=".csv,.txt" (change)="onTagFile($event)" hidden />
       </label>
       <button
@@ -166,11 +167,13 @@
         [disabled]="!pastedTags().trim() || tagImporter.running()"
         (click)="previewTags()"
       >
-        Preview
+        {{ 'settings.importExport.tags.preview' | transloco }}
       </button>
       @if (tagImporter.rows().length && !tagImporter.running()) {
         <button type="button" class="btn" (click)="startTagImport()">
-          Follow all ({{ tagImporter.rows().length }})
+          {{
+            'settings.importExport.tags.followAll' | transloco: { count: tagImporter.rows().length }
+          }}
         </button>
       }
       @if (tagImporter.running()) {
@@ -186,7 +189,7 @@
     </div>
     @if (tagFileName(); as name) {
       <p class="muted small">
-        Loaded <code>{{ name }}</code>
+        {{ 'settings.importExport.tags.loaded' | transloco }} <code>{{ name }}</code>
       </p>
     }
     @if (tagParseNote(); as note) {
@@ -207,8 +210,15 @@
           ></div>
         </div>
         <p class="muted small">
-          {{ tagDoneCount() }} / {{ tagImporter.rows().length }} processed ·
-          {{ tagFollowedCount() }} followed
+          {{
+            'settings.importExport.tags.progress'
+              | transloco
+                : {
+                    done: tagDoneCount(),
+                    total: tagImporter.rows().length,
+                    followed: tagFollowedCount(),
+                  }
+          }}
         </p>
       }
       <!-- Only rendered when the importer actually established the net change;
@@ -364,9 +374,11 @@
     <section id="twitter-archive" class="friend-section">
       <h2>{{ 'settings.importExport.twitter.title' | transloco }}</h2>
       <p class="muted small">
-        Choose your unzipped archive folder. Mawkingbird reads only <code>following.js</code>,
-        <code>tweets.js</code>, and <code>deleted-tweets.js</code> in your browser; nothing is
-        uploaded. You can also select those files directly from the archive's <code>data</code>
+        {{ 'settings.importExport.twitter.archiveHint.a' | transloco }}
+        <code>following.js</code>, <code>tweets.js</code
+        >{{ 'settings.importExport.twitter.archiveHint.b' | transloco }}
+        <code>deleted-tweets.js</code>
+        {{ 'settings.importExport.twitter.archiveHint.c' | transloco }} <code>data</code>
         {{ 'settings.importExport.twitter.folder' | transloco }}
       </p>
       <p class="muted small">

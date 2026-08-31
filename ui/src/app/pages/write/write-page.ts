@@ -199,6 +199,11 @@ export interface Notice {
 // i18n pages.write.aria.enterZen: Enter zen mode, hiding everything but the text
 // i18n pages.write.zenModeButton: Zen mode
 // i18n pages.write.splitHere: Split here
+// i18n pages.write.describeAttachmentsFirst: Describe every attachment first.
+// i18n pages.write.clear: Clear
+// i18n pages.write.scheduleSingleTarget: Scheduling applies to a single Mastodon {{post}}.
+// i18n pages.write.saveDraft: Save draft
+// i18n pages.write.publish: Publish →
 // i18n pages.write.aria.clearScheduled: Clear the scheduled time and publish now
 // i18n pages.write.aria.splitPreview: Split preview
 // i18n pages.write.aria.notesAndTodos: Notes and to-dos
@@ -1477,7 +1482,8 @@ export class WritePage implements OnInit, OnDestroy {
     }
     if (this.altTextMissing()) {
       this.wizardError.set(
-        altTextMessage(this.undescribedMedia(), true) ?? 'Describe every attachment first.',
+        altTextMessage(this.undescribedMedia(), true) ??
+          this.transloco.translate<string>('pages.write.describeAttachmentsFirst'),
       );
       return;
     }

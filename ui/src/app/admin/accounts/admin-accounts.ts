@@ -1,21 +1,47 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { AdminApi } from '../admin-api';
 import { AdminAccount } from '../../models';
 
 const STATUSES = ['active', 'pending', 'silenced', 'suspended', 'disabled'] as const;
 
+// i18n adminAccounts.status.active: active
+// i18n adminAccounts.status.pending: pending
+// i18n adminAccounts.status.silenced: silenced
+// i18n adminAccounts.status.suspended: suspended
+// i18n adminAccounts.status.disabled: disabled
+// i18n adminAccounts.loading: Loading…
+// i18n adminAccounts.empty: No {{status}} accounts.
+// i18n adminAccounts.actions.approve: Approve
+// i18n adminAccounts.actions.reject: Reject
+// i18n adminAccounts.actions.unsensitive: Unsensitive
+// i18n adminAccounts.actions.unsilence: Unsilence
+// i18n adminAccounts.actions.silence: Silence
+// i18n adminAccounts.actions.unsuspend: Unsuspend
+// i18n adminAccounts.actions.suspend: Suspend
+// i18n adminAccounts.actions.enable: Enable
+// i18n adminAccounts.actions.disable: Disable
+// i18n adminAccounts.actions.delete: Delete
+// i18n adminAccounts.confirm.reject: Reject and delete the pending registration for @{{username}}?
+// i18n adminAccounts.confirm.delete: Permanently delete @{{username}}? This cannot be undone.
 @Component({
   selector: 'app-admin-accounts',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './admin-accounts.html',
   styleUrl: './admin-accounts.css',
 })
 export class AdminAccounts implements OnInit {
   private api = inject(AdminApi);
+  private transloco = inject(TranslocoService);
 
   protected readonly statuses = STATUSES;
   protected status = signal<string>('active');
+  protected statusLabel = computed(() => this.statusLabelFor(this.status()));
+
+  statusLabelFor(status: string): string {
+    return this.transloco.translate<string>(`adminAccounts.status.${status}`);
+  }
   protected accounts = signal<AdminAccount[]>([]);
   protected loading = signal(true);
 
@@ -66,7 +92,10 @@ export class AdminAccounts implements OnInit {
   }
 
   reject(a: AdminAccount): void {
-    if (!confirm(`Reject and delete the pending registration for @${a.username}?`)) {
+    const message = this.transloco.translate<string>('adminAccounts.confirm.reject', {
+      username: a.username,
+    });
+    if (!confirm(message)) {
       return;
     }
     this.api.reject(a.id).subscribe(() => this.load());
@@ -77,7 +106,10 @@ export class AdminAccounts implements OnInit {
   }
 
   remove(a: AdminAccount): void {
-    if (!confirm(`Permanently delete @${a.username}? This cannot be undone.`)) {
+    const message = this.transloco.translate<string>('adminAccounts.confirm.delete', {
+      username: a.username,
+    });
+    if (!confirm(message)) {
       return;
     }
     this.api.deleteAccount(a.id).subscribe(() => this.load());

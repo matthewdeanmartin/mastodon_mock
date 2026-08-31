@@ -215,6 +215,14 @@ function saveCsv(csv: string, filename: string): void {
 // i18n settings.importExport.suggest.summary.one: {{tags}} hashtag found across {{posts}} posts. The most-used are ticked.
 // i18n settings.importExport.suggest.summary.other: {{tags}} hashtags found across {{posts}} posts. The most-used are ticked.
 // i18n settings.importExport.suggest.title: Suggest hashtags from what you already read
+// i18n settings.importExport.tags.importHint.a: Paste hashtags, one per line or separated by commas — with or without the
+// i18n settings.importExport.tags.importHint.b: . Tag page URLs like
+// i18n settings.importExport.tags.importHint.c: work too. Each one is followed in turn, and shows up in your Home timeline.
+// i18n settings.importExport.tags.uploadList: Upload list…
+// i18n settings.importExport.tags.preview: Preview
+// i18n settings.importExport.tags.followAll: Follow all ({{count}})
+// i18n settings.importExport.tags.loaded: Loaded
+// i18n settings.importExport.tags.progress: {{done}} / {{total}} processed · {{followed}} followed
 // i18n settings.importExport.tags.exportAll: Export all hashtags
 // i18n settings.importExport.tags.exportBody.a: Download the hashtags you follow as a
 // i18n settings.importExport.tags.exportBody.b: you can import above on another account. Mastodon's own account archive leaves followed tags out, so this file is the only way to carry them across.
@@ -222,6 +230,9 @@ function saveCsv(csv: string, filename: string): void {
 // i18n settings.importExport.tags.exporting: Exporting {{count}}…
 // i18n settings.importExport.tags.textareaLabel: Hashtags to follow
 // i18n settings.importExport.title: Import/Export Friends & Tags
+// i18n settings.importExport.twitter.archiveHint.a: Choose your unzipped archive folder. Mawkingbird reads only
+// i18n settings.importExport.twitter.archiveHint.b: , and
+// i18n settings.importExport.twitter.archiveHint.c: in your browser; nothing is uploaded. You can also select those files directly from the archive's
 // i18n settings.importExport.twitter.candidates.one: {{count}} Mastodon candidate
 // i18n settings.importExport.twitter.candidates.other: {{count}} Mastodon candidates
 // i18n settings.importExport.twitter.candidatesShown: Mastodon candidates shown

@@ -4,11 +4,11 @@
     <span class="tag-actions">
       <!-- Both act as toggles: filled (accent) when on, outline when off. -->
       <button class="btn btn-sm" [class.btn-outline]="!info.following" (click)="toggleFollow()">
-        {{ info.following ? 'Following' : 'Follow' }}
+        {{ (info.following ? 'pages.tag.following' : 'pages.tag.follow') | transloco }}
       </button>
       @if (!auth.isAnonymous) {
         <button class="btn btn-sm" [class.btn-outline]="!info.featuring" (click)="toggleFeature()">
-          {{ info.featuring ? 'Featured' : 'Feature' }}
+          {{ (info.featuring ? 'pages.tag.featured' : 'pages.tag.feature') | transloco }}
         </button>
       }
     </span>
@@ -29,10 +29,12 @@
     [attr.aria-expanded]="bundlePickerOpen()"
   >
     @if (bundlesWithTag().length) {
-      In {{ bundlesWithTag().length }}
-      {{ bundlesWithTag().length === 1 ? 'bundle' : 'bundles' }}
+      {{
+        (bundlesWithTag().length === 1 ? 'pages.tag.inBundles.one' : 'pages.tag.inBundles.other')
+          | transloco: { count: bundlesWithTag().length }
+      }}
     } @else {
-      Add to bundle
+      {{ 'pages.tag.addToBundle' | transloco }}
     }
   </button>
 
@@ -49,11 +51,11 @@
           {{ b.title }}
           <span class="muted small">· {{ b.tags.length }}/{{ bundles.maxTags }}</span>
           @if (!bundles.hasTag(b.id, tag()) && bundles.isFull(b.id)) {
-            <span class="muted small">· full</span>
+            <span class="muted small">{{ 'pages.tag.full' | transloco }}</span>
           }
         </label>
       } @empty {
-        <p class="muted small">No bundles yet — name one below.</p>
+        <p class="muted small">{{ 'pages.tag.noBundlesYet' | transloco }}</p>
       }
 
       <div class="bundle-new">
@@ -62,14 +64,14 @@
           [ngModel]="newBundleTitle()"
           (ngModelChange)="newBundleTitle.set($event)"
           (keyup.enter)="createBundleWithTag()"
-          placeholder="New bundle name"
+          [placeholder]="'pages.tag.newBundleName' | transloco"
         />
         <button
           class="btn btn-sm"
           [disabled]="!newBundleTitle().trim()"
           (click)="createBundleWithTag()"
         >
-          Create &amp; add
+          {{ 'pages.tag.createAndAdd' | transloco }}
         </button>
       </div>
     </div>
@@ -77,12 +79,14 @@
 </div>
 
 <div class="tabs">
-  <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">Feed</button>
+  <button class="tab" [class.active]="tab() === 'posts'" (click)="setTab('posts')">
+    {{ 'pages.tag.tabs.feed' | transloco }}
+  </button>
   <button class="tab" [class.active]="tab() === 'members'" (click)="setTab('members')">
-    Members
+    {{ 'pages.tag.tabs.members' | transloco }}
   </button>
   <button class="tab" [class.active]="tab() === 'analytics'" (click)="setTab('analytics')">
-    Analytics
+    {{ 'pages.tag.tabs.analytics' | transloco }}
   </button>
 </div>
 
@@ -93,9 +97,9 @@
 } @else if (tab() === 'analytics') {
   <app-feed-analytics [source]="feedSource()" />
 } @else if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'pages.tag.loading' | transloco }}</p>
 } @else if (!statuses().length) {
-  <p class="muted center">No statuses tagged #{{ tag() }}.</p>
+  <p class="muted center">{{ 'pages.tag.noStatuses' | transloco: { tag: tag() } }}</p>
 } @else {
   @if (canFilterMine()) {
     <div class="tag-filter">
@@ -106,15 +110,22 @@
         [attr.aria-pressed]="mineOnly()"
         (click)="toggleMine()"
       >
-        My {{ words().posts }}
+        {{ 'pages.tag.myPosts' | transloco: { posts: words().posts } }}
       </button>
       @if (mineOnly()) {
         <!-- Says what was actually searched. This filters the posts already
              loaded, not the whole history of the tag, and implying otherwise
              would make an empty result look like proof. -->
         <span class="muted small">
-          {{ visibleStatuses().length }} of the {{ statuses().length }} loaded {{ words().posts }}.
-          Load more to search further back.
+          {{
+            'pages.tag.mine.summary'
+              | transloco
+                : {
+                    visible: visibleStatuses().length,
+                    total: statuses().length,
+                    posts: words().posts,
+                  }
+          }}
         </span>
       }
     </div>
@@ -122,7 +133,7 @@
 
   @if (mineOnly() && !visibleStatuses().length) {
     <p class="muted center">
-      None of the {{ statuses().length }} loaded {{ words().posts }} are yours.
+      {{ 'pages.tag.mine.none' | transloco: { total: statuses().length, posts: words().posts } }}
     </p>
   }
 
@@ -136,7 +147,7 @@
   }
   @if (!exhausted()) {
     <button class="btn btn-outline more" [disabled]="loadingMore()" (click)="loadMore()">
-      {{ loadingMore() ? 'Loading…' : 'Load more' }}
+      {{ (loadingMore() ? 'pages.tag.loading' : 'pages.tag.loadMore') | transloco }}
     </button>
   }
 }

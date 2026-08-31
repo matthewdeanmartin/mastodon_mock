@@ -87,6 +87,36 @@ Also **never `.replace()` a substring of display text** — once the text is
 German the substring is absent, the replace silently no-ops, and the wrong word
 ships in every non-English locale.
 
+### 2b. English in TypeScript that no scanner can see
+
+`i18n-scan.mjs` reads templates. It cannot see a string that lives in a class
+field, so these leak past a directory that scans clean:
+
+```ts
+readonly placeholder = input('What is happening?');   // rendered as the compose box prompt
+protected status = signal('Finishing authorization.'); // rendered as page text
+this.message.set(warning ?? 'Fetched twice and verified stable.');
+const title = feed.title ?? 'Bluesky feed';
+```
+
+Grep for them before you call a directory done:
+
+```bash
+grep -rnE "input\('[A-Z][a-z]+ [a-z]|signal\('[A-Z][a-z]+ [a-z]|\?\? '[A-Z][a-z]{2,}"   src/app/<dir> --include=*.ts
+```
+
+Most become `this.transloco.translate<string>('key')` at the point of use. An
+**`input()` default cannot**, because it is evaluated before an injection
+context exists. Default it to `''` and resolve in a `computed`, so callers that
+pass their own already-translated value are unaffected:
+
+```ts
+readonly placeholder = input('');
+protected readonly placeholderText = computed(
+  () => this.placeholder() || this.transloco.translate<string>('area.placeholder'),
+);
+```
+
 ### 3. Write a key map and apply it
 
 Write a JSON array of `{"text": "...", "key": "..."}`. `text` is the string as
@@ -187,10 +217,24 @@ alone.
 - **Run the full suite after touching anything shared.** Registries,
   `client-prefs.ts`, `publish-wizard.ts` and `pkm-tags.ts` have consumers outside
   the directory being migrated.
+- **A key can already exist while the template still hardcodes its English.**
+  `settings.blue.zen` was declared *and translated* while the template carried
+  the literal words. Grep the declarations before inventing a key, and reuse
+  rather than adding a second one for the same sentence.
+- **A suspiciously small scan is a symptom, not a result.** `i18n-scan.mjs` once
+  under-reported `account-analytics.html` as 25 strings when it held 88: an
+  apostrophe inside an HTML comment sent the tag regex hunting for its pair and
+  swallowed everything between. That is fixed, but the lesson stands — if a
+  large template scans as nearly clean, say so rather than believing it. A
+  scanner that under-reports looks exactly like a finished directory.
 
 ## Done means
 
 - `npm run check:i18n` prints `i18n OK` with your directory in the count.
+- `grep` for English defaults in `.ts` (step 2b) comes back empty.
+- The gate cannot see three of the four ways this goes wrong: an English string
+  the scanner never found, a declared key the template never uses, and a
+  translation that means the wrong thing. Only your own reading catches those.
 - `node scripts/i18n-scan.mjs` on each template in the directory reports only
   strings you can justify (pipe formats like `'medium'`, or `ALLOWED` entries).
 - Lint clean, Prettier clean, `npm run test:ci` green.

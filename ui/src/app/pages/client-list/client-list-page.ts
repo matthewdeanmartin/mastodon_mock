@@ -1,11 +1,25 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { ClientList, ClientLists } from '../../lists/client-lists';
 import { ProfileLists } from '../../providers/account/profile-lists';
 import { ListFeedResolver, MERGE_MEMBER_CAP } from '../../lists/list-feed-resolver';
 import { Account, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { PageDiagnostics } from '../../page-diagnostics';
+
+// i18n pagesClientList.notFound.note: That list isn't in this browser.
+// i18n pagesClientList.notFound.back: Back to feeds
+// i18n pagesClientList.header.member.one: Client list · kept in this browser · {{count}} member
+// i18n pagesClientList.header.member.other: Client list · kept in this browser · {{count}} members
+// i18n pagesClientList.tabs.posts: Posts
+// i18n pagesClientList.tabs.members: Members
+// i18n pagesClientList.capped.note: Showing posts from the first {{shown}} of {{total}} members — merging every member's timeline is slow against a real server.
+// i18n pagesClientList.unresolved.note: This server couldn't find {{count}} of these accounts, so they aren't in the feed: {{handles}}
+// i18n pagesClientList.loading: Loading…
+// i18n pagesClientList.members.empty: No members yet — add accounts to this list from their profile.
+// i18n pagesClientList.posts.empty: No posts from these accounts.
+// i18n pagesClientList.members.unresolved: No members resolved.
 
 /**
  * One client-side list: its posts, and the accounts behind them.
@@ -18,7 +32,7 @@ import { PageDiagnostics } from '../../page-diagnostics';
  */
 @Component({
   selector: 'app-client-list-page',
-  imports: [RouterLink, StatusCard],
+  imports: [RouterLink, StatusCard, TranslocoPipe],
   templateUrl: './client-list-page.html',
   styleUrl: './client-list-page.css',
 })

@@ -1,6 +1,7 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { catchError, EMPTY } from 'rxjs';
 import { Api } from '../../api';
 import { Account, Relationship } from '../../models';
@@ -37,9 +38,26 @@ const PAGE_SIZE = 80;
  * State lives in the URL (`?order=&local=`) so a view is linkable and the back
  * button restores it, matching how search's URL sync already behaves.
  */
+// i18n pages.directory.heading: Server directory
+// i18n pages.directory.blurb: Accounts on {{host}} that chose to appear in the public directory. Opting out is the default on some servers, so this is a slice of the membership, not a roster.
+// i18n pages.directory.tabs.active: Recently active
+// i18n pages.directory.tabs.new: Recently joined
+// i18n pages.directory.thisServerOnly: This server only
+// i18n pages.directory.remoteNote: Including remote accounts {{host}} has seen — that depends on who its members follow, not on the whole network.
+// i18n pages.directory.searchFallback.a: You can still
+// i18n pages.directory.searchFallback.b: search for accounts
+// i18n pages.directory.searchFallback.c: by name or handle.
+// i18n pages.directory.loading: Loading…
+// i18n pages.directory.noAccountsListed.local: No accounts listed on this server.
+// i18n pages.directory.noAccountsListed.any: No accounts listed.
+// i18n pages.directory.tryUnchecking: Try unchecking “This server only”.
+// i18n pages.directory.loadMore: Load more
+// i18n pages.directory.everyoneListed: That's everyone the directory lists.
+// i18n pages.directory.thisServer: this server
+// i18n pages.directory.errorMessage: {{host}} didn't return a profile directory. The server may have it turned off.
 @Component({
   selector: 'app-directory',
-  imports: [RouterLink, AccountResultCard],
+  imports: [RouterLink, AccountResultCard, TranslocoPipe],
   templateUrl: './directory.html',
   styleUrl: './directory.css',
 })
@@ -51,6 +69,7 @@ export class Directory implements OnInit {
   private destroyRef = inject(DestroyRef);
   protected capabilities = inject(AnonymousCapabilities);
   private anonymousFollows = inject(AnonymousFollows);
+  private transloco = inject(TranslocoService);
 
   protected order = signal<DirectoryOrder>('active');
   protected local = signal(true);
@@ -69,7 +88,9 @@ export class Directory implements OnInit {
 
   /** Named host for the copy. `baseUrl()` is '' for the app's own server. */
   protected host = computed(
-    () => this.server.baseUrl().replace(/^https?:\/\//, '') || 'this server',
+    () =>
+      this.server.baseUrl().replace(/^https?:\/\//, '') ||
+      this.transloco.translate<string>('pages.directory.thisServer'),
   );
 
   /** The card takes the search page's shape; the directory has no matching posts. */
@@ -118,7 +139,9 @@ export class Directory implements OnInit {
       .pipe(
         catchError(() => {
           this.error.set(
-            `${this.host()} didn't return a profile directory. The server may have it turned off.`,
+            this.transloco.translate<string>('pages.directory.errorMessage', {
+              host: this.host(),
+            }),
           );
           this.loading.set(false);
           return EMPTY;

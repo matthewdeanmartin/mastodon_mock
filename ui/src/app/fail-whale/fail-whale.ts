@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { failWhaleArt } from '../build-flavor';
 import { BuildInfo, BUILD_INFO } from '../build-info';
 import { ClientPrefs } from '../client-prefs';
@@ -29,9 +30,34 @@ import { PageDiagnostics } from '../page-diagnostics';
  * screen gets the raw material to troubleshoot, plus a route to the connection
  * doctor in case the instance isn't the culprit at all.
  */
+// i18n failWhale.domainUnavailable: {{domain}} appears to be unavailable
+// i18n failWhale.cantReachServer: Can't reach the server
+// i18n failWhale.noReply: No reply came back at all. Your connection may be down, the instance may be unreachable from here, or something between the two may be blocking it.
+// i18n failWhale.checking: Checking…
+// i18n failWhale.tryAgain: Try again
+// i18n failWhale.reportThis: Report this
+// i18n failWhale.offlineNote: Your browser reports that this device is <strong>offline</strong>. Check your network connection before blaming the server.
+// i18n failWhale.orBrowse: Or browse a different instance:
+// i18n failWhale.whatWentWrong: What went wrong?
+// i18n failWhale.error: Error
+// i18n failWhale.status: Status
+// i18n failWhale.statusZero: <code>0</code> — no response reached the browser
+// i18n failWhale.request: Request
+// i18n failWhale.server: Server
+// i18n failWhale.unknown: unknown
+// i18n failWhale.time: Time
+// i18n failWhale.network: Network
+// i18n failWhale.reportedOnline: Browser reported online
+// i18n failWhale.reportedOffline: Browser reported offline
+// i18n failWhale.build: Build
+// i18n failWhale.noDetails: No error details were recorded. The server was marked unreachable without a specific failure to report.
+// i18n failWhale.notServerHint: It may not be the server at all — a proxy, DNS, or browser extension can produce exactly this. The connection doctor checks each of those in turn.
+// i18n failWhale.openDoctor: Open connection doctor
+// i18n failWhale.copied: Copied
+// i18n failWhale.copyDetails: Copy details
 @Component({
   selector: 'app-fail-whale',
-  imports: [BugReportDialog, ServerPicker, RouterLink],
+  imports: [BugReportDialog, ServerPicker, RouterLink, TranslocoPipe],
   templateUrl: './fail-whale.html',
   styleUrl: './fail-whale.css',
 })

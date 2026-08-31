@@ -1,4 +1,5 @@
 import { Component, input, output } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { FocusTrap } from '../a11y/focus-trap';
 import { ServerDiscovery } from '../server-discovery/server-discovery';
 
@@ -21,9 +22,10 @@ import { ServerDiscovery } from '../server-discovery/server-discovery';
  * fixing a problem they did not cause. They can still cancel, keep looking, or
  * take the first working server offered.
  */
+// i18n unreachableServer.findAServerICanRead: Find a server I can read
 @Component({
   selector: 'app-unreachable-server-dialog',
-  imports: [FocusTrap, ServerDiscovery],
+  imports: [FocusTrap, ServerDiscovery, TranslocoPipe],
   templateUrl: './unreachable-server-dialog.html',
   styleUrl: './unreachable-server-dialog.css',
 })

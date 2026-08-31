@@ -222,7 +222,10 @@
         <span class="spend-stat">
           <strong>{{ credits.total | number }}</strong>
           <span class="muted small">
-            credits left · about {{ pagesRemaining() | number }} refreshes
+            {{
+              'settings.connections.twitter.spend.creditsLeft'
+                | transloco: { count: pagesRemaining() | number }
+            }}
           </span>
         </span>
       }
@@ -249,8 +252,9 @@
 
     @if (usage.atHardLimit()) {
       <p class="feed-error">
-        You have reached today's limit of {{ usage.hardLimit() }} requests. It resets at midnight,
-        or you can raise it below.
+        {{
+          'settings.connections.twitter.spend.hardLimit' | transloco: { count: usage.hardLimit() }
+        }}
       </p>
     } @else if (usage.overSoftLimit()) {
       <p class="spend-warning">

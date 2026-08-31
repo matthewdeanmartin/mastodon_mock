@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -9,9 +10,23 @@ import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-a
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 import { starterKit, StarterAccount } from '../../starter-collection';
 
+// i18n starterCollection.heading: A timeline in one click
+// i18n starterCollection.followingProgress: Following… {{completed}}/{{total}}
+// i18n starterCollection.followed.one: Followed {{count}} account
+// i18n starterCollection.followed.other: Followed {{count}} accounts
+// i18n starterCollection.followAll: Follow all {{count}}
+// i18n starterCollection.membersAria: {{title}} accounts
+// i18n starterCollection.opening: Opening…
+// i18n starterCollection.lookingUp: Looking up…
+// i18n starterCollection.followingRow: Following…
+// i18n starterCollection.followingDone: Following ✓
+// i18n starterCollection.notFound: Not found
+// i18n starterCollection.couldNotFollow: Could not follow
+// i18n starterCollection.note: Anonymous follows use the collection’s built-in account snapshot immediately. Signed-in follows are resolved by your server before the real follow request is sent.
+// i18n starterCollection.findFriends: Find friends another way
 @Component({
   selector: 'app-starter-collection',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './starter-collection.html',
   styleUrl: './starter-collection.css',
 })

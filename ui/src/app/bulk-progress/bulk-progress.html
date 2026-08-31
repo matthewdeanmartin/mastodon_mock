@@ -49,17 +49,21 @@
       @if (pauseSeconds(); as secs) {
         <span class="bp-paused">{{ 'bulk.rateLimited' | transloco: { secs: secs } }}</span>
       } @else if (eta(); as remaining) {
-        <span class="muted">{{ remaining }} left</span>
+        <span class="muted">{{ 'bulk.progress.remaining' | transloco: { time: remaining } }}</span>
       }
     </p>
 
     <p class="bp-line small muted">
-      {{ j.changed.toLocaleString() }} changed
+      {{ 'bulk.progress.changed' | transloco: { count: j.changed.toLocaleString() } }}
       @if (j.skipped) {
-        · {{ j.skipped.toLocaleString() }} already correct
+        ·
+        {{ 'bulk.progress.alreadyCorrect' | transloco: { count: j.skipped.toLocaleString() } }}
       }
       @if (j.failed) {
-        · <span class="bp-failed">{{ j.failed.toLocaleString() }} failed</span>
+        ·
+        <span class="bp-failed">{{
+          'bulk.progress.failed' | transloco: { count: j.failed.toLocaleString() }
+        }}</span>
       }
     </p>
 

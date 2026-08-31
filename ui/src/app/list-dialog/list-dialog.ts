@@ -14,6 +14,7 @@ import { ClientLists, handleFor } from '../lists/client-lists';
 import { Server } from '../server';
 import { Account } from '../models';
 import { FocusTrap } from '../a11y/focus-trap';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 interface ListRow {
   list: UserList;
@@ -75,9 +76,33 @@ interface CollectionRow {
  * Bulk "add several people by name" lives on the list/collection pages
  * instead — this dialog is strictly about one person.
  */
+// i18n listDialog.titleLocal: Add &#64;{{username}} to local lists
+// i18n listDialog.titleFull: Add &#64;{{username}} to lists & collections
+// i18n listDialog.loading: Loading…
+// i18n listDialog.lists: Lists
+// i18n listDialog.private: private
+// i18n listDialog.noListsYet: No lists yet. Create one below.
+// i18n listDialog.followGateMessage: Mastodon only lets you add people you follow to a list, so &#64;{{username}} wasn't added to <strong>{{listTitle}}</strong>.
+// i18n listDialog.followIsPublic: Following them is public — they'll get a notification.
+// i18n listDialog.following: Following…
+// i18n listDialog.followAndAdd: Follow and add
+// i18n listDialog.cancel: Cancel
+// i18n listDialog.newListPlaceholder: New list name
+// i18n listDialog.createAndAdd: Create &amp; add
+// i18n listDialog.clientLists: Client lists
+// i18n listDialog.thisBrowser: this browser
+// i18n listDialog.clientListsHint: No need to follow them, and it works signed out.
+// i18n listDialog.noClientListsYet: None yet — name one below to start.
+// i18n listDialog.newClientListPlaceholder: New client list name
+// i18n listDialog.collections: Collections
+// i18n listDialog.public: public
+// i18n listDialog.collectionsUnsupported: This server does not support collections.
+// i18n listDialog.noCollectionsYet: No collections yet. Create one below.
+// i18n listDialog.newCollectionPlaceholder: New collection name
+// i18n listDialog.done: Done
 @Component({
   selector: 'app-list-dialog',
-  imports: [FocusTrap, FormsModule],
+  imports: [FocusTrap, FormsModule, TranslocoPipe],
   templateUrl: './list-dialog.html',
   styleUrl: './list-dialog.css',
 })

@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Auth } from '../../auth';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { environment } from '../../../environments/environment';
@@ -15,9 +16,38 @@ const BLUESKY_ENTRYWAY = 'https://bsky.social';
  * *connector* under an existing Mastodon or Anonymous account. Here Bluesky *is* who you are,
  * and the app has no Mastodon account at all until Sprint 4 attaches one.
  */
+// i18n pages.loginBluesky.title: Sign in with Bluesky
+// i18n pages.loginBluesky.intro: Your Bluesky timeline becomes your home timeline in {{brand}}. You can reply, like and repost from here.
+// i18n pages.loginBluesky.openingBluesky: Opening Bluesky…
+// i18n pages.loginBluesky.continueWithBluesky: Continue with Bluesky
+// i18n pages.loginBluesky.oauthNote: Sign in on bsky.social with your email address or username, then approve access. Use your account password there; Bluesky does not allow app passwords during OAuth. {{brand}} never sees your password.
+// i18n pages.loginBluesky.advancedSummary: Use a specific handle, DID, or another PDS
+// i18n pages.loginBluesky.handleLabel: Handle, DID, or PDS
+// i18n pages.loginBluesky.handlePlaceholder: you.bsky.social
+// i18n pages.loginBluesky.openingProvider: Opening provider…
+// i18n pages.loginBluesky.continueWithAccount: Continue with this account
+// i18n pages.loginBluesky.selfHostedHint: If you host your own PDS rather than using Bluesky's, signing in that way isn't supported yet — this form authenticates against bsky.social.
+// i18n pages.loginBluesky.compatSummary: My PDS does not support OAuth yet
+// i18n pages.loginBluesky.appPasswordIntro: Use an <strong>app password</strong>, never your real Bluesky password. Make one at
+// i18n pages.loginBluesky.appPasswordLinkText: bsky.app → Settings → Privacy and security → App Passwords
+// i18n pages.loginBluesky.dmTickHint: Tick <em>“Allow access to your direct messages”</em> if you want Bluesky DMs in Chat.
+// i18n pages.loginBluesky.appPasswordLabel: App password
+// i18n pages.loginBluesky.appPasswordPlaceholder: xxxx-xxxx-xxxx-xxxx
+// i18n pages.loginBluesky.signingIn: Signing in…
+// i18n pages.loginBluesky.useAppPassword: Use app password
+// i18n pages.loginBluesky.useDifferentNetwork: Use a different network
+// i18n pages.loginBluesky.lookAround: Look around without an account
+// i18n pages.loginBluesky.errors.storageBlocked: Signed in, but this browser could not store the session. Check whether storage is blocked for this site.
+// i18n pages.loginBluesky.errors.handleUnresolved: That Bluesky handle could not be resolved. Check the spelling or enter your PDS URL.
+// i18n pages.loginBluesky.errors.unreachableProvider: Could not reach your Bluesky provider. Check your connection and try again.
+// i18n pages.loginBluesky.errors.oauthStartFailed: Bluesky sign-in could not start. Please try again.
+// i18n pages.loginBluesky.errors.rateLimited: Bluesky is rate-limiting sign-in attempts from this browser. Wait a few minutes and try again.
+// i18n pages.loginBluesky.errors.credentialsRejected: That handle and app password combination was rejected.
+// i18n pages.loginBluesky.errors.unreachable: Could not reach Bluesky. Check your connection — a content blocker or extension may also be blocking the request.
+// i18n pages.loginBluesky.errors.signInFailed: Sign-in failed. Please try again.
 @Component({
   selector: 'app-login-bluesky',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TranslocoPipe],
   templateUrl: './login-bluesky.html',
   styleUrl: './login-bluesky.css',
 })
@@ -26,6 +56,7 @@ export class LoginBluesky implements OnInit {
   private bsky = inject(BlueskySession);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private transloco = inject(TranslocoService);
   private adding = false;
 
   protected brand = environment.brand;
@@ -93,7 +124,7 @@ export class LoginBluesky implements OnInit {
         this.working.set(false);
         if (!entered) {
           this.error.set(
-            'Signed in, but this browser could not store the session. Check whether storage is blocked for this site.',
+            this.transloco.translate<string>('pages.loginBluesky.errors.storageBlocked'),
           );
           return;
         }
@@ -117,12 +148,12 @@ export class LoginBluesky implements OnInit {
   private describeOAuth(err: unknown): string {
     const message = err instanceof Error ? err.message : '';
     if (/resolve|handle|did/i.test(message)) {
-      return 'That Bluesky handle could not be resolved. Check the spelling or enter your PDS URL.';
+      return this.transloco.translate<string>('pages.loginBluesky.errors.handleUnresolved');
     }
     if (/network|fetch|failed/i.test(message)) {
-      return 'Could not reach your Bluesky provider. Check your connection and try again.';
+      return this.transloco.translate<string>('pages.loginBluesky.errors.unreachableProvider');
     }
-    return 'Bluesky sign-in could not start. Please try again.';
+    return this.transloco.translate<string>('pages.loginBluesky.errors.oauthStartFailed');
   }
 
   /**
@@ -143,17 +174,17 @@ export class LoginBluesky implements OnInit {
     const tag = typeof body?.error === 'string' ? body.error : '';
 
     if (status === 429 || tag === 'RateLimitExceeded') {
-      return 'Bluesky is rate-limiting sign-in attempts from this browser. Wait a few minutes and try again.';
+      return this.transloco.translate<string>('pages.loginBluesky.errors.rateLimited');
     }
     if (status === 400 || status === 401) {
       if (!identifier.endsWith('.bsky.social') && identifier.includes('.')) {
         this.selfHostedHint.set(true);
       }
-      return 'That handle and app password combination was rejected.';
+      return this.transloco.translate<string>('pages.loginBluesky.errors.credentialsRejected');
     }
     if (status === 0) {
-      return 'Could not reach Bluesky. Check your connection — a content blocker or extension may also be blocking the request.';
+      return this.transloco.translate<string>('pages.loginBluesky.errors.unreachable');
     }
-    return 'Sign-in failed. Please try again.';
+    return this.transloco.translate<string>('pages.loginBluesky.errors.signInFailed');
   }
 }

@@ -1,42 +1,46 @@
 <div class="analytics">
   @if (loading()) {
-    <p class="muted center">Crunching the last 100 posts…</p>
+    <p class="muted center">{{ 'accountAnalytics.crunching' | transloco }}</p>
   } @else if (error()) {
-    <p class="muted center">Couldn't load posts — try again later.</p>
+    <p class="muted center">{{ 'accountAnalytics.loadError' | transloco }}</p>
   } @else if (!posts().length) {
-    <p class="muted center">Nothing to analyze yet — no posts found.</p>
+    <p class="muted center">{{ 'accountAnalytics.empty' | transloco }}</p>
   } @else {
     <div class="sample-note muted">
       <span>
-        Based on the last {{ posts().length }} {{ words().posts }}, boosts excluded.
+        {{
+          'accountAnalytics.basedOnLast'
+            | transloco: { count: posts().length, posts: words().posts }
+        }}
         @if (oldestPostDate(); as oldest) {
-          The sample goes back {{ oldest | humanTime }}.
+          {{ 'accountAnalytics.sampleGoesBack' | transloco: { time: (oldest | humanTime) } }}
         }
-        Reach is estimated, not measured — a cheap peek.
+        {{ 'accountAnalytics.reachEstimated' | transloco }}
       </span>
       @if (hasMore()) {
-        <span class="load-more" role="group" [aria-label]="'Get more ' + words().posts">
+        <span
+          class="load-more"
+          role="group"
+          [attr.aria-label]="
+            'accountAnalytics.getMorePosts.aria' | transloco: { posts: words().posts }
+          "
+        >
           @if (loadingMore()) {
-            <span class="muted">Fetching more…</span>
+            <span class="muted">{{ 'accountAnalytics.fetchingMore' | transloco }}</span>
           } @else {
             <!-- A caption for a button group, not a form control — the group's
-                 own `aria-label` below is what carries it to assistive tech. -->
-            <span>Get more posts:</span>
+                 own aria-label below is what carries it to assistive tech. -->
+            <span>{{ 'accountAnalytics.getMorePostsLabel' | transloco }}</span>
             @for (n of loadMoreChoices; track n) {
               <button
                 type="button"
                 class="load-more-btn"
                 (click)="loadMore(n)"
                 [title]="
-                  'Fetch ' +
-                  n +
-                  ' more page' +
-                  (n === 1 ? '' : 's') +
-                  ' (' +
-                  n +
-                  ' API call' +
-                  (n === 1 ? '' : 's') +
-                  ')'
+                  (n === 1
+                    ? 'accountAnalytics.fetchPages.one'
+                    : 'accountAnalytics.fetchPages.other'
+                  ) | transloco: { count: n }
                 "
               >
                 +{{ n }}
@@ -51,43 +55,61 @@
       <span class="live-pill" [class]="livelinessClass()">{{ liveliness().label }}</span>
       <span class="live-detail muted">
         @if (liveliness().daysSinceLastPost === 0) {
-          Posted today.
+          {{ 'accountAnalytics.postedToday' | transloco }}
         } @else if (liveliness().daysSinceLastPost === 1) {
-          Last posted 1 day ago.
+          {{ 'accountAnalytics.lastPosted.one' | transloco: { count: 1 } }}
         } @else {
-          Last posted {{ liveliness().daysSinceLastPost }} days ago.
+          {{
+            'accountAnalytics.lastPosted.other'
+              | transloco: { count: liveliness().daysSinceLastPost }
+          }}
         }
-        {{ liveliness().postsLast30Days }} {{ words().posts }} in the last 30 days,
-        {{ liveliness().postsLast90Days }} in the last 90.
+        {{
+          'accountAnalytics.postsInWindow'
+            | transloco
+              : {
+                  last30: liveliness().postsLast30Days,
+                  last90: liveliness().postsLast90Days,
+                  posts: words().posts,
+                }
+        }}
       </span>
     </div>
 
     <div class="tiles">
       <div class="tile">
-        <span class="tile-label muted">Posts analyzed</span>
+        <span class="tile-label muted">{{
+          'accountAnalytics.tiles.postsAnalyzed' | transloco
+        }}</span>
         <span class="tile-value">{{ fmt(posts().length) }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Favourites</span>
+        <span class="tile-label muted">{{ 'accountAnalytics.tiles.favourites' | transloco }}</span>
         <span class="tile-value">{{ fmt(totalFavourites()) }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Boosts</span>
+        <span class="tile-label muted">{{ 'accountAnalytics.tiles.boosts' | transloco }}</span>
         <span class="tile-value">{{ fmt(totalBoosts()) }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Replies received</span>
+        <span class="tile-label muted">{{
+          'accountAnalytics.tiles.repliesReceived' | transloco
+        }}</span>
         <span class="tile-value">{{ fmt(totalReplies()) }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Engagements per post</span>
+        <span class="tile-label muted">{{
+          'accountAnalytics.tiles.engagementsPerPost' | transloco
+        }}</span>
         <span class="tile-value">{{ avgEngagement() }}</span>
       </div>
       <!-- Replies given, as a share of the sample. A 0% account that posts every
            day is usually a feed or a cross-poster rather than someone you can
            talk to, and no other tile here would tell you that. -->
       <div class="tile">
-        <span class="tile-label muted">Replies given</span>
+        <span class="tile-label muted">{{
+          'accountAnalytics.tiles.repliesGiven' | transloco
+        }}</span>
         <span class="tile-value">
           <!-- Explicit null check, not `as pct`: 0% is falsy and is precisely
                the value this tile exists to show. -->
@@ -96,49 +118,57 @@
           } @else {
             —
           }
-          <small class="tile-sub muted"
-            >{{ fmt(repliesGiven()) }} of {{ fmt(posts().length) }}</small
-          >
+          <small class="tile-sub muted">{{
+            'accountAnalytics.xOfY' | transloco: { x: fmt(repliesGiven()), y: fmt(posts().length) }
+          }}</small>
         </span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Shortest post</span>
+        <span class="tile-label muted">{{
+          'accountAnalytics.tiles.shortestPost' | transloco
+        }}</span>
         <span class="tile-value">
           @if (lengthRange(); as range) {
-            {{ fmt(range.shortest) }}<small class="tile-sub muted">characters</small>
+            {{ fmt(range.shortest)
+            }}<small class="tile-sub muted">{{ 'accountAnalytics.characters' | transloco }}</small>
           } @else {
             —
           }
         </span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Longest post</span>
+        <span class="tile-label muted">{{ 'accountAnalytics.tiles.longestPost' | transloco }}</span>
         <span class="tile-value">
           @if (lengthRange(); as range) {
-            {{ fmt(range.longest) }}<small class="tile-sub muted">characters</small>
+            {{ fmt(range.longest)
+            }}<small class="tile-sub muted">{{ 'accountAnalytics.characters' | transloco }}</small>
           } @else {
             —
           }
         </span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Posts per day</span>
+        <span class="tile-label muted">{{ 'accountAnalytics.tiles.postsPerDay' | transloco }}</span>
         <span class="tile-value">{{ postsPerDay() }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Followers</span>
+        <span class="tile-label muted">{{ 'accountAnalytics.tiles.followers' | transloco }}</span>
         <span class="tile-value">{{ fmt(account().followers_count) }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Following</span>
+        <span class="tile-label muted">{{ 'accountAnalytics.tiles.following' | transloco }}</span>
         <span class="tile-value">{{ fmt(account().following_count) }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Est. reach (total)</span>
+        <span class="tile-label muted">{{
+          'accountAnalytics.tiles.estReachTotal' | transloco
+        }}</span>
         <span class="tile-value">{{ fmt(totalReach()) }}</span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Est. reach / post</span>
+        <span class="tile-label muted">{{
+          'accountAnalytics.tiles.estReachPerPost' | transloco
+        }}</span>
         <span class="tile-value">
           {{ fmt(reachPerPost()) }}
           @if (reachTrendPct(); as trend) {
@@ -149,11 +179,13 @@
         </span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Liveliness</span>
+        <span class="tile-label muted">{{ 'accountAnalytics.tiles.liveliness' | transloco }}</span>
         <span class="tile-value">{{ liveliness().score }}<small class="muted">/100</small></span>
       </div>
       <div class="tile">
-        <span class="tile-label muted">Recent posts / day</span>
+        <span class="tile-label muted">{{
+          'accountAnalytics.tiles.recentPostsPerDay' | transloco
+        }}</span>
         <span class="tile-value">{{ liveliness().recentPostsPerDay }}</span>
       </div>
     </div>
@@ -162,110 +194,152 @@
          the post sample already in memory; this walks the follower and friend
          lists, so it is opt-in behind a dialog that states the cost first. -->
     <section class="section audience-section">
-      <h2>Effective friends &amp; followers</h2>
+      <h2>{{ 'accountAnalytics.audience.heading' | transloco }}</h2>
       @if (audienceResults(); as results) {
         <p class="muted small">
-          How much of the audience is still posting. Counts marked ~ are estimated from a partial
-          scan.
+          {{ 'accountAnalytics.audience.explain' | transloco }}
         </p>
         @if (results.following; as r) {
-          <h3 class="chart-title muted">Friends</h3>
+          <h3 class="chart-title muted">{{ 'accountAnalytics.audience.friends' | transloco }}</h3>
           <div class="tiles">
             <div class="tile">
-              <span class="tile-label muted">Effective friends</span>
+              <span class="tile-label muted">{{
+                'accountAnalytics.audience.effectiveFriends' | transloco
+              }}</span>
               <span class="tile-value"
                 >{{ r.complete ? '' : '~' }}{{ fmt(r.effective)
-                }}<small class="tile-sub muted"
-                  >{{ r.effectiveRatePct }}% of {{ fmt(r.total) }}</small
-                ></span
+                }}<small class="tile-sub muted">{{
+                  'accountAnalytics.pctOf'
+                    | transloco: { pct: r.effectiveRatePct, total: fmt(r.total) }
+                }}</small></span
               >
             </div>
             <div class="tile">
-              <span class="tile-label muted">Zombie friends</span>
+              <span class="tile-label muted">{{
+                'accountAnalytics.audience.zombieFriends' | transloco
+              }}</span>
               <span class="tile-value"
                 >{{ r.complete ? '' : '~' }}{{ fmt(r.estimatedZombies)
-                }}<small class="tile-sub muted">{{ r.zombieRatePct }}% zombie rate</small></span
+                }}<small class="tile-sub muted">{{
+                  'accountAnalytics.zombieRate' | transloco: { pct: r.zombieRatePct }
+                }}</small></span
               >
             </div>
             <div class="tile">
-              <span class="tile-label muted">Dormant</span>
+              <span class="tile-label muted">{{
+                'accountAnalytics.audience.dormant' | transloco
+              }}</span>
               <span class="tile-value"
                 >{{ fmt(r.dormant)
-                }}<small class="tile-sub muted">of {{ fmt(r.scanned) }} read</small></span
+                }}<small class="tile-sub muted">{{
+                  'accountAnalytics.ofScannedRead' | transloco: { scanned: fmt(r.scanned) }
+                }}</small></span
               >
             </div>
             <div class="tile">
-              <span class="tile-label muted">Low-cadence</span>
+              <span class="tile-label muted">{{
+                'accountAnalytics.audience.lowCadence' | transloco
+              }}</span>
               <span class="tile-value"
-                >{{ fmt(r.lowCadence) }}<small class="tile-sub muted">drizzlers</small></span
+                >{{ fmt(r.lowCadence)
+                }}<small class="tile-sub muted">{{
+                  'accountAnalytics.audience.drizzlers' | transloco
+                }}</small></span
               >
             </div>
           </div>
         }
         @if (results.followers; as r) {
-          <h3 class="chart-title muted">Followers</h3>
+          <h3 class="chart-title muted">{{ 'accountAnalytics.audience.followers' | transloco }}</h3>
           <div class="tiles">
             <div class="tile">
-              <span class="tile-label muted">Effective followers</span>
+              <span class="tile-label muted">{{
+                'accountAnalytics.audience.effectiveFollowers' | transloco
+              }}</span>
               <span class="tile-value"
                 >{{ r.complete ? '' : '~' }}{{ fmt(r.effective)
-                }}<small class="tile-sub muted"
-                  >{{ r.effectiveRatePct }}% of {{ fmt(r.total) }}</small
-                ></span
+                }}<small class="tile-sub muted">{{
+                  'accountAnalytics.pctOf'
+                    | transloco: { pct: r.effectiveRatePct, total: fmt(r.total) }
+                }}</small></span
               >
             </div>
             <div class="tile">
-              <span class="tile-label muted">Zombie followers</span>
+              <span class="tile-label muted">{{
+                'accountAnalytics.audience.zombieFollowers' | transloco
+              }}</span>
               <span class="tile-value"
                 >{{ r.complete ? '' : '~' }}{{ fmt(r.estimatedZombies)
-                }}<small class="tile-sub muted">{{ r.zombieRatePct }}% zombie rate</small></span
+                }}<small class="tile-sub muted">{{
+                  'accountAnalytics.zombieRate' | transloco: { pct: r.zombieRatePct }
+                }}</small></span
               >
             </div>
             <div class="tile">
-              <span class="tile-label muted">Dormant</span>
+              <span class="tile-label muted">{{
+                'accountAnalytics.audience.dormant' | transloco
+              }}</span>
               <span class="tile-value"
                 >{{ fmt(r.dormant)
-                }}<small class="tile-sub muted">of {{ fmt(r.scanned) }} read</small></span
+                }}<small class="tile-sub muted">{{
+                  'accountAnalytics.ofScannedRead' | transloco: { scanned: fmt(r.scanned) }
+                }}</small></span
               >
             </div>
             <div class="tile">
-              <span class="tile-label muted">Low-cadence</span>
+              <span class="tile-label muted">{{
+                'accountAnalytics.audience.lowCadence' | transloco
+              }}</span>
               <span class="tile-value"
-                >{{ fmt(r.lowCadence) }}<small class="tile-sub muted">drizzlers</small></span
+                >{{ fmt(r.lowCadence)
+                }}<small class="tile-sub muted">{{
+                  'accountAnalytics.audience.drizzlers' | transloco
+                }}</small></span
               >
             </div>
           </div>
         }
         <button type="button" class="btn btn-outline btn-sm" (click)="openAudienceDialog()">
-          Scan again
+          {{ 'accountAnalytics.audience.scanAgain' | transloco }}
         </button>
       } @else {
         <p class="muted small">
-          A follower count includes everyone who ever clicked follow. This walks the list and works
-          out how many are still posting — the only thing on this page that costs more than a few
-          requests, so it asks first.
+          {{ 'accountAnalytics.audience.explainCta' | transloco }}
         </p>
         <button type="button" class="btn btn-outline" (click)="openAudienceDialog()">
-          Get effective friends/followers
+          {{ 'accountAnalytics.audience.cta' | transloco }}
         </button>
       }
     </section>
 
     @if (showWeekly() || showMonthly()) {
       <section class="section">
-        <h2>When they post</h2>
+        <h2>{{ 'accountAnalytics.whenTheyPost.heading' | transloco }}</h2>
         <p class="muted small">
-          Posting activity over time (posting times, not location). Estimated reach in each bucket.
+          {{ 'accountAnalytics.whenTheyPost.explain' | transloco }}
         </p>
 
         @if (showWeekly()) {
-          <h3 class="chart-title muted">By week</h3>
-          <div class="bars" role="img" [attr.aria-label]="words().Posts + ' per week'">
+          <h3 class="chart-title muted">{{ 'accountAnalytics.byWeek' | transloco }}</h3>
+          <div
+            class="bars"
+            role="img"
+            [attr.aria-label]="
+              'accountAnalytics.postsPerWeek.aria' | transloco: { posts: words().Posts }
+            "
+          >
             @for (b of weekly(); track b.startIso) {
               <div
                 class="bar-col"
                 [title]="
-                  b.label + ': ' + b.posts + ' ' + words().posts + ', ~' + fmt(b.reach) + ' reach'
+                  'accountAnalytics.barTitle'
+                    | transloco
+                      : {
+                          label: b.label,
+                          count: b.posts,
+                          posts: words().posts,
+                          reach: fmt(b.reach),
+                        }
                 "
               >
                 <div class="bar" [style.height.%]="(b.posts / weeklyPeak()) * 100"></div>
@@ -275,13 +349,26 @@
         }
 
         @if (showMonthly()) {
-          <h3 class="chart-title muted">By month</h3>
-          <div class="bars labelled" role="img" [attr.aria-label]="words().Posts + ' per month'">
+          <h3 class="chart-title muted">{{ 'accountAnalytics.byMonth' | transloco }}</h3>
+          <div
+            class="bars labelled"
+            role="img"
+            [attr.aria-label]="
+              'accountAnalytics.postsPerMonth.aria' | transloco: { posts: words().Posts }
+            "
+          >
             @for (b of monthly(); track b.startIso) {
               <div
                 class="bar-col"
                 [title]="
-                  b.label + ': ' + b.posts + ' ' + words().posts + ', ~' + fmt(b.reach) + ' reach'
+                  'accountAnalytics.barTitle'
+                    | transloco
+                      : {
+                          label: b.label,
+                          count: b.posts,
+                          posts: words().posts,
+                          reach: fmt(b.reach),
+                        }
                 "
               >
                 <div class="bar" [style.height.%]="(b.posts / monthlyPeak()) * 100"></div>
@@ -291,10 +378,22 @@
           </div>
         }
 
-        <h3 class="chart-title muted">By day of week</h3>
-        <div class="bars labelled" role="img" [attr.aria-label]="words().Posts + ' per weekday'">
+        <h3 class="chart-title muted">{{ 'accountAnalytics.byWeekday' | transloco }}</h3>
+        <div
+          class="bars labelled"
+          role="img"
+          [attr.aria-label]="
+            'accountAnalytics.postsPerWeekday.aria' | transloco: { posts: words().Posts }
+          "
+        >
           @for (d of weekdays(); track d.label) {
-            <div class="bar-col" [title]="d.label + ': ' + d.posts + ' ' + words().posts">
+            <div
+              class="bar-col"
+              [title]="
+                'accountAnalytics.weekdayBarTitle'
+                  | transloco: { label: d.label, count: d.posts, posts: words().posts }
+              "
+            >
               <div class="bar" [style.height.%]="(d.posts / weekdayPeak()) * 100"></div>
               <span class="bar-label muted">{{ d.label }}</span>
             </div>
@@ -304,14 +403,19 @@
     }
 
     <section class="section">
-      <h2>Languages</h2>
+      <h2>{{ 'accountAnalytics.languages.heading' | transloco }}</h2>
       <p class="muted small">
-        Inferred from the sample's text and each post's declared language — script, accents and
-        common words, not a full model. A rough read.
+        {{ 'accountAnalytics.languages.explain' | transloco }}
       </p>
       <div class="lang-list">
         @for (l of languages(); track l.lang) {
-          <div class="lang-row" [title]="langName(l.lang) + ' ~' + langPct(l.share) + '%'">
+          <div
+            class="lang-row"
+            [title]="
+              'accountAnalytics.langTitle'
+                | transloco: { lang: langName(l.lang), pct: langPct(l.share) }
+            "
+          >
             <span class="lang-name">{{ langName(l.lang) }}</span>
             <span class="lang-bar-track">
               <span class="lang-bar" [style.width.%]="langPct(l.share)"></span>
@@ -324,8 +428,8 @@
 
     @if (topFollower(); as fan) {
       <section class="section">
-        <h2>Top follower</h2>
-        <p class="muted small">The follower with the biggest audience of their own.</p>
+        <h2>{{ 'accountAnalytics.topFollower.heading' | transloco }}</h2>
+        <p class="muted small">{{ 'accountAnalytics.topFollower.explain' | transloco }}</p>
         <a class="fan" [routerLink]="['/accounts', fan.id]">
           <img
             class="fan-avatar"
@@ -338,24 +442,29 @@
             {{ fan.display_name || fan.username }}
             <small class="muted">&#64;{{ fan.acct }}</small>
           </span>
-          <span class="fan-count muted">{{ fmt(fan.followers_count) }} followers</span>
+          <span class="fan-count muted">{{
+            'accountAnalytics.followersCount' | transloco: { count: fmt(fan.followers_count) }
+          }}</span>
         </a>
       </section>
     }
 
     @if (topPartners().length) {
       <section class="section">
-        <h2>Talks to most</h2>
+        <h2>{{ 'accountAnalytics.talksToMost.heading' | transloco }}</h2>
         <p class="muted small">
-          Who they reply to most often in the sample — replies to themselves don't count.
+          {{ 'accountAnalytics.talksToMost.explain' | transloco }}
         </p>
         <ol class="counted">
           @for (p of topPartners(); track p.key) {
             <li class="counted-row">
               <a class="counted-label" [routerLink]="['/accounts', p.key]">{{ p.label }}</a>
-              <span class="counted-count muted"
-                >{{ p.count }} {{ p.count === 1 ? 'reply' : 'replies' }}</span
-              >
+              <span class="counted-count muted">{{
+                (p.count === 1
+                  ? 'accountAnalytics.replyCount.one'
+                  : 'accountAnalytics.replyCount.other'
+                ) | transloco: { count: p.count }
+              }}</span>
             </li>
           }
         </ol>
@@ -364,14 +473,16 @@
 
     @if (hasTopicData()) {
       <section class="section">
-        <h2>What they post about</h2>
+        <h2>{{ 'accountAnalytics.topics.heading' | transloco }}</h2>
         <p class="muted small">
-          Hashtags and link destinations across the sample, counted once per {{ words().post }}.
+          {{ 'accountAnalytics.hashtagsAndLinks' | transloco: { post: words().post } }}
         </p>
         <div class="topic-cols">
           @if (topTags().length) {
             <div class="topic-col">
-              <h3 class="chart-title muted">Top hashtags</h3>
+              <h3 class="chart-title muted">
+                {{ 'accountAnalytics.topics.topHashtags' | transloco }}
+              </h3>
               <ol class="counted">
                 @for (t of topTags(); track t.key) {
                   <li class="counted-row">
@@ -384,7 +495,9 @@
           }
           @if (topDomains().length) {
             <div class="topic-col">
-              <h3 class="chart-title muted">Top link domains</h3>
+              <h3 class="chart-title muted">
+                {{ 'accountAnalytics.topics.topLinkDomains' | transloco }}
+              </h3>
               <ol class="counted">
                 @for (d of topDomains(); track d.key) {
                   <li class="counted-row">
@@ -400,11 +513,11 @@
     }
 
     <section class="section">
-      <h2>Top posts</h2>
+      <h2>{{ 'accountAnalytics.topPosts.heading' | transloco }}</h2>
       @if (!topPosts().length) {
-        <p class="muted small">No engagement on recent posts yet.</p>
+        <p class="muted small">{{ 'accountAnalytics.topPosts.empty' | transloco }}</p>
       } @else {
-        <p class="muted small">Most engaged posts (favourites + boosts + replies).</p>
+        <p class="muted small">{{ 'accountAnalytics.topPosts.explain' | transloco }}</p>
         @for (s of topPosts(); track s.id; let i = $index) {
           <div class="top-post">
             <span class="rank" aria-hidden="true">{{ i + 1 }}</span>
@@ -418,11 +531,12 @@
 
     @if (heatmap().weeks.length) {
       <section class="section">
-        <h2>Posting calendar</h2>
+        <h2>{{ 'accountAnalytics.calendar.heading' | transloco }}</h2>
         <p class="muted small">
-          One square per day, darker means more posts. Covers only the
-          {{ heatmap().days }} days the sample spans — {{ heatmap().activeDays }} of them had posts.
-          Fetch more posts above to stretch it further back.
+          {{
+            'accountAnalytics.heatmapCaption'
+              | transloco: { days: heatmap().days, activeDays: heatmap().activeDays }
+          }}
         </p>
         <div class="lawn-scroll">
           <div class="lawn">
@@ -439,7 +553,10 @@
                       class="lawn-day"
                       [class]="'heat-' + day.level"
                       [title]="
-                        day.label + ': ' + day.posts + (day.posts === 1 ? ' post' : ' posts')
+                        (day.posts === 1
+                          ? 'accountAnalytics.dayTitle.one'
+                          : 'accountAnalytics.dayTitle.other'
+                        ) | transloco: { label: day.label, count: day.posts }
                       "
                     ></span>
                   }
@@ -449,12 +566,15 @@
           </div>
         </div>
         <div class="lawn-legend muted">
-          <span>Less</span>
+          <span>{{ 'accountAnalytics.less' | transloco }}</span>
           @for (level of heatLevels; track level) {
             <span class="lawn-day" [class]="'heat-' + level"></span>
           }
-          <span>More</span>
-          <span class="lawn-peak">Busiest day: {{ heatmap().peak }} {{ words().posts }}</span>
+          <span>{{ 'accountAnalytics.more' | transloco }}</span>
+          <span class="lawn-peak">{{
+            'accountAnalytics.busiestDay'
+              | transloco: { count: heatmap().peak, posts: words().posts }
+          }}</span>
         </div>
       </section>
     }

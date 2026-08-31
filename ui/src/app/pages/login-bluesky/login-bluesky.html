@@ -1,10 +1,9 @@
 <div class="bsky-wrap">
   <div class="bsky-card">
     <span class="bsky-badge" aria-hidden="true">🦋</span>
-    <h1 class="bsky-title">Sign in with Bluesky</h1>
+    <h1 class="bsky-title">{{ 'pages.loginBluesky.title' | transloco }}</h1>
     <p class="bsky-body muted">
-      Your Bluesky timeline becomes your home timeline in {{ brand }}. You can reply, like and
-      repost from here.
+      {{ 'pages.loginBluesky.intro' | transloco: { brand: brand } }}
     </p>
 
     <button
@@ -13,24 +12,25 @@
       [disabled]="working()"
       (click)="submitBluesky()"
     >
-      {{ working() ? 'Opening Bluesky…' : 'Continue with Bluesky' }}
+      {{
+        (working() ? 'pages.loginBluesky.openingBluesky' : 'pages.loginBluesky.continueWithBluesky')
+          | transloco
+      }}
     </button>
 
     <p class="bsky-oauth-note muted small">
-      Sign in on bsky.social with your email address or username, then approve access. Use your
-      account password there; Bluesky does not allow app passwords during OAuth. {{ brand }} never
-      sees your password.
+      {{ 'pages.loginBluesky.oauthNote' | transloco: { brand: brand } }}
     </p>
 
     <details class="bsky-advanced">
-      <summary>Use a specific handle, DID, or another PDS</summary>
+      <summary>{{ 'pages.loginBluesky.advancedSummary' | transloco }}</summary>
       <form class="bsky-form" (ngSubmit)="submit()">
         <label class="bsky-field">
-          <span class="bsky-label">Handle, DID, or PDS</span>
+          <span class="bsky-label">{{ 'pages.loginBluesky.handleLabel' | transloco }}</span>
           <input
             type="text"
             name="bskyHandle"
-            placeholder="you.bsky.social"
+            [placeholder]="'pages.loginBluesky.handlePlaceholder' | transloco"
             autocomplete="username"
             autocapitalize="none"
             spellcheck="false"
@@ -45,7 +45,12 @@
           type="submit"
           [disabled]="!handle().trim() || working()"
         >
-          {{ working() ? 'Opening provider…' : 'Continue with this account' }}
+          {{
+            (working()
+              ? 'pages.loginBluesky.openingProvider'
+              : 'pages.loginBluesky.continueWithAccount'
+            ) | transloco
+          }}
         </button>
       </form>
     </details>
@@ -57,35 +62,32 @@
       <!-- The one failure that looks like a wrong password but isn't: bsky.social
            is an entryway and cannot authenticate an account on someone else's PDS. -->
       <p class="bsky-hint muted small">
-        If you host your own PDS rather than using Bluesky's, signing in that way isn't supported
-        yet — this form authenticates against bsky.social.
+        {{ 'pages.loginBluesky.selfHostedHint' | transloco }}
       </p>
     }
 
     <details class="bsky-compat">
-      <summary>My PDS does not support OAuth yet</summary>
+      <summary>{{ 'pages.loginBluesky.compatSummary' | transloco }}</summary>
       <!-- App passwords are retained only as an explicit compatibility path. -->
       <div class="bsky-appword">
         <p>
-          Use an <strong>app password</strong>, never your real Bluesky password. Make one at
+          {{ 'pages.loginBluesky.appPasswordIntro' | transloco }}
           <a
             href="https://bsky.app/settings/app-passwords"
             target="_blank"
             rel="noopener noreferrer"
-            >bsky.app → Settings → Privacy and security → App Passwords</a
+            >{{ 'pages.loginBluesky.appPasswordLinkText' | transloco }}</a
           >.
         </p>
-        <p class="muted small">
-          Tick <em>“Allow access to your direct messages”</em> if you want Bluesky DMs in Chat.
-        </p>
+        <p class="muted small" [innerHTML]="'pages.loginBluesky.dmTickHint' | transloco"></p>
       </div>
       <form class="bsky-form" (ngSubmit)="submitAppPassword()">
         <label class="bsky-field">
-          <span class="bsky-label">App password</span>
+          <span class="bsky-label">{{ 'pages.loginBluesky.appPasswordLabel' | transloco }}</span>
           <input
             type="password"
             name="bskyAppPassword"
-            placeholder="xxxx-xxxx-xxxx-xxxx"
+            [placeholder]="'pages.loginBluesky.appPasswordPlaceholder' | transloco"
             autocomplete="off"
             [ngModel]="appPassword()"
             (ngModelChange)="appPassword.set($event)"
@@ -97,17 +99,20 @@
           type="submit"
           [disabled]="!handle().trim() || !appPassword() || working()"
         >
-          {{ working() ? 'Signing in…' : 'Use app password' }}
+          {{
+            (working() ? 'pages.loginBluesky.signingIn' : 'pages.loginBluesky.useAppPassword')
+              | transloco
+          }}
         </button>
       </form>
     </details>
 
     <p class="bsky-out small">
-      <a routerLink="/login">Use a different network</a> ·
+      <a routerLink="/login">{{ 'pages.loginBluesky.useDifferentNetwork' | transloco }}</a> ·
       <!-- `/anonymous`, not `/`: this visitor has already been asked whether they
            want to sign in and is answering "no" right now. `/` would seed the
            preview and ask them the same question over again. -->
-      <a routerLink="/anonymous">Look around without an account</a>
+      <a routerLink="/anonymous">{{ 'pages.loginBluesky.lookAround' | transloco }}</a>
     </p>
   </div>
 </div>

@@ -1,4 +1,5 @@
 import { Component, HostListener, computed, inject, input, output, signal } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Auth } from '../auth';
 import { SessionTeardown } from '../session-teardown';
 import { FocusTrap } from '../a11y/focus-trap';
@@ -28,9 +29,29 @@ export type LeaveChoice = 'leave' | 'anonymous-data' | 'all-data';
  * machine is also the person who most wants their follow list to survive the trip,
  * and making them choose between the two would push them toward keeping the data.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n leaveDialog.close: Close
+// i18n leaveDialog.leaveAnonymous: Leave Anonymous?
+// i18n leaveDialog.logOutOf: Log out of {{who}}?
+// i18n leaveDialog.whoAnonymous: Anonymous
+// i18n leaveDialog.whoThisAccount: this account
+// i18n leaveDialog.returnToLogin: Return to the login page
+// i18n leaveDialog.stayAnonymous: Your follows, lists and settings stay in this browser.
+// i18n leaveDialog.stayBluesky: Your Bluesky account stays saved in this browser, so signing back in is one click.
+// i18n leaveDialog.stayDefault: Your saved accounts and settings stay in this browser.
+// i18n leaveDialog.deleteAnonymousThenLeave: Delete anonymous data, then leave
+// i18n leaveDialog.deleteAnonymousDetail: Follows, local lists, saved posts and followed hashtags from browsing without an account. Any signed-in accounts you have saved are kept.
+// i18n leaveDialog.removeAllThenLeave: Remove all browser data, then leave
+// i18n leaveDialog.removeAllDetailBluesky: Your saved Bluesky sign-in, plus every other saved account, connection and setting. Your Bluesky account itself is untouched — but you'll need your app password to return. This can't be undone.
+// i18n leaveDialog.removeAllDetailDefault: Everything above, plus every saved account, connection and setting. This can't be undone.
+// i18n leaveDialog.backupDownloaded: Backup downloaded
+// i18n leaveDialog.downloadFirst: Download my data first
+// i18n leaveDialog.cancel: Cancel
+// i18n leaveDialog.backupNote: The backup holds your follows, lists, saved posts and settings. It never includes passwords or access tokens — you will sign in again on a new browser.
+// i18n leaveDialog.backupError: Couldn't build a backup file. You can still leave.
 @Component({
   selector: 'app-leave-dialog',
-  imports: [FocusTrap],
+  imports: [FocusTrap, TranslocoPipe],
   templateUrl: './leave-dialog.html',
   styleUrl: './leave-dialog.css',
 })
@@ -38,6 +59,7 @@ export class LeaveDialog {
   private auth = inject(Auth);
   private teardown = inject(SessionTeardown);
   private diagnostics = inject(PageDiagnostics);
+  private transloco = inject(TranslocoService);
 
   readonly closed = output<void>();
   /** Emitted once the teardown has run; the shell owns the navigation and reload. */
@@ -67,10 +89,12 @@ export class LeaveDialog {
 
   protected who = computed(() => {
     if (this.isAnonymous()) {
-      return 'Anonymous';
+      return this.transloco.translate<string>('leaveDialog.whoAnonymous');
     }
     const account = this.auth.account();
-    return account?.username ? `@${account.username}` : 'this account';
+    return account?.username
+      ? `@${account.username}`
+      : this.transloco.translate<string>('leaveDialog.whoThisAccount');
   });
 
   /**
@@ -100,7 +124,7 @@ export class LeaveDialog {
     } catch (error: unknown) {
       this.diagnostics.error('Leave', 'backup:error', error);
       // Never block the exit on a failed backup: the user asked to leave.
-      this.exportError.set("Couldn't build a backup file. You can still leave.");
+      this.exportError.set(this.transloco.translate<string>('leaveDialog.backupError'));
     }
   }
 
