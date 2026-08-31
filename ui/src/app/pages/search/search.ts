@@ -168,6 +168,195 @@ const SEARCH_TIMEOUT_MS = 20000;
 // i18n pages.search.explain.maximumCalls: Maximum: {{count}} calls
 // i18n pages.search.explain.usedCalls: Used: {{count}} calls
 // i18n pages.search.explain.truncated: Truncated: {{count}} hashtag(s) dropped to stay within the API-call budget.
+// i18n pages.search.network.mastodon: Mastodon
+// i18n pages.search.network.bluesky: 🦋 Bluesky
+// i18n pages.search.type.accounts: Accounts
+// i18n pages.search.type.posts: Posts
+// i18n pages.search.type.hashtags: Hashtags
+// i18n pages.search.type.web: Search the web ↗
+// i18n pages.search.action.search: Search
+// i18n pages.search.action.searchHelperTitle: Describe what you’re looking for and get a query
+// i18n pages.search.action.helpMeSearch: Help me search
+// i18n pages.search.action.syntaxHelp: Search syntax help
+// i18n pages.search.action.syntax: Syntax?
+// i18n pages.search.action.advanced: Advanced ▾
+// i18n pages.search.saved.summary: Saved ({{count}})
+// i18n pages.search.saved.empty: No saved searches yet.
+// i18n pages.search.saved.anonymous: · anon
+// i18n pages.search.saved.deleteLabel: Delete saved search
+// i18n pages.search.saved.deleteTitle: Delete
+// i18n pages.search.action.save: Save
+// i18n pages.search.action.linkCopied: Link copied!
+// i18n pages.search.action.share: Share
+// i18n pages.search.recent.label: Recent
+// i18n pages.search.recent.searchAgain: Search {{query}} again
+// i18n pages.search.recent.posts: posts
+// i18n pages.search.recent.people: people
+// i18n pages.search.recent.tags: tags
+// i18n pages.search.recent.forget: Forget
+// i18n pages.search.recent.forgetLabel: Forget search {{query}}
+// i18n pages.search.recent.clear: Clear
+// i18n pages.search.blueskyNeedsLink: Bluesky post search needs a linked account —
+// i18n pages.search.linkOneInSettings: link one in Settings
+// i18n pages.search.accountSearchWorksWithoutLink: Account search works without one. Hashtags are Mastodon-only: Bluesky has no hashtag index to search, only a hashtag filter inside post search.
+// i18n pages.search.hashtagsMastodonOnly: Hashtags are Mastodon-only — Bluesky has no hashtag index, only a hashtag filter inside post search (set it under Advanced).
+// i18n pages.search.server.searching: 🔍 Searching: <strong>{{host}}</strong>
+// i18n pages.search.server.publicResults: Public results only. Feeds and profiles still come from {{host}}.
+// i18n pages.search.server.browsing: The server you are browsing. Point search elsewhere if it has search turned off.
+// i18n pages.search.server.own: Your own server.
+// i18n pages.search.server.instructions: Some servers turn off search for logged-out visitors. Point search at a server that allows it — feeds, profiles and your account stay on your own server.
+// i18n pages.search.server.checking: Checking…
+// i18n pages.search.server.use: Use this server
+// i18n pages.search.server.useOwn: Use my own server
+// i18n pages.search.server.testing: Running a test search…
+// i18n pages.search.server.tagsOnly: ⚠ Account search works here ({{accounts}} matched), but a hashtag search comes back with the tag name and no posts — post searches will look empty.
+// i18n pages.search.server.noPosts: ⚠ Account search works here ({{accounts}} matched), but this server returned no posts for a common hashtag — post searches will keep coming back empty.
+// i18n pages.search.server.works: ✓ Anonymous search works — the test queries matched {{accounts}} accounts and {{posts}} {{postWord}}.
+// i18n pages.search.server.noIndex: This server answered but returned nothing for a well-known account. Its search index is empty or restricted — not usable as a search server.
+// i18n pages.search.server.authRequired: This server requires a login for search, so it can’t be used anonymously.
+// i18n pages.search.server.unreachable: Couldn’t reach that server’s search API.
+// i18n pages.search.savedNamePlaceholder: Name this search
+// i18n pages.search.savedNameLabel: Saved search name
+// i18n pages.search.action.cancel: Cancel
+// i18n pages.search.budget.maximumApiCalls: Maximum API calls
+// i18n pages.search.budget.onePage: 1 page (~40 posts)
+// i18n pages.search.budget.twoPages: 2 pages (~80 posts)
+// i18n pages.search.budget.threePages: 3 pages (~120 posts)
+// i18n pages.search.budget.fivePages: 5 pages (~200 posts)
+// i18n pages.search.budget.tenPages: 10 pages (~400 posts)
+// i18n pages.search.anonymousPostSearch: Anonymous post search uses hashtags — Mastodon doesn’t offer anonymous full-text search. Fields below are applied to loaded results.
+// i18n pages.search.fullTextSignIn: Sign in
+// i18n pages.search.fullTextPostSearch: for full-text post search.
+// i18n pages.search.field.exactPhrase: Exact phrase
+// i18n pages.search.field.excludeWords: Exclude these words
+// i18n pages.search.field.postedBy: Posted by
+// i18n pages.search.field.postedAfter: Posted after
+// i18n pages.search.field.postedBefore: Posted before
+// i18n pages.search.field.language: Language
+// i18n pages.search.field.content: Content
+// i18n pages.search.field.replies: Replies
+// i18n pages.search.field.includeReplies: Include replies
+// i18n pages.search.field.repliesOnly: Replies only
+// i18n pages.search.field.excludeReplies: Exclude replies
+// i18n pages.search.field.sensitive: Sensitive
+// i18n pages.search.field.include: Include
+// i18n pages.search.field.sensitiveOnly: Sensitive only
+// i18n pages.search.field.excludeSensitive: Exclude sensitive
+// i18n pages.search.field.searchIn: Search in
+// i18n pages.search.field.publicAndLibrary: Public and my library
+// i18n pages.search.field.public: Public
+// i18n pages.search.field.myLibrary: My library
+// i18n pages.search.accountSearchDescription: Mastodon’s account search only matches names &amp; bios. “What they post” runs a post search and condenses the results down to the people who posted — good for finding, say, economists rather than one specific person.
+// i18n pages.search.accountField.matchOn: Match on
+// i18n pages.search.accountField.followers: Followers
+// i18n pages.search.accountField.following: Following
+// i18n pages.search.accountField.posts: Posts
+// i18n pages.search.accountField.minimum: min
+// i18n pages.search.accountField.maximum: max
+// i18n pages.search.accountField.minimumFollowers: Minimum followers
+// i18n pages.search.accountField.maximumFollowers: Maximum followers
+// i18n pages.search.accountField.minimumFollowing: Minimum following
+// i18n pages.search.accountField.maximumFollowing: Maximum following
+// i18n pages.search.accountField.minimumPosts: Minimum {{posts}}
+// i18n pages.search.accountField.maximumPosts: Maximum {{posts}}
+// i18n pages.search.accountRangesDescription: Ranges filter the loaded results — e.g. cap followers to skip celebrities, or require a minimum post count to skip dead accounts.
+// i18n pages.search.refine.filterPeople: Filter these people
+// i18n pages.search.refine.filterLoadedPeople: Filter loaded people
+// i18n pages.search.refine.sort: Sort
+// i18n pages.search.refine.sortPeople: Sort people
+// i18n pages.search.refine.filterFollowState: Filter by follow state
+// i18n pages.search.refine.everyone: Everyone
+// i18n pages.search.refine.iFollow: I follow
+// i18n pages.search.refine.onlyFollowing: Only accounts you already follow
+// i18n pages.search.refine.notYet: Not yet
+// i18n pages.search.refine.notFollowing: Only accounts you don’t follow yet
+// i18n pages.search.refine.activityMissing: {{count}} of these arrived without a last-post date.
+// i18n pages.search.refine.checkActivity: Check activity
+// i18n pages.search.refine.oneApiCall: (1 API call)
+// i18n pages.search.refine.checkingActivity: Checking activity…
+// i18n pages.search.refine.loadedPeople: Refine loaded people
+// i18n pages.search.refine.basedOnAccounts: Based on {{count}} loaded accounts
+// i18n pages.search.refine.clearFilters: Clear filters
+// i18n pages.search.refine.showingAccounts: Showing {{shown}} of {{loaded}} loaded accounts
+// i18n pages.search.refine.apiCallsUsed: {{used}} of up to {{budget}} API calls used
+// i18n pages.search.refine.loadedPosts: Refine loaded results
+// i18n pages.search.refine.basedOnPosts: Based on {{count}} loaded posts
+// i18n pages.search.refine.excludeAuthor: Exclude author (this search)
+// i18n pages.search.refine.muted: muted
+// i18n pages.search.refine.muteEverywhereTitle: Mute this account everywhere, not just in this search
+// i18n pages.search.refine.muteEverywhere: Mute everywhere
+// i18n pages.search.refine.showExcluded: Show excluded authors again
+// i18n pages.search.refine.collapseRepeated: Collapse repeated
+// i18n pages.search.refine.collapseHint: Folds near-identical
+// i18n pages.search.refine.collapseHintSuffix: from the same author into one row.
+// i18n pages.search.refine.clearFiltersPosts: Clear filters
+// i18n pages.search.refine.showingPosts: Showing {{shown}} of {{loaded}} loaded posts
+// i18n pages.search.refine.hiddenFrom: {{count}} hidden from
+// i18n pages.search.refine.excluded: excluded
+// i18n pages.search.refine.collapsed: near-identical collapsed
+// i18n pages.search.refine.apiCalls: of up to {{budget}} API calls used
+// i18n pages.search.refine.onlyLeft: Only {{count}} left after excluding. The excluded {{accountWord}} made up most of what was loaded — fetching more will find posts from other people.
+// i18n pages.search.results.loading: Loading…
+// i18n pages.search.results.loadMorePosts: Load more posts
+// i18n pages.search.results.people: People
+// i18n pages.search.results.noPeople: No people found.
+// i18n pages.search.results.directory: Or
+// i18n pages.search.results.browseDirectory: browse the server directory
+// i18n pages.search.results.insteadOfSearching: instead of searching.
+// i18n pages.search.results.searchingPosts: · searching posts…
+// i18n pages.search.results.searchingSlow: (this server is being slow)
+// i18n pages.search.results.noLoadedPeople: No loaded people match the current filters.
+// i18n pages.search.results.searching: Searching…
+// i18n pages.search.results.stillWaiting: This server is being slow. Still waiting…
+// i18n pages.search.results.timedOut: This search took too long and was stopped. The server may be down or overloaded.
+// i18n pages.search.results.tryAgain: Try again
+// i18n pages.search.results.noLoadedPosts: No loaded posts match the current filters.
+// i18n pages.search.results.hashtags: Hashtags
+// i18n pages.search.results.posts: Posts
+// i18n pages.search.results.repeatNote.one: +{{count}} near-identical {{postWord}} from this author
+// i18n pages.search.results.repeatNote.other: +{{count}} near-identical {{postsWord}} from this author
+// i18n pages.search.results.hide: Hide
+// i18n pages.search.results.show: Show
+// i18n pages.search.results.loadedSummary: Loaded {{count}} {{postsWord}} in {{calls}} API calls. Facet counts and filters apply only to these posts.
+// i18n pages.search.results.noResults: No results.
+// i18n pages.search.results.nobodyPosted: Nobody has posted <strong>#{{tag}}</strong> yet.
+// i18n pages.search.results.noPostsForTag: No posts for <strong>#{{tag}}</strong> came back — and this server can’t search posts, so there may be some we can’t see.
+// i18n pages.search.results.followingTag: Following it puts new posts in your home timeline as they appear.
+// i18n pages.search.results.viewAndFollow: View and follow #{{tag}}
+// i18n pages.search.results.trendingHashtags: Trending hashtags
+// i18n pages.search.results.recentUses: {{count}} recent uses
+// i18n pages.search.results.chooseSearchServer: Choose a search server
+// i18n pages.search.searchSaved: Search saved.
+// i18n pages.search.enrichError: Could not load activity dates. Try again.
+// i18n pages.search.placeholder.accounts: Search {{network}} accounts
+// i18n pages.search.placeholder.hashtags: Search {{network}} hashtags
+// i18n pages.search.placeholder.posts: Search {{network}} {{posts}}
+// i18n pages.search.accountSource.bioAndPosts: Bio and posts
+// i18n pages.search.accountSource.nameAndBioOnly: Name &amp; bio only
+// i18n pages.search.accountSource.whatTheyPost: What they post
+// i18n pages.search.language.any: Any language
+// i18n pages.search.language.english: English
+// i18n pages.search.language.spanish: Spanish
+// i18n pages.search.language.french: French
+// i18n pages.search.language.german: German
+// i18n pages.search.language.portuguese: Portuguese
+// i18n pages.search.language.japanese: Japanese
+// i18n pages.search.language.chinese: Chinese
+// i18n pages.search.content.any: Any
+// i18n pages.search.content.media: Has media
+// i18n pages.search.content.image: Image
+// i18n pages.search.content.video: Video
+// i18n pages.search.content.audio: Audio
+// i18n pages.search.content.poll: Poll
+// i18n pages.search.content.link: Link or preview
+// i18n pages.search.content.text: Text only
+// i18n pages.search.empty.checking: Checking whether search is available on {{host}}…
+// i18n pages.search.empty.refusedAnonymous: {{host}} doesn’t allow search without an account. Pick a search server below to search from instead.
+// i18n pages.search.empty.refused: {{host}} refused this search. The server may restrict search, or your login may not have search permission.
+// i18n pages.search.empty.unreachable: Couldn’t reach {{host}} to check whether search is working. Your connection or the server may be having trouble.
+// i18n pages.search.empty.tagsOnly: {{host}} recognises the hashtag but won’t serve the posts behind it. A different search server would fix this.
+// i18n pages.search.empty.postsUnavailable: Post search isn’t available on {{host}}. It can find accounts, but returns no posts even for a common hashtag — anonymous full-text search is off on almost every server. A different search server would fix this.
+// i18n pages.search.empty.notWorking: Search doesn’t appear to be working on {{host}}. A different search server would fix this.
 
 @Component({
   selector: 'app-search',
@@ -319,26 +508,26 @@ export class Search implements OnInit, OnDestroy {
     const relevant = this.type() === 'accounts' ? ability.accounts : ability.statuses;
     switch (relevant) {
       case 'checking':
-        return `Checking whether search is available on ${host}…`;
+        return this.transloco.translate('pages.search.empty.checking', { host });
       case 'refused':
         return this.capabilities.active
-          ? `${host} doesn't allow search without an account. Pick a search server below to search from instead.`
-          : `${host} refused this search. The server may restrict search, or your login may not have search permission.`;
+          ? this.transloco.translate('pages.search.empty.refusedAnonymous', { host })
+          : this.transloco.translate('pages.search.empty.refused', { host });
       case 'unreachable':
-        return `Couldn't reach ${host} to check whether search is working. Your connection or the server may be having trouble.`;
+        return this.transloco.translate('pages.search.empty.unreachable', { host });
       case 'tags-only':
         // The strongest evidence there is: the server recognised the hashtag,
         // named it back, and handed over no posts. Nothing the user types will
         // change that, so say so instead of implying they should try harder.
-        return `${host} recognises the hashtag but won't serve the posts behind it. A different search server would fix this.`;
+        return this.transloco.translate('pages.search.empty.tagsOnly', { host });
       case 'empty':
         // Accounts and posts fail separately, so say which one is missing.
         if (this.type() === 'accounts') {
           return null; // An empty account index is indistinguishable from no match.
         }
         return ability.accounts === 'works'
-          ? `Post search isn't available on ${host}. It can find accounts, but returns no posts even for a common hashtag — anonymous full-text search is off on almost every server. A different search server would fix this.`
-          : `Search doesn't appear to be working on ${host}. A different search server would fix this.`;
+          ? this.transloco.translate('pages.search.empty.postsUnavailable', { host })
+          : this.transloco.translate('pages.search.empty.notWorking', { host });
       default:
         return null;
     }
@@ -556,14 +745,19 @@ export class Search implements OnInit, OnDestroy {
 
   /** What the shared box is searching right now, spelled out for the reader. */
   protected queryPlaceholder = computed(() => {
-    const network = this.blueskyMode() ? 'Bluesky' : 'Mastodon';
+    const network = this.blueskyMode()
+      ? this.transloco.translate('pages.search.network.bluesky')
+      : this.transloco.translate('pages.search.network.mastodon');
     switch (this.type()) {
       case 'accounts':
-        return `Search ${network} accounts`;
+        return this.transloco.translate('pages.search.placeholder.accounts', { network });
       case 'hashtags':
-        return `Search ${network} hashtags`;
+        return this.transloco.translate('pages.search.placeholder.hashtags', { network });
       default:
-        return `Search ${network} ${this.words().posts}`;
+        return this.transloco.translate('pages.search.placeholder.posts', {
+          network,
+          posts: this.words().posts,
+        });
     }
   });
 
@@ -781,12 +975,15 @@ export class Search implements OnInit, OnDestroy {
   // Budget = how many large (40-post) pages to pull eagerly on Search, so
   // client-side faceting has a real corpus to work with. Raising it after a
   // search tops up with the extra pages; "Load more" keeps going past it.
-  protected readonly budgetOptions: { value: number; label: string }[] = [
-    { value: 1, label: '1 page (~40 posts)' },
-    { value: 2, label: '2 pages (~80 posts)' },
-    { value: 3, label: '3 pages (~120 posts)' },
-    { value: 5, label: '5 pages (~200 posts)' },
-    { value: 10, label: '10 pages (~400 posts)' },
+  protected readonly budgetOptions: {
+    value: number;
+    label: string;
+  }[] = [
+    { value: 1, label: 'pages.search.budget.onePage' },
+    { value: 2, label: 'pages.search.budget.twoPages' },
+    { value: 3, label: 'pages.search.budget.threePages' },
+    { value: 5, label: 'pages.search.budget.fivePages' },
+    { value: 10, label: 'pages.search.budget.tenPages' },
   ];
   protected apiBudget = signal<number>(DEFAULT_BUDGET_SIMPLE);
   protected callsUsed = signal(0);
@@ -857,9 +1054,9 @@ export class Search implements OnInit, OnDestroy {
   protected statusesMax = signal('');
 
   protected readonly accountSources: { value: AccountSearchSource; label: string }[] = [
-    { value: 'both', label: 'Bio and posts' },
-    { value: 'bio', label: 'Name & bio only' },
-    { value: 'posts', label: 'What they post' },
+    { value: 'both', label: 'pages.search.accountSource.bioAndPosts' },
+    { value: 'bio', label: 'pages.search.accountSource.nameAndBioOnly' },
+    { value: 'posts', label: 'pages.search.accountSource.whatTheyPost' },
   ];
 
   /** Parse a numeric-field string into a bound, ignoring blanks/garbage. */
@@ -897,25 +1094,25 @@ export class Search implements OnInit, OnDestroy {
 
   /** Bundled language options (no API call — spec §6.4). */
   protected readonly languages = [
-    { code: '', label: 'Any language' },
-    { code: 'en', label: 'English' },
-    { code: 'es', label: 'Spanish' },
-    { code: 'fr', label: 'French' },
-    { code: 'de', label: 'German' },
-    { code: 'pt', label: 'Portuguese' },
-    { code: 'ja', label: 'Japanese' },
-    { code: 'zh', label: 'Chinese' },
+    { code: '', label: 'pages.search.language.any' },
+    { code: 'en', label: 'pages.search.language.english' },
+    { code: 'es', label: 'pages.search.language.spanish' },
+    { code: 'fr', label: 'pages.search.language.french' },
+    { code: 'de', label: 'pages.search.language.german' },
+    { code: 'pt', label: 'pages.search.language.portuguese' },
+    { code: 'ja', label: 'pages.search.language.japanese' },
+    { code: 'zh', label: 'pages.search.language.chinese' },
   ];
 
   protected readonly contentTypes: { value: PostContentType; label: string }[] = [
-    { value: 'any', label: 'Any' },
-    { value: 'media', label: 'Has media' },
-    { value: 'image', label: 'Image' },
-    { value: 'video', label: 'Video' },
-    { value: 'audio', label: 'Audio' },
-    { value: 'poll', label: 'Poll' },
-    { value: 'link', label: 'Link or preview' },
-    { value: 'text', label: 'Text only' },
+    { value: 'any', label: 'pages.search.content.any' },
+    { value: 'media', label: 'pages.search.content.media' },
+    { value: 'image', label: 'pages.search.content.image' },
+    { value: 'video', label: 'pages.search.content.video' },
+    { value: 'audio', label: 'pages.search.content.audio' },
+    { value: 'poll', label: 'pages.search.content.poll' },
+    { value: 'link', label: 'pages.search.content.link' },
+    { value: 'text', label: 'pages.search.content.text' },
   ];
 
   /** The advanced form assembled into the rich criteria object. */
@@ -1837,7 +2034,9 @@ export class Search implements OnInit, OnDestroy {
       this.pendingBlueskySave.set(null);
       this.saveDialogOpen.set(false);
       this.diagnostics.info('Search', 'user:save', { ok: result.ok, network: 'bluesky' });
-      this.savedNotice.set(result.ok ? 'Search saved.' : result.error);
+      this.savedNotice.set(
+        result.ok ? this.transloco.translate('pages.search.searchSaved') : result.error,
+      );
       setTimeout(() => this.savedNotice.set(''), 3000);
       return;
     }
@@ -1851,7 +2050,9 @@ export class Search implements OnInit, OnDestroy {
       ok: result.ok,
       target: this.currentSearch().target,
     });
-    this.savedNotice.set(result.ok ? 'Search saved.' : result.error);
+    this.savedNotice.set(
+      result.ok ? this.transloco.translate('pages.search.searchSaved') : result.error,
+    );
     setTimeout(() => this.savedNotice.set(''), 3000);
   }
 
@@ -2508,7 +2709,7 @@ export class Search implements OnInit, OnDestroy {
         },
         error: () => {
           this.enrichingActivity.set(false);
-          this.enrichError.set('Could not load activity dates. Try again.');
+          this.enrichError.set(this.transloco.translate('pages.search.enrichError'));
         },
       });
   }

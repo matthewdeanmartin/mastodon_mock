@@ -26,10 +26,10 @@
     <select
       [ngModel]="networkSelection()"
       (ngModelChange)="onNetworkSelect($event)"
-      aria-label="Search network"
+      [attr.aria-label]="'pages.search.network.ariaLabel' | transloco"
     >
-      <option value="mastodon">Mastodon</option>
-      <option value="bluesky">🦋 Bluesky</option>
+      <option value="mastodon">{{ 'pages.search.network.mastodon' | transloco }}</option>
+      <option value="bluesky">{{ 'pages.search.network.bluesky' | transloco }}</option>
     </select>
     <!-- The engines are an action, not a fourth type: picking one opens a tab and
          the select snaps back to the real type (see onTypeSelect). -->
@@ -37,27 +37,33 @@
       #typeSelect
       [ngModel]="type()"
       (ngModelChange)="onTypeSelect($event, typeSelect)"
-      aria-label="Search for"
+      [attr.aria-label]="'pages.search.type.ariaLabel' | transloco"
     >
-      <option value="accounts">Accounts</option>
+      <option value="accounts">{{ 'pages.search.type.accounts' | transloco }}</option>
       <!-- Disabled rather than hidden: an option that vanishes reads as a bug,
            while a disabled one with a reason beneath the bar teaches what this
            network can do. See typeUnavailable. -->
-      <option value="statuses" [disabled]="typeUnavailable('statuses')">Posts</option>
-      <option value="hashtags" [disabled]="typeUnavailable('hashtags')">Hashtags</option>
-      <optgroup label="Search the web ↗">
+      <option value="statuses" [disabled]="typeUnavailable('statuses')">
+        {{ 'pages.search.type.posts' | transloco }}
+      </option>
+      <option value="hashtags" [disabled]="typeUnavailable('hashtags')">
+        {{ 'pages.search.type.hashtags' | transloco }}
+      </option>
+      <optgroup [label]="'pages.search.type.web' | transloco">
         @for (e of webEngines; track e.id) {
           <option [value]="e.id">{{ e.label }}</option>
         }
       </optgroup>
     </select>
-    <button class="btn" [disabled]="searchDisabled()" (click)="run()">Search</button>
+    <button class="btn" [disabled]="searchDisabled()" (click)="run()">
+      {{ 'pages.search.action.search' | transloco }}
+    </button>
     @if (canUseSearchHelper()) {
       <button
         class="btn btn-outline"
         type="button"
-        title="Describe what you're looking for and get a query"
-        aria-label="Help me search"
+        [title]="'pages.search.action.searchHelperTitle' | transloco"
+        [attr.aria-label]="'pages.search.action.helpMeSearch' | transloco"
         (click)="searchHelperOpen.set(true)"
       >
         🤖
@@ -66,11 +72,11 @@
     <button
       class="btn btn-outline"
       type="button"
-      [title]="'What you can type in a ' + words().post + ' search'"
-      aria-label="Search syntax help"
+      [title]="'pages.search.action.syntaxHelpTitle' | transloco: { post: words().post }"
+      [attr.aria-label]="'pages.search.action.syntaxHelp' | transloco"
       (click)="syntaxHelpOpen.set(true)"
     >
-      Syntax?
+      {{ 'pages.search.action.syntax' | transloco }}
     </button>
     @if (type() === 'statuses' || type() === 'accounts') {
       <button
@@ -79,7 +85,7 @@
         (click)="toggleAdvanced()"
         [attr.aria-expanded]="advancedOpen()"
       >
-        Advanced ▾
+        {{ 'pages.search.action.advanced' | transloco }}
       </button>
     }
 
@@ -91,11 +97,11 @@
     <!-- Saved searches: a dropdown of stored definitions to re-run. -->
     <details class="saved-menu" [open]="savedMenuOpen()">
       <summary class="btn btn-outline" (click)="savedMenuOpen.set(!savedMenuOpen())">
-        Saved ({{ saved.count() }}) ▾
+        {{ 'pages.search.saved.summary' | transloco: { count: saved.count() } }} ▾
       </summary>
       <div class="saved-panel">
         @if (!saved.count()) {
-          <p class="muted small saved-empty">No saved searches yet.</p>
+          <p class="muted small saved-empty">{{ 'pages.search.saved.empty' | transloco }}</p>
         }
         @for (item of saved.all(); track item.id) {
           <div class="saved-row">
@@ -105,14 +111,14 @@
                 <span class="muted small">· 🦋</span>
               }
               @if (!item.authenticated) {
-                <span class="muted small">· anon</span>
+                <span class="muted small">{{ 'pages.search.saved.anonymous' | transloco }}</span>
               }
             </button>
             <button
               class="saved-del"
               (click)="saved.delete(item.id)"
-              aria-label="Delete saved search"
-              title="Delete"
+              [attr.aria-label]="'pages.search.saved.deleteLabel' | transloco"
+              [title]="'pages.search.saved.deleteTitle' | transloco"
             >
               ✕
             </button>
@@ -129,18 +135,18 @@
         [disabled]="saved.atLimit()"
         (click)="blueskyPanel()?.requestSave()"
       >
-        Save
+        {{ 'pages.search.action.save' | transloco }}
       </button>
     } @else {
       <button class="btn btn-outline" [disabled]="saved.atLimit()" (click)="openSaveDialog()">
-        Save
+        {{ 'pages.search.action.save' | transloco }}
       </button>
     }
     <!-- Share works on both now. Bluesky's criteria round-trip through the query
          box (see bluesky-query-serializer), so a Bluesky link carries its
          operators in `q` rather than needing the Mastodon param encoding. -->
     <button class="btn btn-outline" (click)="share()">
-      {{ shareCopied() ? 'Link copied!' : 'Share' }}
+      {{ (shareCopied() ? 'pages.search.action.linkCopied' : 'pages.search.action.share') | transloco }}
     </button>
   </div>
 
@@ -157,35 +163,41 @@
        moment the list answers. -->
   @if (recent.count() && !query().trim() && !results() && !loadedAccountCount()) {
     <div class="recent-row">
-      <span class="muted small recent-label">Recent</span>
+      <span class="muted small recent-label">{{ 'pages.search.recent.label' | transloco }}</span>
       @for (item of recent.all(); track item.query + item.type) {
         <span class="recent-chip">
           <button
             type="button"
             class="recent-run"
             (click)="runRecent(item)"
-            [title]="'Search ' + item.query + ' again'"
+            [title]="'pages.search.recent.searchAgain' | transloco: { query: item.query }"
           >
             {{ item.query }}
             <!-- Which tab it ran on. The same words as posts and as accounts are
                  different searches, so the list keeps them apart and has to say
                  which is which. -->
             <span class="muted recent-type">{{
-              item.type === 'statuses' ? 'posts' : item.type === 'accounts' ? 'people' : 'tags'
+              item.type === 'statuses'
+                ? ('pages.search.recent.posts' | transloco)
+                : item.type === 'accounts'
+                  ? ('pages.search.recent.people' | transloco)
+                  : ('pages.search.recent.tags' | transloco)
             }}</span>
           </button>
           <button
             type="button"
             class="recent-del"
             (click)="forgetRecent(item, $event)"
-            [attr.aria-label]="'Forget search ' + item.query"
-            title="Forget"
+            [attr.aria-label]="'pages.search.recent.forgetLabel' | transloco: { query: item.query }"
+            [title]="'pages.search.recent.forget' | transloco"
           >
             ✕
           </button>
         </span>
       }
-      <button type="button" class="recent-clear muted small" (click)="recent.clear()">Clear</button>
+      <button type="button" class="recent-clear muted small" (click)="recent.clear()">
+        {{ 'pages.search.recent.clear' | transloco }}
+      </button>
     </div>
   }
 

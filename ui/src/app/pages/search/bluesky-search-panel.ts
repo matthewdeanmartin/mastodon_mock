@@ -9,7 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { catchError, map, merge, of, toArray } from 'rxjs';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
@@ -69,9 +69,122 @@ import {
 } from '../../providers/bluesky/bluesky-account-search';
 import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
 import { BlueskyGraph } from '../../providers/bluesky/bluesky-graph';
-import { AnonymousFollows } from '../../providers/anonymous/anonymous-follows';
+import {
+  ANONYMOUS_FOLLOW_LIMIT,
+  AnonymousFollows,
+} from '../../providers/anonymous/anonymous-follows';
 import { Auth } from '../../auth';
 import { Terminology } from '../../terminology';
+
+// i18n pages.search.bluesky.maximumApiCalls: Maximum API calls
+// i18n pages.search.bluesky.budget: {{count}} page (~{{items}})
+// i18n pages.search.bluesky.advancedPostsDescription: These are Bluesky's own filters. There is deliberately no media/reply/sensitive filter — <code>searchPosts</code> has no such parameter, and offering one would mean silently ignoring it. Everything here can also be typed straight into the search box.
+// i18n pages.search.bluesky.postedBy: Posted by
+// i18n pages.search.bluesky.mentioning: Mentioning
+// i18n pages.search.bluesky.hashtags: Hashtags
+// i18n pages.search.bluesky.postsWithAllTags: Posts with <em>all</em> of these tags.
+// i18n pages.search.bluesky.linksToDomain: Links to domain
+// i18n pages.search.bluesky.linksToUrl: Links to URL
+// i18n pages.search.bluesky.postedAfter: Posted after
+// i18n pages.search.bluesky.postedBefore: Posted before
+// i18n pages.search.bluesky.language: Language
+// i18n pages.search.bluesky.ranking: Ranking
+// i18n pages.search.bluesky.latest: Latest
+// i18n pages.search.bluesky.top: Top
+// i18n pages.search.bluesky.minimumEngagement: Minimum engagement
+// i18n pages.search.bluesky.loadedPostsNoNewSearch: Filters loaded {{postType}} — no new search
+// i18n pages.search.bluesky.likes: Likes
+// i18n pages.search.bluesky.minimumLikes: Minimum likes
+// i18n pages.search.bluesky.reposts: Reposts
+// i18n pages.search.bluesky.minimumBoosts: Minimum {{boostType}}
+// i18n pages.search.bluesky.replies: Replies
+// i18n pages.search.bluesky.minimumReplies: Minimum replies
+// i18n pages.search.bluesky.any: any
+// i18n pages.search.bluesky.applyAndSearch: Apply &amp; search
+// i18n pages.search.bluesky.clear: Clear
+// i18n pages.search.bluesky.advancedAccountsDescription: Bluesky's account search takes no parameters beyond the words themselves, so these gates filter the people it already found rather than changing the search.
+// i18n pages.search.bluesky.followers: Followers
+// i18n pages.search.bluesky.following: Following
+// i18n pages.search.bluesky.posts: Posts
+// i18n pages.search.bluesky.minimumFollowers: Minimum followers
+// i18n pages.search.bluesky.maximumFollowers: Maximum followers
+// i18n pages.search.bluesky.minimumFollowing: Minimum following
+// i18n pages.search.bluesky.maximumFollowing: Maximum following
+// i18n pages.search.bluesky.minimumPosts: Minimum {{postType}}
+// i18n pages.search.bluesky.maximumPosts: Maximum {{postType}}
+// i18n pages.search.bluesky.min: min
+// i18n pages.search.bluesky.max: max
+// i18n pages.search.bluesky.sentToBluesky: Sent to Bluesky — changing this needs a new search
+// i18n pages.search.bluesky.filterThesePeople: Filter these people
+// i18n pages.search.bluesky.filterTheseResults: Filter these results
+// i18n pages.search.bluesky.filterLoadedResults: Filter loaded results
+// i18n pages.search.bluesky.sort: Sort
+// i18n pages.search.bluesky.sortPeople: Sort people
+// i18n pages.search.bluesky.sortPosts: Sort {{postType}}
+// i18n pages.search.bluesky.groupBy: Group by
+// i18n pages.search.bluesky.none: None
+// i18n pages.search.bluesky.author: Author
+// i18n pages.search.bluesky.date: Date
+// i18n pages.search.bluesky.refineLoadedResults: Refine loaded results
+// i18n pages.search.bluesky.basedOnLoadedPosts: Based on {{count}} loaded {{postType}}
+// i18n pages.search.bluesky.basedOnLoadedAccounts: Based on {{count}} loaded accounts
+// i18n pages.search.bluesky.excludeAuthor: Exclude author (this search)
+// i18n pages.search.bluesky.muted: muted
+// i18n pages.search.bluesky.muteEverywhereTitle: Mute this account everywhere, not just in this search
+// i18n pages.search.bluesky.muteEverywhere: Mute everywhere
+// i18n pages.search.bluesky.showExcludedAuthors: Show excluded authors again
+// i18n pages.search.bluesky.collapseRepeated: Collapse repeated {{postType}}
+// i18n pages.search.bluesky.collapseNote: Folds near-identical {{postType}} from the same author into one row.
+// i18n pages.search.bluesky.blueskyOnly: Bluesky only
+// i18n pages.search.bluesky.lastActive: Last active
+// i18n pages.search.bluesky.activityNote: Bluesky profiles don't include a last-post date. Checking costs one API call per account.
+// i18n pages.search.bluesky.checkActivity: Check activity for {{count}} {{accountWord}}
+// i18n pages.search.bluesky.account: account
+// i18n pages.search.bluesky.accounts: accounts
+// i18n pages.search.bluesky.checkingActivity: Checking activity…
+// i18n pages.search.bluesky.clearFilters: Clear filters
+// i18n pages.search.bluesky.showingAccounts: Showing {{visible}} of {{loaded}} loaded accounts
+// i18n pages.search.bluesky.showingPosts: Showing {{visible}} of {{loaded}} loaded {{postType}}
+// i18n pages.search.bluesky.hiddenExcludedAccounts: {{hidden}} hidden from {{excluded}} excluded {{accountWord}}
+// i18n pages.search.bluesky.collapsedRepeats: {{count}} near-identical {{postType}} collapsed
+// i18n pages.search.bluesky.aboutMatches: about {{count}} matches on Bluesky
+// i18n pages.search.bluesky.apiCallsUsed: {{used}} of up to {{maximum}} API calls used
+// i18n pages.search.bluesky.moreActivityCalls: {{count}} more for the activity check
+// i18n pages.search.bluesky.searching: Searching Bluesky…
+// i18n pages.search.bluesky.searchingTitle: Searching Bluesky
+// i18n pages.search.bluesky.accountSearchIntro: Matches handles, display names and bios. Works without a linked account.
+// i18n pages.search.bluesky.postSearchIntro: Type words to match, or use Bluesky's operators: <code>from:handle</code>, <code>mentions:handle</code>, <code>#tag</code>, <code>lang:en</code>, <code>domain:github.com</code>, <code>since:2026-01-01</code>, <code>until:2026-07-01</code>. Press <strong>Syntax?</strong> above for the full list, or fill in <strong>Advanced</strong> and the box will show you the query it built.
+// i18n pages.search.bluesky.noAccountsMatched: No Bluesky accounts matched that search.
+// i18n pages.search.bluesky.noPostsMatched: No Bluesky {{postType}} matched that search.
+// i18n pages.search.bluesky.people: People
+// i18n pages.search.bluesky.followUnavailable: Searching without a linked account: follow state is not available.
+// i18n pages.search.bluesky.anonymousFollowing: Following saves to this browser and feeds your Home timeline — no Bluesky account needed.
+// i18n pages.search.bluesky.noLoadedPeople: No loaded people match the current filters.
+// i18n pages.search.bluesky.loading: Loading…
+// i18n pages.search.bluesky.loadMore: Load more
+// i18n pages.search.bluesky.loadedAccounts: Loaded {{count}} accounts in {{calls}} API calls.
+// i18n pages.search.bluesky.repeatNote: +{{count}} near-identical {{postType}} from this author
+// i18n pages.search.bluesky.hide: Hide
+// i18n pages.search.bluesky.show: Show
+// i18n pages.search.bluesky.noLoadedPosts: No loaded {{postType}} match the current filters.
+// i18n pages.search.bluesky.loadedPosts: Loaded {{count}} {{postType}} in {{calls}} API calls. Facet counts and filters apply only to these {{postType}}.
+// i18n pages.search.bluesky.stoppedAfter: Stopped after {{calls}} API calls. Run the search again to load more.
+// i18n pages.search.bluesky.followUpdateFailed: Could not update the follow on Bluesky.
+// i18n pages.search.bluesky.activityCheckFailed: Could not check activity. Try again.
+// i18n pages.search.bluesky.searchFailed: Bluesky search failed.
+// i18n pages.search.bluesky.anonymousFollowLimit: Anonymous accounts can follow up to {{limit}} accounts.
+// i18n pages.search.bluesky.sortRelevance: Relevance
+// i18n pages.search.bluesky.sortNewest: Newest
+// i18n pages.search.bluesky.sortOldest: Oldest
+// i18n pages.search.bluesky.sortMostLiked: Most liked
+// i18n pages.search.bluesky.sortMostReposted: Most reposted
+// i18n pages.search.bluesky.sortMostReplies: Most replies
+// i18n pages.search.bluesky.sortMostFollowers: Most followers
+// i18n pages.search.bluesky.sortMostFollowing: Most following
+// i18n pages.search.bluesky.sortMostPosts: Most posts
+// i18n pages.search.bluesky.sortName: Name (A–Z)
+// i18n pages.search.bluesky.sortMostMatching: Most matching posts
+// i18n pages.search.bluesky.sortRecentlyActive: Recently active
 
 /**
  * Which Bluesky index the panel is querying.
@@ -220,11 +333,15 @@ export class BlueskySearchPanel {
   protected session = inject(BlueskySession);
   private auth = inject(Auth);
   private anonymousFollows = inject(AnonymousFollows);
+  private transloco = inject(TranslocoService);
 
   /** Account results, hydrated with counts. */
   protected accounts = signal<BlueskyAccountResult[]>([]);
   protected accountSort = signal<AccountSortKey>('relevance');
-  protected readonly accountSorts = ACCOUNT_SORTS;
+  protected readonly accountSorts = ACCOUNT_SORTS.map((sort) => ({
+    ...sort,
+    label: this.accountSortLabel(sort.value),
+  }));
   private accountCursor = signal<string | null>(null);
   /** DIDs with a follow/unfollow in flight. */
   protected followBusy = signal<Set<string>>(new Set());
@@ -296,7 +413,11 @@ export class BlueskySearchPanel {
       } else {
         const result = this.anonymousFollows.follow(account, '');
         if (!result.ok) {
-          this.error.set(result.error);
+          this.error.set(
+            this.transloco.translate<string>('pages.search.bluesky.anonymousFollowLimit', {
+              limit: ANONYMOUS_FOLLOW_LIMIT,
+            }),
+          );
         }
       }
       // Re-read: the cards render from `accounts()`, and nothing else changed.
@@ -321,7 +442,9 @@ export class BlueskySearchPanel {
         this.clearFollowBusy(account.id);
         this.diagnostics.error('Search', 'bsky:follow-failed', error, { did });
         this.error.set(
-          error instanceof Error ? error.message : 'Could not update the follow on Bluesky.',
+          error instanceof Error
+            ? error.message
+            : this.transloco.translate<string>('pages.search.bluesky.followUpdateFailed'),
         );
       },
     });
@@ -387,11 +510,11 @@ export class BlueskySearchPanel {
   // exactly one request per page for both targets — there is no anonymous
   // fan-out to account for — so `callsUsed` is simply the page count.
   protected readonly budgetOptions: { value: number; label: string }[] = [
-    { value: 1, label: '1 page (~25)' },
-    { value: 2, label: '2 pages (~50)' },
-    { value: 3, label: '3 pages (~75)' },
-    { value: 5, label: '5 pages (~125)' },
-    { value: 10, label: '10 pages (~250)' },
+    { value: 1, label: 'pages.search.bluesky.budget' },
+    { value: 2, label: 'pages.search.bluesky.budget' },
+    { value: 3, label: 'pages.search.bluesky.budget' },
+    { value: 5, label: 'pages.search.bluesky.budget' },
+    { value: 10, label: 'pages.search.bluesky.budget' },
   ];
   protected apiBudget = signal(BLUESKY_DEFAULT_BUDGET);
   protected callsUsed = signal(0);
@@ -512,7 +635,9 @@ export class BlueskySearchPanel {
         },
         error: () => {
           this.scanningActivity.set(false);
-          this.scanError.set('Could not check activity. Try again.');
+          this.scanError.set(
+            this.transloco.translate<string>('pages.search.bluesky.activityCheckFailed'),
+          );
         },
       });
   }
@@ -556,12 +681,33 @@ export class BlueskySearchPanel {
    * would fork `search-sort.ts` for nothing.
    */
   protected readonly statusSorts = STATUS_SORTS.map((sort) => {
-    const relabelled: Record<string, string> = {
-      favourites: 'pages.search.sort.mostLiked',
-      reblogs: 'pages.search.sort.mostReposted',
-    };
-    return relabelled[sort.value] ? { ...sort, label: relabelled[sort.value] } : sort;
+    return { ...sort, label: this.statusSortLabel(sort.value) };
   });
+
+  private statusSortLabel(value: StatusSortKey): string {
+    const labels: Record<StatusSortKey, string> = {
+      relevance: 'pages.search.bluesky.sortRelevance',
+      newest: 'pages.search.bluesky.sortNewest',
+      oldest: 'pages.search.bluesky.sortOldest',
+      favourites: 'pages.search.bluesky.sortMostLiked',
+      reblogs: 'pages.search.bluesky.sortMostReposted',
+      replies: 'pages.search.bluesky.sortMostReplies',
+    };
+    return labels[value];
+  }
+
+  private accountSortLabel(value: AccountSortKey): string {
+    const labels: Record<AccountSortKey, string> = {
+      relevance: 'pages.search.bluesky.sortRelevance',
+      followers: 'pages.search.bluesky.sortMostFollowers',
+      following: 'pages.search.bluesky.sortMostFollowing',
+      posts: 'pages.search.bluesky.sortMostPosts',
+      name: 'pages.search.bluesky.sortName',
+      matches: 'pages.search.bluesky.sortMostMatching',
+      active: 'pages.search.bluesky.sortRecentlyActive',
+    };
+    return labels[value];
+  }
 
   protected exhausted = computed(() =>
     this.target() === 'accounts'
@@ -1018,6 +1164,10 @@ export class BlueskySearchPanel {
     this.cursor.set(null);
     this.accountCursor.set(null);
     this.diagnostics.error('Search', event, error);
-    this.error.set(error instanceof Error ? error.message : 'Bluesky search failed.');
+    this.error.set(
+      error instanceof Error
+        ? error.message
+        : this.transloco.translate<string>('pages.search.bluesky.searchFailed'),
+    );
   }
 }
