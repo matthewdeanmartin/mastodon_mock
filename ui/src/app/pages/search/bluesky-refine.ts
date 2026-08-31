@@ -112,7 +112,7 @@ export type BlueskyAccountFacetKind =
 
 export interface BlueskyAccountFacet {
   kind: BlueskyAccountFacetKind;
-  label: string;
+  labelKey: string;
   values: AccountFacetValue[];
   /** Show every row rather than truncating — see `AccountFacet.showAll`. */
   showAll?: boolean;
@@ -259,12 +259,12 @@ export function buildBlueskyAccountFacets(
   const facets: BlueskyAccountFacet[] = [];
   const push = (
     kind: BlueskyAccountFacetKind,
-    label: string,
+    labelKey: string,
     values: AccountFacetValue[],
     extra: Partial<BlueskyAccountFacet> = {},
   ): void => {
     if (values.length > 1) {
-      facets.push({ kind, label, values, ...extra });
+      facets.push({ kind, labelKey, values, ...extra });
     }
   };
 
@@ -368,7 +368,7 @@ export type BlueskyPostFacetKind =
 
 export interface BlueskyPostFacet {
   kind: BlueskyPostFacetKind;
-  label: string;
+  labelKey: string;
   values: AccountFacetValue[];
   hint?: string;
 }
@@ -502,12 +502,12 @@ export function buildBlueskyPostFacets(statuses: readonly Status[]): BlueskyPost
   const facets: BlueskyPostFacet[] = [];
   const push = (
     kind: BlueskyPostFacetKind,
-    label: string,
+    labelKey: string,
     values: AccountFacetValue[],
     hint?: string,
   ): void => {
     if (values.length > 1) {
-      facets.push({ kind, label, values, ...(hint ? { hint } : {}) });
+      facets.push({ kind, labelKey, values, ...(hint ? { hint } : {}) });
     }
   };
 
@@ -558,7 +558,7 @@ export function buildBlueskyPostFacets(statuses: readonly Status[]): BlueskyPost
     'pages.search.facet.linksTo',
     tallyStatuses(statuses, (s) => {
       const d = linkDomain(bskyRef(s)?.externalUri);
-      return d ? { value: d, labelKey: d } : null;
+      return d ? { value: d, labelKey: null, text: d } : null;
     }),
   );
 

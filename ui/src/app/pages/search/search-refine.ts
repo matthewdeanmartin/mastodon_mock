@@ -73,8 +73,10 @@ export function filterLoaded(statuses: Status[], text: string): Status[] {
 export interface FacetValue {
   /** Stable key used for selection/matching (e.g. a language code or domain). */
   value: string;
-  /** Human label shown in the UI. */
-  label: string;
+  /** The key to translate, or null when the label is result data. */
+  labelKey: string | null;
+  /** Literal result data, set only when `labelKey` is null. */
+  text?: string;
   /** Number of currently-loaded results matching this value. */
   count: number;
 }
@@ -83,7 +85,7 @@ export type FacetKind = 'language' | 'author' | 'media' | 'replies' | 'sensitive
 
 export interface Facet {
   kind: FacetKind;
-  label: string;
+  labelKey: string;
   values: FacetValue[];
 }
 
@@ -125,8 +127,8 @@ export function buildFacets(statuses: Status[]): Facet[] {
 
   const tally = (
     kind: FacetKind,
-    label: string,
-    pick: (s: Status) => { value: string; label: string } | null,
+    labelKey: string,
+    pick: (s: Status) => { value: string; labelKey: string | null; text?: string } | null,
   ): void => {
     const counts = new Map<string, FacetValue>();
     for (const s of statuses) {
@@ -138,40 +140,48 @@ export function buildFacets(statuses: Status[]): Facet[] {
       if (existing) {
         existing.count++;
       } else {
-        counts.set(hit.value, { value: hit.value, label: hit.label, count: 1 });
+        counts.set(hit.value, {
+          value: hit.value,
+          labelKey: hit.labelKey,
+          text: hit.text,
+          count: 1,
+        });
       }
     }
     const values = [...counts.values()].sort((a, b) => b.count - a.count);
     // Omit facets that don't discriminate (§11.2).
     if (values.length > 1) {
-      facets.push({ kind, label, values });
+      facets.push({ kind, labelKey, values });
     }
   };
 
   tally('language', 'pages.search.facet.language', (s) =>
-    s.language ? { value: s.language, label: s.language.toUpperCase() } : null,
+    s.language ? { value: s.language, labelKey: null, text: s.language.toUpperCase() } : null,
   );
   tally('author', 'pages.search.facet.author', (s) => ({
     value: s.account.acct,
-    label: s.account.display_name || s.account.acct,
+    labelKey: null,
+    text: s.account.display_name || s.account.acct,
   }));
   tally('media', 'pages.search.facet.media', (s) => {
     const k = mediaKind(s);
-    return { value: k, label: mediaKindLabel(k) };
+    return { value: k, labelKey: mediaKindLabel(k) };
   });
   tally('replies', 'pages.search.facet.type', (s) =>
     s.in_reply_to_id
-      ? { value: 'reply', label: 'pages.search.facet.replies' }
-      : { value: 'original', label: 'pages.search.facet.originalPosts' },
+      ? { value: 'reply', labelKey: 'pages.search.facet.replies' }
+      : { value: 'original', labelKey: 'pages.search.facet.originalPosts' },
   );
   tally('sensitive', 'pages.search.facet.sensitive', (s) =>
     s.sensitive
-      ? { value: 'yes', label: 'pages.search.facet.sensitive' }
-      : { value: 'no', label: 'pages.search.facet.notSensitive' },
+      ? { value: 'yes', labelKey: 'pages.search.facet.sensitive' }
+      : { value: 'no', labelKey: 'pages.search.facet.notSensitive' },
   );
   tally('domain', 'pages.search.facet.authorDomain', (s) => {
     const d = acctDomain(s.account.acct);
-    return d ? { value: d, label: d } : { value: 'local', label: 'pages.search.facet.thisServer' };
+    return d
+      ? { value: d, labelKey: null, text: d }
+      : { value: 'local', labelKey: 'pages.search.facet.thisServer' };
   });
 
   return facets;
