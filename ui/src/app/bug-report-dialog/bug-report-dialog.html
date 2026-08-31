@@ -55,9 +55,7 @@
     }
 
     <button class="link-btn" type="button" (click)="showDetails.set(!showDetails())">
-      {{
-        (showDetails() ? 'bugReport.toggle.hide' : 'bugReport.toggle.show') | transloco
-      }}
+      {{ (showDetails() ? 'bugReport.toggle.hide' : 'bugReport.toggle.show') | transloco }}
     </button>
     @if (showDetails()) {
       <pre class="preview">{{ preview() }}</pre>

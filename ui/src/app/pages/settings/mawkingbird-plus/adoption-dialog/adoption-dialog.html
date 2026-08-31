@@ -16,10 +16,10 @@
     being asked. A reader who cannot tell whether they are looking at a problem
     or a routine choice assumes the worst and cancels.
   -->
-  <h2 id="ad-title">You have {{ noun() }} here and on your account</h2>
+  <h2 id="ad-title">{{ 'settings.plus.adoption.title' | transloco: { noun: noun() } }}</h2>
 
   <p class="ad-summary">
-    You're switching this on for the first time, so there are two sets to combine: the
+    {{ 'settings.plus.adoption.summaryLead' | transloco }}
     <strong>{{ localCount() }}</strong> {{ 'settings.plus.adoption.counts.a' | transloco }}
     <strong>{{ remoteCount() }}</strong> {{ 'settings.plus.adoption.counts.b' | transloco }}
   </p>

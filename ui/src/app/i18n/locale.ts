@@ -37,7 +37,7 @@ import { isCanaryBuild, isTestBuild } from '../build-flavor';
  * the settings control all read from this list.
  */
 export const PRODUCTION_LOCALES = ['en'] as const;
-export const IN_PROGRESS_LOCALES = ['de'] as const;
+export const IN_PROGRESS_LOCALES = ['de', 'fr'] as const;
 
 export type SupportedLocale =
   | (typeof PRODUCTION_LOCALES)[number]
@@ -75,7 +75,7 @@ export const FALLBACK_LOCALE: SupportedLocale = 'en';
 export const LOCALE_ENDONYMS: Record<string, string> = {
   en: 'English',
   de: 'Deutsch (in Arbeit)',
-  fr: 'Français',
+  fr: 'Français (en cours)',
   es: 'Español',
   sv: 'Svenska',
   fi: 'Suomi',

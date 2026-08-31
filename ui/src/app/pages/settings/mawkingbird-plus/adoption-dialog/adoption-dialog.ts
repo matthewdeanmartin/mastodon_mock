@@ -22,6 +22,8 @@ import type { AdoptableCollection } from '../../../../providers/account/collecti
  * The consequence is stated in the copy, not buried: on a merge, anything held
  * in both places keeps the account's version.
  */
+// i18n settings.plus.adoption.title: You have {{noun}} here and on your account
+// i18n settings.plus.adoption.summaryLead: You're switching this on for the first time, so there are two sets to combine: the
 // i18n settings.plus.adoption.cancel: Cancel
 // i18n settings.plus.adoption.counts.a: already in this browser, and the
 // i18n settings.plus.adoption.counts.b: saved to your Mawkingbird account by another device.

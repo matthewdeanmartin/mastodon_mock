@@ -26,8 +26,12 @@
       </div>
       <div class="actions">
         @if (status() === 'pending') {
-          <button class="op" (click)="approve(a)">{{ 'adminAccounts.actions.approve' | transloco }}</button>
-          <button class="op warn" (click)="reject(a)">{{ 'adminAccounts.actions.reject' | transloco }}</button>
+          <button class="op" (click)="approve(a)">
+            {{ 'adminAccounts.actions.approve' | transloco }}
+          </button>
+          <button class="op warn" (click)="reject(a)">
+            {{ 'adminAccounts.actions.reject' | transloco }}
+          </button>
         }
         <button class="op" (click)="unsensitive(a)">
           {{ 'adminAccounts.actions.unsensitive' | transloco }}
@@ -51,13 +55,17 @@
           </button>
         }
         @if (a.disabled) {
-          <button class="op" (click)="enable(a)">{{ 'adminAccounts.actions.enable' | transloco }}</button>
+          <button class="op" (click)="enable(a)">
+            {{ 'adminAccounts.actions.enable' | transloco }}
+          </button>
         } @else {
           <button class="op warn" (click)="moderate(a, 'disable')">
             {{ 'adminAccounts.actions.disable' | transloco }}
           </button>
         }
-        <button class="op warn" (click)="remove(a)">{{ 'adminAccounts.actions.delete' | transloco }}</button>
+        <button class="op warn" (click)="remove(a)">
+          {{ 'adminAccounts.actions.delete' | transloco }}
+        </button>
       </div>
     </div>
   }

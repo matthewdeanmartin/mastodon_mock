@@ -139,6 +139,29 @@ Reported but not fatal: incomplete coverage, `max` overflow, a value identical t
 Then **look at it** — force the locale in the footer language picker and walk the main surfaces.
 That is the only review that catches a button whose text no longer fits.
 
+### Trap-word sweep
+
+`make i18n` passes at 100% coverage on a file that says the unblock-everyone
+button *blocks the amnesty*. Coverage counts keys; it cannot read. Before calling
+a language done, grep the finished file for the **wrong sense** of each glossary
+term — the sense a translator reaches for when the word arrives without context.
+In German this found real bugs on two separate passes:
+
+| Wrong rendering | What it actually says | Should be |
+|---|---|---|
+| `Anruf` | a telephone call | API-Aufruf / Anfrage |
+| `verfolgen` | to stalk or pursue | folgen (social sense) |
+| `Zeitleiste` | a chronology widget | Timeline |
+| `Licht` | illumination | Hell (the theme) |
+| `Pasten` | pasta | Pastes |
+| `Wal` | a literal whale | Fail Whale, kept |
+| `Girokonto` | a bank current account | aktuelles Konto |
+
+Build the same table for your language from the glossary above: for each term,
+write down the sense you do **not** mean, then search for it. A hit is not proof
+of a bug — `Analyseskript` is a legitimate "script" — but every hit deserves a
+look, and the cost of the sweep is minutes.
+
 To make the picker available while translating, add the locale to `IN_PROGRESS_LOCALES` in
 `ui/src/app/i18n/locale.ts`. It will appear on `/test/` and `/canary/`, with missing keys falling
 back to English. Move it to `PRODUCTION_LOCALES` only after the locale's work order is complete,

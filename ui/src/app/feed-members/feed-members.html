@@ -19,14 +19,20 @@
       }}
     </span>
     @if (paged()) {
-      <span class="sample-controls" role="group" [attr.aria-label]="'feedMembers.sample.sizeAria' | transloco">
+      <span
+        class="sample-controls"
+        role="group"
+        [attr.aria-label]="'feedMembers.sample.sizeAria' | transloco"
+      >
         <span>{{ 'feedMembers.sample.label' | transloco }}</span>
         @for (n of sampleChoices; track n) {
           <button
             type="button"
             class="sample-btn"
             [class.active]="sampleSize() === n"
-            [title]="'feedMembers.sample.optionTitle' | transloco: { count: n, posts: words().posts }"
+            [title]="
+              'feedMembers.sample.optionTitle' | transloco: { count: n, posts: words().posts }
+            "
             (click)="setSampleSize(n)"
           >
             {{ n }}
