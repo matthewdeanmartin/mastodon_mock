@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { MockApi } from '../../mock-api';
 import { Auth } from '../../auth';
@@ -54,16 +55,20 @@ const ACCESS_SCOPES: Record<OAuthAccess, string> = {
   read: 'read',
 };
 
-const ACCESS_CHOICES: { value: OAuthAccess; label: string; hint: string }[] = [
+// i18n pages.login.access.full.label: Full access
+// i18n pages.login.access.full.hint: Read, post, reply, follow — everything the app does.
+// i18n pages.login.access.read.label: Read only
+// i18n pages.login.access.read.hint: Browse and read. This app won't be able to post, reply or follow as you.
+const ACCESS_CHOICES: { value: OAuthAccess; labelKey: string; hintKey: string }[] = [
   {
     value: 'full',
-    label: 'Full access',
-    hint: 'Read, post, reply, follow — everything the app does.',
+    labelKey: 'pages.login.access.full.label',
+    hintKey: 'pages.login.access.full.hint',
   },
   {
     value: 'read',
-    label: 'Read only',
-    hint: "Browse and read. This app won't be able to post, reply or follow as you.",
+    labelKey: 'pages.login.access.read.label',
+    hintKey: 'pages.login.access.read.hint',
   },
 ];
 
@@ -77,9 +82,76 @@ const DOMAIN_RE =
 /** How the current server-combo text relates to a reachable instance. */
 type ServerStatus = 'idle' | 'checking' | 'ok' | 'degraded' | 'unreachable';
 
+// i18n pages.login.tagline: An opinionated client for Mastodon and the Fediverse.
+// i18n pages.login.tabs.signin: Sign in / Register
+// i18n pages.login.tabs.mockLogin: Mock Login
+// i18n pages.login.tabs.mockInit: Mock Init
+// i18n pages.login.notSure.question: Not sure which server?
+// i18n pages.login.notSure.browse: Browse the full directory on joinmastodon.org ↗
+// i18n pages.login.server.label: Your server
+// i18n pages.login.server.placeholder: mastodon.social — or type any instance
+// i18n pages.login.server.thisServerMock: This server (mock)
+// i18n pages.login.server.checking: Checking {{server}}…
+// i18n pages.login.server.connected: ✓ Connected to <strong>{{server}}</strong>
+// i18n pages.login.server.degraded: ⚠ Connected to <strong>{{server}}</strong>, but {{media}} is blocked or down. Images will not load.
+// i18n pages.login.server.itsMediaServer: its media server
+// i18n pages.login.server.useAnyway: Use anyway
+// i18n pages.login.server.unreachable: ⚠ Can’t reach {{server}}. The server may be offline or blocked.
+// i18n pages.login.server.tryAgain: Try again
+// i18n pages.login.server.talkingTo: Talking to
+// i18n pages.login.server.thisServer: this server
+// i18n pages.login.server.pickAServer: — pick a server —
+// i18n pages.login.path.haveAccount: I have an account
+// i18n pages.login.path.pickServerFirst: Pick your server above, then sign in.
+// i18n pages.login.oauth.accessLegend: How much access to grant this app
+// i18n pages.login.oauth.redirecting: Redirecting…
+// i18n pages.login.oauth.signInWith: Sign in with {{server}}
+// i18n pages.login.oauth.ownPage: You'll log in on {{server}}'s own page and come straight back.
+// i18n pages.login.oauth.neverSeePassword: We never see your password.
+// i18n pages.login.token.summary: I have an API token
+// i18n pages.login.token.paste: For developers and power users: paste an access token for {{server}} (create one under Preferences → Development on your server).
+// i18n pages.login.token.placeholder: access token
+// i18n pages.login.token.checking: Checking…
+// i18n pages.login.token.submit: Sign in with token
+// i18n pages.login.path.newHere: I'm new here
+// i18n pages.login.confirm.sentTo: Almost there! We sent a confirmation email to
+// i18n pages.login.confirm.clickLink: . Click the link to verify your address.
+// i18n pages.login.confirm.verifying: Verifying…
+// i18n pages.login.confirm.verify: ✉ Verify email & continue
+// i18n pages.login.confirm.mockNote.a: (This mock doesn't really send mail — clicking just exercises
+// i18n pages.login.confirm.mockNote.b: and signs you in.)
+// i18n pages.login.register.usernamePlaceholder: username
+// i18n pages.login.register.emailPlaceholder: email
+// i18n pages.login.register.passwordPlaceholder: password
+// i18n pages.login.register.agree: I agree to the server rules
+// i18n pages.login.register.creating: Creating…
+// i18n pages.login.register.submit: Sign up on the mock
+// i18n pages.login.signup.createOn: Create an account on {{server}} →
+// i18n pages.login.anon.heading: Browse anonymously
+// i18n pages.login.anon.continue: Continue anonymously
+// i18n pages.login.anon.tryIt: Try it without an account, using {{server}} for public data.
+// i18n pages.login.anon.findOne: Or let us find a working public server:
+// i18n pages.login.anon.findAWorkingServer: Find a working server
+// i18n pages.login.mock.intro: One-click sign-in as any local account — Twitter-style. Switch between them anytime from the avatar menu in the header.
+// i18n pages.login.mock.addRegular: + Regular user
+// i18n pages.login.mock.addAdmin: + Admin user
+// i18n pages.login.mock.refresh: refresh
+// i18n pages.login.mock.loginAs: Log in as @{{username}}
+// i18n pages.login.mock.adminBadge: admin
+// i18n pages.login.mock.empty: No accounts yet — generate one above or seed sample data.
+// i18n pages.login.seed.intro: Bulk-generate a throwaway cohort of accounts, statuses and relationships.
+// i18n pages.login.seed.preset.tiny: tiny (~100 posts)
+// i18n pages.login.seed.preset.small: small (~5k posts)
+// i18n pages.login.seed.preset.medium: medium (~100k posts)
+// i18n pages.login.seed.seeding: Seeding…
+// i18n pages.login.seed.submit: Seed sample data
+// i18n pages.login.seed.hint.a: After seeding, head to
+// i18n pages.login.seed.hint.b: to sign in as one of the new accounts.
+// i18n pages.login.privacy.checkbox: Count my page views
+// i18n pages.login.privacy.explain: Anonymous page counts only — which kinds of page get used, never which account, post or tag you looked at. Unchecking this means the analytics script is never loaded: nothing is fetched, counted or sent. You can change it later in Settings.
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, RouterLink, AppFooter, ServerDiscovery],
+  imports: [FormsModule, RouterLink, AppFooter, ServerDiscovery, TranslocoPipe],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })

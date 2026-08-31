@@ -5,14 +5,21 @@
 @if (showFollowNudge()) {
   <aside class="follow-nudge">
     <div class="nudge-copy">
-      <strong>Your timeline gets better with every follow.</strong>
+      <strong>{{ 'pages.home.nudge.title' | transloco }}</strong>
       <span class="muted">
-        You follow {{ followingCount() }} {{ followingCount() === 1 ? 'account' : 'accounts' }} —
-        import a follow list or browse directories to fill your feed.
+        {{
+          (followingCount() === 1 ? 'pages.home.nudge.follow.one' : 'pages.home.nudge.follow.other')
+            | transloco: { count: followingCount() }
+        }}
       </span>
     </div>
-    <a class="btn nudge-cta" routerLink="/find-friends">Find people</a>
-    <button class="nudge-dismiss" type="button" aria-label="Dismiss" (click)="dismissNudge()">
+    <a class="btn nudge-cta" routerLink="/find-friends">{{ 'pages.home.nudge.cta' | transloco }}</a>
+    <button
+      class="nudge-dismiss"
+      type="button"
+      [attr.aria-label]="'pages.home.nudge.dismiss' | transloco"
+      (click)="dismissNudge()"
+    >
       ✕
     </button>
   </aside>
@@ -23,9 +30,11 @@
     class="anonymous-login-post"
     routerLink="/login"
     (click)="auth.exitAnonymous()"
-    [aria-label]="'Login or create an account to ' + words().post + ' content, reply and more'"
+    [attr.aria-label]="'pages.home.anonPost.ariaLabel' | transloco: { post: words().post }"
   >
-    <div class="anonymous-login-post-label muted">📌 Pinned</div>
+    <div class="anonymous-login-post-label muted">
+      📌 {{ 'pages.home.anonPost.pinned' | transloco }}
+    </div>
     <div class="anonymous-login-post-body">
       <div class="anonymous-login-post-avatar" aria-hidden="true">M</div>
       <div class="anonymous-login-post-content">
@@ -33,7 +42,7 @@
           <strong>Mawkingbird</strong>
           <span class="muted">&#64;mawkingbird</span>
         </div>
-        <p>Login or create an account to post content, reply and more</p>
+        <p [innerHTML]="'pages.home.anonPost.ariaLabel' | transloco: { post: words().post }"></p>
       </div>
     </div>
   </a>
@@ -45,7 +54,9 @@
      Arriving with a draft skips all of it — that IS the deliberate publish step. -->
 @if (!fromDraft() && !openedDraft() && !miniComposerOpen()) {
   <div class="write-cta">
-    <button class="btn write-btn" type="button" (click)="startWriting()">✍ Write</button>
+    <button class="btn write-btn" type="button" (click)="startWriting()">
+      ✍ {{ 'pages.home.write.button' | transloco }}
+    </button>
     <!-- Under thoughtful posting there is no Quick post button and no note
          explaining its absence: the setting is the user's own choice, and
          narrating it back to them on every visit to Home is the app talking
@@ -53,7 +64,7 @@
          and the button says so. -->
     @if (offersMiniComposer()) {
       <button class="btn btn-outline write-btn" type="button" (click)="openMiniComposer()">
-        💬 Quick post
+        💬 {{ 'pages.home.write.quickPost' | transloco }}
       </button>
     }
   </div>
@@ -97,7 +108,11 @@
 <!-- FILTER: content narrowing for every presentation above. Like WHAT and HOW,
      this name stays in source rather than becoming another visible label. -->
 @if (!nothingFollowed()) {
-  <div class="home-filters" role="group" aria-label="Timeline filters">
+  <div
+    class="home-filters"
+    role="group"
+    [attr.aria-label]="'pages.home.filters.ariaLabel' | transloco"
+  >
     <button
       type="button"
       class="btn btn-outline btn-sm"
@@ -105,7 +120,7 @@
       [attr.aria-pressed]="showBoosts()"
       (click)="toggleBoosts()"
     >
-      🔁 Retweets
+      🔁 {{ 'pages.home.filters.retweets' | transloco }}
     </button>
     <button
       type="button"
@@ -114,18 +129,18 @@
       [attr.aria-pressed]="showReplies()"
       (click)="toggleReplies()"
     >
-      💬 Replies
+      💬 {{ 'pages.home.filters.replies' | transloco }}
     </button>
     <label class="home-window">
       📅
       <select
         [ngModel]="prefs.homeWindow()"
         (ngModelChange)="setHomeWindow($event)"
-        aria-label="How far back to load"
+        [attr.aria-label]="'pages.home.filters.windowAriaLabel' | transloco"
       >
-        <option value="today">Today</option>
-        <option value="week">This week</option>
-        <option value="all">Everything</option>
+        <option value="today">{{ 'pages.home.filters.window.today' | transloco }}</option>
+        <option value="week">{{ 'pages.home.filters.window.week' | transloco }}</option>
+        <option value="all">{{ 'pages.home.filters.window.all' | transloco }}</option>
       </select>
     </label>
     <button
@@ -134,15 +149,9 @@
       [class.active]="prefs.algoCalm()"
       [attr.aria-pressed]="prefs.algoCalm()"
       (click)="prefs.setAlgoCalm(!prefs.algoCalm())"
-      [title]="
-        'Calm mode: hide ' +
-        words().posts +
-        ' that read as inflammatory — heated wording, quote-dunks, and ratioed ' +
-        words().posts +
-        ' (all detected on-device)'
-      "
+      [title]="'pages.home.filters.calm.title' | transloco: { posts: words().posts }"
     >
-      😌 Calm
+      😌 {{ 'pages.home.filters.calm.label' | transloco }}
     </button>
     <app-feed-language-picker />
   </div>
@@ -179,14 +188,14 @@
     />
   }
 } @else if (view() === 'articles') {
-  <section class="home-articles" aria-label="Articles from the loaded feed">
+  <section class="home-articles" [attr.aria-label]="'pages.home.articles.ariaLabel' | transloco">
     @for (article of articles(); track article.status.id) {
       <article class="home-article">
         <app-preview-card [card]="article.card" />
         <p class="muted small home-article-meta">&#64;{{ article.status.account.acct }}</p>
       </article>
     } @empty {
-      <p class="muted center">No article links in the posts currently loaded.</p>
+      <p class="muted center">{{ 'pages.home.articles.empty' | transloco }}</p>
     }
   </section>
 } @else {
@@ -209,7 +218,12 @@
        better trade: ten ways to jump-start a feed, chosen rather than served. -->
   @if (loading()) {
     <p class="muted center">
-      {{ waitingForServerList() ? 'Preparing Just My Server…' : 'Loading…' }}
+      {{
+        (waitingForServerList()
+          ? 'pages.home.loading.preparingServer'
+          : 'pages.home.loading.generic'
+        ) | transloco
+      }}
     </p>
   } @else if (nothingFollowed()) {
     <!--
@@ -222,8 +236,8 @@
       want different answers.
     -->
     <div class="home-empty">
-      <p class="home-empty-lead">Your timeline is empty — you're not following anyone yet.</p>
-      <a class="btn" routerLink="/find-friends">Find people to follow</a>
+      <p class="home-empty-lead">{{ 'pages.home.empty.lead' | transloco }}</p>
+      <a class="btn" routerLink="/find-friends">{{ 'pages.home.empty.cta' | transloco }}</a>
     </div>
   } @else if (!visible().length && allHiddenByFilters()) {
     <!-- Posts arrived and the filters hid every one of them. "Find friends to
@@ -233,26 +247,30 @@
          same as the end-of-feed notes below. -->
     <div class="feed-all-hidden">
       <p class="muted">
-        {{ statuses().length }} post{{ statuses().length === 1 ? '' : 's' }} loaded, and your
-        filters are hiding {{ statuses().length === 1 ? 'it' : 'them all' }}.
+        {{
+          (statuses().length === 1
+            ? 'pages.home.allHidden.loaded.one'
+            : 'pages.home.allHidden.loaded.other'
+          ) | transloco: { count: statuses().length }
+        }}
       </p>
       @if (hiddenByCalm()) {
         <button type="button" class="link-button" (click)="showCalmHidden()">
-          Turn Calm off to see {{ hiddenByCalm() }}.
+          {{ 'pages.home.allHidden.turnCalmOff' | transloco: { count: hiddenByCalm() } }}
         </button>
       } @else if (hiddenByFilters()) {
         <button type="button" class="link-button" (click)="showEverything()">
-          Show {{ hiddenByFilters() }} hidden by Boosts/Replies.
+          {{ 'pages.home.allHidden.showHidden' | transloco: { count: hiddenByFilters() } }}
         </button>
       } @else {
         <span class="muted small">
-          The language picker at the top of the feed is what is holding them back.
+          {{ 'pages.home.allHidden.languagePicker' | transloco }}
         </span>
       }
     </div>
   } @else if (!visible().length) {
     <p class="muted center">
-      <a routerLink="/find-friends">Find friends to follow →</a>
+      <a routerLink="/find-friends">{{ 'pages.home.noneVisible.findFriends' | transloco }}</a>
     </p>
   } @else {
     @for (s of visible(); track s.id) {
@@ -270,10 +288,12 @@
          non-empty bookmark list coincided, which meant nobody ever saw it. -->
     @if (visibleBookmarkReview().length) {
       <div class="feed-cap">
-        <div class="feed-cap-rule">—— some posts you saved for later ——</div>
+        <div class="feed-cap-rule">{{ 'pages.home.feedCap.savedRule' | transloco }}</div>
       </div>
       @for (s of visibleBookmarkReview(); track s.id) {
-        <div class="bookmark-label muted">🔖 From your bookmarks</div>
+        <div class="bookmark-label muted">
+          🔖 {{ 'pages.home.feedCap.fromBookmarks' | transloco }}
+        </div>
         <app-status-card
           [status]="s"
           (changed)="onBookmarkChanged(s, $event)"
@@ -285,10 +305,12 @@
 
     @if (capActive()) {
       <div class="feed-cap">
-        <div class="feed-cap-rule">—— that’s the end of your feed for now ——</div>
+        <div class="feed-cap-rule">{{ 'pages.home.feedCap.endRule' | transloco }}</div>
         <p class="feed-cap-msg">
-          You’ve had enough for now, bub. Take it easy.
-          <span class="muted">Resets in ~{{ capMinutesLeft() }} min, or on reload.</span>
+          {{ 'pages.home.feedCap.message' | transloco }}
+          <span class="muted">
+            {{ 'pages.home.feedCap.resetsIn' | transloco: { minutes: capMinutesLeft() } }}
+          </span>
         </p>
         <!-- The cooldown still stops the feed; what changed is that it no longer
              stops it silently, and no longer stops the bookmarks the reader
@@ -300,19 +322,25 @@
             [disabled]="loadingBookmarks()"
             (click)="reviewBookmarks()"
           >
-            {{ loadingBookmarks() ? 'Loading…' : 'Review bookmarks' }}
+            {{
+              loadingBookmarks()
+                ? ('pages.home.reviewBookmarks.loading' | transloco)
+                : ('pages.home.reviewBookmarks.button' | transloco)
+            }}
           </button>
         }
       </div>
     } @else if (autoLoading()) {
-      <p class="muted center">Loading more…</p>
+      <p class="muted center">{{ 'pages.home.loadMore.loading' | transloco }}</p>
     } @else if (canLoadMore()) {
       <!-- The pair. Each press appends its own kind and re-renders both, so the
            reader can alternate freely: a page of feed, a page of bookmarks,
            another page of feed. "Review bookmarks" appears only when there are
            bookmarks to show — a dead button beside a live one is noise. -->
       <div class="feed-more-actions">
-        <button class="btn btn-outline more" type="button" (click)="loadMore()">Load more</button>
+        <button class="btn btn-outline more" type="button" (click)="loadMore()">
+          {{ 'pages.home.loadMore.button' | transloco }}
+        </button>
         @if (canReviewBookmarks()) {
           <button
             class="btn btn-outline more"
@@ -320,7 +348,11 @@
             [disabled]="loadingBookmarks()"
             (click)="reviewBookmarks()"
           >
-            {{ loadingBookmarks() ? 'Loading…' : 'Review bookmarks' }}
+            {{
+              loadingBookmarks()
+                ? ('pages.home.reviewBookmarks.loading' | transloco)
+                : ('pages.home.reviewBookmarks.button' | transloco)
+            }}
           </button>
         }
       </div>
@@ -331,9 +363,11 @@
            rather than a dead end. -->
       <div class="feed-window-end">
         <p class="muted small">
-          That’s everything from {{ windowLabel() }}. There are older posts.
+          {{ 'pages.home.windowEnd.everythingFrom' | transloco: { window: windowLabel() } }}
         </p>
-        <button class="btn btn-outline more" (click)="widenWindow()">Load older posts</button>
+        <button class="btn btn-outline more" (click)="widenWindow()">
+          {{ 'pages.home.windowEnd.loadOlder' | transloco }}
+        </button>
       </div>
     } @else {
       <!-- The end of the feed is exactly where "why is my feed like this" gets
@@ -346,17 +380,17 @@
                that sent readers hunting for a bug. Name the number instead. The
                chips only re-show posts already fetched, so this never implies a
                new page is coming — "Load more" above is what fetches. -->
-          That’s everything matching your filters.
+          {{ 'pages.home.feedEnd.matchingFilters' | transloco }}
           <button type="button" class="link-button" (click)="showEverything()">
-            Show {{ hidden }} more already loaded (hidden by Boosts/Replies).
+            {{ 'pages.home.feedEnd.showHiddenByFilters' | transloco: { count: hidden } }}
           </button>
         } @else if (hiddenByCalm(); as calmed) {
           <!-- Calm could empty a feed without ever saying so, which reads as
                "my follows went quiet" rather than "I turned a filter on". Same
                shape as the chips above: name the number, offer the undo. -->
-          That’s everything Calm mode is letting through.
+          {{ 'pages.home.feedEnd.calmLettingThrough' | transloco }}
           <button type="button" class="link-button" (click)="showCalmHidden()">
-            Show {{ calmed }} more already loaded (hidden by Calm).
+            {{ 'pages.home.feedEnd.showHiddenByCalm' | transloco: { count: calmed } }}
           </button>
         } @else if (hiddenByLanguage(); as byLanguage) {
           <!-- No one-click undo for this one, deliberately: the language filter
@@ -364,14 +398,18 @@
                "the rest" would mean guessing which languages were meant. The
                picker is in the filter bar at the top of this same page, so
                naming the number and pointing at it is the honest move. -->
-          That’s everything in your chosen languages.
+          {{ 'pages.home.feedEnd.chosenLanguages' | transloco }}
           <span class="muted">
-            {{ byLanguage }} more already loaded {{ byLanguage === 1 ? 'is' : 'are' }} in another
-            language — the language picker is at the top of the feed.
+            {{
+              (byLanguage === 1
+                ? 'pages.home.feedEnd.moreInAnotherLanguage.one'
+                : 'pages.home.feedEnd.moreInAnotherLanguage.other'
+              ) | transloco: { count: byLanguage }
+            }}
           </span>
         } @else {
-          You’re all caught up. Were you expecting more?
-          <a routerLink="/feed-doctor">Check the Feed Doctor.</a>
+          {{ 'pages.home.feedEnd.allCaughtUp' | transloco }}
+          <a routerLink="/feed-doctor">{{ 'pages.home.feedEnd.checkDoctor' | transloco }}</a>
         }
       </p>
       <!-- The end of the feed is where saved posts are most welcome, and the
@@ -385,7 +423,11 @@
             [disabled]="loadingBookmarks()"
             (click)="reviewBookmarks()"
           >
-            {{ loadingBookmarks() ? 'Loading…' : 'Review bookmarks' }}
+            {{
+              loadingBookmarks()
+                ? ('pages.home.reviewBookmarks.loading' | transloco)
+                : ('pages.home.reviewBookmarks.button' | transloco)
+            }}
           </button>
         </div>
       }
@@ -408,7 +450,9 @@
       @for (warning of anonymousProvider.errors(); track warning) {
         <div>{{ warning }}</div>
       }
-      <a routerLink="/settings/follows">Review followed sources or retry the public API</a>
+      <a routerLink="/settings/follows">{{
+        'pages.home.warnings.anonymousErrors.link' | transloco
+      }}</a>
     </aside>
   }
 
@@ -418,12 +462,20 @@
   @if (twitterProvider.unloaded(); as pending) {
     <aside class="muted feed-warning" role="status">
       <div>
-        {{ pending }} followed Twitter {{ pending === 1 ? 'account has' : 'accounts have' }} nothing
-        saved yet, so {{ pending === 1 ? 'it is' : 'they are' }} not in this feed.
+        {{
+          (pending === 1
+            ? 'pages.home.twitterUnloaded.summary.one'
+            : 'pages.home.twitterUnloaded.summary.other'
+          ) | transloco: { count: pending }
+        }}
       </div>
       <a routerLink="/settings/connections/twitter">
-        Load {{ pending === 1 ? 'it' : 'them' }} on the Twitter connector ({{ pending }}
-        {{ pending === 1 ? 'request' : 'requests' }})
+        {{
+          (pending === 1
+            ? 'pages.home.twitterUnloaded.loadLink.one'
+            : 'pages.home.twitterUnloaded.loadLink.other'
+          ) | transloco: { count: pending }
+        }}
       </a>
     </aside>
   }
@@ -435,8 +487,10 @@
       <div>{{ summary }}</div>
       @if (twitterProvider.paused()) {
         <div>
-          Paused for a few minutes so it stops retrying. Saved tweets are still shown.
-          <button type="button" class="linklike" (click)="retryTwitter()">Try again now</button>
+          {{ 'pages.home.warnings.twitterPaused.message' | transloco }}
+          <button type="button" class="linklike" (click)="retryTwitter()">
+            {{ 'pages.home.warnings.twitterPaused.retry' | transloco }}
+          </button>
         </div>
       }
     </aside>

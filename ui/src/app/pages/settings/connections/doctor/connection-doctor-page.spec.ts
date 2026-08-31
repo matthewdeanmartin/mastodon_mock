@@ -4,8 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import { Server } from '../../../../server';
 import { ConnectionDoctorPage } from './connection-doctor-page';
-import { PROBE_TARGETS } from './connection-doctor-catalog';
+import { probeTargets } from './connection-doctor-catalog';
 import { enableProxyFlags } from '../../../../testing/enable-proxy-flags';
+import { translocoTesting } from '../../../../i18n/i18n.testing';
+
+const PROBE_TARGETS = probeTargets((key: string) => key);
 
 describe('ConnectionDoctorPage', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -14,7 +17,10 @@ describe('ConnectionDoctorPage', () => {
     localStorage.clear();
     fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })));
     vi.stubGlobal('fetch', fetchMock);
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    TestBed.configureTestingModule({
+      imports: [translocoTesting()],
+      providers: [provideRouter([])],
+    });
     // These specs use a third-party proxy as the vehicle for testing proxy
     enableProxyFlags();
   });

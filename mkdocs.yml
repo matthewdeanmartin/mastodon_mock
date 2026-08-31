@@ -9,6 +9,8 @@ theme:
   name: readthedocs
   features: [navigation.footer]
 edit_uri: edit/main/docs/
+extra_javascript:
+  - javascripts/nav-sections.js
 markdown_extensions:
   - attr_list
   - codehilite
@@ -16,24 +18,29 @@ markdown_extensions:
       permalink: true
 nav:
   - Home: index.md
-  - Overview:
-      - Readme.md: overview/README.md
-      - How It Works: overview/how-it-works.md
-  - Installation: installation.md
-  - Usage:
-      - Quick Start: usage/quickstart.md
-      - HTTPS and Real Mastodon Clients: usage/https-and-real-clients.md
-      - Writing Tests: usage/writing-tests.md
-      - Data Generation: usage/data-generation.md
-      - Admin UI and API: usage/admin-ui.md
-      - Deploying and Publishing: usage/deploying.md
-  - Reference:
-      - What Is and Isn't Mocked: reference/coverage.md
-  - Troubleshooting: troubleshooting.md
-  - Contributing:
-      - Guide: extending/CONTRIBUTING.md
-      - OpenAPI Sync & Contract Tasks: extending/openapi-sync.md
-      - Performance Design: performance_design.md
+  - User guide:
+      - Overview:
+          - Readme.md: overview/README.md
+          - How It Works: overview/how-it-works.md
+      - Installation: installation.md
+      - Usage:
+          - Quick Start: usage/quickstart.md
+          - HTTPS and Real Mastodon Clients: usage/https-and-real-clients.md
+          - Writing Tests: usage/writing-tests.md
+          - Data Generation: usage/data-generation.md
+          - Admin UI and API: usage/admin-ui.md
+          - Deploying and Publishing: usage/deploying.md
+      - Reference:
+          - What Is and Isn't Mocked: reference/coverage.md
+          - Mataroa API reference: reference/mataroa-api.md
+      - Troubleshooting: troubleshooting.md
+  - Contributor guide:
+      - Start here: contributing/index.md
+      - Architecture: contributing/architecture.md
+      - Data models: contributing/data-models.md
+      - Endpoint workflow: extending/CONTRIBUTING.md
+      - OpenAPI sync and contract tasks: extending/openapi-sync.md
+      - Performance design: performance_design.md
   - Change Log: CHANGELOG.md
 validation:
   nav:

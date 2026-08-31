@@ -37,6 +37,7 @@ import {
   BskyMessageView,
 } from '../../providers/bluesky/bluesky-types';
 import { Terminology } from '../../terminology';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /** localStorage map of chat key → ISO timestamp of the newest message seen there. */
 const READ_KEY = 'mockingbird_chat_read';
@@ -121,9 +122,65 @@ export function stripLeadingMentions(html: string): string {
   return out && out !== '<p></p>' ? out : html;
 }
 
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n pages.conversations.close: Close
+// i18n pages.conversations.chats: Chats
+// i18n pages.conversations.chatListHeading: Chat
+// i18n pages.conversations.filters.whoAriaLabel: Who
+// i18n pages.conversations.filters.allTitle: Everyone you talk to on Bluesky and the fediverse (bots have their own tab)
+// i18n pages.conversations.filters.all: All
+// i18n pages.conversations.filters.mutualsTitle: People you follow who follow you back
+// i18n pages.conversations.filters.mutuals: Mutuals
+// i18n pages.conversations.filters.botTitle: Eliza and your language model
+// i18n pages.conversations.filters.bot: Bot
+// i18n pages.conversations.filters.kindAriaLabel: Kind
+// i18n pages.conversations.filters.privateTitle: Private DMs
+// i18n pages.conversations.badge.private: 🔒 Private
+// i18n pages.conversations.filters.publicTitle: Public reply threads
+// i18n pages.conversations.badge.public: 📢 Public
+// i18n pages.conversations.filters.bskyTitle: Bluesky DMs
+// i18n pages.conversations.badge.bluesky: 🦋 Bluesky
+// i18n pages.conversations.bskyScopeHint.a: 🦋 Your Bluesky app password can't read DMs. Create a new app password at bsky.app with "Allow access to your direct messages" checked, then relink in
+// i18n pages.conversations.bskyScopeHint.link: Settings → Connections → Bluesky
+// i18n pages.conversations.loading: Loading…
+// i18n pages.conversations.emptyChats: No conversations yet. Post with visibility "direct", or reply to a mention.
+// i18n pages.conversations.noMatch: No chats match the filters.
+// i18n pages.conversations.unreadTitle: Unread
+// i18n pages.conversations.badge.publicUpper: 📢 PUBLIC
+// i18n pages.conversations.badge.bot: 🤖 This browser
+// i18n pages.conversations.noOlderMessages: No older messages.
+// i18n pages.conversations.loadMoreTitle: Load older mentions into your public chats
+// i18n pages.conversations.loadMore: Load more
+// i18n pages.conversations.actionsAriaLabel: Conversation actions
+// i18n pages.conversations.mute: Mute
+// i18n pages.conversations.block: Block
+// i18n pages.conversations.report: Report
+// i18n pages.conversations.publicBanner.title: THIS CONVERSATION IS PUBLIC.
+// i18n pages.conversations.publicBanner.body: Every message here is visible to anyone on the internet — this is a reply thread, not a private DM.
+// i18n pages.conversations.bot.pickerAriaLabel: Conversation
+// i18n pages.conversations.bot.allConversations: All conversations
+// i18n pages.conversations.bot.newConversation: + New conversation
+// i18n pages.conversations.bot.everyConversationWith: Every conversation with {{name}}, oldest first. Sending a message continues the most recent one.
+// i18n pages.conversations.bot.elizaNoMemory: Eliza remembers nothing between messages, so starting a new conversation clears this one rather than saving it.
+// i18n pages.conversations.loadingThread: Loading thread…
+// i18n pages.conversations.bot.cutOff: ⚠ Cut off — the reply was still arriving.
+// i18n pages.conversations.bot.answering: Answering… you can leave this page; the reply keeps arriving.
+// i18n pages.conversations.bot.stopGenerating: Stop
+// i18n pages.conversations.bot.nothingYet: Nothing here yet. Say something to {{name}}.
+// i18n pages.conversations.likeTitle: Like
+// i18n pages.conversations.bookmarkTitle: Bookmark
+// i18n pages.conversations.openAs: Open as {{term}}
+// i18n pages.conversations.groupHint: 🔒 Group membership is just who's &#64;-mentioned — anyone replying can add or remove people by editing the mentions.
+// i18n pages.conversations.bot.messagePlaceholder: Message {{name}}…
+// i18n pages.conversations.send: Send
+// i18n pages.conversations.bskyMessagePlaceholder: Message on Bluesky…
+// i18n pages.conversations.replyPublicly: Reply publicly…
+// i18n pages.conversations.replyPrivately: Reply privately…
+// i18n pages.conversations.selectPrompt: Select a conversation.
+// i18n pages.conversations.legend: 🔒 rows are private DMs; 📢 rows are public reply threads.
 @Component({
   selector: 'app-conversations',
-  imports: [Compose, FormsModule, HumanTimePipe, ReportDialog, RouterLink],
+  imports: [Compose, FormsModule, HumanTimePipe, ReportDialog, RouterLink, TranslocoPipe],
   templateUrl: './conversations.html',
   styleUrl: './conversations.css',
 })

@@ -1,30 +1,41 @@
 <div class="page-head invite-page-head">
-  <h1>Invite people</h1>
+  <h1>{{ 'pages.invites.title' | transloco }}</h1>
   <p class="muted">
-    Send a personal invitation from wherever your friends still post. Mawkingbird opens a composer
-    with your chosen text; it never posts for you.
+    {{ 'pages.invites.intro' | transloco }}
   </p>
 </div>
 
 @if (!signedIn) {
   <div class="anonymous-note">
-    <strong>Anonymous on {{ homeHost() }}</strong>
+    <strong [innerHTML]="'pages.invites.anon.title' | transloco: { host: homeHost() }"></strong>
     <span>
-      Everything here works without an account. <a routerLink="/login">Sign in</a> to add your
-      profile, or share <code>/invites?{{ homeHost() }}</code> to choose this default server.
+      {{ 'pages.invites.anon.body.a' | transloco }}
+      <a routerLink="/login">{{ 'pages.invites.anon.signIn' | transloco }}</a>
+      {{ 'pages.invites.anon.body.b' | transloco }}
+      <code>/invites?{{ homeHost() }}</code>
+      {{ 'pages.invites.anon.body.c' | transloco }}
     </span>
   </div>
 }
 
-<div class="mode-switch" role="group" aria-label="Invitation mode">
+<div
+  class="mode-switch"
+  role="group"
+  [attr.aria-label]="'pages.invites.mode.ariaLabel' | transloco"
+>
   <button
     type="button"
     [class.active]="mode() === 'simple'"
     [attr.aria-pressed]="mode() === 'simple'"
     (click)="setMode('simple')"
   >
-    <strong>Simple</strong>
-    <span>{{ network() === 'mastodon' ? 'Four' : 'Two' }} good defaults</span>
+    <strong>{{ 'pages.invites.mode.simple.title' | transloco }}</strong>
+    <span>{{
+      (network() === 'mastodon'
+        ? 'pages.invites.mode.simple.four'
+        : 'pages.invites.mode.simple.two'
+      ) | transloco
+    }}</span>
   </button>
   <button
     type="button"
@@ -32,12 +43,16 @@
     [attr.aria-pressed]="mode() === 'advanced'"
     (click)="setMode('advanced')"
   >
-    <strong>Advanced</strong>
-    <span>Ten messages + link controls</span>
+    <strong>{{ 'pages.invites.mode.advanced.title' | transloco }}</strong>
+    <span>{{ 'pages.invites.mode.advanced.subtitle' | transloco }}</span>
   </button>
 </div>
 
-<div class="tabs" role="tablist" [aria-label]="'Where to ' + words().post + ' the invitation'">
+<div
+  class="tabs"
+  role="tablist"
+  [attr.aria-label]="'pages.invites.tabs.ariaLabel' | transloco: { post: words().post }"
+>
   <button
     class="tab"
     type="button"
@@ -46,7 +61,7 @@
     [class.active]="network() === 'x'"
     (click)="setNetwork('x')"
   >
-    Twitter
+    {{ 'pages.invites.network.twitter' | transloco }}
   </button>
   <button
     class="tab"
@@ -56,7 +71,7 @@
     [class.active]="network() === 'bluesky'"
     (click)="setNetwork('bluesky')"
   >
-    Bluesky
+    {{ 'pages.invites.network.bluesky' | transloco }}
   </button>
   <button
     class="tab"
@@ -66,46 +81,56 @@
     [class.active]="network() === 'mastodon'"
     (click)="setNetwork('mastodon')"
   >
-    Mastodon rally
+    {{ 'pages.invites.network.mastodonRally' | transloco }}
   </button>
 </div>
 
 <section class="platform-intro" aria-live="polite">
   @if (network() === 'x') {
-    <strong>Invite friends who are still on Twitter.</strong>
-    <span class="muted small">These messages can be direct about leaving Twitter.</span>
+    <strong>{{ 'pages.invites.platformIntro.x.title' | transloco }}</strong>
+    <span class="muted small">{{ 'pages.invites.platformIntro.x.subtitle' | transloco }}</span>
   } @else if (network() === 'bluesky') {
-    <strong>Invite Bluesky friends into another part of the open social web.</strong>
-    <span class="muted small">These assume they already understand why open networks matter.</span>
+    <strong>{{ 'pages.invites.platformIntro.bluesky.title' | transloco }}</strong>
+    <span class="muted small">{{
+      'pages.invites.platformIntro.bluesky.subtitle' | transloco
+    }}</span>
   } @else {
-    <strong>Ask Mastodon users to invite people from other platforms.</strong>
+    <strong>{{ 'pages.invites.platformIntro.mastodon.title' | transloco }}</strong>
     <span class="muted small">
-      These rally posts link back to this builder. They never advertise leaving one Mastodon server
-      for another.
+      {{ 'pages.invites.platformIntro.mastodon.subtitle' | transloco }}
     </span>
   }
 </section>
 
 @if (mode() === 'advanced') {
   <details class="advanced-options" open>
-    <summary>Invitation links and tracking</summary>
+    <summary>{{ 'pages.invites.advanced.summary' | transloco }}</summary>
     <div class="advanced-body">
       @if (network() !== 'mastodon') {
-        <label class="field-label" for="promotion-target">Where should people start?</label>
+        <label class="field-label" for="promotion-target">{{
+          'pages.invites.advanced.startLabel' | transloco
+        }}</label>
         <select
           id="promotion-target"
           [value]="promotion()"
           (change)="setPromotion($any($event.target).value)"
         >
-          <option value="join-mastodon">Promote joining Mastodon</option>
-          <option value="home-server">Promote my home server — {{ homeHost() }}</option>
+          <option value="join-mastodon">
+            {{ 'pages.invites.advanced.promoteJoinMastodon' | transloco }}
+          </option>
+          <option value="home-server">
+            {{ 'pages.invites.advanced.promoteHomeServer' | transloco: { host: homeHost() } }}
+          </option>
         </select>
         <p class="muted small">
           @if (promotion() === 'home-server') {
-            Links to <strong>{{ linkUrl() }}</strong
-            >, the server’s public homepage.
+            <span
+              [innerHTML]="
+                'pages.invites.advanced.linksTo.homeServer' | transloco: { url: linkUrl() }
+              "
+            ></span>
           } @else {
-            Links to the Join Mastodon server picker.
+            {{ 'pages.invites.advanced.linksTo.joinMastodon' | transloco }}
           }
         </p>
       }
@@ -119,8 +144,8 @@
         <span>
           {{
             network() === 'mastodon'
-              ? 'Include the invitation-builder link'
-              : 'Include the “where to start” link'
+              ? ('pages.invites.advanced.includeLink.builder' | transloco)
+              : ('pages.invites.advanced.includeLink.whereToStart' | transloco)
           }}
         </span>
       </label>
@@ -134,11 +159,15 @@
             (change)="toggleProfile($any($event.target).checked)"
           />
           <span>
-            Include my Mastodon profile
+            {{ 'pages.invites.advanced.includeProfile' | transloco }}
             @if (hasProfile()) {
               <span class="muted small">— {{ profileUrl() }}</span>
             } @else {
-              <span class="muted small">— <a routerLink="/login">sign in</a> to add one.</span>
+              <span class="muted small">
+                —
+                <a routerLink="/login">{{ 'pages.invites.advanced.signInToAdd' | transloco }}</a>
+                {{ 'pages.invites.advanced.toAddOne' | transloco }}
+              </span>
             }
           </span>
         </label>
@@ -151,24 +180,29 @@
           [disabled]="!shortenerReady() || shortening() || !includeLink()"
           (change)="toggleShorten($any($event.target).checked)"
         />
-        <span>
-          Shorten the link with {{ shortenerLabel() }}
-          @if (!shortenerReady()) {
-            <span class="muted small">
-              —
-              @if (!signedIn) {
-                <a routerLink="/login">sign in</a>, then connect a link shortener to track clicks.
-              } @else {
-                <a routerLink="/settings/connections/link-shortener">connect a link shortener</a>
-                to track clicks.
-              }
-            </span>
-          } @else if (shortening()) {
-            <span class="muted small">— shortening…</span>
-          } @else if (shorten()) {
-            <span class="muted small">— {{ linkUrl() }}</span>
-          }
-        </span>
+        <span
+          [innerHTML]="
+            'pages.invites.advanced.shortenWith' | transloco: { shortener: shortenerLabel() }
+          "
+        ></span>
+        @if (!shortenerReady()) {
+          <span class="muted small">
+            —
+            @if (!signedIn) {
+              <a routerLink="/login">{{ 'pages.invites.advanced.shortener.signIn' | transloco }}</a>
+              {{ 'pages.invites.advanced.shortener.thenConnect' | transloco }}
+            } @else {
+              <a routerLink="/settings/connections/link-shortener">{{
+                'pages.invites.advanced.shortener.connect' | transloco
+              }}</a>
+              {{ 'pages.invites.advanced.shortener.toTrack' | transloco }}
+            }
+          </span>
+        } @else if (shortening()) {
+          <span class="muted small">{{ 'pages.invites.advanced.shortening' | transloco }}</span>
+        } @else if (shorten()) {
+          <span class="muted small">— {{ linkUrl() }}</span>
+        }
       </label>
 
       @if (shorten() && shortenerReady()) {
@@ -180,8 +214,10 @@
             (change)="toggleTracking($any($event.target).checked)"
           />
           <span>
-            Add campaign tags for this wording
-            <span class="muted small">— counts clicks without identifying who clicked.</span>
+            {{ 'pages.invites.advanced.campaignTags' | transloco }}
+            <span class="muted small">{{
+              'pages.invites.advanced.campaignTagsHint' | transloco
+            }}</span>
           </span>
         </label>
       }
@@ -195,11 +231,15 @@
 
 <div class="message-toolbar">
   <span class="muted small">
-    {{ cards().length }} {{ networkLabel() }} {{ cards().length === 1 ? 'message' : 'messages' }}
-    — edit any one before opening the composer.
+    {{
+      (cards().length === 1
+        ? 'pages.invites.toolbar.count.one'
+        : 'pages.invites.toolbar.count.other'
+      ) | transloco: { count: cards().length, network: networkLabel() }
+    }}
   </span>
   <button class="btn btn-outline btn-sm" type="button" (click)="shuffle()">
-    Shuffle — show a new one first
+    {{ 'pages.invites.toolbar.shuffle' | transloco }}
   </button>
 </div>
 
@@ -217,7 +257,7 @@
       </div>
 
       <label class="sr-only" [attr.for]="'invite-text-' + card.variation.id">
-        {{ card.variation.title }} — invitation text, editable
+        {{ 'pages.invites.card.editableLabel' | transloco: { title: card.variation.title } }}
       </label>
       <textarea
         class="invite-text"
@@ -228,7 +268,9 @@
       ></textarea>
 
       @if (card.overLimit) {
-        <p class="warn small">Longer than {{ networkLabel() }} normally allows.</p>
+        <p class="warn small">
+          {{ 'pages.invites.card.overLimit' | transloco: { network: networkLabel() } }}
+        </p>
       }
 
       <div class="invite-actions">
@@ -240,17 +282,28 @@
           [attr.aria-label]="actionLabel(card)"
           (click)="onIntentOpen(card)"
         >
-          {{ network() === 'mastodon' ? 'Rally Mastodon' : 'Post on ' + networkLabel() }} ↗
+          {{
+            network() === 'mastodon'
+              ? ('pages.invites.card.rally' | transloco)
+              : ('pages.invites.card.postOn' | transloco: { network: networkLabel() })
+          }}
+          ↗
         </a>
-        <button class="btn btn-outline" type="button" (click)="copy(card)">Copy text</button>
+        <button class="btn btn-outline" type="button" (click)="copy(card)">
+          {{ 'pages.invites.card.copyText' | transloco }}
+        </button>
         @if (card.edited) {
-          <button class="link" type="button" (click)="reset(card.variation.id)">Reset</button>
+          <button class="link" type="button" (click)="reset(card.variation.id)">
+            {{ 'pages.invites.card.reset' | transloco }}
+          </button>
         }
         @if (copied() === card.variation.id) {
-          <span class="copy-note" role="status">✓ Copied</span>
+          <span class="copy-note" role="status">{{ 'pages.invites.card.copied' | transloco }}</span>
         }
         @if (copyFailed() === card.variation.id) {
-          <span class="copy-note warn" role="status">Couldn’t use the clipboard</span>
+          <span class="copy-note warn" role="status">{{
+            'pages.invites.card.copyFailed' | transloco
+          }}</span>
         }
       </div>
     </li>
@@ -258,8 +311,9 @@
 </ul>
 
 <p class="muted small footnote">
-  Need a server-generated signup code instead?
-  <a routerLink="/settings/invites">Settings → Invite links</a>.
+  {{ 'pages.invites.footnote.question' | transloco }}
+  <a routerLink="/settings/invites">{{ 'pages.invites.footnote.link' | transloco }}</a
+  >.
 </p>
 
 @if (fallbackText(); as text) {
@@ -278,10 +332,12 @@
       (click)="$event.stopPropagation()"
       (keyup)="$event.stopPropagation()"
     >
-      <h2 id="invite-copy-fallback-title">Copy this by hand</h2>
-      <p class="muted small">Select the text below and copy it yourself.</p>
+      <h2 id="invite-copy-fallback-title">{{ 'pages.invites.fallback.title' | transloco }}</h2>
+      <p class="muted small">{{ 'pages.invites.fallback.instructions' | transloco }}</p>
       <textarea class="invite-text" rows="9" readonly>{{ text }}</textarea>
-      <button class="btn" type="button" (click)="closeFallback()">Done</button>
+      <button class="btn" type="button" (click)="closeFallback()">
+        {{ 'pages.invites.fallback.done' | transloco }}
+      </button>
     </div>
   </div>
 }

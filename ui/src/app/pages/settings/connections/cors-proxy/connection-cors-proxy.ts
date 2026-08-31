@@ -2,6 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { catchError, map, of, timeout } from 'rxjs';
 import {
   availableCorsProxies,
@@ -67,9 +68,62 @@ type TestState =
  * explicit about what each one costs and the custom option is presented as the
  * one that actually keeps working.
  */
+// i18n settings.connections.corsProxy.title: 🔀 CORS proxy
+// i18n settings.connections.corsProxy.intro: Some sites refuse to answer requests that come from another site's JavaScript. Mockingbird has no server of its own, so those feeds simply cannot be read — unless you route them through a relay that fetches on your behalf. That relay is a CORS proxy.
+// i18n settings.connections.corsProxy.credentialWarning: A proxy can read every address you ask it for and every byte it sends back, and it can change the response. Only ever use one for public things — Mockingbird refuses to send your Mastodon instance, any connected account, or anything carrying a login through a proxy, but a private feed URL with a key baked into it would still be exposed. Never point a proxy at one of those.
+// i18n settings.connections.corsProxy.droppedSelection: Your previous proxy only works on localhost, so it has been cleared for this site. Choose one that works here.
+// i18n settings.connections.corsProxy.chooseHeading: Choose a proxy
+// i18n settings.connections.corsProxy.devOnlyHidden: Proxies whose free tier only answers <code>localhost</code> are hidden here, because they cannot work on this site. Run Mockingbird locally to see them.
+// i18n settings.connections.corsProxy.devOnlyTag: localhost only
+// i18n settings.connections.corsProxy.keyRequiredTag: key required
+// i18n settings.connections.corsProxy.supporterTag: Mawkingbird Plus active — supporter rate limit
+// i18n settings.connections.corsProxy.proxyWebsite: {{label}} website
+// i18n settings.connections.corsProxy.proxyUrlLabel: Proxy URL
+// i18n settings.connections.corsProxy.proxyUrlPlaceholder: https://my-worker.example.workers.dev/?url={url}
+// i18n settings.connections.corsProxy.putUrlPlaceholder: Put <code>{url}</code> where the address being fetched should go.
+// i18n settings.connections.corsProxy.percentEncodeLabel: Percent-encode the address
+// i18n settings.connections.corsProxy.percentEncodeNote: Needed when your proxy reads it from a query parameter, which is the common case. Turn off if your proxy takes the address as a plain path suffix.
+// i18n settings.connections.corsProxy.headerNameLabel: Header name (optional)
+// i18n settings.connections.corsProxy.headerNamePlaceholder: x-api-key
+// i18n settings.connections.corsProxy.headerNameNote: Only if your proxy authenticates with a header.
+// i18n settings.connections.corsProxy.apiKeyLabel: API key
+// i18n settings.connections.corsProxy.optional: (optional)
+// i18n settings.connections.corsProxy.keySavedPlaceholder: A key is saved — type to replace it
+// i18n settings.connections.corsProxy.pasteKeyPlaceholder: Paste your key
+// i18n settings.connections.corsProxy.keySaved: A key is saved in this browser.
+// i18n settings.connections.corsProxy.removeKey: Remove key
+// i18n settings.connections.corsProxy.keyDeletedOn: This key is deleted from this browser on {{date}}.
+// i18n settings.connections.corsProxy.testFetchesBefore: Test fetches
+// i18n settings.connections.corsProxy.testFetchesSentAs: , sent as:
+// i18n settings.connections.corsProxy.saveProxy: Save proxy
+// i18n settings.connections.corsProxy.testing: Testing…
+// i18n settings.connections.corsProxy.testProxy: Test proxy
+// i18n settings.connections.corsProxy.stopUsing: Stop using a proxy
+// i18n settings.connections.corsProxy.pendingSelection: Save {{selected}} before testing it. Until you do, {{current}} is still the one feeds use — so a test now would tell you about the wrong service.
+// i18n settings.connections.corsProxy.noProxy: no proxy
+// i18n settings.connections.corsProxy.testWorked: Works — a test feed came back in {{ms}} ms.
+// i18n settings.connections.corsProxy.testSlow: That is slow enough that feeds will feel sluggish.
+// i18n settings.connections.corsProxy.runningYourOwn: Running your own
+// i18n settings.connections.corsProxy.ownProxyNote: Free proxies are rate-limited, and they close down — of the well-known ones, most now refuse anything that is not <code>localhost</code>. A twenty-line Cloudflare Worker that only accepts your own origin is free, faster, and cannot read anything you would not have handed it anyway. It is the only option here that nobody else controls.
+// i18n settings.connections.corsProxy.nowActive: {{label}} is now the active proxy.
+// i18n settings.connections.corsProxy.chooseProxyFirst: Choose a proxy first.
+// i18n settings.connections.corsProxy.customUrlNeedsPlaceholder: A custom proxy URL must contain {url} where the address being fetched should go.
+// i18n settings.connections.corsProxy.needsKey: {{label}} needs an API key before it will answer any request.
+// i18n settings.connections.corsProxy.savedFull: {{label}} saved. Turn it on per feed under Settings → RSS.
+// i18n settings.connections.corsProxy.keyRemoved: API key removed from this browser.
+// i18n settings.connections.corsProxy.disconnected: No proxy configured. Feeds are fetched directly again.
+// i18n settings.connections.corsProxy.saveBeforeTest: Save a working configuration before testing it.
+// i18n settings.connections.corsProxy.notAFeed: The proxy answered, but not with a feed. It may have returned its own error page — check any key or quota.
+// i18n settings.connections.corsProxy.unreachable: Couldn't reach the proxy at all. It may be down, blocking this origin, or the URL may be wrong.
+// i18n settings.connections.corsProxy.rejected401: The proxy rejected the request (401). It needs a key, or the key is wrong.
+// i18n settings.connections.corsProxy.rejected403: A 403 came back. Either the proxy refused this request — a missing, wrong, or out-of-quota key, or an origin it has not been told to allow — or the test feed refused the proxy, which some sites do to any request from a datacentre. If your feeds still load, the proxy is fine.
+// i18n settings.connections.corsProxy.rateLimited: The proxy is rate-limiting this browser right now.
+// i18n settings.connections.corsProxy.answeredStatus: The proxy answered {{status}}.
+// i18n settings.connections.corsProxy.timedOut: The proxy did not answer within 15 seconds. It is up but too slow to read feeds through.
+// i18n settings.connections.corsProxy.unknownFailure: The test failed for an unknown reason.
 @Component({
   selector: 'app-connection-cors-proxy',
-  imports: [FormsModule, RouterLink, StorageBadge],
+  imports: [FormsModule, RouterLink, StorageBadge, TranslocoPipe],
   templateUrl: './connection-cors-proxy.html',
   styleUrls: ['../connection-page.css', './connection-cors-proxy.css'],
 })
@@ -77,6 +131,7 @@ export class ConnectionCorsProxy implements OnInit {
   protected settings = inject(CorsProxySettings);
   private bridge = inject(VaultBridge);
   private http = inject(HttpClient);
+  private transloco = inject(TranslocoService);
 
   protected readonly expiryLabel = expiryLabel;
 
@@ -130,6 +185,13 @@ export class ConnectionCorsProxy implements OnInit {
   });
 
   protected readonly isCustom = computed(() => this.selectedId() === 'custom');
+
+  /** The currently-saved proxy's label, or a translated "no proxy" fallback. */
+  protected readonly currentProxyLabel = computed(
+    () =>
+      this.settings.chosen()?.label ??
+      this.transloco.translate<string>('settings.connections.corsProxy.noProxy'),
+  );
 
   /**
    * True when the proxy on screen is not the one a test would actually use.
@@ -224,7 +286,11 @@ export class ConnectionCorsProxy implements OnInit {
       return;
     }
     this.settings.select(entry.id);
-    this.notice.set(`${entry.label} is now the active proxy.`);
+    this.notice.set(
+      this.transloco.translate<string>('settings.connections.corsProxy.nowActive', {
+        label: entry.label,
+      }),
+    );
   }
 
   save(): void {
@@ -234,12 +300,16 @@ export class ConnectionCorsProxy implements OnInit {
     this.test.set({ status: 'idle' });
 
     if (!entry) {
-      this.error.set('Choose a proxy first.');
+      this.error.set(
+        this.transloco.translate<string>('settings.connections.corsProxy.chooseProxyFirst'),
+      );
       return;
     }
     if (entry.id === 'custom' && !this.customTemplate().includes('{url}')) {
       this.error.set(
-        'A custom proxy URL must contain {url} where the address being fetched should go.',
+        this.transloco.translate<string>(
+          'settings.connections.corsProxy.customUrlNeedsPlaceholder',
+        ),
       );
       return;
     }
@@ -264,16 +334,24 @@ export class ConnectionCorsProxy implements OnInit {
     }
 
     if (entry.keyRequired && !this.settings.hasKey()) {
-      this.error.set(`${entry.label} needs an API key before it will answer any request.`);
+      this.error.set(
+        this.transloco.translate<string>('settings.connections.corsProxy.needsKey', {
+          label: entry.label,
+        }),
+      );
       return;
     }
-    this.notice.set(`${entry.label} saved. Turn it on per feed under Settings → RSS.`);
+    this.notice.set(
+      this.transloco.translate<string>('settings.connections.corsProxy.savedFull', {
+        label: entry.label,
+      }),
+    );
   }
 
   clearKey(): void {
     this.settings.clearKey();
     this.apiKey.set('');
-    this.notice.set('API key removed from this browser.');
+    this.notice.set(this.transloco.translate<string>('settings.connections.corsProxy.keyRemoved'));
   }
 
   disconnect(): void {
@@ -281,7 +359,9 @@ export class ConnectionCorsProxy implements OnInit {
     this.selectedId.set(null);
     this.apiKey.set('');
     this.test.set({ status: 'idle' });
-    this.notice.set('No proxy configured. Feeds are fetched directly again.');
+    this.notice.set(
+      this.transloco.translate<string>('settings.connections.corsProxy.disconnected'),
+    );
   }
 
   /**
@@ -293,7 +373,9 @@ export class ConnectionCorsProxy implements OnInit {
   runTest(): void {
     const config = this.settings.resolve();
     if (!config) {
-      this.error.set('Save a working configuration before testing it.');
+      this.error.set(
+        this.transloco.translate<string>('settings.connections.corsProxy.saveBeforeTest'),
+      );
       return;
     }
     this.error.set(null);
@@ -317,14 +399,13 @@ export class ConnectionCorsProxy implements OnInit {
       .subscribe((result) => {
         const ms = Date.now() - startedAt;
         if ('error' in result) {
-          this.test.set({ status: 'failed', message: describeTestFailure(result.error) });
+          this.test.set({ status: 'failed', message: this.describeTestFailure(result.error) });
           return;
         }
         if (!result.ok) {
           this.test.set({
             status: 'failed',
-            message:
-              'The proxy answered, but not with a feed. It may have returned its own error page — check any key or quota.',
+            message: this.transloco.translate<string>('settings.connections.corsProxy.notAFeed'),
           });
           return;
         }
@@ -341,37 +422,36 @@ export class ConnectionCorsProxy implements OnInit {
   private storedKeyOrEmpty(): string {
     return this.settings.resolve()?.header?.value ?? '';
   }
-}
 
-function describeTestFailure(err: unknown): string {
-  if (err instanceof HttpErrorResponse) {
-    if (err.status === 0) {
-      return "Couldn't reach the proxy at all. It may be down, blocking this origin, or the URL may be wrong.";
+  private describeTestFailure(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      if (err.status === 0) {
+        return this.transloco.translate<string>('settings.connections.corsProxy.unreachable');
+      }
+      if (err.status === 401) {
+        return this.transloco.translate<string>('settings.connections.corsProxy.rejected401');
+      }
+      if (err.status === 403) {
+        // Deliberately two possibilities rather than one confident wrong answer.
+        // A 403 here is ambiguous by construction: the proxy relays the target's
+        // status as its own, so a target that blocks datacentre IP ranges — which
+        // many do, and every proxy is hosted in one — is indistinguishable from
+        // the proxy itself refusing us. Naming only the key sent people to check a
+        // key that was never the problem.
+        return this.transloco.translate<string>('settings.connections.corsProxy.rejected403');
+      }
+      if (err.status === 429) {
+        return this.transloco.translate<string>('settings.connections.corsProxy.rateLimited');
+      }
+      return this.transloco.translate<string>('settings.connections.corsProxy.answeredStatus', {
+        status: err.status,
+      });
     }
-    if (err.status === 401) {
-      return 'The proxy rejected the request (401). It needs a key, or the key is wrong.';
+    if (err instanceof Error && err.name === 'TimeoutError') {
+      return this.transloco.translate<string>('settings.connections.corsProxy.timedOut');
     }
-    if (err.status === 403) {
-      // Deliberately two possibilities rather than one confident wrong answer.
-      // A 403 here is ambiguous by construction: the proxy relays the target's
-      // status as its own, so a target that blocks datacentre IP ranges — which
-      // many do, and every proxy is hosted in one — is indistinguishable from
-      // the proxy itself refusing us. Naming only the key sent people to check a
-      // key that was never the problem.
-      return (
-        'A 403 came back. Either the proxy refused this request — a missing, wrong, or ' +
-        'out-of-quota key, or an origin it has not been told to allow — or the test feed ' +
-        'refused the proxy, which some sites do to any request from a datacentre. ' +
-        'If your feeds still load, the proxy is fine.'
-      );
-    }
-    if (err.status === 429) {
-      return 'The proxy is rate-limiting this browser right now.';
-    }
-    return `The proxy answered ${err.status}.`;
+    return err instanceof Error
+      ? err.message
+      : this.transloco.translate<string>('settings.connections.corsProxy.unknownFailure');
   }
-  if (err instanceof Error && err.name === 'TimeoutError') {
-    return 'The proxy did not answer within 15 seconds. It is up but too slow to read feeds through.';
-  }
-  return err instanceof Error ? err.message : 'The test failed for an unknown reason.';
 }

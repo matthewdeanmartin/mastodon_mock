@@ -101,8 +101,8 @@ describe('readingEase', () => {
   });
 
   it('bands the score in words rather than numbers', () => {
-    expect(readabilityBand(80)).toBe('plain');
-    expect(readabilityBand(20)).toBe('dense');
+    expect(readabilityBand(80)).toBe('pages.write.readability.plain');
+    expect(readabilityBand(20)).toBe('pages.write.readability.dense');
   });
 });
 
@@ -121,7 +121,9 @@ describe('runQualityChecks', () => {
   it('counts every over-limit segment, not just the first', () => {
     const long = 'x'.repeat(600);
     const findings = runQualityChecks(long, context({ segments: [long, long], limit: 500 }));
-    expect(findings.find((f) => f.id === 'over-limit')?.message).toContain('2 posts');
+    const finding = findings.find((f) => f.id === 'over-limit');
+    expect(finding?.messageKey).toBe('pages.write.finding.overLimit.other');
+    expect(finding?.messageParams).toEqual({ count: 2 });
   });
 
   it('warns that a tagged note is about to go to followers', () => {
@@ -145,7 +147,7 @@ describe('runQualityChecks', () => {
     const findings = runQualityChecks(`see ${url}`, context({ segments: [`see ${url}`] }));
     const finding = findings.find((f) => f.id === 'long-links');
     expect(finding?.severity).toBe('info');
-    expect(finding?.message).toContain('cosmetic');
+    expect(finding?.messageKey).toBe('pages.write.finding.longLinks');
   });
 
   it('does not flag a short link', () => {

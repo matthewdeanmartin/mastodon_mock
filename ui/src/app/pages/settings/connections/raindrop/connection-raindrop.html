@@ -1,44 +1,45 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.backLink' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>💧 Raindrop.io bookmarks</h1>
+  <h1>{{ 'settings.connections.raindrop.title' | transloco }}</h1>
   <p>
-    Add Raindrop.io as a second bookmark provider. When you bookmark a post, you can save the post
-    itself or unwrap it and save its first external link. Hashtags and links back to your Mastodon
-    instance are skipped.
+    {{ 'settings.connections.raindrop.intro' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
 <ol class="setup-steps muted small">
-  <li>Create or open an app in Raindrop.io's App Management Console.</li>
-  <li>Copy the <strong>Test token</strong> shown in that app's settings.</li>
-  <li>Paste the Test token below and choose “Save connection”.</li>
+  <li>{{ 'settings.connections.raindrop.step1' | transloco }}</li>
+  <li>
+    {{ 'settings.connections.raindrop.copyThe' | transloco }}
+    <strong>{{ 'settings.connections.raindrop.testToken' | transloco }}</strong>
+    {{ 'settings.connections.raindrop.shownInSettings' | transloco }}
+  </li>
+  <li>{{ 'settings.connections.raindrop.step3' | transloco }}</li>
 </ol>
 <p class="muted small">
-  Client ID/secret OAuth is intentionally not used here: Raindrop's OAuth token exchange does not
-  permit browser CORS. Their Test token is the supported shortcut when an app only accesses its
-  owner's account; bookmark API calls still go directly from this browser to Raindrop.io.
+  {{ 'settings.connections.raindrop.oauthNote' | transloco }}
 </p>
 <p class="credential-warning small">
-  The Test token grants access to your Raindrop.io account and is stored in this browser's
-  localStorage. Only use this on a device and browser profile you trust. You can replace the token
-  in Raindrop.io to revoke access.
+  {{ 'settings.connections.raindrop.credentialWarning' | transloco }}
 </p>
 
 @if (raindrop.connected()) {
   <div class="raindrop-actions">
-    <span class="connection-ok">Connected</span>
+    <span class="connection-ok">{{ 'settings.connections.raindrop.connected' | transloco }}</span>
     <app-storage-badge [where]="where()" />
-    <button class="btn btn-outline" type="button" (click)="disconnectRaindrop()">Disconnect</button>
+    <button class="btn btn-outline" type="button" (click)="disconnectRaindrop()">
+      {{ 'settings.connections.raindrop.disconnect' | transloco }}
+    </button>
   </div>
   @if (expiryLabel(raindrop.expiresAt()); as expiry) {
     <p class="muted small">
       @if (where() === 'local') {
-        This token is deleted from this browser on {{ expiry }}.
+        {{ 'settings.connections.raindrop.tokenDeletedOn' | transloco: { date: expiry } }}
       } @else {
-        This token is cleared from this browser on {{ expiry }}, and fetched back from your vault
-        the next time it is needed.
+        {{ 'settings.connections.raindrop.tokenClearedOn' | transloco: { date: expiry } }}
       }
     </p>
   }
@@ -47,12 +48,14 @@
     <input
       type="password"
       name="raindropToken"
-      placeholder="Raindrop.io Test token"
+      [placeholder]="'settings.connections.raindrop.tokenPlaceholder' | transloco"
       autocomplete="off"
       [ngModel]="raindropToken()"
       (ngModelChange)="raindropToken.set($event)"
     />
-    <button class="btn" type="submit" [disabled]="!raindropToken().trim()">Save connection</button>
+    <button class="btn" type="submit" [disabled]="!raindropToken().trim()">
+      {{ 'settings.connections.raindrop.save' | transloco }}
+    </button>
   </form>
 }
 @if (raindropNotice(); as msg) {

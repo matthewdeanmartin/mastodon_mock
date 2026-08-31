@@ -44,6 +44,151 @@ import { ArticleReadingTally } from '../../../providers/article/article-reading-
  * lands on the account service, which sets a cookie and redirects back here
  * already signed in. There is nothing to unpack from the URL.
  */
+// i18n settings.plus.account.auth.email: Confirmed email address
+// i18n settings.plus.account.auth.full: Full account
+// i18n settings.plus.account.cancelledUntil: — cancelled, yours until
+// i18n settings.plus.account.manageNote: Manage or cancel your subscription from the receipt email Stripe sent you. Cancelling stops the renewal; you keep Plus for the rest of the year you paid for.
+// i18n settings.plus.account.plan.free: Free
+// i18n settings.plus.account.plan.plus: Mawkingbird Plus
+// i18n settings.plus.account.plan: Plan
+// i18n settings.plus.account.renews: — renews
+// i18n settings.plus.account.signIn: Sign-in
+// i18n settings.plus.account.signOut: Sign out
+// i18n settings.plus.account.signOutNote: Signing out here stops new sessions immediately. A token already issued to this browser stays valid until it expires, so close other tabs if you are on a shared machine.
+// i18n settings.plus.account.title: Your account
+// i18n settings.plus.checking: Checking…
+// i18n settings.plus.checkingAccount: Checking your account…
+// i18n settings.plus.checkout.cancelled: Checkout cancelled. Nothing was charged.
+// i18n settings.plus.checkout.cta: Support Mawkingbird — ${{price}}/year
+// i18n settings.plus.checkout.starting: Starting checkout…
+// i18n settings.plus.checkout.thanks: Thank you for supporting Mawkingbird. Your account is set up.
+// i18n settings.plus.diagnostics.byAccount: Saved collections by account
+// i18n settings.plus.diagnostics.check: Check
+// i18n settings.plus.diagnostics.comparison: Current account comparison
+// i18n settings.plus.diagnostics.couldNotRead: Could not read
+// i18n settings.plus.diagnostics.current: (current)
+// i18n settings.plus.diagnostics.data: Data
+// i18n settings.plus.diagnostics.intro: See everything your Mawkingbird Plus account stores, including collections kept separately for each Mastodon account. Nothing is changed by looking.
+// i18n settings.plus.diagnostics.keysOpen: keys (
+// i18n settings.plus.diagnostics.lastUpdated: Account last updated
+// i18n settings.plus.diagnostics.lists: Lists
+// i18n settings.plus.diagnostics.mastodonAccount: Mastodon account
+// i18n settings.plus.diagnostics.matches: Everything matches.
+// i18n settings.plus.diagnostics.noneFromAccount: Nothing saved from this account yet
+// i18n settings.plus.diagnostics.noneSaved: No Mastodon account has saved collections to Plus yet.
+// i18n settings.plus.diagnostics.nothingStored: Nothing stored
+// i18n settings.plus.diagnostics.of: of
+// i18n settings.plus.diagnostics.oneAccount.body: Settings are shared across it. Saved collections stay separated by Mastodon account so an alt never receives your main account's trust decisions, feeds or lists.
+// i18n settings.plus.diagnostics.oneAccount: Mawkingbird Plus is one account.
+// i18n settings.plus.diagnostics.reading: Reading your account…
+// i18n settings.plus.diagnostics.retry: Try again
+// i18n settings.plus.diagnostics.revision: , revision
+// i18n settings.plus.diagnostics.rssFeeds: RSS feeds
+// i18n settings.plus.diagnostics.savedFor: Saved for
+// i18n settings.plus.diagnostics.settings: Settings
+// i18n settings.plus.diagnostics.sharedSettings: Shared settings
+// i18n settings.plus.diagnostics.storedAccounts.one: Plus currently holds saved collections for {{count}} account.
+// i18n settings.plus.diagnostics.storedAccounts.other: Plus currently holds saved collections for {{count}} accounts.
+// i18n settings.plus.diagnostics.syncAffects.after: . Collections saved for your other Mastodon accounts remain separate and unchanged.
+// i18n settings.plus.diagnostics.syncAffects: Sync now affects
+// i18n settings.plus.diagnostics.syncNow: Sync now
+// i18n settings.plus.diagnostics.syncing: Syncing…
+// i18n settings.plus.diagnostics.thisBrowser: This browser
+// i18n settings.plus.diagnostics.title: Diagnostics
+// i18n settings.plus.diagnostics.trusted: Trusted
+// i18n settings.plus.diagnostics.using: Using
+// i18n settings.plus.diagnostics.whatStored: What is stored
+// i18n settings.plus.features.intro: Turn any of these off and back on whenever you like. Turning one off stops it syncing — nothing stored on your account is deleted.
+// i18n settings.plus.features.title: What's switched on
+// i18n settings.plus.intro.free: A free Mawkingbird account. It is optional and always will be — feeds, posting and the CORS proxy all work signed out, exactly as they do today.
+// i18n settings.plus.intro.supporter: Thank you for supporting Mawkingbird. Here is what your subscription is doing.
+// i18n settings.plus.offer.aYear: a year.
+// i18n settings.plus.offer.buysTwoThings: A subscription buys two things: articles open here instead of in another tab, and everything you set up shows up on your other devices. The free column is what you keep either way.
+// i18n settings.plus.offer.free: Free
+// i18n settings.plus.offer.moreMayFollow: More may follow; none of it is promised. Anything already stored on your account stays readable and exportable whether or not you keep subscribing.
+// i18n settings.plus.offer.plus: Plus
+// i18n settings.plus.offer.seeExactly.after: — every limit, and what changes when you sign in.
+// i18n settings.plus.offer.seeExactly: See exactly what free and Plus include
+// i18n settings.plus.offer.staysFree: Mawkingbird itself stays free: every feed, timeline, list and post works without an account, and nothing you have made is taken away if you never subscribe or if you stop.
+// i18n settings.plus.offer.stripeNote: Payment is handled by Stripe. This browser never sees your card details, and Mawkingbird stores nothing beyond which account is a supporter and when the year ends.
+// i18n settings.plus.offer.title: Support Mawkingbird
+// i18n settings.plus.offer.what: What
+// i18n settings.plus.signin.emailLabel: Email address
+// i18n settings.plus.signin.intro: Signing in is optional — Mawkingbird works without an account. What it adds is somewhere to keep what you set up, so it is waiting for you on your phone and your other computers instead of only here. Everything already in this browser stays here either way.
+// i18n settings.plus.signin.linkSent: If that address can receive mail, a sign-in link is on its way. It expires in 15 minutes and can only be used once.
+// i18n settings.plus.signin.noPassword: There is no password. Mawkingbird sends a one-time link instead, so there is nothing to remember and nothing for us to lose. Your address is used to identify the account and to send that link — nothing else.
+// i18n settings.plus.signin.seeInclude: See what free and Plus each include.
+// i18n settings.plus.signin.sendLink: Email me a sign-in link
+// i18n settings.plus.signin.sending: Sending…
+// i18n settings.plus.signin.title: Not signed in
+// i18n settings.plus.title: Mawkingbird Plus
+// i18n settings.plus.usage.checkAbove: Check above to include what your account holds.
+// i18n settings.plus.usage.countedHere: — counted on this browser
+// i18n settings.plus.usage.dailyLimit: Your daily reading limit
+// i18n settings.plus.usage.fetchedAll: Times we fetched something for you, all devices
+// i18n settings.plus.usage.fetchedHere: Times we fetched something for you, this browser
+// i18n settings.plus.usage.keptOnAccount: kept on your account
+// i18n settings.plus.usage.none: None
+// i18n settings.plus.usage.openedToday: Of those, opened today
+// i18n settings.plus.usage.resetsMidnight: — resets at midnight
+// i18n settings.plus.usage.since: — since
+// i18n settings.plus.vault.bytes: Encrypted bytes
+// i18n settings.plus.vault.changePassphrase: Change passphrase
+// i18n settings.plus.vault.checkTest: Check test vault
+// i18n settings.plus.vault.close.hint: Forgets your passphrase here until you type it again. Your connections keep working; nothing is deleted and your other devices are unaffected. Worth doing on a shared computer.
+// i18n settings.plus.vault.close: Close on this browser
+// i18n settings.plus.vault.copyKeys.hint: Sends any connections saved only in this browser up, and brings down any saved only on your other devices. Nothing is overwritten.
+// i18n settings.plus.vault.copyKeys: Copy keys to my other devices
+// i18n settings.plus.vault.create: Create encrypted store
+// i18n settings.plus.vault.creating: Creating…
+// i18n settings.plus.vault.credentials.one: <strong>{{count}}</strong> connection credential is encrypted and available to your other devices.
+// i18n settings.plus.vault.credentials.other: <strong>{{count}}</strong> connection credentials are encrypted and available to your other devices.
+// i18n settings.plus.vault.delete: Delete the encrypted stored copy
+// i18n settings.plus.vault.deleteAction: Delete encrypted stored copy
+// i18n settings.plus.vault.deleteConfirm: Confirm: delete encrypted stored copy
+// i18n settings.plus.vault.deployment: Deployment
+// i18n settings.plus.vault.empty: The store is empty. Connect a supported low-churn service, or sync keys already in this browser.
+// i18n settings.plus.vault.entitlement: Plus entitlement
+// i18n settings.plus.vault.error.badSignIn: The profile Worker did not recognize this sign-in
+// i18n settings.plus.vault.error.noPlus: The profile Worker did not recognize Plus
+// i18n settings.plus.vault.error.notTester: The profile Worker did not recognize this account as a tester
+// i18n settings.plus.vault.error.strongerSignIn: The Worker requires a stronger sign-in (unexpected on test)
+// i18n settings.plus.vault.error.unreachable: The profile Worker or vault binding could not be reached
+// i18n settings.plus.vault.expiry: Stored-copy expiry
+// i18n settings.plus.vault.gettingTitle: What you are getting
+// i18n settings.plus.vault.lockedNote: A stored copy exists, but its credential count and connector names are encrypted. Unlock it to see them — the server genuinely cannot.
+// i18n settings.plus.vault.newPassphrase: New vault passphrase
+// i18n settings.plus.vault.noExpiry: No expiry while subscribed
+// i18n settings.plus.vault.noneStored: No connection credentials are stored yet.
+// i18n settings.plus.vault.notRecognized: Not recognized — the switch stays disabled
+// i18n settings.plus.vault.off: Off
+// i18n settings.plus.vault.offHere: Off on this browser
+// i18n settings.plus.vault.passphrase: Vault passphrase
+// i18n settings.plus.vault.policy.age365: 365 days after it was created
+// i18n settings.plus.vault.policy.age90: 90 days after it was created
+// i18n settings.plus.vault.policy.idle365: After 365 days without use
+// i18n settings.plus.vault.policy.idle90: After 90 days without use
+// i18n settings.plus.vault.policy.never: Never while Plus remains active
+// i18n settings.plus.vault.recognized: Recognized
+// i18n settings.plus.vault.repeatPassphrase: Repeat passphrase
+// i18n settings.plus.vault.retryDiagnostics: Retry diagnostics
+// i18n settings.plus.vault.rolloutEnabled: Test rollout enabled
+// i18n settings.plus.vault.state.locked: Found and locked on this browser
+// i18n settings.plus.vault.state.open: Open and syncing
+// i18n settings.plus.vault.state.ready: Ready, but no encrypted store has been created
+// i18n settings.plus.vault.state.unchecked: Not checked yet
+// i18n settings.plus.vault.store: Encrypted store
+// i18n settings.plus.vault.storedFor: Stored for:
+// i18n settings.plus.vault.syncSwitch: Sync switch
+// i18n settings.plus.vault.testNote: Test deployment. Mawkingbird stores only ciphertext; your passphrase and decrypted keys stay in this browser.
+// i18n settings.plus.vault.title: Encrypted connection keys
+// i18n settings.plus.vault.tokenFreeNote: This test account is signed in, but its current token says Free. Refreshing the account or fixing the test subscription should change “Plus entitlement” above to Recognized.
+// i18n settings.plus.vault.unlock: Unlock on this browser
+// i18n settings.plus.vault.unlocking: Unlocking…
+// i18n settings.plus.vault.whyTitle: Why it is or is not working
+
+// i18n settings.plus.usage.gettingTitle: What you are getting
+
 @Component({
   selector: 'app-settings-mawkingbird-plus',
   imports: [

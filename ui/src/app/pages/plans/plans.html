@@ -1,10 +1,10 @@
-<div class="page-head">What each plan includes</div>
+<div class="page-head">{{ 'pages.plans.title' | transloco }}</div>
 
 <div class="plans-body">
   <p>
-    Mawkingbird works without an account. Signing in is free, and a subscription is
-    <strong>${{ priceUsd }} a year</strong>. This page lists everything that differs between the
-    three, including the exact limits.
+    {{ 'pages.plans.intro.a' | transloco }}
+    <strong [innerHTML]="'pages.plans.intro.price' | transloco: { price: priceUsd }"></strong>
+    {{ 'pages.plans.intro.b' | transloco }}
   </p>
 
   <!--
@@ -14,84 +14,77 @@
     in a footnote below three screens of limits.
   -->
   <p class="plans-lede">
-    Nothing here takes anything away. Every timeline, feed, list and post works signed out, and
-    anything you have already made stays yours — readable and exportable — whether you subscribe,
-    stop subscribing, or never start.
+    {{ 'pages.plans.lede' | transloco }}
   </p>
 
-  <h2>Reading articles</h2>
+  <h2>{{ 'pages.plans.reading.title' | transloco }}</h2>
   <p>
-    A link in a feed can always be opened in a new browser tab, on every plan, as many times as you
-    like. That costs nothing and needs nothing from us. What the limit below covers is opening the
-    article <em>inside Mawkingbird</em> — pulled in, stripped of navigation and adverts, and laid
-    out to read next to the feed you found it in.
+    {{ 'pages.plans.reading.intro.a' | transloco }}
+    <em>{{ 'pages.plans.reading.intro.b' | transloco }}</em>
+    {{ 'pages.plans.reading.intro.c' | transloco }}
   </p>
   <div class="plans-scroll">
     <table class="plans-table">
       <thead>
         <tr>
-          <th scope="col">What</th>
-          <th scope="col">Signed out</th>
-          <th scope="col">Signed in, free</th>
-          <th scope="col">Plus</th>
+          <th scope="col">{{ 'pages.plans.table.what' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.signedOut' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.signedInFree' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.plus' | transloco }}</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <th scope="row">Open a link in a new tab</th>
-          <td>Unlimited</td>
-          <td>Unlimited</td>
-          <td>Unlimited</td>
+          <th scope="row">{{ 'pages.plans.reading.row.openTab' | transloco }}</th>
+          <td>{{ 'pages.plans.table.unlimited' | transloco }}</td>
+          <td>{{ 'pages.plans.table.unlimited' | transloco }}</td>
+          <td>{{ 'pages.plans.table.unlimited' | transloco }}</td>
         </tr>
         <tr>
-          <th scope="row">Read an article inside the app</th>
-          <td>{{ freeArticles }} a day</td>
-          <td>{{ freeArticles }} a day</td>
-          <td>Unlimited</td>
+          <th scope="row">{{ 'pages.plans.reading.row.readInApp' | transloco }}</th>
+          <td [innerHTML]="'pages.plans.perDay' | transloco: { count: freeArticles }"></td>
+          <td [innerHTML]="'pages.plans.perDay' | transloco: { count: freeArticles }"></td>
+          <td>{{ 'pages.plans.table.unlimited' | transloco }}</td>
         </tr>
         <tr>
-          <th scope="row">Re-open an article you already read</th>
-          <td>Free, does not count</td>
-          <td>Free, does not count</td>
-          <td>Free, does not count</td>
+          <th scope="row">{{ 'pages.plans.reading.row.reopen' | transloco }}</th>
+          <td>{{ 'pages.plans.table.freeNoCount' | transloco }}</td>
+          <td>{{ 'pages.plans.table.freeNoCount' | transloco }}</td>
+          <td>{{ 'pages.plans.table.freeNoCount' | transloco }}</td>
         </tr>
       </tbody>
     </table>
   </div>
   <p class="muted small">
-    The count resets at midnight, by your computer's clock. An article already fetched is kept in
-    this browser and stays free to reopen forever, so re-reading something never costs an expansion.
+    {{ 'pages.plans.reading.footnote' | transloco }}
   </p>
 
-  <h2>Connecting to other sites</h2>
+  <h2>{{ 'pages.plans.connecting.title' | transloco }}</h2>
   <p>
-    Feeds, paste sites, link shorteners and blog publishing all involve Mawkingbird fetching
-    something from a site that is not this one. Browsers refuse most of those requests for security
-    reasons, so they pass through a small relay we run. The limit is on how fast you can make those
-    requests, not how many in total.
+    {{ 'pages.plans.connecting.intro' | transloco }}
   </p>
   <div class="plans-scroll">
     <table class="plans-table">
       <thead>
         <tr>
-          <th scope="col">What</th>
-          <th scope="col">Signed out</th>
-          <th scope="col">Signed in, free</th>
-          <th scope="col">Plus</th>
+          <th scope="col">{{ 'pages.plans.table.what' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.signedOut' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.signedInFree' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.plus' | transloco }}</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <th scope="row">Requests through the relay</th>
-          <td>{{ proxyFreeRate }} a minute</td>
-          <td>{{ proxyFreeRate }} a minute</td>
-          <td>{{ proxyPlusRate }} a minute</td>
+          <th scope="row">{{ 'pages.plans.connecting.row.requests' | transloco }}</th>
+          <td [innerHTML]="'pages.plans.perMinute' | transloco: { count: proxyFreeRate }"></td>
+          <td [innerHTML]="'pages.plans.perMinute' | transloco: { count: proxyFreeRate }"></td>
+          <td [innerHTML]="'pages.plans.perMinute' | transloco: { count: proxyPlusRate }"></td>
         </tr>
         <tr>
-          <th scope="row">Counted against</th>
-          <td>Your network address</td>
-          <td>Your network address</td>
-          <td>Your account</td>
+          <th scope="row">{{ 'pages.plans.connecting.row.countedAgainst' | transloco }}</th>
+          <td>{{ 'pages.plans.connecting.networkAddress' | transloco }}</td>
+          <td>{{ 'pages.plans.connecting.networkAddress' | transloco }}</td>
+          <td>{{ 'pages.plans.connecting.yourAccount' | transloco }}</td>
         </tr>
       </tbody>
     </table>
@@ -104,92 +97,79 @@
     changes the tier.
   -->
   <p class="muted small">
-    Signing in does not change this limit — the relay does not ask who you are until you subscribe.
-    What signing in changes is counted per address rather than per account, which matters if several
-    people share a connection.
+    {{ 'pages.plans.connecting.footnote1' | transloco }}
   </p>
   <p class="muted small">
-    To put the number in scale: refreshing a page of feeds is typically one request per feed. The
-    free rate is enough to refresh dozens of feeds at once, several times a minute. You are most
-    likely to notice the ceiling while importing a large subscription file for the first time.
+    {{ 'pages.plans.connecting.footnote2' | transloco }}
   </p>
 
-  <h2>Your things on your other devices</h2>
+  <h2>{{ 'pages.plans.devices.title' | transloco }}</h2>
   <p>
-    Everything you set up in Mawkingbird is kept in the browser you set it up in. That is true on
-    every plan and it is why the app works signed out at all. What a subscription adds is a copy
-    kept on your account, so opening Mawkingbird on your phone finds the same setup as your
-    computer.
+    {{ 'pages.plans.devices.intro' | transloco }}
   </p>
   <div class="plans-scroll">
     <table class="plans-table">
       <thead>
         <tr>
-          <th scope="col">What</th>
-          <th scope="col">Signed out</th>
-          <th scope="col">Signed in, free</th>
-          <th scope="col">Plus</th>
+          <th scope="col">{{ 'pages.plans.table.what' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.signedOut' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.signedInFree' | transloco }}</th>
+          <th scope="col">{{ 'pages.plans.table.plus' | transloco }}</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <th scope="row">Feeds you subscribe to</th>
-          <td>This browser</td>
-          <td>This browser</td>
-          <td>Every device you sign in on</td>
+          <th scope="row">{{ 'pages.plans.devices.row.feeds' | transloco }}</th>
+          <td>{{ 'pages.plans.devices.thisBrowser' | transloco }}</td>
+          <td>{{ 'pages.plans.devices.thisBrowser' | transloco }}</td>
+          <td>{{ 'pages.plans.devices.everyDevice' | transloco }}</td>
         </tr>
         <tr>
-          <th scope="row">Lists you make</th>
-          <td>This browser</td>
-          <td>This browser</td>
-          <td>Every device you sign in on</td>
+          <th scope="row">{{ 'pages.plans.devices.row.lists' | transloco }}</th>
+          <td>{{ 'pages.plans.devices.thisBrowser' | transloco }}</td>
+          <td>{{ 'pages.plans.devices.thisBrowser' | transloco }}</td>
+          <td>{{ 'pages.plans.devices.everyDevice' | transloco }}</td>
         </tr>
         <tr>
-          <th scope="row">Accounts you trust</th>
-          <td>This browser</td>
-          <td>This browser</td>
-          <td>Every device you sign in on</td>
+          <th scope="row">{{ 'pages.plans.devices.row.accounts' | transloco }}</th>
+          <td>{{ 'pages.plans.devices.thisBrowser' | transloco }}</td>
+          <td>{{ 'pages.plans.devices.thisBrowser' | transloco }}</td>
+          <td>{{ 'pages.plans.devices.everyDevice' | transloco }}</td>
         </tr>
         <tr>
-          <th scope="row">Your settings</th>
-          <td>This browser</td>
-          <td>This browser</td>
-          <td>Every device you sign in on</td>
+          <th scope="row">{{ 'pages.plans.devices.row.settings' | transloco }}</th>
+          <td>{{ 'pages.plans.devices.thisBrowser' | transloco }}</td>
+          <td>{{ 'pages.plans.devices.thisBrowser' | transloco }}</td>
+          <td>{{ 'pages.plans.devices.everyDevice' | transloco }}</td>
         </tr>
         <tr>
-          <th scope="row">How many of each you can have</th>
-          <td>Unlimited</td>
-          <td>Unlimited</td>
-          <td>Unlimited</td>
+          <th scope="row">{{ 'pages.plans.devices.row.howMany' | transloco }}</th>
+          <td>{{ 'pages.plans.table.unlimited' | transloco }}</td>
+          <td>{{ 'pages.plans.table.unlimited' | transloco }}</td>
+          <td>{{ 'pages.plans.table.unlimited' | transloco }}</td>
         </tr>
         <tr>
-          <th scope="row">Move them yourself with a file</th>
-          <td>Yes</td>
-          <td>Yes</td>
-          <td>Yes</td>
+          <th scope="row">{{ 'pages.plans.devices.row.moveByFile' | transloco }}</th>
+          <td>{{ 'pages.plans.table.yes' | transloco }}</td>
+          <td>{{ 'pages.plans.table.yes' | transloco }}</td>
+          <td>{{ 'pages.plans.table.yes' | transloco }}</td>
         </tr>
       </tbody>
     </table>
   </div>
   <p class="muted small">
-    There is no cap on any of these, on any plan — a free list is not a smaller list, it is a list
-    kept somewhere else. Export and import by file works on every plan, so a subscription buys not
-    having to do it by hand, not permission to do it at all.
+    {{ 'pages.plans.devices.footnote1' | transloco }}
   </p>
   <p class="muted small">
-    Lists, feeds and trust are stored separately for each Mastodon account you sign in with, so an
-    alt never inherits your main account's decisions. Settings are shared across the whole
-    Mawkingbird account.
+    {{ 'pages.plans.devices.footnote2' | transloco }}
   </p>
 
-  <h2>If you stop</h2>
+  <h2>{{ 'pages.plans.stop.title' | transloco }}</h2>
   <p>
-    A cancelled subscription runs to the end of the year you paid for. After that, the copies on
-    your account stay readable and exportable, and everything in this browser is untouched — the app
-    returns to keeping things locally, which is how it works for everyone who never subscribed.
+    {{ 'pages.plans.stop.body' | transloco }}
   </p>
 
   <p class="plans-back">
-    <a routerLink="/settings/mawkingbird-plus">Back to your plan</a>
+    <a routerLink="/settings/mawkingbird-plus">{{ 'pages.plans.backLink' | transloco }}</a>
   </p>
 </div>

@@ -1,7 +1,11 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { TranslocoService } from '@jsverse/transloco';
 import { scopedKey } from '../../account-scope';
 import { MawkingbirdSearch } from './mawkingbird-search';
 import { BlueskyPostSearch } from '../../providers/bluesky/bluesky-post-search';
+
+// i18n pages.search.saved.limitReached: You can save up to {{limit}} searches. Delete one to make room.
+// i18n pages.search.saved.untitled: Untitled search
 
 const STORAGE_KEY_BASE = 'mockingbird_saved_searches';
 /**
@@ -103,6 +107,7 @@ function load(): SavedSearchState {
 /** Browser-local saved search definitions, scoped per account (see {@link scopedKey}). */
 @Injectable({ providedIn: 'root' })
 export class SavedSearches {
+  private transloco = inject(TranslocoService);
   private state = signal(load());
 
   readonly all = computed(() => this.state().searches);
@@ -119,13 +124,15 @@ export class SavedSearches {
     if (this.atLimit()) {
       return {
         ok: false,
-        error: `You can save up to ${SAVED_SEARCH_LIMIT} searches. Delete one to make room.`,
+        error: this.transloco.translate<string>('pages.search.saved.limitReached', {
+          limit: SAVED_SEARCH_LIMIT,
+        }),
       };
     }
     const now = new Date().toISOString();
     const saved: SavedSearch = {
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-      name: name.trim() || 'Untitled search',
+      name: name.trim() || this.transloco.translate<string>('pages.search.saved.untitled'),
       createdAt: now,
       updatedAt: now,
       instance: context.instance,

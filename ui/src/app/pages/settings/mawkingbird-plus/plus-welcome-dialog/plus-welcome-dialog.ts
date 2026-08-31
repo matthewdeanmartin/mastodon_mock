@@ -1,3 +1,4 @@
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Component, computed, inject, output, signal } from '@angular/core';
 import { CorsProxySettings } from '../../../../providers/cors-proxy/cors-proxy-settings';
 import {
@@ -40,8 +41,13 @@ import { VAULT_TEST_ROLLOUT } from '../../../../providers/vault/vault-preference
  * API key sync is active on the test deployment and remains a visible planned
  * row elsewhere. Chat remains planned everywhere.
  */
+// i18n settings.plus.welcome.intro: Here's what your subscription switches on. Everything is on to begin with — turn off anything you'd rather not use. You can change any of this later in Settings.
+// i18n settings.plus.welcome.save: Save
+// i18n settings.plus.welcome.title: You're signed in to Mawkingbird Plus
+
 @Component({
   selector: 'app-plus-welcome-dialog',
+  imports: [TranslocoPipe],
   templateUrl: './plus-welcome-dialog.html',
   styleUrl: './plus-welcome-dialog.css',
 })

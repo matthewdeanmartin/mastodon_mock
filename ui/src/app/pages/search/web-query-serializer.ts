@@ -55,14 +55,28 @@ export function isWebEngine(value: string): value is WebEngine {
   return WEB_ENGINES.some((e) => e.id === value);
 }
 
+/**
+ * A criterion the web serializer could not express, identified by a stable code
+ * rather than English prose — the caller renders each one through a translation
+ * key (`pages.search.webDropped.<code>`) so the "can't filter by…" note is not
+ * English baked into data. `date`/`language`/`contentType` carry the value that
+ * varies; the rest are fixed phrases with no parameter.
+ */
+export type WebDroppedItem =
+  | { code: 'after'; value: string }
+  | { code: 'before'; value: string }
+  | { code: 'language'; value: string }
+  | { code: 'contentType'; value: string }
+  | { code: 'repliesOnly' | 'noReplies' | 'sensitiveOnly' | 'noSensitivePosts' | 'libraryOnly' };
+
 export interface WebQuery {
   /** The query string to send to the engine. */
   query: string;
   /**
-   * Criteria that have no web equivalent and were left out, phrased for display
-   * ("replies only", "has media"). Empty when the translation was lossless.
+   * Criteria that have no web equivalent and were left out. Empty when the
+   * translation was lossless. See {@link WebDroppedItem}.
    */
-  dropped: string[];
+  dropped: WebDroppedItem[];
 }
 
 /** Split a free-text field into individual tokens on whitespace. */
@@ -103,7 +117,7 @@ function authorTerm(author: string): string {
  */
 export function serializeWebQuery(criteria: PostSearchCriteria, host?: string): WebQuery {
   const parts: string[] = [];
-  const dropped: string[] = [];
+  const dropped: WebDroppedItem[] = [];
 
   // Scope to the instance's own pages. Bare host — no scheme, no trailing slash.
   const site = (host ?? '')
@@ -146,34 +160,34 @@ export function serializeWebQuery(criteria: PostSearchCriteria, host?: string): 
   // and the crawl date is the page's, not the post's. A date-shaped operator
   // would look honest and filter on the wrong field.
   if (criteria.dates?.after) {
-    dropped.push(`after ${criteria.dates.after}`);
+    dropped.push({ code: 'after', value: criteria.dates.after });
   }
   if (criteria.dates?.before) {
-    dropped.push(`before ${criteria.dates.before}`);
+    dropped.push({ code: 'before', value: criteria.dates.before });
   }
 
   if (criteria.language) {
-    dropped.push(`language ${criteria.language}`);
+    dropped.push({ code: 'language', value: criteria.language });
   }
 
   if (criteria.contentType && criteria.contentType !== 'any') {
-    dropped.push(`content type ${criteria.contentType}`);
+    dropped.push({ code: 'contentType', value: criteria.contentType });
   }
 
   if (criteria.replies === 'only') {
-    dropped.push('replies only');
+    dropped.push({ code: 'repliesOnly' });
   } else if (criteria.replies === 'exclude') {
-    dropped.push('no replies');
+    dropped.push({ code: 'noReplies' });
   }
 
   if (criteria.sensitive === 'only') {
-    dropped.push('sensitive only');
+    dropped.push({ code: 'sensitiveOnly' });
   } else if (criteria.sensitive === 'exclude') {
-    dropped.push('no sensitive posts');
+    dropped.push({ code: 'noSensitivePosts' });
   }
 
   if (criteria.scope === 'library') {
-    dropped.push('your library only');
+    dropped.push({ code: 'libraryOnly' });
   }
 
   return { query: parts.join(' ').trim(), dropped };

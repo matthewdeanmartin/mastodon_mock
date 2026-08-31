@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ClientPrefs } from '../../../../client-prefs';
 import { Drafts } from '../../../../drafts';
 import { GitHubSession } from '../../../../providers/github/github-session';
@@ -26,10 +27,98 @@ const HUGO_KEY = 'mockingbird_hugo_credentials';
 import { Terminology } from '../../../../terminology';
 import { PageDiagnostics } from '../../../../page-diagnostics';
 
+// i18n settings.connections.hugo.back: ‹ All connections
+// i18n settings.connections.hugo.title: ✍️ Blog (Hugo)
+// i18n settings.connections.hugo.intro: Publish Markdown posts to your own Hugo site on GitHub. A post is a file: Mawkingbird commits it to your repository, and GitHub builds the site. Nobody else hosts your writing, and there is no blog service that can close your account.
+// i18n settings.connections.hugo.step1.a: Have a Hugo site in a GitHub repository. Starting from scratch?
+// i18n settings.connections.hugo.step1.link: Hugo's quick start ↗
+// i18n settings.connections.hugo.step1.b: — or fork any Hugo theme's example site, then turn on GitHub Pages for it.
+// i18n settings.connections.hugo.step2.link: Create a fine-grained personal access token ↗
+// i18n settings.connections.hugo.step2.a: . Under
+// i18n settings.connections.hugo.repositoryAccess: Repository access
+// i18n settings.connections.hugo.step2.b: pick
+// i18n settings.connections.hugo.onlySelectRepositories: Only select repositories
+// i18n settings.connections.hugo.step2.c: and choose your blog repo. Under
+// i18n settings.connections.hugo.permissionsRepository: Permissions → Repository
+// i18n settings.connections.hugo.step2.d: set
+// i18n settings.connections.hugo.step2.e: to
+// i18n settings.connections.hugo.readAndWrite: Read and write
+// i18n settings.connections.hugo.step2.f: , and
+// i18n settings.connections.hugo.readOnly: Read-only
+// i18n settings.connections.hugo.step2.g: (that one is for showing build status later).
+// i18n settings.connections.hugo.step3: Paste it below with your repository details, then save. We check them before storing.
+// i18n settings.connections.hugo.warning.a: This token can commit files to the repository you scope it to. It is stored in this browser's localStorage, never sent to Mawkingbird, and sent only to
+// i18n settings.connections.hugo.warning.b: — no CORS proxy is involved, because GitHub's API accepts browser requests directly. Scope it to the one blog repository, and revoke it in GitHub to invalidate it.
+// i18n settings.connections.hugo.connected: Connected
+// i18n settings.connections.hugo.viewSite: View site ↗
+// i18n settings.connections.hugo.disconnect: Disconnect
+// i18n settings.connections.hugo.publishingTo: Publishing to
+// i18n settings.connections.hugo.on: on
+// i18n settings.connections.hugo.deletedOn: This token is deleted from this browser on {{date}}.
+// i18n settings.connections.hugo.readBack.title: Read your blog back
+// i18n settings.connections.hugo.readBack.body: Your Hugo site publishes an RSS feed, so Mawkingbird can read your own posts the same way it reads any other feed — no special handling, and no CORS proxy if your site is on GitHub Pages.
+// i18n settings.connections.hugo.includeInProfile: Include my blog's posts on my profile
+// i18n settings.connections.hugo.includeInProfile.on: Your published posts appear alongside your Mawkingbird posts on your own profile.
+// i18n settings.connections.hugo.includeInProfile.off: Add your site address above to turn this on.
+// i18n settings.connections.hugo.inHomeTimeline: In your home timeline
+// i18n settings.connections.hugo.removeFromFeeds: Remove from feeds
+// i18n settings.connections.hugo.lookingForFeed: Looking for your feed…
+// i18n settings.connections.hugo.addToHomeTimeline: Add my blog to my home timeline
+// i18n settings.connections.hugo.addSiteFirst: Add your site address above first.
+// i18n settings.connections.hugo.posse.title: Record what you like and boost
+// i18n settings.connections.hugo.posse.label: Record interactions on my blog
+// i18n settings.connections.hugo.posse.hintA: Liking or boosting a post also keeps a record of it on your own site, so it survives whether or not the other server does. The post is still liked normally — this is additional. Records collect under
+// i18n settings.connections.hugo.waitingToPublish: Waiting to publish
+// i18n settings.connections.hugo.posse.hintB: and are committed when you say so, not one commit per like.
+// i18n settings.connections.hugo.posse.hintC: Turn this on once your blog is set up to receive: a webmention endpoint, a template that renders these records, and the scheduled job that pulls mentions in. Before that, it writes files nothing displays.
+// i18n settings.connections.hugo.postsHeading: Posts in this repository
+// i18n settings.connections.hugo.reading: Reading…
+// i18n settings.connections.hugo.refresh: Refresh
+// i18n settings.connections.hugo.readingFolder: Reading your posts folder…
+// i18n settings.connections.hugo.noPostsYet.a: No posts yet in
+// i18n settings.connections.hugo.noPostsYet.b: . Publish one from the composer and it will show up here.
+// i18n settings.connections.hugo.draft: Draft
+// i18n settings.connections.hugo.opening: Opening…
+// i18n settings.connections.hugo.edit: Edit
+// i18n settings.connections.hugo.reading2: Reading…
+// i18n settings.connections.hugo.loadMoreTitles: Load more titles
+// i18n settings.connections.hugo.titlesHint: Titles and dates are read one file at a time, so only the newest are loaded up front.
+// i18n settings.connections.hugo.needsToken: Your repository details are saved, but the token is gone — either it aged out under the retention policy, or these settings were imported from another browser. Paste a token to publish again.
+// i18n settings.connections.hugo.githubTokenLabel: GitHub token
+// i18n settings.connections.hugo.tokenPlaceholder: github_pat_…
+// i18n settings.connections.hugo.repositoryLabel: Repository
+// i18n settings.connections.hugo.repositoryPlaceholder: you/your-blog
+// i18n settings.connections.hugo.repositoryHint: Or paste the repository's address from your browser.
+// i18n settings.connections.hugo.branchLabel: Branch
+// i18n settings.connections.hugo.branchPlaceholder: main
+// i18n settings.connections.hugo.branchHint: The branch your site is built from.
+// i18n settings.connections.hugo.postsFolderLabel: Posts folder
+// i18n settings.connections.hugo.postsFolderPlaceholder: content/posts
+// i18n settings.connections.hugo.postsFolderHint.a: Where your posts live in the repository. Some themes use
+// i18n settings.connections.hugo.postsFolderHint.or: or
+// i18n settings.connections.hugo.siteAddressLabel: Site address
+// i18n settings.connections.hugo.optional: (optional)
+// i18n settings.connections.hugo.siteAddressPlaceholder: https://you.github.io/your-blog/
+// i18n settings.connections.hugo.siteAddressHint: Used to link to a published post. Without it, posts link to the file on GitHub.
+// i18n settings.connections.hugo.checking: Checking…
+// i18n settings.connections.hugo.saveAndCheck: Save and check repository
+// i18n settings.connections.hugo.fromFilenameTitle: Read from the file name — this {{post}} own title and date have not been loaded yet.
+// i18n settings.connections.hugo.fromFilename: · from file name
+// i18n settings.connections.hugo.error.invalidRepo: Enter your repository as owner/name, or paste its GitHub address.
+// i18n settings.connections.hugo.error.checkSiteAddress: Check the site address.
+// i18n settings.connections.hugo.notice.connectedWithPosts.one: Connected. Found {{count}} post in {{path}}. Hugo is now a target in the composer.
+// i18n settings.connections.hugo.notice.connectedWithPosts.other: Connected. Found {{count}} posts in {{path}}. Hugo is now a target in the composer.
+// i18n settings.connections.hugo.notice.connectedEmpty: Connected. {{path}} is empty — your first post will be the first file in it.
+// i18n settings.connections.hugo.warning.notHugo: We couldn't find a Hugo config file at the root of this repository. Publishing will still commit your posts, but check this is the right repo.
+// i18n settings.connections.hugo.error.connectFailed: Couldn't reach GitHub.
+// i18n settings.connections.hugo.error.openPostFailed: Could not open that post for editing.
+// i18n settings.connections.hugo.error.feedFindFailed: Could not reach your site to find its feed.
+// i18n settings.connections.hugo.notice.feedRemoved: Removed your blog from your feeds. Your posts are untouched.
+
 /** Settings → Connections → Blog (Hugo). */
 @Component({
   selector: 'app-connection-hugo',
-  imports: [DatePipe, FormsModule, RouterLink, StorageBadge],
+  imports: [DatePipe, FormsModule, RouterLink, StorageBadge, TranslocoPipe],
   templateUrl: './connection-hugo.html',
   styleUrls: ['../connection-page.css', './connection-hugo.css'],
 })
@@ -47,6 +136,7 @@ export class ConnectionHugo implements OnInit {
   private readonly diagnostics = inject(PageDiagnostics);
   private readonly prefs = inject(ClientPrefs);
   private readonly router = inject(Router);
+  private readonly transloco = inject(TranslocoService);
 
   /** The row whose file is being fetched, so only that row shows a spinner. */
   protected readonly opening = signal<string | null>(null);
@@ -124,7 +214,7 @@ export class ConnectionHugo implements OnInit {
 
     const parsed = parseRepoInput(this.repoInput());
     if (!parsed) {
-      this.error.set('Enter your repository as owner/name, or paste its GitHub address.');
+      this.error.set(this.transloco.translate('settings.connections.hugo.error.invalidRepo'));
       return;
     }
     let siteUrl: string | null;
@@ -134,7 +224,11 @@ export class ConnectionHugo implements OnInit {
       this.diagnostics.warn('Hugo', 'user:invalid-site-url', {
         reason: error instanceof Error ? error.message : 'invalid',
       });
-      this.error.set(error instanceof Error ? error.message : 'Check the site address.');
+      this.error.set(
+        error instanceof Error
+          ? error.message
+          : this.transloco.translate('settings.connections.hugo.error.checkSiteAddress'),
+      );
       return;
     }
 
@@ -157,18 +251,27 @@ export class ConnectionHugo implements OnInit {
       this.token.set('');
       this.notice.set(
         result.postCount
-          ? `Connected. Found ${result.postCount} post${result.postCount === 1 ? '' : 's'} in ${candidate.contentPath}. Hugo is now a target in the composer.`
-          : `Connected. ${candidate.contentPath} is empty — your first post will be the first file in it.`,
+          ? this.transloco.translate(
+              result.postCount === 1
+                ? 'settings.connections.hugo.notice.connectedWithPosts.one'
+                : 'settings.connections.hugo.notice.connectedWithPosts.other',
+              { count: result.postCount, path: candidate.contentPath },
+            )
+          : this.transloco.translate('settings.connections.hugo.notice.connectedEmpty', {
+              path: candidate.contentPath,
+            }),
       );
       void this.posts.load();
       if (!result.looksLikeHugo) {
-        this.warning.set(
-          "We couldn't find a Hugo config file at the root of this repository. Publishing will still commit your posts, but check this is the right repo.",
-        );
+        this.warning.set(this.transloco.translate('settings.connections.hugo.warning.notHugo'));
       }
     } catch (error: unknown) {
       this.diagnostics.error('Hugo', 'connect:error', error);
-      this.error.set(error instanceof Error ? error.message : "Couldn't reach GitHub.");
+      this.error.set(
+        error instanceof Error
+          ? error.message
+          : this.transloco.translate('settings.connections.hugo.error.connectFailed'),
+      );
     } finally {
       this.busy.set(false);
     }
@@ -225,7 +328,9 @@ export class ConnectionHugo implements OnInit {
     } catch (error: unknown) {
       this.diagnostics.error('Hugo', 'open-post:error', error);
       this.openError.set(
-        error instanceof Error ? error.message : 'Could not open that post for editing.',
+        error instanceof Error
+          ? error.message
+          : this.transloco.translate('settings.connections.hugo.error.openPostFailed'),
       );
     } finally {
       this.opening.set(null);
@@ -254,7 +359,9 @@ export class ConnectionHugo implements OnInit {
     } catch (error: unknown) {
       this.diagnostics.error('Hugo', 'feed-subscribe:error', error);
       this.feedError.set(
-        error instanceof Error ? error.message : 'Could not reach your site to find its feed.',
+        error instanceof Error
+          ? error.message
+          : this.transloco.translate('settings.connections.hugo.error.feedFindFailed'),
       );
     } finally {
       this.feedBusy.set(false);
@@ -264,7 +371,7 @@ export class ConnectionHugo implements OnInit {
   unsubscribeFeed(): void {
     this.feed.unsubscribe();
     this.feedError.set(null);
-    this.feedNotice.set('Removed your blog from your feeds. Your posts are untouched.');
+    this.feedNotice.set(this.transloco.translate('settings.connections.hugo.notice.feedRemoved'));
   }
 
   refresh(): void {

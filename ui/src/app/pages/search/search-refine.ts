@@ -10,6 +10,25 @@
 
 import { Status } from '../../models';
 
+// Facet/group labels are translation keys, not English — see the
+// `migrate-i18n` skill's "indirect keys" idiom.
+// i18n pages.search.facet.language: Language
+// i18n pages.search.facet.author: Author
+// i18n pages.search.facet.media: Media
+// i18n pages.search.facet.textOnly: Text only
+// i18n pages.search.mediaType.image: Image
+// i18n pages.search.mediaType.video: Video
+// i18n pages.search.mediaType.gifv: GIF
+// i18n pages.search.mediaType.audio: Audio
+// i18n pages.search.facet.type: Type
+// i18n pages.search.facet.replies: Replies
+// i18n pages.search.facet.originalPosts: Original posts
+// i18n pages.search.facet.sensitive: Sensitive
+// i18n pages.search.facet.notSensitive: Not sensitive
+// i18n pages.search.group.today: Today
+// i18n pages.search.group.yesterday: Yesterday
+// i18n pages.search.group.earlier: Earlier
+
 /** Strip HTML tags to plain text for substring matching / filtering. */
 export function plainText(html: string): string {
   return html
@@ -74,6 +93,23 @@ function mediaKind(s: Status): string {
   return first ? first.type : 'none';
 }
 
+/** Known Mastodon attachment types translated by key; anything else falls back
+ *  to the raw type capitalised, so an unrecognised type still reads sensibly
+ *  rather than throwing. */
+const MEDIA_TYPE_KEYS: Record<string, string> = {
+  image: 'pages.search.mediaType.image',
+  video: 'pages.search.mediaType.video',
+  gifv: 'pages.search.mediaType.gifv',
+  audio: 'pages.search.mediaType.audio',
+};
+
+function mediaKindLabel(kind: string): string {
+  if (kind === 'none') {
+    return 'pages.search.facet.textOnly';
+  }
+  return MEDIA_TYPE_KEYS[kind] ?? kind[0].toUpperCase() + kind.slice(1);
+}
+
 /**
  * §11: facets derived *only* from the loaded results. Counts mean "loaded
  * results matching this value" — never total server counts. Values are sorted
@@ -112,28 +148,30 @@ export function buildFacets(statuses: Status[]): Facet[] {
     }
   };
 
-  tally('language', 'Language', (s) =>
+  tally('language', 'pages.search.facet.language', (s) =>
     s.language ? { value: s.language, label: s.language.toUpperCase() } : null,
   );
-  tally('author', 'Author', (s) => ({
+  tally('author', 'pages.search.facet.author', (s) => ({
     value: s.account.acct,
     label: s.account.display_name || s.account.acct,
   }));
-  tally('media', 'Media', (s) => {
+  tally('media', 'pages.search.facet.media', (s) => {
     const k = mediaKind(s);
-    return { value: k, label: k === 'none' ? 'Text only' : k[0].toUpperCase() + k.slice(1) };
+    return { value: k, label: mediaKindLabel(k) };
   });
-  tally('replies', 'Type', (s) =>
+  tally('replies', 'pages.search.facet.type', (s) =>
     s.in_reply_to_id
-      ? { value: 'reply', label: 'Replies' }
-      : { value: 'original', label: 'Original posts' },
+      ? { value: 'reply', label: 'pages.search.facet.replies' }
+      : { value: 'original', label: 'pages.search.facet.originalPosts' },
   );
-  tally('sensitive', 'Sensitive', (s) =>
-    s.sensitive ? { value: 'yes', label: 'Sensitive' } : { value: 'no', label: 'Not sensitive' },
+  tally('sensitive', 'pages.search.facet.sensitive', (s) =>
+    s.sensitive
+      ? { value: 'yes', label: 'pages.search.facet.sensitive' }
+      : { value: 'no', label: 'pages.search.facet.notSensitive' },
   );
-  tally('domain', 'Author domain', (s) => {
+  tally('domain', 'pages.search.facet.authorDomain', (s) => {
     const d = acctDomain(s.account.acct);
-    return d ? { value: d, label: d } : { value: 'local', label: 'This server' };
+    return d ? { value: d, label: d } : { value: 'local', label: 'pages.search.facet.thisServer' };
   });
 
   return facets;
@@ -257,33 +295,50 @@ export function collapsedCount(rows: CollapsedStatus[]): number {
 export interface StatusGroup {
   key: string;
   label: string;
+  /**
+   * Whether `label` is a translation key to pipe through `transloco`, or an
+   * already-formatted string (the per-weekday date labels from `Intl`, which
+   * vary with the date itself and cannot be a fixed key). `''` (grouping
+   * 'none') is neither and is never rendered.
+   */
+  labelIsKey: boolean;
   statuses: Status[];
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Local-calendar day label for the date grouping (§13.3). */
-function dateBucket(created: string, now: number): { key: string; label: string; order: number } {
+function dateBucket(
+  created: string,
+  now: number,
+): { key: string; label: string; labelIsKey: boolean; order: number } {
   const then = new Date(created);
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
   const diffDays = Math.floor((startOfToday.getTime() - then.getTime()) / DAY_MS);
   if (then.getTime() >= startOfToday.getTime()) {
-    return { key: 'today', label: 'Today', order: 0 };
+    return { key: 'today', label: 'pages.search.group.today', labelIsKey: true, order: 0 };
   }
   if (diffDays < 1) {
-    return { key: 'yesterday', label: 'Yesterday', order: 1 };
+    return {
+      key: 'yesterday',
+      label: 'pages.search.group.yesterday',
+      labelIsKey: true,
+      order: 1,
+    };
   }
   if (diffDays < 7) {
+    // Already locale-correct via Intl — not a key, because the value itself
+    // varies with every date, not just with the reader's language.
     const label = then.toLocaleDateString(undefined, {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
     });
     // Order by recency within the week; older = higher order number.
-    return { key: label, label, order: 2 + diffDays };
+    return { key: label, label, labelIsKey: false, order: 2 + diffDays };
   }
-  return { key: 'earlier', label: 'Earlier', order: 1000 };
+  return { key: 'earlier', label: 'pages.search.group.earlier', labelIsKey: true, order: 1000 };
 }
 
 /**
@@ -297,7 +352,7 @@ export function groupResults(
   now: number = Date.now(),
 ): StatusGroup[] {
   if (grouping === 'none' || !statuses.length) {
-    return [{ key: 'all', label: '', statuses }];
+    return [{ key: 'all', label: '', labelIsKey: false, statuses }];
   }
 
   if (grouping === 'author') {
@@ -307,7 +362,14 @@ export function groupResults(
       const key = s.account.acct;
       let g = index.get(key);
       if (!g) {
-        g = { key, label: s.account.display_name || s.account.acct, statuses: [] };
+        // An author's display name/handle is not translation-key text either —
+        // same reason a date label isn't, once it's off the fixed ladder.
+        g = {
+          key,
+          label: s.account.display_name || s.account.acct,
+          labelIsKey: false,
+          statuses: [],
+        };
         index.set(key, g);
         groups.push(g); // first-seen author order
       }
@@ -322,7 +384,7 @@ export function groupResults(
     const b = dateBucket(s.created_at, now);
     let g = buckets.get(b.key);
     if (!g) {
-      g = { key: b.key, label: b.label, order: b.order, statuses: [] };
+      g = { key: b.key, label: b.label, labelIsKey: b.labelIsKey, order: b.order, statuses: [] };
       buckets.set(b.key, g);
     }
     g.statuses.push(s);

@@ -52,12 +52,12 @@ describe('serializeWebQuery', () => {
     // None of the untranslatable criteria leak into the query.
     expect(query).toBe('site:mastodon.social angular');
     expect(dropped).toEqual([
-      'after 2026-01-01',
-      'before 2026-02-01',
-      'language en',
-      'content type media',
-      'no replies',
-      'no sensitive posts',
+      { code: 'after', value: '2026-01-01' },
+      { code: 'before', value: '2026-02-01' },
+      { code: 'language', value: 'en' },
+      { code: 'contentType', value: 'media' },
+      { code: 'noReplies' },
+      { code: 'noSensitivePosts' },
     ]);
   });
 

@@ -510,8 +510,12 @@ describe('BlueskySearchPanel', () => {
     it('names the sorts after Bluesky, reusing the shared sort keys', () => {
       const fixture = setUp();
       const sorts = internals(fixture).statusSorts;
-      expect(sorts.find((s) => s.value === 'favourites')?.label).toBe('Most liked');
-      expect(sorts.find((s) => s.value === 'reblogs')?.label).toBe('Most reposted');
+      expect(sorts.find((s) => s.value === 'favourites')?.label).toBe(
+        'pages.search.sort.mostLiked',
+      );
+      expect(sorts.find((s) => s.value === 'reblogs')?.label).toBe(
+        'pages.search.sort.mostReposted',
+      );
     });
 
     it('clears the new filters along with everything else', () => {

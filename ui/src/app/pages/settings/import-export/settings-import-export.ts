@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../../api';
@@ -257,6 +257,13 @@ function saveCsv(csv: string, filename: string): void {
 // i18n settings.importExport.tags.seeAll: See every hashtag you follow →
 // i18n settings.importExport.twitter.title: Extract contacts from Twitter/Twitter
 
+// i18n settings.importExport.friends.found.one: Found {{count}} account to follow.
+// i18n settings.importExport.friends.found.other: Found {{count}} accounts to follow.
+// i18n settings.importExport.friends.noneFound: No handles found — expected @user@host, profile URLs, or a Mastodon CSV export.
+// i18n settings.importExport.tags.found.one: Found {{count}} hashtag to follow.
+// i18n settings.importExport.tags.found.other: Found {{count}} hashtags to follow.
+// i18n settings.importExport.tags.noneFound: No hashtags found — expected #tag names, one per line, or tag page URLs.
+
 @Component({
   selector: 'app-settings-import-export',
   imports: [FormsModule, RouterLink, TranslocoPipe],
@@ -265,6 +272,7 @@ function saveCsv(csv: string, filename: string): void {
 })
 export class SettingsImportExport {
   private readonly diagnostics = inject(PageDiagnostics);
+  private transloco = inject(TranslocoService);
   private api = inject(Api);
   // CSV import/export is a mock-server control-plane endpoint, not public
   // Mastodon; its UI is already gated on `mockTooling` below.
@@ -794,8 +802,13 @@ export class SettingsImportExport {
     this.importer.load(handles);
     this.parseNote.set(
       handles.length
-        ? `Found ${handles.length} account${handles.length === 1 ? '' : 's'} to follow.`
-        : 'No handles found — expected @user@host, profile URLs, or a Mastodon CSV export.',
+        ? this.transloco.translate<string>(
+            handles.length === 1
+              ? 'settings.importExport.friends.found.one'
+              : 'settings.importExport.friends.found.other',
+            { count: handles.length },
+          )
+        : this.transloco.translate<string>('settings.importExport.friends.noneFound'),
     );
   }
 
@@ -828,8 +841,13 @@ export class SettingsImportExport {
     this.tagImporter.load(tags);
     this.tagParseNote.set(
       tags.length
-        ? `Found ${tags.length} hashtag${tags.length === 1 ? '' : 's'} to follow.`
-        : 'No hashtags found — expected #tag names, one per line, or tag page URLs.',
+        ? this.transloco.translate<string>(
+            tags.length === 1
+              ? 'settings.importExport.tags.found.one'
+              : 'settings.importExport.tags.found.other',
+            { count: tags.length },
+          )
+        : this.transloco.translate<string>('settings.importExport.tags.noneFound'),
     );
   }
 

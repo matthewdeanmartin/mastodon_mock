@@ -105,6 +105,15 @@ export async function gradeTagsUntilEnough(
  * Built only when too few tags were alive. The similar tags are the valuable
  * half — they turn "try again" into "here is what this instance actually knows".
  */
+/**
+ * **Prompt text, not interface text — deliberately never translated.**
+ *
+ * The string this builds is fed straight back to the model as the feedback
+ * half of the two-pass tag helper (see `refine` below); no reader ever sees
+ * it. Translating it would change the prompt per locale, so the model would be
+ * asked a different question in German than in English for no benefit. The
+ * `n === 1 ? '' : 's'` below is therefore correct rather than the usual bug.
+ */
 export function describeTagChecks(checked: TagCheck[], target: number = TAG_TARGET_LIVE): string {
   if (checked.length === 0) {
     return '';

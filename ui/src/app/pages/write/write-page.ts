@@ -9,10 +9,9 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LowerCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { FocusTrap } from '../../a11y/focus-trap';
 import { Api } from '../../api';
@@ -26,7 +25,12 @@ import { MataroaSettings } from '../../providers/mataroa/mataroa-settings';
 import { Draft, DraftMedia, DraftSnapshot, Drafts, draftHasContent } from '../../drafts';
 import { HumanTimePipe } from '../../human-time.pipe';
 import { MAX_POST_CHARS, PostTarget } from '../../compose/compose';
-import { VISIBILITIES, VisibilityState } from '../../compose/visibility-state';
+import {
+  VISIBILITIES,
+  visibilityHint,
+  visibilityLabel,
+  VisibilityState,
+} from '../../compose/visibility-state';
 import { altTextMessage, mediaTypeOf, undescribedIndexes } from '../../compose/alt-text';
 import { LinkShortening } from '../../compose/link-shortening';
 import { ProxyConsentDialog } from '../../providers/shortener/proxy-consent-dialog/proxy-consent-dialog';
@@ -73,6 +77,7 @@ import {
   boxesToBody,
   splitModeHint,
   splitModeLabel,
+  splitModeNoun,
   splitText,
 } from './split-modes';
 import { WriteWorkspace } from './write-workspace';
@@ -82,7 +87,7 @@ type DraftFilter = 'all' | DraftKind;
 
 interface FilterChip {
   id: DraftFilter;
-  label: string;
+  key: string;
 }
 
 /**
@@ -100,7 +105,8 @@ interface Editing {
   localId: string | null;
   /** The kind this text came from, for the "copied from" line. */
   origin: DraftKind | null;
-  title: string;
+  /** Translation key for the editor-head title. */
+  titleKey: string;
   savedAt: string | null;
 }
 
@@ -109,6 +115,144 @@ interface PendingSwitch {
   run: () => void;
 }
 
+/** A transient status line: a translation key plus its interpolation params. */
+export interface Notice {
+  key: string;
+  params?: Record<string, unknown>;
+}
+
+// i18n pages.write.aria.write: Write
+// i18n pages.write.heading: Write
+// i18n pages.write.aria.writingSurfaces: Writing surfaces
+// i18n pages.write.tab.editor: Editor
+// i18n pages.write.tab.notes: Notes & to-dos
+// i18n pages.write.boardButton: ▦ Board
+// i18n pages.write.toggleDrafts: Drafts
+// i18n pages.write.toggleNotes: Notes
+// i18n pages.write.allDrafts: All drafts →
+// i18n pages.write.pageNote: Drafts, editor and notes, side by side. Nothing else.
+// i18n pages.write.aria.drafts: Drafts
+// i18n pages.write.newDraftButton: New
+// i18n pages.write.aria.filterDraftsByKind: Filter drafts by kind
+// i18n pages.write.loadingDrafts: Loading drafts…
+// i18n pages.write.noDraftsOfKind: No drafts of that kind.
+// i18n pages.write.noDraftsYet: Nothing in progress yet. Hit <strong>New</strong> and start writing.
+// i18n pages.write.title.localOnly: Saved in this browser only
+// i18n pages.write.badge.local: 💾 local
+// i18n pages.write.badge.parked: ⏳ parked
+// i18n pages.write.badge.self: 🔒 self
+// i18n pages.write.title.pasteService: Published to a paste service
+// i18n pages.write.badge.paste: 📋 paste
+// i18n pages.write.aria.editor: Editor
+// i18n pages.write.savedAt: saved
+// i18n pages.write.copyUntouched: a copy — the original is untouched
+// i18n pages.write.notSavedYet: not saved yet
+// i18n pages.write.title.unsavedChanges: Unsaved changes
+// i18n pages.write.splitLabel: Split
+// i18n pages.write.aria.contentWarning: Content warning
+// i18n pages.write.placeholder.cw: Content warning or blog title
+// i18n pages.write.aria.postsInThread: Posts in this thread
+// i18n pages.write.boxAriaLabel: Post {{index}} of {{total}}
+// i18n pages.write.placeholder.writeFirst: Write.
+// i18n pages.write.placeholder.writeNext: And then…
+// i18n pages.write.removePostAriaLabel: Remove post {{index}}
+// i18n pages.write.addPostButton: + Add {{noun}}
+// i18n pages.write.aria.attachedMedia: Attached media
+// i18n pages.write.placeholder.describeMedia: Describe this media
+// i18n pages.write.aria.poll: Poll
+// i18n pages.write.addChoice: + Add choice
+// i18n pages.write.allowMultiple: Allow multiple
+// i18n pages.write.aria.pollDuration: Poll duration
+// i18n pages.write.aria.writingTools: Writing tools
+// i18n pages.write.title.attachMediaHint: Attach media — or paste an image into the writing box
+// i18n pages.write.attachMedia: Attach media
+// i18n pages.write.addPoll: Add poll
+// i18n pages.write.contentWarning: Content warning
+// i18n pages.write.cwShort: CW
+// i18n pages.write.markSensitive: Mark attached media sensitive
+// i18n pages.write.insertEmoji: Insert emoji
+// i18n pages.write.suggestHashtags: Suggest hashtags
+// i18n pages.write.translateWriting: Translate writing
+// i18n pages.write.aria.whoCanSee: Who can see this
+// i18n pages.write.languageNotSpecified: 🌐 Not specified
+// i18n pages.write.linkCost.one: That link counts as {{chars}} characters, however long it is — you have room.
+// i18n pages.write.linkCost.other: Those links count as {{chars}} characters, however long they are — you have room.
+// i18n pages.write.shorteningHelps.one: Shortening only makes it easier to read.
+// i18n pages.write.shorteningHelps.other: Shortening only makes them easier to read.
+// i18n pages.write.shortening: Shortening…
+// i18n pages.write.shortenWith: Shorten with {{name}}
+// i18n pages.write.setUpShortener: Set up a shortener
+// i18n pages.write.aria.writingFeedback: Writing feedback
+// i18n pages.write.advisoryOnly: All advisory — none of this stops you publishing.
+// i18n pages.write.askingOpenRouter: Asking OpenRouter…
+// i18n pages.write.proofreadAgain: 🤖 Proofread again
+// i18n pages.write.proofreadWithAi: 🤖 Proofread with AI
+// i18n pages.write.sendsTextTo: Sends your text to {{connector}} and may use paid credits.
+// i18n pages.write.connectorLabel: Connector:
+// i18n pages.write.modelLabel: Model:
+// i18n pages.write.exactPromptLabel: Exact prompt that will be sent:
+// i18n pages.write.sendToOpenRouter: Send to OpenRouter
+// i18n pages.write.cancel: Cancel
+// i18n pages.write.askingModel: OpenRouter is asking the selected model for diagnostic notes…
+// i18n pages.write.noDiagnosticNotes: The model returned no diagnostic notes.
+// i18n pages.write.aiUnavailable: AI proofreader unavailable:
+// i18n pages.write.aria.enterZen: Enter zen mode, hiding everything but the text
+// i18n pages.write.zenModeButton: Zen mode
+// i18n pages.write.splitHere: Split here
+// i18n pages.write.aria.clearScheduled: Clear the scheduled time and publish now
+// i18n pages.write.aria.splitPreview: Split preview
+// i18n pages.write.aria.notesAndTodos: Notes and to-dos
+// i18n pages.write.tagsLink: Tags…
+// i18n pages.write.jotANote: Jot a note
+// i18n pages.write.placeholder.jot: Jot something down…
+// i18n pages.write.kindLabel: Kind
+// i18n pages.write.saveButton: Save
+// i18n pages.write.aria.filterNotesByKind: Filter notes by kind
+// i18n pages.write.allChip: All
+// i18n pages.write.loadingNotes: Loading notes…
+// i18n pages.write.nothingOfThatKind: Nothing of that kind.
+// i18n pages.write.pkmEmptySide: Tag anything <code>#NOTE</code> or <code>#TODO</code> and it shows up here — as a draft, or as a post only you can see.
+// i18n pages.write.pkmEmptyTab.lead: Tag anything <code>#NOTE</code> or <code>#TODO</code> and it lands here.
+// i18n pages.write.pkmEmptyTab.defs: A <strong>note</strong> is something you wrote down to keep. A <strong>to-do</strong> is something you owe a reply to. Either can be a draft in this browser, or a post only you can see.
+// i18n pages.write.changeTheseWords: Change these words…
+// i18n pages.write.badge.draft: 💾 draft
+// i18n pages.write.badge.privatePost: 🔒 private post
+// i18n pages.write.unsavedTitle: You have unsaved writing
+// i18n pages.write.unsavedMessage.media: Attachments remain only in this open editor. Publish or remove them before switching, or discard everything. Discarding cannot be undone.
+// i18n pages.write.unsavedMessage.plain: Save it as a local draft before moving on, or discard it. Discarding cannot be undone.
+// i18n pages.write.discard: Discard
+// i18n pages.write.saveAndContinue: Save and continue
+// i18n pages.write.wizardStep: Step {{position}} of {{total}}
+// i18n pages.write.aria.publishTo: Publish to
+// i18n pages.write.scheduleAvailable: Mastodon can hold this post server-side. You can choose a publishing time next.
+// i18n pages.write.scheduleUnavailable: This publishes now. Scheduling is offered only for a single Mastodon post; Mockingbird does not rely on a browser or phone staying open.
+// i18n pages.write.noTargets.before: Nothing is connected that this could be published to. Link a service under
+// i18n pages.write.noTargets.after: , or sign in.
+// i18n pages.write.connections: Connections
+// i18n pages.write.noFindings: The built-in checks found nothing worth mentioning.
+// i18n pages.write.proofreadElsewhere: Proofreading happens in the editor, where you can still change the text. Close this and use 🤖 Proofread with AI beside your writing.
+// i18n pages.write.publishAt: Publish at
+// i18n pages.write.holdsUntilPublish: The server holds it and publishes it then. It appears under Parked in your drafts until it does.
+// i18n pages.write.emptyPublishesNow: Leave this empty to publish to Mastodon now.
+// i18n pages.write.back: Back
+// i18n pages.write.aria.draftBoard: Draft board
+// i18n pages.write.pickADraft: Pick a draft on the left, or start a new one.
+// i18n pages.write.newDraftEmptyState: New draft
+// i18n pages.write.leaveZenMode: Leave zen mode
+// i18n pages.write.saveDraft: Save draft
+// i18n pages.write.segmentCount.one: {{count}} {{noun}}
+// i18n pages.write.segmentCount.other: {{count}} {{noun}}
+// i18n pages.write.tooLongCount.one: {{count}} too long
+// i18n pages.write.tooLongCount.other: {{count}} too long
+// i18n pages.write.overLimitCount.one: {{count}} over the limit
+// i18n pages.write.overLimitCount.other: {{count}} over the limit
+// i18n pages.write.showingRendered: Showing rendered
+// i18n pages.write.showingRaw: Showing raw
+// i18n pages.write.splitSummary.one: {{count}} {{noun}}, split by {{mode}}.
+// i18n pages.write.splitSummary.other: {{count}} {{noun}}, split by {{mode}}.
+// i18n pages.write.overLimitRefuse.one: {{count}} over the limit — the server will refuse it.
+// i18n pages.write.overLimitRefuse.other: {{count}} over the limit — the server will refuse them.
+// i18n pages.write.publishing: Publishing…
 /**
  * The writing workspace.
  *
@@ -129,7 +273,6 @@ interface PendingSwitch {
     FocusTrap,
     FormsModule,
     HumanTimePipe,
-    LowerCasePipe,
     RouterLink,
     WriteBoard,
     EmojiPicker,
@@ -145,6 +288,7 @@ interface PendingSwitch {
 export class WritePage implements OnInit, OnDestroy {
   /** post/tweet/florp vocabulary, per the Blue setting. */
   protected words = inject(Terminology).words;
+  private transloco = inject(TranslocoService);
 
   protected sources = inject(DraftSources);
   protected pkm = inject(PkmSource);
@@ -264,7 +408,7 @@ export class WritePage implements OnInit, OnDestroy {
   protected editing = signal<Editing | null>(null);
   /** True once the body differs from what was last saved. */
   protected dirty = signal(false);
-  protected notice = signal<string | null>(null);
+  protected notice = signal<Notice | null>(null);
   protected saveError = signal<string | null>(null);
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -317,17 +461,23 @@ export class WritePage implements OnInit, OnDestroy {
   /** A switch held up by unsaved work, released or discarded by the dialog. */
   protected pendingSwitch = signal<PendingSwitch | null>(null);
 
+  // i18n pages.write.chips.all: All
+  // i18n pages.write.chips.local: 💾 Local
+  // i18n pages.write.chips.scheduled: ⏳ Parked
+  // i18n pages.write.chips.self: 🔒 Self
+  // i18n pages.write.chips.paste: 📋 Paste
   protected readonly chips: FilterChip[] = [
-    { id: 'all', label: 'All' },
-    { id: 'local', label: '💾 Local' },
-    { id: 'scheduled', label: '⏳ Parked' },
-    { id: 'self', label: '🔒 Self' },
-    { id: 'paste', label: '📋 Paste' },
+    { id: 'all', key: 'pages.write.chips.all' },
+    { id: 'local', key: 'pages.write.chips.local' },
+    { id: 'scheduled', key: 'pages.write.chips.scheduled' },
+    { id: 'self', key: 'pages.write.chips.self' },
+    { id: 'paste', key: 'pages.write.chips.paste' },
   ];
 
   protected readonly splitModes = SPLIT_MODES;
   protected readonly modeLabel = splitModeLabel;
   protected readonly modeHint = splitModeHint;
+  protected readonly modeNoun = splitModeNoun;
 
   // ----------------------------------------------------------------- the notes
   //
@@ -380,7 +530,7 @@ export class WritePage implements OnInit, OnDestroy {
         key: item.key,
         localId: null,
         origin: 'self',
-        title: 'Copy of a private note',
+        titleKey: 'pages.write.editing.copyOfPrivateNote',
         savedAt: null,
       });
       this.dirty.set(false);
@@ -414,7 +564,10 @@ export class WritePage implements OnInit, OnDestroy {
     // a stray dash to split a two-word note into two posts.
     this.workspace.setSplitMode(`local:${id}`, 'demand');
     this.jotText.set('');
-    this.flash(`Saved a ${pkmNounKey(kind)}.`);
+    this.flash({
+      key: 'pages.write.saved.jotted',
+      params: { noun: this.transloco.translate<string>(pkmNounKey(kind)) },
+    });
   }
 
   protected visible = computed(() => {
@@ -613,14 +766,16 @@ export class WritePage implements OnInit, OnDestroy {
    * worse than saying so. The choice itself is not thrown away — it is stashed
    * and comes back when the destination does.
    */
+  // i18n pages.write.visibilityLock.blog: A blog post is public at its URL.
+  // i18n pages.write.visibilityLock.paste: A paste is reachable by anyone with the link.
   protected visibilityLockReason = computed(() => {
     switch (this.wizardTarget()) {
       case 'blog':
       case 'blogger':
       case 'hugo':
-        return 'A blog post is public at its URL.';
+        return 'pages.write.visibilityLock.blog';
       case 'paste':
-        return 'A paste is reachable by anyone with the link.';
+        return 'pages.write.visibilityLock.paste';
       default:
         return null;
     }
@@ -639,18 +794,8 @@ export class WritePage implements OnInit, OnDestroy {
     }
   }
 
-  protected visibilityHint(value: string): string {
-    switch (value) {
-      case 'public':
-        return 'Anyone, and it appears in public timelines.';
-      case 'unlisted':
-        return 'Anyone with the link, but kept out of public timelines.';
-      case 'private':
-        return 'Your followers only.';
-      default:
-        return 'Only the people you mention.';
-    }
-  }
+  protected readonly visibilityLabel = visibilityLabel;
+  protected readonly visibilityHint = visibilityHint;
 
   protected setPollOption(index: number, value: string): void {
     this.pollOptions.update((options) =>
@@ -836,7 +981,7 @@ export class WritePage implements OnInit, OnDestroy {
         key: `new:${Date.now()}`,
         localId: null,
         origin: null,
-        title: 'New draft',
+        titleKey: 'pages.write.editing.newDraft',
         savedAt: null,
       });
       this.dirty.set(false);
@@ -866,7 +1011,7 @@ export class WritePage implements OnInit, OnDestroy {
         key: item.key,
         localId: null,
         origin: item.kind,
-        title: kindTitle(item.kind),
+        titleKey: kindTitleKey(item.kind),
         savedAt: null,
       });
       this.dirty.set(false);
@@ -882,13 +1027,18 @@ export class WritePage implements OnInit, OnDestroy {
       key: `local:${draft.id}`,
       localId: draft.id,
       origin: 'local',
-      title: 'Local draft',
+      titleKey: 'pages.write.editing.localDraft',
       savedAt: draft.updatedAt,
     });
     this.dirty.set(false);
     this.focusEditor();
   }
 
+  // i18n pages.write.saved.plain: Saved.
+  // i18n pages.write.saved.replacedDeleted: That draft was gone, so this was saved as a new one.
+  // i18n pages.write.saved.copiedFrom: Saved as a local draft. The {{origin}} is still here too.
+  // i18n pages.write.saved.withAttachments: {{saved}} Attachments remain only in this open editor.
+  // i18n pages.write.saved.jotted: Saved a {{noun}}.
   /**
    * Save the editor to a local draft.
    *
@@ -906,13 +1056,13 @@ export class WritePage implements OnInit, OnDestroy {
     const snapshot = this.snapshot();
     if (current.localId) {
       if (this.drafts.update(current.localId, snapshot)) {
-        this.afterSave(current, current.localId, 'Saved.');
+        this.afterSave(current, current.localId, { key: 'pages.write.saved.plain' });
         return;
       }
       // Deleted underneath us — in another tab, or from /drafts. Saving a fresh
       // copy is the only outcome that doesn't throw away what was just written.
       const id = this.drafts.save(snapshot);
-      this.afterSave(current, id, 'That draft was gone, so this was saved as a new one.');
+      this.afterSave(current, id, { key: 'pages.write.saved.replacedDeleted' });
       return;
     }
     const id = this.drafts.save(snapshot);
@@ -920,12 +1070,15 @@ export class WritePage implements OnInit, OnDestroy {
       current,
       id,
       current.origin && current.origin !== 'local'
-        ? `Saved as a local draft. The ${kindNoun(current.origin)} is still here too.`
-        : 'Saved.',
+        ? {
+            key: 'pages.write.saved.copiedFrom',
+            params: { origin: this.transloco.translate<string>(kindNounKey(current.origin)) },
+          }
+        : { key: 'pages.write.saved.plain' },
     );
   }
 
-  private afterSave(current: Editing, localId: string, message: string): void {
+  private afterSave(current: Editing, localId: string, notice: Notice): void {
     const key = `local:${localId}`;
     // Carry the split mode across, so a copy that has just become a real draft
     // keeps the mode it was written in.
@@ -937,13 +1090,26 @@ export class WritePage implements OnInit, OnDestroy {
       ...current,
       key,
       localId,
-      title: 'Local draft',
+      titleKey: 'pages.write.editing.localDraft',
       savedAt: new Date().toISOString(),
     });
     this.dirty.set(false);
+    // A whole extra key rather than gluing on a clause: "Saved." plus a bolted-on
+    // sentence is exactly the concatenation the migration guide forbids, because
+    // English word order isn't universal.
     this.flash(
-      this.media().length ? `${message} Attachments remain only in this open editor.` : message,
+      this.media().length
+        ? {
+            key: 'pages.write.saved.withAttachments',
+            params: { saved: this.translateNotice(notice) },
+          }
+        : notice,
     );
+  }
+
+  /** Resolve a notice to its translated text, for embedding inside another sentence. */
+  private translateNotice(notice: Notice): string {
+    return this.transloco.translate<string>(notice.key, notice.params);
   }
 
   private snapshot(): DraftSnapshot {
@@ -1092,7 +1258,7 @@ export class WritePage implements OnInit, OnDestroy {
 
   protected wizardForwardLabel = computed(() => {
     const step = this.wizardStep();
-    return step ? forwardLabel(step, this.wizardEnabled()) : 'Publish';
+    return step ? forwardLabel(step, this.wizardEnabled()) : 'wizard.forward.publish';
   });
 
   protected wizardCanGoBack = computed(() => {
@@ -1110,6 +1276,10 @@ export class WritePage implements OnInit, OnDestroy {
       vocab: this.prefs.pkmVocabulary(),
       missingAltText: this.undescribedMedia().length > 0,
       requireAltText: this.prefs.requireAltText(),
+      // The readability band is itself a translation key; resolve it here so the
+      // template's outer `| transloco: finding.messageParams` gets plain text
+      // for `{{band}}` rather than a key it would print verbatim.
+      translateBand: (key) => this.transloco.translate<string>(key),
     }),
   );
 
@@ -1458,8 +1628,8 @@ export class WritePage implements OnInit, OnDestroy {
     );
   }
 
-  private flash(message: string): void {
-    this.notice.set(message);
+  private flash(notice: Notice): void {
+    this.notice.set(notice);
     if (this.noticeTimer) {
       clearTimeout(this.noticeTimer);
     }
@@ -1534,29 +1704,38 @@ function releaseDraftMedia(item: DraftMedia): void {
   }
 }
 
-function kindTitle(kind: DraftKind): string {
+// i18n pages.write.editing.localDraft: Local draft
+// i18n pages.write.editing.newDraft: New draft
+// i18n pages.write.editing.copyOfParkedPost: Copy of a parked post
+// i18n pages.write.editing.copyOfPrivateNote: Copy of a private note
+// i18n pages.write.editing.copyOfPaste: Copy of a paste
+function kindTitleKey(kind: DraftKind): string {
   switch (kind) {
     case 'local':
-      return 'Local draft';
+      return 'pages.write.editing.localDraft';
     case 'scheduled':
-      return 'Copy of a parked post';
+      return 'pages.write.editing.copyOfParkedPost';
     case 'self':
-      return 'Copy of a private note';
+      return 'pages.write.editing.copyOfPrivateNote';
     case 'paste':
-      return 'Copy of a paste';
+      return 'pages.write.editing.copyOfPaste';
   }
 }
 
-function kindNoun(kind: DraftKind): string {
+// i18n pages.write.kindNoun.local: original draft
+// i18n pages.write.kindNoun.scheduled: parked post
+// i18n pages.write.kindNoun.self: private note
+// i18n pages.write.kindNoun.paste: paste
+function kindNounKey(kind: DraftKind): string {
   switch (kind) {
     case 'local':
-      return 'original draft';
+      return 'pages.write.kindNoun.local';
     case 'scheduled':
-      return 'parked post';
+      return 'pages.write.kindNoun.scheduled';
     case 'self':
-      return 'private note';
+      return 'pages.write.kindNoun.self';
     case 'paste':
-      return 'paste';
+      return 'pages.write.kindNoun.paste';
   }
 }
 

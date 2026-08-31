@@ -298,11 +298,11 @@ describe('last-activity facet', () => {
       activeDaysAgo(20),
       activeDaysAgo(400),
     ]);
-    expect(facet?.values.map((v) => v.label)).toEqual([
-      'Today',
-      'This week',
-      'This month',
-      '1 – 2 years ago',
+    expect(facet?.values.map((v) => v.labelKey)).toEqual([
+      'pages.search.activity.today',
+      'pages.search.activity.thisWeek',
+      'pages.search.activity.thisMonth',
+      'pages.search.activity.oneToTwoYears',
     ]);
     expect(facet?.values.every((v) => v.count === 1)).toBe(true);
   });
@@ -314,7 +314,10 @@ describe('last-activity facet', () => {
    */
   it('drops empty bins so a narrow corpus stays short', () => {
     const facet = activityFacet([activeDaysAgo(0), activeDaysAgo(1), activeDaysAgo(2)]);
-    expect(facet?.values.map((v) => v.label)).toEqual(['Today', 'This week']);
+    expect(facet?.values.map((v) => v.labelKey)).toEqual([
+      'pages.search.activity.today',
+      'pages.search.activity.thisWeek',
+    ]);
   });
 
   it('keeps ladder order rather than sorting by count', () => {
@@ -323,14 +326,17 @@ describe('last-activity facet', () => {
       activeDaysAgo(0),
       ...Array.from({ length: 5 }, () => activeDaysAgo(300)),
     ]);
-    expect(facet?.values.map((v) => v.label)).toEqual(['Today', 'Last year']);
+    expect(facet?.values.map((v) => v.labelKey)).toEqual([
+      'pages.search.activity.today',
+      'pages.search.activity.lastYear',
+    ]);
     expect(facet?.values.map((v) => v.count)).toEqual([1, 5]);
   });
 
   it('never exceeds the nine-bin ceiling', () => {
     const facet = activityFacet([0, 3, 20, 60, 120, 300, 500, 2000].map((d) => activeDaysAgo(d)));
     expect(facet!.values.length).toBeLessThanOrEqual(9);
-    expect(facet?.values.at(-1)?.label).toBe('Over 2 years ago');
+    expect(facet?.values.at(-1)?.labelKey).toBe('pages.search.activity.overTwoYears');
   });
 
   it('bins accounts with no known last post separately, last', () => {
@@ -339,7 +345,11 @@ describe('last-activity facet', () => {
       makeAccount({ last_status_at: null }),
       makeAccount({ last_status_at: undefined }),
     ]);
-    expect(facet?.values.at(-1)).toMatchObject({ value: 'unknown', label: 'Not known', count: 2 });
+    expect(facet?.values.at(-1)).toMatchObject({
+      value: 'unknown',
+      labelKey: 'Not known',
+      count: 2,
+    });
   });
 
   it('treats an unreadable date as unknown rather than ancient', () => {

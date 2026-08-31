@@ -127,16 +127,16 @@ describe('buildBlueskyAccountFacets', () => {
   it('splits default handles from custom domains', () => {
     const facet = buildBlueskyAccountFacets(mixed).find((f) => f.kind === 'handleType');
     expect(facet?.values).toEqual([
-      { value: 'default', label: 'bsky.social', count: 2 },
-      { value: 'custom', label: 'Custom domain', count: 1 },
+      { value: 'default', labelKey: 'pages.search.facet.defaultHandle', count: 2 },
+      { value: 'custom', labelKey: 'pages.search.facet.customDomain', count: 1 },
     ]);
   });
 
   it('breaks handles down by domain', () => {
     const facet = buildBlueskyAccountFacets(mixed).find((f) => f.kind === 'handleDomain');
     expect(facet?.values).toEqual([
-      { value: 'bsky.social', label: 'bsky.social', count: 2 },
-      { value: 'mozilla.org', label: 'mozilla.org', count: 1 },
+      { value: 'bsky.social', labelKey: 'bsky.social', count: 2 },
+      { value: 'mozilla.org', labelKey: 'mozilla.org', count: 1 },
     ]);
   });
 
@@ -147,10 +147,10 @@ describe('buildBlueskyAccountFacets', () => {
       '1000-9999',
       '10000+',
     ]);
-    expect(facets.find((f) => f.kind === 'statuses')?.values.map((v) => v.label)).toEqual([
-      '< 100',
-      '100 – 1k',
-      '1k – 10k',
+    expect(facets.find((f) => f.kind === 'statuses')?.values.map((v) => v.labelKey)).toEqual([
+      'pages.search.count.under100',
+      'pages.search.count.100to1k',
+      'pages.search.count.1kTo10k',
     ]);
   });
 
@@ -188,9 +188,9 @@ describe('buildBlueskyAccountFacets', () => {
     const facet = buildBlueskyAccountFacets(scanned, now).find((f) => f.kind === 'activity');
     expect(facet?.showAll).toBe(true);
     expect(facet?.values).toEqual([
-      { value: 'd1', label: 'Today', count: 1 },
-      { value: 'd90', label: 'Last 3 months', count: 1 },
-      { value: 'unknown', label: 'Not checked', count: 1 },
+      { value: 'd1', labelKey: 'pages.search.activity.today', count: 1 },
+      { value: 'd90', labelKey: 'pages.search.activity.last3Months', count: 1 },
+      { value: 'unknown', labelKey: 'pages.search.activity.notChecked', count: 1 },
     ]);
   });
 
@@ -267,9 +267,9 @@ describe('buildBlueskyPostFacets', () => {
   it('buckets likes with an explicit "None" row, in ladder order', () => {
     const facet = buildBlueskyPostFacets(posts).find((f) => f.kind === 'likes');
     expect(facet?.values).toEqual([
-      { value: '0', label: 'None', count: 1 },
-      { value: '1-9', label: '1 – 9', count: 1 },
-      { value: '100-999', label: '100 – 999', count: 1 },
+      { value: '0', labelKey: 'pages.search.count.none', count: 1 },
+      { value: '1-9', labelKey: 'pages.search.count.1to9', count: 1 },
+      { value: '100-999', labelKey: 'pages.search.count.100to999', count: 1 },
     ]);
   });
 
@@ -306,10 +306,10 @@ describe('buildBlueskyPostFacets', () => {
     ] as Status[];
     const facet = buildBlueskyPostFacets(withMedia).find((f) => f.kind === 'altText');
     expect(facet?.values).toEqual([
-      { value: 'yes', label: 'Has alt text', count: 1 },
-      { value: 'no', label: 'Missing alt text', count: 1 },
+      { value: 'yes', labelKey: 'pages.search.facet.hasAltText', count: 1 },
+      { value: 'no', labelKey: 'pages.search.facet.missingAltText', count: 1 },
     ]);
-    expect(facet?.hint).toBe('Counts only posts with images.');
+    expect(facet?.hint).toBe('pages.search.facet.altTextHint');
   });
 
   it('treats a partly-described post as missing alt text', () => {
@@ -327,7 +327,11 @@ describe('buildBlueskyPostFacets', () => {
       }),
     ] as Status[];
     const facet = buildBlueskyPostFacets(partial).find((f) => f.kind === 'altText');
-    expect(facet?.values).toContainEqual({ value: 'no', label: 'Missing alt text', count: 1 });
+    expect(facet?.values).toContainEqual({
+      value: 'no',
+      labelKey: 'pages.search.facet.missingAltText',
+      count: 1,
+    });
   });
 
   it('facets the linked domain from the embed, not the rendered html', () => {
@@ -339,8 +343,8 @@ describe('buildBlueskyPostFacets', () => {
     ];
     const facet = buildBlueskyPostFacets(linked).find((f) => f.kind === 'linkDomain');
     expect(facet?.values).toEqual([
-      { value: 'github.com', label: 'github.com', count: 2 },
-      { value: 'youtube.com', label: 'youtube.com', count: 1 },
+      { value: 'github.com', labelKey: 'github.com', count: 2 },
+      { value: 'youtube.com', labelKey: 'youtube.com', count: 1 },
     ]);
   });
 

@@ -8,8 +8,8 @@ import {
   homeServerTarget,
   interpret,
   outcomeLabel,
+  probeTargets,
   ProbeResult,
-  PROBE_TARGETS,
   ProbeTarget,
   ProbeVerdict,
   proxyHint,
@@ -18,6 +18,11 @@ import {
   timingHint,
 } from './connection-doctor-catalog';
 import { enableProxyFlags } from '../../../../testing/enable-proxy-flags';
+import { translateEn } from '../../../../testing/translate-en';
+
+const translate = translateEn;
+
+const PROBE_TARGETS = probeTargets(translate);
 
 /** A ProbeResult with the fields a given assertion does not care about filled in. */
 function result(
@@ -285,7 +290,7 @@ describe('ConnectionDoctor (probes)', () => {
 
 describe('homeServerTarget', () => {
   it('probes the instance endpoint of whatever server you are on', () => {
-    const home = homeServerTarget('https://mastodon.social');
+    const home = homeServerTarget('https://mastodon.social', translate);
     expect(home?.host).toBe('mastodon.social');
     expect(home?.probeUrl).toBe('https://mastodon.social/api/v1/instance');
     // Opening a raw API URL in a tab shows JSON, which teaches nobody
@@ -297,7 +302,7 @@ describe('homeServerTarget', () => {
   it('contributes no row for the built-in mock', () => {
     // An empty base URL means same-origin, and probing your own origin from
     // your own origin proves nothing about the network.
-    expect(homeServerTarget('')).toBeNull();
+    expect(homeServerTarget('', translate)).toBeNull();
   });
 });
 
@@ -401,7 +406,7 @@ describe('timingHint', () => {
     // The one failure shape that points at something installed locally rather
     // than at the network, which is worth separating precisely because the
     // remedy is different.
-    const hint = timingHint(result('failed', 'unknown', 3))!;
+    const hint = timingHint(result('failed', 'unknown', 3), translate)!;
     expect(hint).toContain('too fast for anything to have gone out');
     expect(hint).toContain('3ms');
   });
@@ -411,36 +416,38 @@ describe('timingHint', () => {
     // 50-350ms. Calling that "an extension blocked it" sends the reader after
     // software that is not there.
     for (const ms of [68, 83, 342]) {
-      expect(timingHint(result('failed', 'unknown', ms))).toContain('one round trip');
+      expect(timingHint(result('failed', 'unknown', ms), translate)).toContain('one round trip');
     }
   });
 
   it('reads a slow failure as something along the path refusing', () => {
-    expect(timingHint(result('failed', 'unknown', 800))).toContain(
+    expect(timingHint(result('failed', 'unknown', 800), translate)).toContain(
       'reached something that refused it',
     );
   });
 
   it('reads a timeout as silent discard', () => {
-    expect(timingHint(result('timeout', 'unknown', 8000))).toContain('discarded silently');
+    expect(timingHint(result('timeout', 'unknown', 8000), translate)).toContain(
+      'discarded silently',
+    );
   });
 
   it('flags a host that works but is slow enough to feel broken', () => {
     // AllOrigins is exactly this case, and a green row alone would mislead.
-    expect(timingHint(result('reachable', 'readable', 6200))).toContain('6.2s');
+    expect(timingHint(result('reachable', 'readable', 6200), translate)).toContain('6.2s');
   });
 
   it('says nothing when the timing adds nothing', () => {
     // A hint on every row is noise, and noise is how a diagnostic stops being
     // read at all.
-    expect(timingHint(result('reachable', 'readable', 210))).toBeNull();
-    expect(timingHint(result('idle', 'unknown', null))).toBeNull();
+    expect(timingHint(result('reachable', 'readable', 210), translate)).toBeNull();
+    expect(timingHint(result('idle', 'unknown', null), translate)).toBeNull();
   });
 });
 
 describe('corsHint', () => {
   it('explains that a blocked read is the host’s decision, not a local setting', () => {
-    const hint = corsHint(result('reachable', 'blocked', 300))!;
+    const hint = corsHint(result('reachable', 'blocked', 300), translate)!;
     expect(hint).toMatch(/host's policy/);
     // The load-bearing claim: nothing installed on this side changes it, which
     // is why the extension advice is wrong.
@@ -452,19 +459,19 @@ describe('corsHint', () => {
     // without CORS headers while `/rest/v1/collections` answers with them. A
     // row that contradicts a connector the user can see working needs to say
     // which of the two to believe.
-    const hint = corsHint(result('reachable', 'blocked', 300))!;
+    const hint = corsHint(result('reachable', 'blocked', 300), translate)!;
     expect(hint).toMatch(/single URL|one URL/);
     expect(hint).toMatch(/believe the connector/);
   });
 
   it('says a readable host needs no proxy', () => {
-    expect(corsHint(result('reachable', 'readable', 300))).toContain('no proxy needed');
+    expect(corsHint(result('reachable', 'readable', 300), translate)).toContain('no proxy needed');
   });
 
   it('refuses to mention CORS for a host that was never reached', () => {
     // Naming CORS here would invite exactly the wrong fix for a network block.
-    expect(corsHint(result('failed', 'unknown', 50))).toBeNull();
-    expect(corsHint(result('timeout', 'unknown', 8000))).toBeNull();
+    expect(corsHint(result('failed', 'unknown', 50), translate)).toBeNull();
+    expect(corsHint(result('timeout', 'unknown', 8000), translate)).toBeNull();
   });
 });
 
@@ -473,7 +480,11 @@ describe('proxyHint', () => {
     // The whole reason for the third leg: proving the bytes can make the round
     // trip eliminates network, proxy and CORS at once, which turns an
     // unbounded "could not reach the service" into "check your key".
-    const hint = proxyHint(result('reachable', 'blocked', 200, 'works', 640), 'AllOrigins')!;
+    const hint = proxyHint(
+      result('reachable', 'blocked', 200, 'works', 640),
+      'AllOrigins',
+      translate,
+    )!;
     expect(hint).toContain('AllOrigins');
     expect(hint).toContain('640ms');
     expect(hint).toContain('an API key, a plan or credit limit, or a consent');
@@ -483,6 +494,7 @@ describe('proxyHint', () => {
     const refused = proxyHint(
       result('reachable', 'blocked', 200, 'target-refused', 300),
       'CORS.SH',
+      translate,
     )!;
     expect(refused).toContain('refused the request coming from it');
     // The actionable part: retrying will not help, a different proxy might.
@@ -491,19 +503,24 @@ describe('proxyHint', () => {
     const dead = proxyHint(
       result('reachable', 'blocked', 200, 'proxy-unreachable', 8000),
       'CORS.SH',
+      translate,
     )!;
     expect(dead).toContain('could not be reached at all');
   });
 
   it('says so when there is no proxy to try', () => {
-    expect(proxyHint(result('reachable', 'blocked', 200, 'none'), null)).toContain(
+    expect(proxyHint(result('reachable', 'blocked', 200, 'none'), null, translate)).toContain(
       'none is configured',
     );
   });
 
   it('stays quiet for a host that never needed a proxy', () => {
-    expect(proxyHint(result('reachable', 'readable', 200, 'not-needed'), 'AllOrigins')).toBeNull();
-    expect(proxyHint(result('failed', 'unknown', 50, 'unknown'), 'AllOrigins')).toBeNull();
+    expect(
+      proxyHint(result('reachable', 'readable', 200, 'not-needed'), 'AllOrigins', translate),
+    ).toBeNull();
+    expect(
+      proxyHint(result('failed', 'unknown', 50, 'unknown'), 'AllOrigins', translate),
+    ).toBeNull();
   });
 });
 
@@ -511,13 +528,15 @@ describe('interpret', () => {
   it('clears the network when the page loads but the request does not', () => {
     // The pairing that carries information neither half has alone, and the
     // reason the self-report step exists at all.
-    const reading = interpret('failed', 'loaded');
+    const reading = interpret('failed', 'loaded', translate);
     expect(reading).toContain('CORS');
     expect(reading).toContain('reachable');
   });
 
   it('names the network when the user saw a block page', () => {
-    expect(interpret('failed', 'block-page')).toContain('filtering this host on purpose');
+    expect(interpret('failed', 'block-page', translate)).toContain(
+      'filtering this host on purpose',
+    );
   });
 
   it('clears the network on a bot check, and says clicking through will not fix it', () => {
@@ -525,20 +544,20 @@ describe('interpret', () => {
     // answering, so the network is exonerated, but the connector still cannot
     // work — and the user will otherwise pass the challenge, see the site, and
     // reasonably expect the app to start working.
-    const reading = interpret('failed', 'bot-check');
+    const reading = interpret('failed', 'bot-check', translate);
     expect(reading).toContain('your network is fine');
     expect(reading).toContain('keep failing even after you clear the challenge');
   });
 
   it('treats a bot check as a non-issue when the request got through anyway', () => {
-    const reading = interpret('reachable', 'bot-check');
+    const reading = interpret('reachable', 'bot-check', translate);
     expect(reading).toContain('Nothing to do');
   });
 
   it('never claims certainty about a silent drop', () => {
     // A firewall discarding packets and a slow host are genuinely
     // indistinguishable, and the copy has to say so.
-    expect(interpret('timeout', 'timed-out')).toContain('looks the same');
+    expect(interpret('timeout', 'timed-out', translate)).toContain('looks the same');
   });
 });
 
@@ -571,14 +590,14 @@ describe('rowOutcome', () => {
     expect(rowOutcome(proxied)).toBe('usable');
     // And the headline names the route, because "works directly" and "works via
     // a proxy" fail differently later.
-    expect(outcomeLabel(rowOutcome(proxied), proxied)).toBe('Working (via proxy)');
+    expect(outcomeLabel(rowOutcome(proxied), proxied, translate)).toBe('Working (via proxy)');
   });
 
   it('is usable, unqualified, when the host is directly readable', () => {
     const direct = probe({});
 
     expect(rowOutcome(direct)).toBe('usable');
-    expect(outcomeLabel(rowOutcome(direct), direct)).toBe('Working');
+    expect(outcomeLabel(rowOutcome(direct), direct, translate)).toBe('Working');
   });
 
   // Amber is for the state the reader can act on, and only that state.
@@ -614,7 +633,7 @@ describe('rowOutcome', () => {
   // The other half of the mixed signal: once a proxy has solved it, the CORS
   // line explains the route instead of restating an open problem.
   it('stops diagnosing CORS once the proxy has solved it', () => {
-    const hint = corsHint(probe({ cors: 'blocked', proxy: 'works' }));
+    const hint = corsHint(probe({ cors: 'blocked', proxy: 'works' }), translate);
 
     expect(hint).toContain('goes through your proxy');
     expect(hint).not.toContain('Access-Control-Allow-Origin');
@@ -696,7 +715,9 @@ describe('a host reachable only through the proxy', () => {
     };
 
     expect(rowOutcome(viaProxyOnly)).toBe('usable');
-    expect(outcomeLabel(rowOutcome(viaProxyOnly), viaProxyOnly)).toBe('Working (via proxy)');
+    expect(outcomeLabel(rowOutcome(viaProxyOnly), viaProxyOnly, translate)).toBe(
+      'Working (via proxy)',
+    );
   });
 
   // The copy must not claim the path is clear when the direct leg is broken —
@@ -705,6 +726,7 @@ describe('a host reachable only through the proxy', () => {
     const hint = proxyHint(
       { verdict: 'failed', cors: 'unknown', proxy: 'works', ms: 40, proxyMs: 300 },
       'AllOrigins',
+      translate,
     );
 
     expect(hint).toContain('could not reach this host directly');

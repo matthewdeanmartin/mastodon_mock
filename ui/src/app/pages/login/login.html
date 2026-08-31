@@ -12,7 +12,7 @@
       />
       <div>
         <h1>{{ brand }}</h1>
-        <p class="tagline muted">An opinionated client for Mastodon and the Fediverse.</p>
+        <p class="tagline muted">{{ 'pages.login.tagline' | transloco }}</p>
       </div>
     </div>
 
@@ -24,7 +24,7 @@
         [attr.aria-selected]="tab() === 'signin'"
         (click)="selectTab('signin')"
       >
-        Sign in / Register
+        {{ 'pages.login.tabs.signin' | transloco }}
       </button>
       @if (mockTooling && server.isMock) {
         <button
@@ -34,7 +34,7 @@
           [attr.aria-selected]="tab() === 'mock'"
           (click)="selectTab('mock')"
         >
-          Mock Login
+          {{ 'pages.login.tabs.mockLogin' | transloco }}
         </button>
         <button
           class="tab"
@@ -43,7 +43,7 @@
           [attr.aria-selected]="tab() === 'init'"
           (click)="selectTab('init')"
         >
-          Mock Init
+          {{ 'pages.login.tabs.mockInit' | transloco }}
         </button>
       }
     </div>
@@ -52,13 +52,15 @@
     @if (tab() === 'signin') {
       <!-- ---------- Server combo: pick a common one or type your own ---------- -->
       <p class="muted small">
-        Not sure which server?
+        {{ 'pages.login.notSure.question' | transloco }}
         <a href="https://joinmastodon.org/servers" target="_blank" rel="noopener">
-          Browse the full directory on joinmastodon.org ↗
+          {{ 'pages.login.notSure.browse' | transloco }}
         </a>
       </p>
       <div class="server-row">
-        <label class="server-label muted" for="server-combo">Your server</label>
+        <label class="server-label muted" for="server-combo">{{
+          'pages.login.server.label' | transloco
+        }}</label>
         <div class="server-combo">
           <div class="server-field">
             <input
@@ -73,7 +75,7 @@
               (focus)="onServerFocus()"
               (blur)="onServerBlur()"
               (keyup.enter)="applyServerNow()"
-              placeholder="mastodon.social — or type any instance"
+              [placeholder]="'pages.login.server.placeholder' | transloco"
               autocomplete="off"
               autocapitalize="off"
               spellcheck="false"
@@ -107,45 +109,59 @@
               [class.active]="server.isMock"
               (click)="selectServer('')"
             >
-              This server (mock)
+              {{ 'pages.login.server.thisServerMock' | transloco }}
             </button>
           }
         </div>
         <p class="server-status muted small">
           @switch (serverStatus()) {
             @case ('checking') {
-              Checking {{ customServer() }}…
+              {{ 'pages.login.server.checking' | transloco: { server: customServer() } }}
             }
             @case ('ok') {
-              ✓ Connected to <strong>{{ serverHostLabel() }}</strong>
+              <span
+                [innerHTML]="
+                  'pages.login.server.connected' | transloco: { server: serverHostLabel() }
+                "
+              ></span>
               @if (serverTitle()) {
                 ({{ serverTitle() }})
               }
             }
             @case ('degraded') {
               <span class="server-warning">
-                ⚠ Connected to <strong>{{ probedServerHostLabel() }}</strong
-                >, but {{ mediaHost() || 'its media server' }} is blocked or down. Images will not
-                load.
+                <span
+                  [innerHTML]="
+                    'pages.login.server.degraded'
+                      | transloco
+                        : {
+                            server: probedServerHostLabel(),
+                            media: mediaHost() || ('pages.login.server.itsMediaServer' | transloco),
+                          }
+                  "
+                ></span>
                 @if (pendingDegradedServer()) {
                   <button class="text-button" type="button" (click)="useDegradedServer()">
-                    Use anyway
+                    {{ 'pages.login.server.useAnyway' | transloco }}
                   </button>
                 }
               </span>
             }
             @case ('unreachable') {
               <span class="server-warning">
-                ⚠ Can’t reach {{ customServer() }}. The server may be offline or blocked.
+                {{ 'pages.login.server.unreachable' | transloco: { server: customServer() } }}
                 <button class="text-button" type="button" (click)="applyServerNow()">
-                  Try again
+                  {{ 'pages.login.server.tryAgain' | transloco }}
                 </button>
               </span>
             }
             @default {
-              Talking to
+              {{ 'pages.login.server.talkingTo' | transloco }}
               <code>{{
-                server.baseUrl() || (server.allowsThisServer ? 'this server' : '— pick a server —')
+                server.baseUrl() ||
+                  (server.allowsThisServer
+                    ? ('pages.login.server.thisServer' | transloco)
+                    : ('pages.login.server.pickAServer' | transloco))
               }}</code>
             }
           }
@@ -156,15 +172,17 @@
       <div class="paths">
         <!-- Path 1: existing account, OAuth (never your password) -->
         <section class="path path-primary">
-          <h2>I have an account</h2>
+          <h2>{{ 'pages.login.path.haveAccount' | transloco }}</h2>
           @if (needsInstance()) {
-            <p class="muted small">Pick your server above, then sign in.</p>
+            <p class="muted small">{{ 'pages.login.path.pickServerFirst' | transloco }}</p>
           } @else {
             @if (oauthError()) {
               <p class="error">{{ oauthError() }}</p>
             }
             <fieldset class="access-choice">
-              <legend class="muted small">How much access to grant this app</legend>
+              <legend class="muted small">
+                {{ 'pages.login.oauth.accessLegend' | transloco }}
+              </legend>
               @for (choice of accessChoices; track choice.value) {
                 <label class="access-option">
                   <input
@@ -176,32 +194,35 @@
                     [disabled]="oauthWorking()"
                   />
                   <span>
-                    <strong>{{ choice.label }}</strong>
-                    <span class="muted small">{{ choice.hint }}</span>
+                    <strong>{{ choice.labelKey | transloco }}</strong>
+                    <span class="muted small">{{ choice.hintKey | transloco }}</span>
                   </span>
                 </label>
               }
             </fieldset>
             <button class="btn btn-hero" [disabled]="oauthWorking()" (click)="startOAuth()">
-              {{ oauthWorking() ? 'Redirecting…' : 'Sign in with ' + serverHostLabel() }}
+              {{
+                oauthWorking()
+                  ? ('pages.login.oauth.redirecting' | transloco)
+                  : ('pages.login.oauth.signInWith' | transloco: { server: serverHostLabel() })
+              }}
             </button>
             <p class="muted small">
-              You'll log in on {{ serverHostLabel() }}'s own page and come straight back.
-              <strong>We never see your password.</strong>
+              {{ 'pages.login.oauth.ownPage' | transloco: { server: serverHostLabel() } }}
+              <strong>{{ 'pages.login.oauth.neverSeePassword' | transloco }}</strong>
             </p>
           }
           <details class="token-path account-token-path">
-            <summary>I have an API token</summary>
+            <summary>{{ 'pages.login.token.summary' | transloco }}</summary>
             <p class="muted small">
-              For developers and power users: paste an access token for
-              {{ serverHostLabel() }} (create one under Preferences → Development on your server).
+              {{ 'pages.login.token.paste' | transloco: { server: serverHostLabel() } }}
             </p>
             <input
               type="text"
               [ngModel]="token()"
               (ngModelChange)="token.set($event)"
               (keyup.enter)="submit()"
-              placeholder="access token"
+              [placeholder]="'pages.login.token.placeholder' | transloco"
               [disabled]="needsInstance()"
             />
             @if (error()) {
@@ -212,47 +233,56 @@
               [disabled]="!token().trim() || checking() || needsInstance()"
               (click)="submit()"
             >
-              {{ checking() ? 'Checking…' : 'Sign in with token' }}
+              {{
+                checking()
+                  ? ('pages.login.token.checking' | transloco)
+                  : ('pages.login.token.submit' | transloco)
+              }}
             </button>
           </details>
         </section>
 
         <!-- Path 2: no account yet -->
         <section class="path">
-          <h2>I'm new here</h2>
+          <h2>{{ 'pages.login.path.newHere' | transloco }}</h2>
           @if (server.isMock) {
             <!-- The embedded mock owns its accounts, so an inline signup is safe here. -->
             @if (pendingToken()) {
               <p class="muted small">
-                Almost there! We sent a confirmation email to
-                <code>{{ regEmail() }}</code
-                >. Click the link to verify your address.
+                {{ 'pages.login.confirm.sentTo' | transloco }}
+                <code>{{ regEmail() }}</code>
+                {{ 'pages.login.confirm.clickLink' | transloco }}
               </p>
               <button class="btn verify-link" [disabled]="verifying()" (click)="confirmAndEnter()">
-                {{ verifying() ? 'Verifying…' : '✉ Verify email & continue' }}
+                {{
+                  verifying()
+                    ? ('pages.login.confirm.verifying' | transloco)
+                    : ('pages.login.confirm.verify' | transloco)
+                }}
               </button>
               <p class="muted small">
-                (This mock doesn't really send mail — clicking just exercises
-                <code>/api/v1/emails/confirmations</code> and signs you in.)
+                {{ 'pages.login.confirm.mockNote.a' | transloco }}
+                <code>/api/v1/emails/confirmations</code>
+                {{ 'pages.login.confirm.mockNote.b' | transloco }}
               </p>
             } @else {
               <input
                 type="text"
                 [ngModel]="regUsername()"
                 (ngModelChange)="regUsername.set($event)"
-                placeholder="username"
+                [placeholder]="'pages.login.register.usernamePlaceholder' | transloco"
               />
               <input
                 type="email"
                 [ngModel]="regEmail()"
                 (ngModelChange)="regEmail.set($event)"
-                placeholder="email"
+                [placeholder]="'pages.login.register.emailPlaceholder' | transloco"
               />
               <input
                 type="password"
                 [ngModel]="regPassword()"
                 (ngModelChange)="regPassword.set($event)"
-                placeholder="password"
+                [placeholder]="'pages.login.register.passwordPlaceholder' | transloco"
               />
               <label class="agree">
                 <input
@@ -260,13 +290,17 @@
                   [ngModel]="regAgree()"
                   (ngModelChange)="regAgree.set($event)"
                 />
-                <span>I agree to the server rules</span>
+                <span>{{ 'pages.login.register.agree' | transloco }}</span>
               </label>
               @if (regError()) {
                 <p class="error">{{ regError() }}</p>
               }
               <button class="btn btn-outline" [disabled]="regWorking()" (click)="register()">
-                {{ regWorking() ? 'Creating…' : 'Sign up on the mock' }}
+                {{
+                  regWorking()
+                    ? ('pages.login.register.creating' | transloco)
+                    : ('pages.login.register.submit' | transloco)
+                }}
               </button>
             }
           } @else {
@@ -278,7 +312,7 @@
               routerLink="/welcome-back"
               [queryParams]="{ server: server.baseUrl() }"
             >
-              Create an account on {{ serverHostLabel() }} →
+              {{ 'pages.login.signup.createOn' | transloco: { server: serverHostLabel() } }}
             </a>
             <p class="muted small">
               Sign-up happens on the server itself — Mocking Bird will not get your email or
@@ -289,21 +323,23 @@
 
         <!-- Path 3: local-only Anonymous account, kept visually secondary. -->
         <section class="path anonymous-option" aria-labelledby="anonymous-heading">
-          <h2 id="anonymous-heading">Browse anonymously</h2>
+          <h2 id="anonymous-heading">{{ 'pages.login.anon.heading' | transloco }}</h2>
           <button
             class="btn btn-outline"
             type="button"
             [disabled]="serverStatus() === 'unreachable' || !!pendingDegradedServer()"
             (click)="continueAnonymously()"
           >
-            Continue anonymously
+            {{ 'pages.login.anon.continue' | transloco }}
           </button>
           <p class="muted small">
-            Try it without an account, using {{ anonymousServerHostLabel() }} for public data.
+            {{ 'pages.login.anon.tryIt' | transloco: { server: anonymousServerHostLabel() } }}
           </p>
-          <p class="anonymous-finder-label">Or let us find a working public server:</p>
+          <p class="anonymous-finder-label">
+            {{ 'pages.login.anon.findOne' | transloco }}
+          </p>
           <app-server-discovery
-            startLabel="Find a working server"
+            [startLabel]="'pages.login.anon.findAWorkingServer' | transloco"
             [currentServer]="server.baseUrl()"
             (selected)="continueAnonymously($event)"
           />
@@ -314,17 +350,18 @@
     <!-- ====================== Mock Login ====================== -->
     @if (mockTooling && tab() === 'mock' && server.isMock) {
       <p class="muted">
-        One-click sign-in as any local account — Twitter-style. Switch between them anytime from the
-        avatar menu in the header.
+        {{ 'pages.login.mock.intro' | transloco }}
       </p>
       <div class="dev-gen">
         <button class="btn btn-outline" [disabled]="working()" (click)="generate(false)">
-          + Regular user
+          {{ 'pages.login.mock.addRegular' | transloco }}
         </button>
         <button class="btn btn-outline" [disabled]="working()" (click)="generate(true)">
-          + Admin user
+          {{ 'pages.login.mock.addAdmin' | transloco }}
         </button>
-        <button class="link refresh" (click)="refreshDevUsers()">refresh</button>
+        <button class="link refresh" (click)="refreshDevUsers()">
+          {{ 'pages.login.mock.refresh' | transloco }}
+        </button>
       </div>
       @if (error()) {
         <p class="error">{{ error() }}</p>
@@ -337,11 +374,11 @@
                 class="dev-user"
                 [disabled]="working()"
                 (click)="loginAs(u)"
-                [title]="'Log in as @' + u.username"
+                [title]="'pages.login.mock.loginAs' | transloco: { username: u.username }"
               >
                 <span class="dev-name">{{ u.display_name || u.username }}</span>
                 @if (u.role === 'admin') {
-                  <span class="badge">admin</span>
+                  <span class="badge">{{ 'pages.login.mock.adminBadge' | transloco }}</span>
                 }
                 <span class="muted dev-acct">&#64;{{ u.username }}</span>
               </button>
@@ -349,29 +386,36 @@
           }
         </ul>
       } @else {
-        <p class="muted small">No accounts yet — generate one above or seed sample data.</p>
+        <p class="muted small">{{ 'pages.login.mock.empty' | transloco }}</p>
       }
     }
 
     <!-- ====================== Mock Initialization ====================== -->
     @if (mockTooling && tab() === 'init' && server.isMock) {
-      <p class="muted">Bulk-generate a throwaway cohort of accounts, statuses and relationships.</p>
+      <p class="muted">{{ 'pages.login.seed.intro' | transloco }}</p>
       <div class="dev-gen">
         <select [ngModel]="preset()" (ngModelChange)="preset.set($event)" [disabled]="seeding()">
-          <option value="tiny">tiny (~100 posts)</option>
-          <option value="small">small (~5k posts)</option>
-          <option value="medium">medium (~100k posts)</option>
+          <option value="tiny">{{ 'pages.login.seed.preset.tiny' | transloco }}</option>
+          <option value="small">{{ 'pages.login.seed.preset.small' | transloco }}</option>
+          <option value="medium">{{ 'pages.login.seed.preset.medium' | transloco }}</option>
         </select>
         <button class="btn btn-outline" [disabled]="seeding()" (click)="seedSample()">
-          {{ seeding() ? 'Seeding…' : 'Seed sample data' }}
+          {{
+            seeding()
+              ? ('pages.login.seed.seeding' | transloco)
+              : ('pages.login.seed.submit' | transloco)
+          }}
         </button>
       </div>
       @if (seedMessage()) {
         <p class="muted small">{{ seedMessage() }}</p>
       }
       <p class="muted small">
-        After seeding, head to <button class="link" (click)="selectTab('mock')">Mock Login</button>
-        to sign in as one of the new accounts.
+        {{ 'pages.login.seed.hint.a' | transloco }}
+        <button class="link" (click)="selectTab('mock')">
+          {{ 'pages.login.tabs.mockLogin' | transloco }}
+        </button>
+        {{ 'pages.login.seed.hint.b' | transloco }}
       </p>
     }
   </div>
@@ -389,12 +433,10 @@
         [ngModel]="prefs.analytics()"
         (ngModelChange)="prefs.setAnalytics($event)"
       />
-      Count my page views
+      {{ 'pages.login.privacy.checkbox' | transloco }}
     </label>
     <p class="muted small">
-      Anonymous page counts only — which kinds of page get used, never which account, post or tag
-      you looked at. Unchecking this means the analytics script is never loaded: nothing is fetched,
-      counted or sent. You can change it later in Settings.
+      {{ 'pages.login.privacy.explain' | transloco }}
     </p>
   </div>
 

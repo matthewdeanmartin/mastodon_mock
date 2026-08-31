@@ -11,6 +11,7 @@ import {
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { firstValueFrom, switchMap } from 'rxjs';
 import { Api } from '../api';
 import { PageDiagnostics } from '../page-diagnostics';
@@ -347,6 +348,82 @@ function dragHasFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes('Files');
 }
 
+// i18n compose.editing: Editing
+// i18n compose.cancelEdit: Cancel edit
+// i18n compose.dismissBuildStatus: Dismiss build status
+// i18n compose.replyMentionHint: 💬 The leading <strong>&#64;handle</strong> notifies them of your reply. Remove it to reply without sending a mention notification.
+// i18n compose.threadPostPlaceholder: Post {{index}} of the thread
+// i18n compose.removeFromThread: Remove this {{noun}} from the thread
+// i18n compose.choicePlaceholder: Choice {{index}}
+// i18n compose.postTo: {{noun}} to
+// i18n compose.postLanguage: {{noun}} language
+// i18n compose.scheduleThis: Schedule {{noun}}
+// i18n compose.suggestHashtagsFor: Suggest hashtags for this {{noun}}
+// i18n compose.translateThis: Translate this {{noun}} into another language
+// i18n compose.addAnotherPost: Add another {{noun}} (thread / tweet storm)
+// i18n compose.byteCount: {{count}} bytes
+
+// i18n compose.addChoice: + Add choice
+// i18n compose.addPoll: Add poll
+// i18n compose.allowMultiple: Allow multiple
+// i18n compose.altPlaceholder: Describe for the visually impaired
+// i18n compose.attachMedia: Attach media — or paste / drag & drop an image
+// i18n compose.blueskyLimit: Bluesky limit
+// i18n compose.cancel: Cancel
+// i18n compose.clear: Clear
+// i18n compose.deleteDraftCopy: Delete the private draft copy?
+// i18n compose.dismiss: Dismiss
+// i18n compose.drafts: Drafts
+// i18n compose.insertEmoji: Insert emoji
+// i18n compose.markSensitive: Mark media sensitive
+// i18n compose.pasteExpiry: Paste expiry
+// i18n compose.pasteService: Paste service
+// i18n compose.postingIn: Posting in
+// i18n compose.previewEmpty: Nothing here yet…
+// i18n compose.previewHeading: Preview — as it will appear in the feed
+// i18n compose.publishAt: Publish at
+// i18n compose.publishNow: Publish now
+// i18n compose.remove: Remove
+// i18n compose.removeChoice: Remove choice
+// i18n compose.showDrafts: Show drafts
+// i18n compose.syntaxLanguage: Syntax language
+// i18n compose.threadOf: Will post as a thread of
+// i18n compose.titlePrefix: Title:
+// i18n compose.togglePreview: Toggle preview
+// i18n compose.visibility: Visibility
+// i18n compose.visibilityFixed: Visibility is fixed here
+// i18n compose.warn.blogOneDoc: Blog posts accept one titled Markdown document here — remove media, polls, thread boxes, or scheduling.
+// i18n compose.warn.bskyNoPolls: Bluesky has no polls — remove the poll first.
+// i18n compose.warn.bskyThreads: Threads post to Bluesky as a chain of replies, one box per post.
+// i18n compose.warn.overLimit.a: A post is over
+// i18n compose.warn.overLimit.b: characters — shorten it or move text to another thread post (➕🧵).
+// i18n compose.warn.pasteOneDoc: Paste services accept one text document here — remove media, polls, thread boxes, or scheduling.
+// i18n compose.warn.pasteTooBig: This paste is over the provider's 2 MB limit.
+// i18n compose.warn.pollsCwFediOnly: Polls and CWs go to Fedi only — images go to both.
+// i18n compose.warn.scheduleFediOnly: Scheduling is Fedi-only — switch the post target to 🦣.
+
+// i18n compose.target.fedi: 🦣 Fedi
+// i18n compose.target.bluesky: 🦋 Bluesky
+// i18n compose.target.both: 🦣+🦋 Both
+// i18n compose.target.mataroa: ✍️ Mataroa
+// i18n compose.target.paste: 📋 Paste
+// i18n compose.draftsTab: 📝 Drafts
+// i18n compose.saveAsDraft: 💾 Save as draft
+// i18n compose.langMismatch: You set the language to <strong>{{picked}}</strong>, but this reads as <strong>{{detected}}</strong>. Post anyway, or fix it?
+// i18n compose.keepEditing: Keep editing
+// i18n compose.publishAnyway: Publish anyway
+// i18n compose.notPosted: Not posted
+// i18n compose.savedToDrafts: Saved to drafts.
+// i18n compose.warn.threadsNoSchedule: Threads can't be scheduled — remove the extra posts.
+
+// i18n compose.postAs: Post as {{language}}
+
+// i18n compose.blogDraft: Draft
+// i18n compose.switchTo: Switch to {{language}}
+// i18n compose.pkmWarning: This is tagged <strong>{{label}}</strong>. Publishing posts it to your followers.
+// i18n compose.warn.pasteDisabled: This paste draft cannot be published while Pastebin is disabled in Settings → Feature flags.
+// i18n compose.warn.scheduleTooSoon: Times less than ~5 minutes out publish immediately instead of scheduling.
+
 @Component({
   selector: 'app-compose',
   imports: [
@@ -357,6 +434,7 @@ function dragHasFiles(event: DragEvent): boolean {
     TagHelperDialog,
     TranslateDialog,
     ProxyConsentDialog,
+    TranslocoPipe,
   ],
   templateUrl: './compose.html',
   styleUrl: './compose.css',
@@ -457,6 +535,49 @@ export class Compose implements OnDestroy {
    * post happens later from /drafts. The whole point is the gap in between.
    */
   protected gated = computed(() => this.gateable() && this.prefs.thoughtfulPosting());
+
+  // i18n compose.savesToDraftsHint: Saves to Drafts — post it from there when you're ready
+  // i18n compose.submit.uploading: Uploading…
+  // i18n compose.submit.saveDraft: Save draft
+  // i18n compose.submit.reply: Reply
+  // i18n compose.submit.quote: Quote
+  // i18n compose.submit.schedule: Schedule
+  // i18n compose.submit.paste: Paste
+  // i18n compose.submit.updatePost: Update post
+  // i18n compose.submit.publish: Publish
+  /**
+   * Translation key for the submit button's label.
+   *
+   * Every branch is a whole, independent phrase rather than a word glued onto
+   * a shared stem, so each gets its own key — nothing here concatenates.
+   */
+  protected submitLabelKey = computed(() => {
+    if (this.uploading()) {
+      return 'compose.submit.uploading';
+    }
+    if (this.gated()) {
+      return 'compose.submit.saveDraft';
+    }
+    if (this.inReplyToId()) {
+      return 'compose.submit.reply';
+    }
+    if (this.quotedStatusId()) {
+      return 'compose.submit.quote';
+    }
+    if (this.scheduleActive()) {
+      return 'compose.submit.schedule';
+    }
+    if (this.targetIncludesPaste()) {
+      return 'compose.submit.paste';
+    }
+    if (this.targetIncludesBlog()) {
+      if (this.hugoEdit.editing()) {
+        return 'compose.submit.updatePost';
+      }
+      return this.blogDraft() ? 'compose.submit.saveDraft' : 'compose.submit.publish';
+    }
+    return null;
+  });
 
   protected readonly visibilities = VISIBILITIES;
   protected readonly pollExpiry = POLL_EXPIRY;

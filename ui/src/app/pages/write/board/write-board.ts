@@ -1,4 +1,5 @@
 import { Component, OnDestroy, computed, inject, input, output, signal } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { HumanTimePipe } from '../../../human-time.pipe';
 import { DraftItem } from '../../drafts/draft-items';
 import { WriteColumn, WriteWorkspace } from '../write-workspace';
@@ -41,15 +42,28 @@ const MENU_WIDTH = 150;
  * If moving it means touching anything in here, the boundary was drawn wrong.
  * Its spec mounts it standalone for exactly that reason.
  */
+// i18n pages.write.board.title: Board
+// i18n pages.write.board.intro: Everything unpublished, by how far along it is. Drag a card, or use its ⋯ menu.
+// i18n pages.write.board.close: Close board
+// i18n pages.write.board.moveSetByScheduling: {{column}} is set by scheduling a post, not by moving it here.
+// i18n pages.write.board.scheduledStays: A scheduled post stays in Scheduled until it publishes or is cancelled.
+// i18n pages.write.board.movedTo: Moved to {{column}}.
+// i18n pages.write.board.moveTo: Move to
+// i18n pages.write.board.moveAriaLabel: Move {{preview}} to another column
+// i18n pages.write.board.title.parked: Parked as a far-future scheduled {{noun}}
+// i18n pages.write.board.title.selfOnly: A {{noun}} visible only to you
+// i18n pages.write.board.columnDraftCount.one: {{count}} draft
+// i18n pages.write.board.columnDraftCount.other: {{count}} drafts
 @Component({
   selector: 'app-write-board',
-  imports: [HumanTimePipe],
+  imports: [HumanTimePipe, TranslocoPipe],
   templateUrl: './write-board.html',
   styleUrl: './write-board.css',
 })
 export class WriteBoard implements OnDestroy {
   /** post/tweet/florp vocabulary, per the Blue setting. */
   protected words = inject(Terminology).words;
+  private transloco = inject(TranslocoService);
 
   private workspace = inject(WriteWorkspace);
 
@@ -171,15 +185,23 @@ export class WriteBoard implements OnDestroy {
   protected move(item: DraftItem, to: WriteColumn): void {
     this.closeMenu();
     if (isDerivedColumn(to)) {
-      this.announce(`${this.label(to)} is set by scheduling a post, not by moving it here.`);
+      this.announce(
+        this.transloco.translate<string>('pages.write.board.moveSetByScheduling', {
+          column: this.transloco.translate<string>(this.label(to)),
+        }),
+      );
       return;
     }
     if (item.kind === 'scheduled') {
-      this.announce('A scheduled post stays in Scheduled until it publishes or is cancelled.');
+      this.announce(this.transloco.translate<string>('pages.write.board.scheduledStays'));
       return;
     }
     this.workspace.setColumn(item.key, to);
-    this.announce(`Moved to ${this.label(to)}.`);
+    this.announce(
+      this.transloco.translate<string>('pages.write.board.movedTo', {
+        column: this.transloco.translate<string>(this.label(to)),
+      }),
+    );
   }
 
   // ------------------------------------------------------------ drag and drop

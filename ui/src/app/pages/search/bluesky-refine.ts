@@ -33,6 +33,34 @@ import { BskyRef } from '../../providers/bluesky/bluesky-types';
 import { AccountFacetValue } from './account-refine';
 import { NumericRange } from './mawkingbird-search';
 
+// Labels here are translation keys, not English — see `account-refine.ts` for
+// the shared activity/count ladders and the "indirect keys" idiom they follow.
+// i18n pages.search.activity.notChecked: Not checked
+// i18n pages.search.facet.handle: Handle
+// i18n pages.search.facet.defaultHandle: bsky.social
+// i18n pages.search.facet.customDomain: Custom domain
+// i18n pages.search.facet.customDomainHint: Custom domains are self-hosted handles.
+// i18n pages.search.facet.handleDomain: Handle domain
+// i18n pages.search.facet.likes: Likes
+// i18n pages.search.facet.reposts: Reposts
+// i18n pages.search.facet.replies: Replies
+// i18n pages.search.facet.threadPosition: Thread position
+// i18n pages.search.thread.top: Top-level posts
+// i18n pages.search.thread.direct: Replies to the thread
+// i18n pages.search.thread.deep: Deeper in a thread
+// i18n pages.search.facet.altText: Alt text
+// i18n pages.search.facet.altTextHint: Counts only posts with images.
+// i18n pages.search.facet.hasAltText: Has alt text
+// i18n pages.search.facet.missingAltText: Missing alt text
+// i18n pages.search.facet.quotePosts: Quote posts
+// i18n pages.search.facet.notQuoting: Not quoting
+// i18n pages.search.facet.linksTo: Links to
+// i18n pages.search.count.none: None
+// i18n pages.search.count.1to9: 1 – 9
+// i18n pages.search.count.10to99: 10 – 99
+// i18n pages.search.count.100to999: 100 – 999
+// i18n pages.search.count.1kPlus: 1k+
+
 /** Bluesky's default handle suffix — anything else is a custom domain. */
 const DEFAULT_HANDLE_DOMAIN = 'bsky.social';
 
@@ -94,16 +122,20 @@ export interface BlueskyAccountFacet {
 
 interface Bucket {
   key: string;
-  label: string;
+  labelKey: string;
   test: (n: number) => boolean;
 }
 
 /** Shared with the Mastodon account ladders so the rows read identically. */
 const COUNT_BUCKETS: Bucket[] = [
-  { key: '0-99', label: '< 100', test: (n) => n < 100 },
-  { key: '100-999', label: '100 – 1k', test: (n) => n >= 100 && n < 1_000 },
-  { key: '1000-9999', label: '1k – 10k', test: (n) => n >= 1_000 && n < 10_000 },
-  { key: '10000+', label: '10k+', test: (n) => n >= 10_000 },
+  { key: '0-99', labelKey: 'pages.search.count.under100', test: (n) => n < 100 },
+  { key: '100-999', labelKey: 'pages.search.count.100to1k', test: (n) => n >= 100 && n < 1_000 },
+  {
+    key: '1000-9999',
+    labelKey: 'pages.search.count.1kTo10k',
+    test: (n) => n >= 1_000 && n < 10_000,
+  },
+  { key: '10000+', labelKey: 'pages.search.count.10kPlus', test: (n) => n >= 10_000 },
 ];
 
 function bucketFor(n: number, buckets: Bucket[]): Bucket {
@@ -114,20 +146,20 @@ const DAY_MS = 86_400_000;
 
 interface ActivityBin {
   key: string;
-  label: string;
+  labelKey: string;
   withinDays: number;
 }
 
 /** The same ladder `account-refine.ts` uses, for the same reasons. */
 const ACTIVITY_BINS: readonly ActivityBin[] = [
-  { key: 'd1', label: 'Today', withinDays: 1 },
-  { key: 'd7', label: 'This week', withinDays: 7 },
-  { key: 'd30', label: 'This month', withinDays: 30 },
-  { key: 'd90', label: 'Last 3 months', withinDays: 90 },
-  { key: 'd180', label: 'Last 6 months', withinDays: 180 },
-  { key: 'd365', label: 'Last year', withinDays: 365 },
-  { key: 'd730', label: '1 – 2 years ago', withinDays: 730 },
-  { key: 'older', label: 'Over 2 years ago', withinDays: Infinity },
+  { key: 'd1', labelKey: 'pages.search.activity.today', withinDays: 1 },
+  { key: 'd7', labelKey: 'pages.search.activity.thisWeek', withinDays: 7 },
+  { key: 'd30', labelKey: 'pages.search.activity.thisMonth', withinDays: 30 },
+  { key: 'd90', labelKey: 'pages.search.activity.last3Months', withinDays: 90 },
+  { key: 'd180', labelKey: 'pages.search.activity.last6Months', withinDays: 180 },
+  { key: 'd365', labelKey: 'pages.search.activity.lastYear', withinDays: 365 },
+  { key: 'd730', labelKey: 'pages.search.activity.oneToTwoYears', withinDays: 730 },
+  { key: 'older', labelKey: 'pages.search.activity.overTwoYears', withinDays: Infinity },
 ];
 
 /**
@@ -142,7 +174,7 @@ const ACTIVITY_BINS: readonly ActivityBin[] = [
  */
 const UNKNOWN_ACTIVITY: ActivityBin = {
   key: 'unknown',
-  label: 'Not checked',
+  labelKey: 'pages.search.activity.notChecked',
   withinDays: Infinity,
 };
 
@@ -168,7 +200,7 @@ function activityBinFor(account: Account, now: number): ActivityBin {
 
 function tallyValues(
   items: readonly Account[],
-  pick: (a: Account) => { value: string; label: string } | null,
+  pick: (a: Account) => { value: string; labelKey: string | null; text?: string } | null,
 ): AccountFacetValue[] {
   const counts = new Map<string, AccountFacetValue>();
   for (const a of items) {
@@ -180,7 +212,12 @@ function tallyValues(
     if (existing) {
       existing.count++;
     } else {
-      counts.set(hit.value, { value: hit.value, label: hit.label, count: 1 });
+      counts.set(hit.value, {
+        value: hit.value,
+        labelKey: hit.labelKey,
+        text: hit.text,
+        count: 1,
+      });
     }
   }
   return [...counts.values()].sort((a, b) => b.count - a.count);
@@ -199,7 +236,7 @@ function bucketValues(
   // Count buckets keep their natural small→large order, not popularity order.
   return buckets
     .filter((b) => counts.has(b.key))
-    .map((b) => ({ value: b.key, label: b.label, count: counts.get(b.key)! }));
+    .map((b) => ({ value: b.key, labelKey: b.labelKey, count: counts.get(b.key)! }));
 }
 
 /**
@@ -237,33 +274,34 @@ export function buildBlueskyAccountFacets(
   // handle carries its server's domain whether the user chose it or not.
   push(
     'handleType',
-    'Handle',
+    'pages.search.facet.handle',
     tallyValues(accounts, (a) =>
       isDefaultHandle(a.acct)
-        ? { value: 'default', label: 'bsky.social' }
-        : { value: 'custom', label: 'Custom domain' },
+        ? { value: 'default', labelKey: 'pages.search.facet.defaultHandle' }
+        : { value: 'custom', labelKey: 'pages.search.facet.customDomain' },
     ),
-    { hint: 'Custom domains are self-hosted handles.' },
+    { hint: 'pages.search.facet.customDomainHint' },
   );
 
   // The per-domain breakdown, which groups colleagues at a shared domain.
   push(
     'handleDomain',
-    'Handle domain',
+    'pages.search.facet.handleDomain',
     tallyValues(accounts, (a) => {
+      // A domain is data, identical in every language — see account-refine.
       const d = handleDomain(a.acct);
-      return d ? { value: d, label: d } : null;
+      return d ? { value: d, labelKey: null, text: d } : null;
     }),
   );
 
   push(
     'followers',
-    'Followers',
+    'pages.search.facet.followers',
     bucketValues(accounts, COUNT_BUCKETS, (a) => a.followers_count),
   );
   push(
     'statuses',
-    'Posts',
+    'pages.search.facet.posts',
     bucketValues(accounts, COUNT_BUCKETS, (a) => a.statuses_count),
   );
 
@@ -276,8 +314,8 @@ export function buildBlueskyAccountFacets(
     }
     const values = [...ACTIVITY_BINS, UNKNOWN_ACTIVITY]
       .filter((b) => counts.has(b.key))
-      .map((b) => ({ value: b.key, label: b.label, count: counts.get(b.key)! }));
-    push('activity', 'Last active', values, { showAll: true });
+      .map((b) => ({ value: b.key, labelKey: b.labelKey, count: counts.get(b.key)! }));
+    push('activity', 'pages.search.facet.lastActive', values, { showAll: true });
   }
 
   return facets;
@@ -345,11 +383,11 @@ export interface BlueskyPostFacet {
  * perfectly balanced ones.
  */
 const ENGAGEMENT_BUCKETS: Bucket[] = [
-  { key: '0', label: 'None', test: (n) => n <= 0 },
-  { key: '1-9', label: '1 – 9', test: (n) => n < 10 },
-  { key: '10-99', label: '10 – 99', test: (n) => n < 100 },
-  { key: '100-999', label: '100 – 999', test: (n) => n < 1_000 },
-  { key: '1000+', label: '1k+', test: () => true },
+  { key: '0', labelKey: 'pages.search.count.none', test: (n) => n <= 0 },
+  { key: '1-9', labelKey: 'pages.search.count.1to9', test: (n) => n < 10 },
+  { key: '10-99', labelKey: 'pages.search.count.10to99', test: (n) => n < 100 },
+  { key: '100-999', labelKey: 'pages.search.count.100to999', test: (n) => n < 1_000 },
+  { key: '1000+', labelKey: 'pages.search.count.1kPlus', test: () => true },
 ];
 
 function bskyRef(s: Status): BskyRef | null {
@@ -380,9 +418,9 @@ export function threadPosition(s: Status): ThreadPosition {
 }
 
 const THREAD_LABELS: Record<ThreadPosition, string> = {
-  top: 'Top-level posts',
-  direct: 'Replies to the thread',
-  deep: 'Deeper in a thread',
+  top: 'pages.search.thread.top',
+  direct: 'pages.search.thread.direct',
+  deep: 'pages.search.thread.deep',
 };
 
 /** Registrable-ish domain of a url, with `www.` dropped. Null when unparseable. */
@@ -398,7 +436,7 @@ export function linkDomain(url: string | null | undefined): string | null {
 }
 
 /** True when the post carries at least one image and every image has alt text. */
-function altTextState(s: Status): { value: string; label: string } | null {
+function altTextState(s: Status): { value: string; labelKey: string } | null {
   const media = s.media_attachments ?? [];
   if (!media.length) {
     // Text-only posts aren't "missing" alt text; they'd swamp the facet.
@@ -406,13 +444,13 @@ function altTextState(s: Status): { value: string; label: string } | null {
   }
   const described = media.every((m) => !!m.description?.trim());
   return described
-    ? { value: 'yes', label: 'Has alt text' }
-    : { value: 'no', label: 'Missing alt text' };
+    ? { value: 'yes', labelKey: 'pages.search.facet.hasAltText' }
+    : { value: 'no', labelKey: 'pages.search.facet.missingAltText' };
 }
 
 function tallyStatuses(
   statuses: readonly Status[],
-  pick: (s: Status) => { value: string; label: string } | null,
+  pick: (s: Status) => { value: string; labelKey: string | null; text?: string } | null,
 ): AccountFacetValue[] {
   const counts = new Map<string, AccountFacetValue>();
   for (const s of statuses) {
@@ -424,7 +462,12 @@ function tallyStatuses(
     if (existing) {
       existing.count++;
     } else {
-      counts.set(hit.value, { value: hit.value, label: hit.label, count: 1 });
+      counts.set(hit.value, {
+        value: hit.value,
+        labelKey: hit.labelKey,
+        text: hit.text,
+        count: 1,
+      });
     }
   }
   return [...counts.values()].sort((a, b) => b.count - a.count);
@@ -441,7 +484,7 @@ function bucketStatuses(
   }
   return ENGAGEMENT_BUCKETS.filter((b) => counts.has(b.key)).map((b) => ({
     value: b.key,
-    label: b.label,
+    labelKey: b.labelKey,
     count: counts.get(b.key)!,
   }));
 }
@@ -470,50 +513,52 @@ export function buildBlueskyPostFacets(statuses: readonly Status[]): BlueskyPost
 
   push(
     'likes',
-    'Likes',
+    'pages.search.facet.likes',
     bucketStatuses(statuses, (s) => s.favourites_count),
   );
   push(
     'reposts',
-    'Reposts',
+    'pages.search.facet.reposts',
     bucketStatuses(statuses, (s) => s.reblogs_count),
   );
   push(
     'replyCount',
-    'Replies',
+    'pages.search.facet.replies',
     bucketStatuses(statuses, (s) => s.replies_count),
   );
 
   push(
     'threadPosition',
-    'Thread position',
+    'pages.search.facet.threadPosition',
     tallyStatuses(statuses, (s) => {
       const pos = threadPosition(s);
-      return { value: pos, label: THREAD_LABELS[pos] };
+      return { value: pos, labelKey: THREAD_LABELS[pos] };
     }),
   );
 
   push(
     'altText',
-    'Alt text',
+    'pages.search.facet.altText',
     tallyStatuses(statuses, altTextState),
-    'Counts only posts with images.',
+    'pages.search.facet.altTextHint',
   );
 
   push(
     'quote',
-    'Quote posts',
+    'pages.search.facet.quotePosts',
     tallyStatuses(statuses, (s) =>
-      s.quote ? { value: 'yes', label: 'Quote posts' } : { value: 'no', label: 'Not quoting' },
+      s.quote
+        ? { value: 'yes', labelKey: 'pages.search.facet.quotePosts' }
+        : { value: 'no', labelKey: 'pages.search.facet.notQuoting' },
     ),
   );
 
   push(
     'linkDomain',
-    'Links to',
+    'pages.search.facet.linksTo',
     tallyStatuses(statuses, (s) => {
       const d = linkDomain(bskyRef(s)?.externalUri);
-      return d ? { value: d, label: d } : null;
+      return d ? { value: d, labelKey: d } : null;
     }),
   );
 

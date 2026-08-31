@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { catchError, map, merge, of, toArray } from 'rxjs';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
@@ -123,7 +124,7 @@ const ACTIVITY_SCAN_CONCURRENCY = 4;
  */
 @Component({
   selector: 'app-bluesky-search-panel',
-  imports: [FormsModule, StatusCard, AccountResultCard],
+  imports: [FormsModule, StatusCard, AccountResultCard, TranslocoPipe],
   templateUrl: './bluesky-search-panel.html',
   styleUrls: ['./bluesky-search-panel.css', './search-refine.css'],
 })
@@ -556,9 +557,8 @@ export class BlueskySearchPanel {
    */
   protected readonly statusSorts = STATUS_SORTS.map((sort) => {
     const relabelled: Record<string, string> = {
-      favourites: 'Most liked',
-      reblogs: 'Most reposted',
-      replies: 'Most replies',
+      favourites: 'pages.search.sort.mostLiked',
+      reblogs: 'pages.search.sort.mostReposted',
     };
     return relabelled[sort.value] ? { ...sort, label: relabelled[sort.value] } : sort;
   });

@@ -10,31 +10,53 @@
       #zenEditorBox
       class="zen-box"
       spellcheck="true"
-      aria-label="Write"
+      [aria-label]="'pages.write.aria.write' | transloco"
       [ngModel]="body()"
       (ngModelChange)="onBodyInput($event)"
       (keydown)="onZenKeydown($event)"
     ></textarea>
     <div class="zen-bar">
       <span class="zen-count muted">
-        {{ segments().length }} {{ segments().length === 1 ? words().post : words().posts }}
+        {{
+          (segments().length === 1
+            ? 'pages.write.segmentCount.one'
+            : 'pages.write.segmentCount.other'
+          )
+            | transloco
+              : {
+                  count: segments().length,
+                  noun: segments().length === 1 ? words().post : words().posts,
+                }
+        }}
         @if (overLimitCount()) {
-          <span class="over">· {{ overLimitCount() }} too long</span>
+          <span class="over">
+            ·
+            {{
+              (overLimitCount() === 1
+                ? 'pages.write.tooLongCount.one'
+                : 'pages.write.tooLongCount.other'
+              ) | transloco: { count: overLimitCount() }
+            }}
+          </span>
         }
       </span>
       <button class="btn btn-outline btn-sm" type="button" (click)="exitZen()">
-        Leave zen mode
+        {{ 'pages.write.leaveZenMode' | transloco }}
       </button>
       <button class="btn btn-sm" type="button" [disabled]="!hasContent()" (click)="save()">
-        Save draft
+        {{ 'pages.write.saveDraft' | transloco }}
       </button>
     </div>
   </div>
 } @else {
   <div class="write">
     <div class="write-head">
-      <h2>Write</h2>
-      <div class="write-tabs" role="tablist" aria-label="Writing surfaces">
+      <h2>{{ 'pages.write.heading' | transloco }}</h2>
+      <div
+        class="write-tabs"
+        role="tablist"
+        [aria-label]="'pages.write.aria.writingSurfaces' | transloco"
+      >
         <button
           class="write-tab"
           type="button"
@@ -43,7 +65,7 @@
           [attr.aria-selected]="tab() === 'write'"
           (click)="tab.set('write')"
         >
-          Editor
+          {{ 'pages.write.tab.editor' | transloco }}
         </button>
         <button
           class="write-tab"
@@ -53,7 +75,7 @@
           [attr.aria-selected]="tab() === 'notes'"
           (click)="tab.set('notes')"
         >
-          Notes &amp; to-dos
+          {{ 'pages.write.tab.notes' | transloco }}
           <span class="chip-count">{{ pkmCount(null) }}</span>
         </button>
       </div>
@@ -64,7 +86,7 @@
           [attr.aria-expanded]="boardOpen()"
           (click)="openBoard()"
         >
-          ▦ Board
+          {{ 'pages.write.boardButton' | transloco }}
         </button>
         @if (tab() === 'write') {
           <button
@@ -73,7 +95,7 @@
             [attr.aria-expanded]="leftOpen()"
             (click)="toggleLeft()"
           >
-            Drafts
+            {{ 'pages.write.toggleDrafts' | transloco }}
           </button>
           <button
             class="btn btn-outline btn-sm pane-toggle"
@@ -81,23 +103,35 @@
             [attr.aria-expanded]="rightOpen()"
             (click)="toggleRight()"
           >
-            Notes
+            {{ 'pages.write.toggleNotes' | transloco }}
           </button>
         }
-        <a class="btn btn-outline btn-sm" routerLink="/drafts">All drafts →</a>
+        <a class="btn btn-outline btn-sm" routerLink="/drafts">{{
+          'pages.write.allDrafts' | transloco
+        }}</a>
       </div>
     </div>
-    <p class="page-note">Drafts, editor and notes, side by side. Nothing else.</p>
+    <p class="page-note">{{ 'pages.write.pageNote' | transloco }}</p>
 
     <div class="panes" [class.hidden-tab]="tab() !== 'write'">
       <!-- Drafts ------------------------------------------------------------ -->
-      <aside class="pane pane-left" [class.open]="leftOpen()" aria-label="Drafts">
+      <aside
+        class="pane pane-left"
+        [class.open]="leftOpen()"
+        [aria-label]="'pages.write.aria.drafts' | transloco"
+      >
         <div class="pane-head">
-          <h3>Drafts</h3>
-          <button class="btn btn-sm" type="button" (click)="newDraft()">New</button>
+          <h3>{{ 'pages.write.toggleDrafts' | transloco }}</h3>
+          <button class="btn btn-sm" type="button" (click)="newDraft()">
+            {{ 'pages.write.newDraftButton' | transloco }}
+          </button>
         </div>
 
-        <div class="draft-chips" role="group" aria-label="Filter drafts by kind">
+        <div
+          class="draft-chips"
+          role="group"
+          [aria-label]="'pages.write.aria.filterDraftsByKind' | transloco"
+        >
           @for (chip of chips; track chip.id) {
             <button
               class="chip"
@@ -107,7 +141,7 @@
               [attr.aria-pressed]="filter() === chip.id"
               (click)="select(chip.id)"
             >
-              {{ chip.label }}
+              {{ chip.key | transloco }}
               <span class="chip-count">{{ count(chip.id) }}</span>
             </button>
           }
@@ -119,13 +153,13 @@
 
         <div class="pane-body">
           @if (sources.loading() && !sources.items().length) {
-            <p class="muted center">Loading drafts…</p>
+            <p class="muted center">{{ 'pages.write.loadingDrafts' | transloco }}</p>
           } @else if (!visible().length) {
             <p class="muted center">
               @if (sources.items().length) {
-                No drafts of that kind.
+                {{ 'pages.write.noDraftsOfKind' | transloco }}
               } @else {
-                Nothing in progress yet. Hit <strong>New</strong> and start writing.
+                <span [innerHTML]="'pages.write.noDraftsYet' | transloco"></span>
               }
             </p>
           } @else {
@@ -140,18 +174,30 @@
                 <span class="draft-meta muted">
                   @switch (item.kind) {
                     @case ('local') {
-                      <span title="Saved in this browser only">💾 local</span>
+                      <span [title]="'pages.write.title.localOnly' | transloco">{{
+                        'pages.write.badge.local' | transloco
+                      }}</span>
                     }
                     @case ('scheduled') {
-                      <span [title]="'Parked as a far-future scheduled ' + words().post"
-                        >⏳ parked</span
+                      <span
+                        [title]="
+                          'pages.write.board.title.parked' | transloco: { noun: words().post }
+                        "
+                        >{{ 'pages.write.badge.parked' | transloco }}</span
                       >
                     }
                     @case ('self') {
-                      <span [title]="'A ' + words().post + ' visible only to you'">🔒 self</span>
+                      <span
+                        [title]="
+                          'pages.write.board.title.selfOnly' | transloco: { noun: words().post }
+                        "
+                        >{{ 'pages.write.badge.self' | transloco }}</span
+                      >
                     }
                     @case ('paste') {
-                      <span title="Published to a paste service">📋 paste</span>
+                      <span [title]="'pages.write.title.pasteService' | transloco">{{
+                        'pages.write.badge.paste' | transloco
+                      }}</span>
                     }
                   }
                   <span>{{ item.at | humanTime }}</span>
@@ -163,45 +209,51 @@
       </aside>
 
       <!-- Editor ------------------------------------------------------------ -->
-      <section class="pane pane-editor" aria-label="Editor">
+      <section class="pane pane-editor" [aria-label]="'pages.write.aria.editor' | transloco">
         @if (editing(); as current) {
           <div class="editor-head">
             <div class="editor-id">
-              <strong>{{ current.title }}</strong>
+              <strong>{{ current.titleKey | transloco }}</strong>
               @if (current.savedAt) {
-                <span class="muted">saved {{ current.savedAt | humanTime }}</span>
+                <span class="muted"
+                  >{{ 'pages.write.savedAt' | transloco }} {{ current.savedAt | humanTime }}</span
+                >
               } @else if (current.origin && current.origin !== 'local') {
-                <span class="muted">a copy — the original is untouched</span>
+                <span class="muted">{{ 'pages.write.copyUntouched' | transloco }}</span>
               } @else {
-                <span class="muted">not saved yet</span>
+                <span class="muted">{{ 'pages.write.notSavedYet' | transloco }}</span>
               }
               @if (dirty()) {
-                <span class="dirty-dot" title="Unsaved changes">•</span>
+                <span class="dirty-dot" [title]="'pages.write.title.unsavedChanges' | transloco"
+                  >•</span
+                >
               }
             </div>
 
             <div class="split-picker">
-              <label class="muted" [attr.for]="'split-mode'">Split</label>
+              <label class="muted" [attr.for]="'split-mode'">{{
+                'pages.write.splitLabel' | transloco
+              }}</label>
               <select
                 id="split-mode"
                 [ngModel]="splitMode()"
                 (ngModelChange)="setSplitMode($event)"
               >
                 @for (mode of splitModes; track mode) {
-                  <option [value]="mode">{{ modeLabel(mode) }}</option>
+                  <option [value]="mode">{{ modeLabel(mode) | transloco }}</option>
                 }
               </select>
             </div>
           </div>
 
-          <p class="split-hint muted">{{ modeHint(splitMode()) }}</p>
+          <p class="split-hint muted">{{ modeHint(splitMode()) | transloco }}</p>
 
           @if (cwOpen()) {
             <input
               class="write-cw"
               type="text"
-              aria-label="Content warning"
-              placeholder="Content warning or blog title"
+              [aria-label]="'pages.write.aria.contentWarning' | transloco"
+              [placeholder]="'pages.write.placeholder.cw' | transloco"
               [ngModel]="spoilerText()"
               (ngModelChange)="setSpoilerText($event)"
             />
@@ -213,15 +265,23 @@
               layout where a post is a thing you can point at — which is what
               giving one post its own poll or images needs.
             -->
-            <div class="write-boxes" aria-label="Posts in this thread">
+            <div class="write-boxes" [aria-label]="'pages.write.aria.postsInThread' | transloco">
               @for (box of boxes(); track $index; let i = $index) {
                 <div class="write-box">
                   <div class="write-box-num muted small">{{ i + 1 }}</div>
                   <textarea
                     class="editor-box editor-box-small"
                     spellcheck="true"
-                    [attr.aria-label]="'Post ' + (i + 1) + ' of ' + boxes().length"
-                    [attr.placeholder]="i === 0 ? 'Write.' : 'And then…'"
+                    [attr.aria-label]="
+                      'pages.write.boxAriaLabel'
+                        | transloco: { index: i + 1, total: boxes().length }
+                    "
+                    [attr.placeholder]="
+                      (i === 0
+                        ? 'pages.write.placeholder.writeFirst'
+                        : 'pages.write.placeholder.writeNext'
+                      ) | transloco
+                    "
                     [ngModel]="box"
                     (ngModelChange)="setBoxText(i, $event)"
                     (paste)="onPaste($event)"
@@ -231,7 +291,9 @@
                       class="btn btn-outline btn-sm"
                       type="button"
                       (click)="removeBox(i)"
-                      [attr.aria-label]="'Remove post ' + (i + 1)"
+                      [attr.aria-label]="
+                        'pages.write.removePostAriaLabel' | transloco: { index: i + 1 }
+                      "
                     >
                       ✕
                     </button>
@@ -239,7 +301,7 @@
                 </div>
               }
               <button class="btn btn-outline btn-sm write-box-add" type="button" (click)="addBox()">
-                + Add {{ words().post }}
+                {{ 'pages.write.addPostButton' | transloco: { noun: words().post } }}
               </button>
             </div>
           } @else {
@@ -247,7 +309,7 @@
               #editorBox
               class="editor-box"
               spellcheck="true"
-              aria-label="Write"
+              [aria-label]="'pages.write.aria.write' | transloco"
               [attr.placeholder]="'Write. A line of --- starts a new post.'"
               [ngModel]="body()"
               (ngModelChange)="onBodyInput($event)"
@@ -260,7 +322,7 @@
           }
 
           @if (media().length) {
-            <div class="write-media" aria-label="Attached media">
+            <div class="write-media" [aria-label]="'pages.write.aria.attachedMedia' | transloco">
               @for (item of media(); track item.media.id; let i = $index) {
                 <div class="write-media-item">
                   @if (item.media.type === 'image' || item.media.type === 'gifv') {
@@ -278,7 +340,7 @@
                     type="text"
                     [ngModel]="item.description"
                     (ngModelChange)="setMediaDescription(i, $event)"
-                    placeholder="Describe this media"
+                    [placeholder]="'pages.write.placeholder.describeMedia' | transloco"
                     [attr.aria-label]="'Description for attachment ' + (i + 1)"
                   />
                   <button
@@ -304,7 +366,7 @@
           }
 
           @if (pollOpen()) {
-            <div class="write-poll" aria-label="Poll">
+            <div class="write-poll" [aria-label]="'pages.write.aria.poll' | transloco">
               @for (option of pollOptions(); track $index; let i = $index) {
                 <div class="write-poll-option">
                   <input
@@ -332,7 +394,7 @@
                   [disabled]="pollOptions().length >= 4"
                   (click)="addPollOption()"
                 >
-                  + Add choice
+                  {{ 'pages.write.addChoice' | transloco }}
                 </button>
                 <label>
                   <input
@@ -340,10 +402,10 @@
                     [ngModel]="pollMultiple()"
                     (ngModelChange)="setPollMultiple($event)"
                   />
-                  Allow multiple
+                  {{ 'pages.write.allowMultiple' | transloco }}
                 </label>
                 <select
-                  aria-label="Poll duration"
+                  [aria-label]="'pages.write.aria.pollDuration' | transloco"
                   [ngModel]="pollExpiresIn()"
                   (ngModelChange)="setPollExpiry(+$event)"
                 >
@@ -355,14 +417,14 @@
             </div>
           }
 
-          <div class="write-tools" aria-label="Writing tools">
+          <div class="write-tools" [aria-label]="'pages.write.aria.writingTools' | transloco">
             <label
               class="write-tool"
               [class.disabled]="pollOpen()"
-              title="Attach media — or paste an image into the writing box"
+              [title]="'pages.write.title.attachMediaHint' | transloco"
             >
               📎
-              <span class="sr-only">Attach media</span>
+              <span class="sr-only">{{ 'pages.write.attachMedia' | transloco }}</span>
               <input
                 type="file"
                 multiple
@@ -378,8 +440,8 @@
               [class.on]="pollOpen()"
               [disabled]="media().length > 0"
               (click)="togglePoll()"
-              aria-label="Add poll"
-              title="Add poll"
+              [aria-label]="'pages.write.addPoll' | transloco"
+              [title]="'pages.write.addPoll' | transloco"
             >
               📊
             </button>
@@ -388,9 +450,9 @@
               type="button"
               [class.on]="cwOpen()"
               (click)="toggleCw()"
-              title="Content warning"
+              [title]="'pages.write.contentWarning' | transloco"
             >
-              CW
+              {{ 'pages.write.cwShort' | transloco }}
             </button>
             <button
               class="write-tool"
@@ -398,8 +460,8 @@
               [class.on]="sensitive()"
               [disabled]="!media().length"
               (click)="toggleSensitive()"
-              aria-label="Mark attached media sensitive"
-              title="Mark attached media sensitive"
+              [aria-label]="'pages.write.markSensitive' | transloco"
+              [title]="'pages.write.markSensitive' | transloco"
             >
               ⚠️
             </button>
@@ -409,8 +471,8 @@
                 type="button"
                 [class.on]="emojiOpen()"
                 (click)="toggleEmoji()"
-                aria-label="Insert emoji"
-                title="Insert emoji"
+                [aria-label]="'pages.write.insertEmoji' | transloco"
+                [title]="'pages.write.insertEmoji' | transloco"
               >
                 🙂
               </button>
@@ -425,8 +487,8 @@
                 class="write-tool"
                 type="button"
                 (click)="tagHelperOpen.set(true)"
-                aria-label="Suggest hashtags"
-                title="Suggest hashtags"
+                [aria-label]="'pages.write.suggestHashtags' | transloco"
+                [title]="'pages.write.suggestHashtags' | transloco"
               >
                 🤖#️⃣
               </button>
@@ -434,8 +496,8 @@
                 class="write-tool"
                 type="button"
                 (click)="translateOpen.set(true)"
-                aria-label="Translate writing"
-                title="Translate writing"
+                [aria-label]="'pages.write.translateWriting' | transloco"
+                [title]="'pages.write.translateWriting' | transloco"
               >
                 🤖🌐
               </button>
@@ -444,7 +506,11 @@
             <!-- The compact composer squeezes this into a <select>. Here there
                  is room to show every choice and what it costs, which is the
                  whole reason the writing page exists. -->
-            <div class="write-visibility" role="radiogroup" aria-label="Who can see this">
+            <div
+              class="write-visibility"
+              role="radiogroup"
+              [aria-label]="'pages.write.aria.whoCanSee' | transloco"
+            >
               @for (option of visibilities; track option) {
                 <button
                   class="write-tool write-visibility-option"
@@ -453,15 +519,15 @@
                   [class.active]="visibility() === option"
                   [attr.aria-checked]="visibility() === option"
                   [disabled]="!!visibilityLockReason()"
-                  [title]="visibilityHint(option)"
+                  [title]="visibilityHint(option) | transloco"
                   (click)="setVisibility(option)"
                 >
-                  {{ visibilityIcon(option) }} {{ option }}
+                  {{ visibilityIcon(option) }} {{ visibilityLabel(option) | transloco }}
                 </button>
               }
             </div>
             @if (visibilityLockReason(); as reason) {
-              <span class="write-visibility-locked muted small">🔒 {{ reason }}</span>
+              <span class="write-visibility-locked muted small">🔒 {{ reason | transloco }}</span>
             }
             <span class="bar-gap"></span>
             <select
@@ -471,7 +537,7 @@
               [title]="words().Post + ' language'"
               [attr.aria-label]="words().Post + ' language'"
             >
-              <option value="">🌐 Not specified</option>
+              <option value="">{{ 'pages.write.languageNotSpecified' | transloco }}</option>
               @for (language of languageOptions(); track language.code) {
                 <option [value]="language.code">{{ language.name }}</option>
               }
@@ -483,14 +549,17 @@
           @if (longLinks().length; as linkCount) {
             <div class="link-note muted">
               <span class="link-note-text">
-                {{ linkCount === 1 ? 'That link counts' : 'Those links count' }} as
-                {{ linkCount === 1 ? '23 characters' : linkCount * 23 + ' characters' }}, however
-                long {{ linkCount === 1 ? 'it is' : 'they are' }} — you have room.
+                {{
+                  (linkCount === 1 ? 'pages.write.linkCost.one' : 'pages.write.linkCost.other')
+                    | transloco: { count: linkCount, chars: linkCount * 23 }
+                }}
                 @if (shortenerReady()) {
-                  <span
-                    >Shortening only makes {{ linkCount === 1 ? 'it' : 'them' }} easier to
-                    read.</span
-                  >
+                  <span>{{
+                    (linkCount === 1
+                      ? 'pages.write.shorteningHelps.one'
+                      : 'pages.write.shorteningHelps.other'
+                    ) | transloco
+                  }}</span>
                 }
               </span>
               @if (shortenerReady()) {
@@ -500,11 +569,15 @@
                   [disabled]="shortening()"
                   (click)="shortenLinks()"
                 >
-                  {{ shortening() ? 'Shortening…' : 'Shorten with ' + shortenerName() }}
+                  {{
+                    shortening()
+                      ? ('pages.write.shortening' | transloco)
+                      : ('pages.write.shortenWith' | transloco: { name: shortenerName() })
+                  }}
                 </button>
               } @else {
                 <a class="link-note-setup" routerLink="/settings/connections/link-shortener">
-                  Set up a shortener
+                  {{ 'pages.write.setUpShortener' | transloco }}
                 </a>
               }
             </div>
@@ -520,8 +593,8 @@
           @if (saveError()) {
             <p class="write-warning" role="alert">⚠ {{ saveError() }}</p>
           }
-          @if (notice()) {
-            <p class="write-notice" role="status">✓ {{ notice() }}</p>
+          @if (notice(); as n) {
+            <p class="write-notice" role="status">✓ {{ n.key | transloco: n.params }}</p>
           }
 
           <!--
@@ -535,7 +608,10 @@
             is the same idea for feedback.
           -->
           @if (qualityFindings().length || aiFindings().length || proofreadingRequest()) {
-            <section class="write-findings" aria-label="Writing feedback">
+            <section
+              class="write-findings"
+              [aria-label]="'pages.write.aria.writingFeedback' | transloco"
+            >
               @if (qualityFindings().length || aiFindings().length) {
                 <ul class="write-finding-list">
                   @for (finding of qualityFindings(); track finding.id) {
@@ -544,7 +620,7 @@
                         {{ finding.severity === 'warn' ? '⚠' : 'ℹ' }}
                       </span>
                       <span>
-                        {{ finding.message }}
+                        {{ finding.messageKey | transloco: finding.messageParams }}
                         @if (finding.samples?.length) {
                           <span class="finding-samples">
                             @for (sample of finding.samples; track sample) {
@@ -562,7 +638,7 @@
                     </li>
                   }
                 </ul>
-                <p class="muted small">All advisory — none of this stops you publishing.</p>
+                <p class="muted small">{{ 'pages.write.advisoryOnly' | transloco }}</p>
               }
 
               @if (proofreadingRequest(); as request) {
@@ -574,25 +650,29 @@
                     (click)="toggleProofreadConsent()"
                   >
                     @if (aiProofreading()) {
-                      Asking OpenRouter…
+                      {{ 'pages.write.askingOpenRouter' | transloco }}
                     } @else if (aiProofreadComplete()) {
-                      🤖 Proofread again
+                      {{ 'pages.write.proofreadAgain' | transloco }}
                     } @else {
-                      🤖 Proofread with AI
+                      {{ 'pages.write.proofreadWithAi' | transloco }}
                     }
                   </button>
                   <span class="muted small">
-                    Sends your text to {{ request.connector }} and may use paid credits.
+                    {{ 'pages.write.sendsTextTo' | transloco: { connector: request.connector } }}
                   </span>
 
                   @if (proofreadConsentOpen()) {
                     <div class="write-proofread-consent">
                       <p class="small">
-                        <strong>Connector:</strong> {{ request.connector }}
+                        <strong>{{ 'pages.write.connectorLabel' | transloco }}</strong>
+                        {{ request.connector }}
                         <br />
-                        <strong>Model:</strong> <code>{{ request.model }}</code>
+                        <strong>{{ 'pages.write.modelLabel' | transloco }}</strong>
+                        <code>{{ request.model }}</code>
                       </p>
-                      <p class="small"><strong>Exact prompt that will be sent:</strong></p>
+                      <p class="small">
+                        <strong>{{ 'pages.write.exactPromptLabel' | transloco }}</strong>
+                      </p>
                       <pre class="proofread-prompt">{{ request.prompt }}</pre>
                       <button
                         class="btn btn-sm"
@@ -600,14 +680,14 @@
                         [disabled]="aiProofreading()"
                         (click)="confirmAiProofreader()"
                       >
-                        Send to OpenRouter
+                        {{ 'pages.write.sendToOpenRouter' | transloco }}
                       </button>
                       <button
                         class="btn btn-outline btn-sm"
                         type="button"
                         (click)="proofreadConsentOpen.set(false)"
                       >
-                        Cancel
+                        {{ 'pages.write.cancel' | transloco }}
                       </button>
                     </div>
                   }
@@ -616,13 +696,17 @@
 
               @if (aiProofreading()) {
                 <p class="muted small" role="status">
-                  OpenRouter is asking the selected model for diagnostic notes…
+                  {{ 'pages.write.askingModel' | transloco }}
                 </p>
               } @else if (aiProofreadComplete() && !aiFindings().length) {
-                <p class="muted small" role="status">The model returned no diagnostic notes.</p>
+                <p class="muted small" role="status">
+                  {{ 'pages.write.noDiagnosticNotes' | transloco }}
+                </p>
               }
               @if (aiProofreadError(); as error) {
-                <p class="muted small" role="status">AI proofreader unavailable: {{ error }}</p>
+                <p class="muted small" role="status">
+                  {{ 'pages.write.aiUnavailable' | transloco }} {{ error }}
+                </p>
               }
             </section>
           }
@@ -633,13 +717,13 @@
               class="btn btn-outline btn-sm"
               type="button"
               (click)="enterZen()"
-              aria-label="Enter zen mode, hiding everything but the text"
+              [aria-label]="'pages.write.aria.enterZen' | transloco"
             >
-              Zen mode
+              {{ 'pages.write.zenModeButton' | transloco }}
             </button>
             @if (splitMode() === 'demand') {
               <button class="btn btn-outline btn-sm" type="button" (click)="splitHere()">
-                Split here
+                {{ 'pages.write.splitHere' | transloco }}
               </button>
             }
             <span class="bar-gap"></span>
@@ -648,7 +732,7 @@
                  and publishing are the same act. Mastodon holds the post
                  server-side; nothing depends on this browser staying open. -->
             <label class="write-schedule">
-              <span class="muted small">Publish at</span>
+              <span class="muted small">{{ 'pages.write.publishAt' | transloco }}</span>
               <input
                 type="datetime-local"
                 [ngModel]="wizardScheduleAt()"
@@ -662,7 +746,7 @@
                 class="btn btn-outline btn-sm"
                 type="button"
                 (click)="setWizardScheduleAt('')"
-                aria-label="Clear the scheduled time and publish now"
+                [aria-label]="'pages.write.aria.clearScheduled' | transloco"
               >
                 Clear
               </button>
@@ -687,11 +771,29 @@
 
           <!-- The split preview: the first of the virtuous distractions. -->
           @if (segments().length) {
-            <div class="segments" aria-label="Split preview">
+            <div class="segments" [aria-label]="'pages.write.aria.splitPreview' | transloco">
               <div class="segments-head muted">
-                {{ segments().length }} {{ segments().length === 1 ? words().post : words().posts }}
+                {{
+                  (segments().length === 1
+                    ? 'pages.write.segmentCount.one'
+                    : 'pages.write.segmentCount.other'
+                  )
+                    | transloco
+                      : {
+                          count: segments().length,
+                          noun: segments().length === 1 ? words().post : words().posts,
+                        }
+                }}
                 @if (overLimitCount()) {
-                  <span class="over">· {{ overLimitCount() }} over the limit</span>
+                  <span class="over">
+                    ·
+                    {{
+                      (overLimitCount() === 1
+                        ? 'pages.write.overLimitCount.one'
+                        : 'pages.write.overLimitCount.other'
+                      ) | transloco: { count: overLimitCount() }
+                    }}
+                  </span>
                 }
                 <span class="bar-gap"></span>
                 <!-- Raw shows exactly what you typed and where it splits;
@@ -703,7 +805,10 @@
                   [attr.aria-pressed]="renderedPreview()"
                   (click)="renderedPreview.set(!renderedPreview())"
                 >
-                  {{ renderedPreview() ? 'Showing rendered' : 'Showing raw' }}
+                  {{
+                    (renderedPreview() ? 'pages.write.showingRendered' : 'pages.write.showingRaw')
+                      | transloco
+                  }}
                 </button>
               </div>
               @for (segment of segments(); track $index; let i = $index) {
@@ -723,8 +828,10 @@
           }
         } @else {
           <div class="editor-empty muted">
-            <p>Pick a draft on the left, or start a new one.</p>
-            <button class="btn" type="button" (click)="newDraft()">New draft</button>
+            <p>{{ 'pages.write.pickADraft' | transloco }}</p>
+            <button class="btn" type="button" (click)="newDraft()">
+              {{ 'pages.write.newDraftEmptyState' | transloco }}
+            </button>
           </div>
         }
       </section>
@@ -732,25 +839,31 @@
       <!-- Notes -------------------------------------------------------------
            The virtuous distraction: your own material, not somebody else's
            trending tags. -->
-      <aside class="pane pane-right" [class.open]="rightOpen()" aria-label="Notes and to-dos">
+      <aside
+        class="pane pane-right"
+        [class.open]="rightOpen()"
+        [aria-label]="'pages.write.aria.notesAndTodos' | transloco"
+      >
         <div class="pane-head">
-          <h3>Notes</h3>
-          <a class="pane-link muted" routerLink="/settings/writing">Tags…</a>
+          <h3>{{ 'pages.write.toggleNotes' | transloco }}</h3>
+          <a class="pane-link muted" routerLink="/settings/writing">{{
+            'pages.write.tagsLink' | transloco
+          }}</a>
         </div>
 
         <!-- Jot a stray thought without losing the piece you are writing. -->
         <div class="jot">
-          <label class="sr-only" for="jot-text">Jot a note</label>
+          <label class="sr-only" for="jot-text">{{ 'pages.write.jotANote' | transloco }}</label>
           <input
             id="jot-text"
             class="jot-box"
             type="text"
-            placeholder="Jot something down…"
+            [placeholder]="'pages.write.placeholder.jot' | transloco"
             [ngModel]="jotText()"
             (ngModelChange)="jotText.set($event)"
             (keydown.enter)="jot()"
           />
-          <label class="sr-only" for="jot-kind">Kind</label>
+          <label class="sr-only" for="jot-kind">{{ 'pages.write.kindLabel' | transloco }}</label>
           <select
             id="jot-kind"
             class="jot-kind"
@@ -764,11 +877,15 @@
             }
           </select>
           <button class="btn btn-sm" type="button" [disabled]="!jotText().trim()" (click)="jot()">
-            Save
+            {{ 'pages.write.saveButton' | transloco }}
           </button>
         </div>
 
-        <div class="draft-chips" role="group" aria-label="Filter notes by kind">
+        <div
+          class="draft-chips"
+          role="group"
+          [aria-label]="'pages.write.aria.filterNotesByKind' | transloco"
+        >
           <button
             class="chip"
             type="button"
@@ -776,7 +893,7 @@
             [attr.aria-pressed]="pkmFilter() === null"
             (click)="setPkmFilter(null)"
           >
-            All
+            {{ 'pages.write.allChip' | transloco }}
             <span class="chip-count">{{ pkmCount(null) }}</span>
           </button>
           @for (kind of pkmKindList; track kind) {
@@ -802,14 +919,13 @@
 
         <div class="pane-body">
           @if (pkm.loading() && !pkm.items().length) {
-            <p class="muted center">Loading notes…</p>
+            <p class="muted center">{{ 'pages.write.loadingNotes' | transloco }}</p>
           } @else if (!pkmVisible().length) {
             <p class="muted center">
               @if (pkm.items().length) {
-                Nothing of that kind.
+                {{ 'pages.write.nothingOfThatKind' | transloco }}
               } @else {
-                Tag anything <code>#NOTE</code> or <code>#TODO</code> and it shows up here — as a
-                draft, or as a post only you can see.
+                <span [innerHTML]="'pages.write.pkmEmptySide' | transloco"></span>
               }
             </p>
           } @else {
@@ -821,9 +937,14 @@
                     <span class="pkm-badge">{{ pkmChipLabel(kind) }}</span>
                   }
                   @if (item.source.kind === 'local') {
-                    <span title="Saved in this browser only">💾</span>
+                    <span [title]="'pages.write.title.localOnly' | transloco">💾</span>
                   } @else {
-                    <span [title]="'A ' + words().post + ' visible only to you'">🔒</span>
+                    <span
+                      [title]="
+                        'pages.write.board.title.selfOnly' | transloco: { noun: words().post }
+                      "
+                      >🔒</span
+                    >
                   }
                   <span>{{ item.at | humanTime }}</span>
                 </span>
@@ -837,8 +958,12 @@
     <!-- Notes as a feed. The narrow pane is for glancing; this is for triage,
          because a to-do list fills up like any other feed. -->
     @if (tab() === 'notes') {
-      <section class="notes-tab" aria-label="Notes and to-dos">
-        <div class="draft-chips" role="group" aria-label="Filter notes by kind">
+      <section class="notes-tab" [aria-label]="'pages.write.aria.notesAndTodos' | transloco">
+        <div
+          class="draft-chips"
+          role="group"
+          [aria-label]="'pages.write.aria.filterNotesByKind' | transloco"
+        >
           <button
             class="chip"
             type="button"
@@ -846,7 +971,7 @@
             [attr.aria-pressed]="pkmFilter() === null"
             (click)="setPkmFilter(null)"
           >
-            All
+            {{ 'pages.write.allChip' | transloco }}
             <span class="chip-count">{{ pkmCount(null) }}</span>
           </button>
           @for (kind of pkmKindList; track kind) {
@@ -865,7 +990,9 @@
             }
           }
           <span class="bar-gap"></span>
-          <a class="pane-link muted" routerLink="/settings/writing">Change these words…</a>
+          <a class="pane-link muted" routerLink="/settings/writing">{{
+            'pages.write.changeTheseWords' | transloco
+          }}</a>
         </div>
 
         @for (error of pkm.sourceErrors(); track error.kind) {
@@ -873,18 +1000,14 @@
         }
 
         @if (pkm.loading() && !pkm.items().length) {
-          <p class="muted center">Loading notes…</p>
+          <p class="muted center">{{ 'pages.write.loadingNotes' | transloco }}</p>
         } @else if (!pkmVisible().length) {
           <div class="editor-empty muted">
             @if (pkm.items().length) {
-              <p>Nothing of that kind.</p>
+              <p>{{ 'pages.write.nothingOfThatKind' | transloco }}</p>
             } @else {
-              <p>Tag anything <code>#NOTE</code> or <code>#TODO</code> and it lands here.</p>
-              <p class="small">
-                A <strong>note</strong> is something you wrote down to keep. A
-                <strong>to-do</strong> is something you owe a reply to. Either can be a draft in
-                this browser, or a post only you can see.
-              </p>
+              <p [innerHTML]="'pages.write.pkmEmptyTab.lead' | transloco"></p>
+              <p class="small" [innerHTML]="'pages.write.pkmEmptyTab.defs' | transloco"></p>
             }
           </div>
         } @else {
@@ -898,10 +1021,13 @@
               <span class="note-text">{{ item.preview }}</span>
               <span class="note-meta muted">
                 @if (item.source.kind === 'local') {
-                  <span title="Saved in this browser only">💾 draft</span>
+                  <span [title]="'pages.write.title.localOnly' | transloco">{{
+                    'pages.write.badge.draft' | transloco
+                  }}</span>
                 } @else {
-                  <span [title]="'A ' + words().post + ' visible only to you'"
-                    >🔒 private post</span
+                  <span
+                    [title]="'pages.write.board.title.selfOnly' | transloco: { noun: words().post }"
+                    >{{ 'pages.write.badge.privatePost' | transloco }}</span
                   >
                 }
                 <span>{{ item.at | humanTime }}</span>
@@ -936,19 +1062,20 @@
       (click)="$event.stopPropagation()"
       (keyup)="$event.stopPropagation()"
     >
-      <h3 id="unsaved-title">You have unsaved writing</h3>
+      <h3 id="unsaved-title">{{ 'pages.write.unsavedTitle' | transloco }}</h3>
       <p id="unsaved-message">
         @if (media().length) {
-          Attachments remain only in this open editor. Publish or remove them before switching, or
-          discard everything. Discarding cannot be undone.
+          {{ 'pages.write.unsavedMessage.media' | transloco }}
         } @else {
-          Save it as a local draft before moving on, or discard it. Discarding cannot be undone.
+          {{ 'pages.write.unsavedMessage.plain' | transloco }}
         }
       </p>
       <div class="unsaved-actions">
-        <button class="btn btn-outline" type="button" (click)="cancelSwitch()">Cancel</button>
+        <button class="btn btn-outline" type="button" (click)="cancelSwitch()">
+          {{ 'pages.write.cancel' | transloco }}
+        </button>
         <button class="btn btn-outline btn-danger" type="button" (click)="discardAndContinue()">
-          Discard
+          {{ 'pages.write.discard' | transloco }}
         </button>
         <button
           class="btn"
@@ -956,7 +1083,7 @@
           [disabled]="media().length > 0"
           (click)="saveAndContinue()"
         >
-          Save and continue
+          {{ 'pages.write.saveAndContinue' | transloco }}
         </button>
       </div>
     </div>
@@ -983,14 +1110,22 @@
       (click)="$event.stopPropagation()"
       (keyup)="$event.stopPropagation()"
     >
-      <p class="wizard-step muted small">Step {{ wizardPosition() }} of {{ wizardTotal() }}</p>
+      <p class="wizard-step muted small">
+        {{
+          'pages.write.wizardStep' | transloco: { position: wizardPosition(), total: wizardTotal() }
+        }}
+      </p>
       <h3 id="wizard-title" tabindex="-1">{{ stepTitleKey(step) | transloco }}</h3>
 
       <div class="wizard-body">
         @switch (step) {
           @case ('targets') {
             @if (wizardTargets().length) {
-              <div class="wizard-targets" role="radiogroup" aria-label="Publish to">
+              <div
+                class="wizard-targets"
+                role="radiogroup"
+                [aria-label]="'pages.write.aria.publishTo' | transloco"
+              >
                 @for (target of wizardTargets(); track target) {
                   <label class="wizard-target">
                     <input
@@ -1015,32 +1150,46 @@
               @if (prefs.wizardSteps().when) {
                 @if (canScheduleSelectedTarget()) {
                   <p class="muted small">
-                    Mastodon can hold this post server-side. You can choose a publishing time next.
+                    {{ 'pages.write.scheduleAvailable' | transloco }}
                   </p>
                 } @else {
                   <p class="muted small">
-                    This publishes now. Scheduling is offered only for a single Mastodon post;
-                    Mockingbird does not rely on a browser or phone staying open.
+                    {{ 'pages.write.scheduleUnavailable' | transloco }}
                   </p>
                 }
               }
             } @else {
               <p class="muted">
-                Nothing is connected that this could be published to. Link a service under
-                <a routerLink="/settings/connections">Connections</a>, or sign in.
+                {{ 'pages.write.noTargets.before' | transloco }}
+                <a routerLink="/settings/connections">{{ 'pages.write.connections' | transloco }}</a
+                >{{ 'pages.write.noTargets.after' | transloco }}
               </p>
             }
           }
 
           @case ('preview') {
             <p class="muted small">
-              {{ segments().length }} {{ segments().length === 1 ? words().post : words().posts }},
-              split by {{ modeLabel(splitMode()) | lowercase }}.
+              {{
+                (segments().length === 1
+                  ? 'pages.write.splitSummary.one'
+                  : 'pages.write.splitSummary.other'
+                )
+                  | transloco
+                    : {
+                        count: segments().length,
+                        noun: segments().length === 1 ? words().post : words().posts,
+                        mode: (modeNoun(splitMode()) | transloco),
+                      }
+              }}
               @if (overLimitCount()) {
-                <span class="over"
-                  >{{ overLimitCount() }} over the limit — the server will refuse
-                  {{ overLimitCount() === 1 ? 'it' : 'them' }}.</span
-                >
+                <span class="over">
+                  {{
+                    (overLimitCount() === 1
+                      ? 'pages.write.overLimitRefuse.one'
+                      : 'pages.write.overLimitRefuse.other'
+                    ) | transloco: { count: overLimitCount() }
+                  }}
+                </span>
               }
             </p>
             <div class="wizard-preview">
@@ -1065,7 +1214,7 @@
                       {{ finding.severity === 'warn' ? '⚠' : 'ℹ' }}
                     </span>
                     <span>
-                      {{ finding.message }}
+                      {{ finding.messageKey | transloco: finding.messageParams }}
                       @if (finding.samples?.length) {
                         <span class="finding-samples muted small">
                           @for (sample of finding.samples; track sample) {
@@ -1083,20 +1232,19 @@
                   </li>
                 }
               </ul>
-              <p class="muted small">All advisory — none of this stops you publishing.</p>
+              <p class="muted small">{{ 'pages.write.advisoryOnly' | transloco }}</p>
             } @else {
-              <p class="muted">The built-in checks found nothing worth mentioning.</p>
+              <p class="muted">{{ 'pages.write.noFindings' | transloco }}</p>
             }
 
             <p class="muted small">
-              Proofreading happens in the editor, where you can still change the text. Close this
-              and use 🤖 Proofread with AI beside your writing.
+              {{ 'pages.write.proofreadElsewhere' | transloco }}
             </p>
           }
 
           @case ('when') {
             <label class="wizard-when">
-              <span>Publish at</span>
+              <span>{{ 'pages.write.publishAt' | transloco }}</span>
               <input
                 type="datetime-local"
                 [ngModel]="wizardScheduleAt()"
@@ -1106,10 +1254,9 @@
             </label>
             <p class="muted small">
               @if (wizardScheduleAt()) {
-                The server holds it and publishes it then. It appears under Parked in your drafts
-                until it does.
+                {{ 'pages.write.holdsUntilPublish' | transloco }}
               } @else {
-                Leave this empty to publish to Mastodon now.
+                {{ 'pages.write.emptyPublishesNow' | transloco }}
               }
             </p>
           }
@@ -1121,10 +1268,14 @@
       }
 
       <div class="wizard-actions">
-        <button class="btn btn-outline" type="button" (click)="wizardCancel()">Cancel</button>
+        <button class="btn btn-outline" type="button" (click)="wizardCancel()">
+          {{ 'pages.write.cancel' | transloco }}
+        </button>
         <span class="bar-gap"></span>
         @if (wizardCanGoBack()) {
-          <button class="btn btn-outline" type="button" (click)="wizardBack()">Back</button>
+          <button class="btn btn-outline" type="button" (click)="wizardBack()">
+            {{ 'pages.write.back' | transloco }}
+          </button>
         }
         <button
           class="btn"
@@ -1132,7 +1283,11 @@
           [disabled]="wizardBusy() || aiProofreading()"
           (click)="wizardForward()"
         >
-          {{ wizardBusy() ? 'Publishing…' : wizardForwardLabel() }}
+          {{
+            wizardBusy()
+              ? ('pages.write.publishing' | transloco)
+              : (wizardForwardLabel() | transloco)
+          }}
         </button>
       </div>
     </div>
@@ -1180,7 +1335,7 @@
       class="dialog board-panel"
       role="dialog"
       aria-modal="true"
-      aria-label="Draft board"
+      [aria-label]="'pages.write.aria.draftBoard' | transloco"
       appFocusTrap
       (dismissed)="closeBoard()"
       (click)="$event.stopPropagation()"

@@ -1,36 +1,32 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.backLink' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>🔀 CORS proxy</h1>
+  <h1>{{ 'settings.connections.corsProxy.title' | transloco }}</h1>
   <p>
-    Some sites refuse to answer requests that come from another site's JavaScript. Mockingbird has
-    no server of its own, so those feeds simply cannot be read — unless you route them through a
-    relay that fetches on your behalf. That relay is a CORS proxy.
+    {{ 'settings.connections.corsProxy.intro' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
 <p class="credential-warning small">
-  A proxy can read every address you ask it for and every byte it sends back, and it can change the
-  response. Only ever use one for public things — Mockingbird refuses to send your Mastodon
-  instance, any connected account, or anything carrying a login through a proxy, but a private feed
-  URL with a key baked into it would still be exposed. Never point a proxy at one of those.
+  {{ 'settings.connections.corsProxy.credentialWarning' | transloco }}
 </p>
 
 @if (droppedSelection()) {
   <p class="feed-error" role="alert">
-    Your previous proxy only works on localhost, so it has been cleared for this site. Choose one
-    that works here.
+    {{ 'settings.connections.corsProxy.droppedSelection' | transloco }}
   </p>
 }
 
-<h2 class="section-heading">Choose a proxy</h2>
+<h2 class="section-heading">{{ 'settings.connections.corsProxy.chooseHeading' | transloco }}</h2>
 
 @if (!isDevOrigin) {
-  <p class="muted small">
-    Proxies whose free tier only answers <code>localhost</code> are hidden here, because they cannot
-    work on this site. Run Mockingbird locally to see them.
-  </p>
+  <p
+    class="muted small"
+    [innerHTML]="'settings.connections.corsProxy.devOnlyHidden' | transloco"
+  ></p>
 }
 
 <div class="proxy-list">
@@ -47,10 +43,14 @@
         <span class="proxy-title">
           {{ proxy.label }}
           @if (proxy.devOnly) {
-            <span class="proxy-tag">localhost only</span>
+            <span class="proxy-tag">{{
+              'settings.connections.corsProxy.devOnlyTag' | transloco
+            }}</span>
           }
           @if (proxy.keyRequired) {
-            <span class="proxy-tag">key required</span>
+            <span class="proxy-tag">{{
+              'settings.connections.corsProxy.keyRequiredTag' | transloco
+            }}</span>
           }
         </span>
         <span class="muted small">{{ proxy.pitch }}</span>
@@ -60,11 +60,13 @@
           this says so rather than asking them to pick it.
         -->
         @if (proxy.id === 'mawkingbird' && onSupporterTier()) {
-          <span class="proxy-tag">Mawkingbird Plus active — supporter rate limit</span>
+          <span class="proxy-tag">{{
+            'settings.connections.corsProxy.supporterTag' | transloco
+          }}</span>
         }
         <span class="muted small">{{ proxy.limits }}</span>
         <a class="small" [href]="proxy.homepage" target="_blank" rel="noopener noreferrer">
-          {{ proxy.label }} website
+          {{ 'settings.connections.corsProxy.proxyWebsite' | transloco: { label: proxy.label } }}
         </a>
       </span>
     </label>
@@ -74,17 +76,19 @@
 @if (isCustom()) {
   <div class="custom-fields">
     <label class="field">
-      <span>Proxy URL</span>
+      <span>{{ 'settings.connections.corsProxy.proxyUrlLabel' | transloco }}</span>
       <input
         type="url"
         name="customTemplate"
-        placeholder="https://my-worker.example.workers.dev/?url={url}"
+        [placeholder]="'settings.connections.corsProxy.proxyUrlPlaceholder' | transloco"
         autocomplete="off"
         [ngModel]="customTemplate()"
         (ngModelChange)="customTemplate.set($event)"
       />
-      <span class="muted small">
-        Put <code>{{ '{url}' }}</code> where the address being fetched should go.
+      <span
+        class="muted small"
+        [innerHTML]="'settings.connections.corsProxy.putUrlPlaceholder' | transloco"
+      >
       </span>
     </label>
 
@@ -96,25 +100,26 @@
         name="customEncode"
       />
       <span>
-        Percent-encode the address
+        {{ 'settings.connections.corsProxy.percentEncodeLabel' | transloco }}
         <span class="muted small">
-          Needed when your proxy reads it from a query parameter, which is the common case. Turn off
-          if your proxy takes the address as a plain path suffix.
+          {{ 'settings.connections.corsProxy.percentEncodeNote' | transloco }}
         </span>
       </span>
     </label>
 
     <label class="field">
-      <span>Header name (optional)</span>
+      <span>{{ 'settings.connections.corsProxy.headerNameLabel' | transloco }}</span>
       <input
         type="text"
         name="customHeader"
-        placeholder="x-api-key"
+        [placeholder]="'settings.connections.corsProxy.headerNamePlaceholder' | transloco"
         autocomplete="off"
         [ngModel]="customHeader()"
         (ngModelChange)="customHeader.set($event)"
       />
-      <span class="muted small">Only if your proxy authenticates with a header.</span>
+      <span class="muted small">{{
+        'settings.connections.corsProxy.headerNameNote' | transloco
+      }}</span>
     </label>
   </div>
 }
@@ -122,17 +127,20 @@
 @if (takesKey()) {
   <label class="field">
     <span
-      >API key
+      >{{ 'settings.connections.corsProxy.apiKeyLabel' | transloco }}
       @if (!selected()?.keyRequired) {
-        <span class="muted small">(optional)</span>
+        <span class="muted small">{{ 'settings.connections.corsProxy.optional' | transloco }}</span>
       }
     </span>
     <input
       type="password"
       name="corsApiKey"
-      placeholder="{{
-        settings.hasKey() ? 'A key is saved — type to replace it' : 'Paste your key'
-      }}"
+      [placeholder]="
+        (settings.hasKey()
+          ? 'settings.connections.corsProxy.keySavedPlaceholder'
+          : 'settings.connections.corsProxy.pasteKeyPlaceholder'
+        ) | transloco
+      "
       autocomplete="off"
       [ngModel]="apiKey()"
       (ngModelChange)="apiKey.set($event)"
@@ -144,46 +152,59 @@
 
   @if (settings.hasKey()) {
     <p class="key-state">
-      <span class="connection-ok">A key is saved in this browser.</span>
+      <span class="connection-ok">{{ 'settings.connections.corsProxy.keySaved' | transloco }}</span>
       <app-storage-badge [where]="where()" />
       <button class="btn btn-outline btn-small" type="button" (click)="clearKey()">
-        Remove key
+        {{ 'settings.connections.corsProxy.removeKey' | transloco }}
       </button>
     </p>
     @if (expiryLabel(settings.expiresAt()); as expiry) {
-      <p class="muted small">This key is deleted from this browser on {{ expiry }}.</p>
+      <p class="muted small">
+        {{ 'settings.connections.corsProxy.keyDeletedOn' | transloco: { date: expiry } }}
+      </p>
     }
   }
 }
 
 @if (preview(); as previewUrl) {
   <p class="muted small preview">
-    Test fetches <code>{{ testFeedUrl }}</code
-    >, sent as:<br />
+    {{ 'settings.connections.corsProxy.testFetchesBefore' | transloco }}
+    <code>{{ testFeedUrl }}</code
+    >{{ 'settings.connections.corsProxy.testFetchesSentAs' | transloco }}<br />
     <code class="preview-url">{{ previewUrl }}</code>
   </p>
 }
 
 <div class="proxy-actions">
-  <button class="btn" type="button" [disabled]="!selectedId()" (click)="save()">Save proxy</button>
+  <button class="btn" type="button" [disabled]="!selectedId()" (click)="save()">
+    {{ 'settings.connections.corsProxy.saveProxy' | transloco }}
+  </button>
   <button
     class="btn btn-outline"
     type="button"
     [disabled]="!settings.usable() || pendingSelection() || test().status === 'running'"
     (click)="runTest()"
   >
-    {{ test().status === 'running' ? 'Testing…' : 'Test proxy' }}
+    {{
+      (test().status === 'running'
+        ? 'settings.connections.corsProxy.testing'
+        : 'settings.connections.corsProxy.testProxy'
+      ) | transloco
+    }}
   </button>
   @if (settings.currentId()) {
-    <button class="btn btn-outline" type="button" (click)="disconnect()">Stop using a proxy</button>
+    <button class="btn btn-outline" type="button" (click)="disconnect()">
+      {{ 'settings.connections.corsProxy.stopUsing' | transloco }}
+    </button>
   }
 </div>
 
 @if (pendingSelection()) {
   <p class="muted small" role="status">
-    Save {{ selected()?.label }} before testing it. Until you do,
-    {{ settings.chosen()?.label ?? 'no proxy' }} is still the one feeds use — so a test now would
-    tell you about the wrong service.
+    {{
+      'settings.connections.corsProxy.pendingSelection'
+        | transloco: { selected: selected()?.label, current: currentProxyLabel() }
+    }}
   </p>
 }
 
@@ -191,9 +212,9 @@
   @switch (result.status) {
     @case ('ok') {
       <p class="connection-ok" role="status">
-        Works — a test feed came back in {{ result.ms }} ms.
+        {{ 'settings.connections.corsProxy.testWorked' | transloco: { ms: result.ms } }}
         @if (result.ms > 4000) {
-          <span class="muted"> That is slow enough that feeds will feel sluggish.</span>
+          <span class="muted"> {{ 'settings.connections.corsProxy.testSlow' | transloco }}</span>
         }
       </p>
     }
@@ -210,10 +231,5 @@
   <p class="feed-error" role="alert">{{ msg }}</p>
 }
 
-<h2 class="section-heading">Running your own</h2>
-<p class="muted small">
-  Free proxies are rate-limited, and they close down — of the well-known ones, most now refuse
-  anything that is not <code>localhost</code>. A twenty-line Cloudflare Worker that only accepts
-  your own origin is free, faster, and cannot read anything you would not have handed it anyway. It
-  is the only option here that nobody else controls.
-</p>
+<h2 class="section-heading">{{ 'settings.connections.corsProxy.runningYourOwn' | transloco }}</h2>
+<p class="muted small" [innerHTML]="'settings.connections.corsProxy.ownProxyNote' | transloco"></p>

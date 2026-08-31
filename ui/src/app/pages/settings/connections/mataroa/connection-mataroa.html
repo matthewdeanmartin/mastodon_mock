@@ -1,44 +1,51 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.backLink' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>✍️ Blog (Mataroa)</h1>
+  <h1>{{ 'settings.connections.mataroa.title' | transloco }}</h1>
   <p>
-    Publish Markdown posts to one Mataroa blog from the composer. One Mataroa blog per signed-in
-    account; the <a [routerLink]="['/settings/connections/blogger']">Blogger connector</a> is
-    separate and can be connected at the same time.
+    {{ 'settings.connections.mataroa.introBefore' | transloco }}
+    <a [routerLink]="['/settings/connections/blogger']">{{
+      'settings.connections.mataroa.bloggerLink' | transloco
+    }}</a>
+    {{ 'settings.connections.mataroa.introAfter' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
 <ol class="setup-steps muted small">
-  <li>Open Mataroa’s dashboard and copy the API key from its API page.</li>
+  <li>{{ 'settings.connections.mataroa.step1' | transloco }}</li>
   <li>
-    <a [routerLink]="['/settings/connections/cors-proxy']">Set up a CORS proxy</a> that forwards
-    custom headers.
+    <a [routerLink]="['/settings/connections/cors-proxy']">{{
+      'settings.connections.mataroa.setUpProxyLink' | transloco
+    }}</a>
+    {{ 'settings.connections.mataroa.setUpProxyAfter' | transloco }}
   </li>
-  <li>Enter the public address of your blog, then save and test the connection.</li>
+  <li>{{ 'settings.connections.mataroa.step3' | transloco }}</li>
 </ol>
 
 <p class="credential-warning small">
-  Mataroa’s API key can publish, edit, and delete your writing. Its API does not accept browser
-  requests directly, so the configured CORS proxy will see this key and the posts you publish. Only
-  continue with a proxy operator you trust.
+  {{ 'settings.connections.mataroa.credentialWarning' | transloco }}
 </p>
 
 @if (settings.connected()) {
   <div class="connected-row">
-    <span class="connection-ok">Connected</span>
+    <span class="connection-ok">{{ 'settings.connections.mataroa.connected' | transloco }}</span>
     <app-storage-badge [where]="where()" />
-    <a [href]="settings.blogUrl()" target="_blank" rel="noopener noreferrer">View blog ↗</a>
-    <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
+    <a [href]="settings.blogUrl()" target="_blank" rel="noopener noreferrer">{{
+      'settings.connections.mataroa.viewBlog' | transloco
+    }}</a>
+    <button class="btn btn-outline" type="button" (click)="disconnect()">
+      {{ 'settings.connections.mataroa.disconnect' | transloco }}
+    </button>
   </div>
   @if (expiryLabel(settings.expiresAt()); as expiry) {
     <p class="muted small">
       @if (where() === 'local') {
-        This API key is deleted from this browser on {{ expiry }}.
+        {{ 'settings.connections.mataroa.keyDeletedOn' | transloco: { date: expiry } }}
       } @else {
-        This API key is cleared from this browser on {{ expiry }}, and fetched back from your vault
-        the next time it is needed.
+        {{ 'settings.connections.mataroa.keyClearedOn' | transloco: { date: expiry } }}
       }
     </p>
   }
@@ -49,32 +56,31 @@
       (ngModelChange)="setProfileFeed($event)"
     />
     <span>
-      <strong>Include my blog’s RSS feed in my profile feed</strong>
-      <span class="muted small"
-        >Your published blog posts appear alongside your Mawkingbird posts on your own
-        profile.</span
-      >
+      <strong>{{ 'settings.connections.mataroa.includeRssLabel' | transloco }}</strong>
+      <span class="muted small">{{
+        'settings.connections.mataroa.includeRssNote' | transloco
+      }}</span>
     </span>
   </label>
 } @else {
   <form class="mataroa-form" (ngSubmit)="connect()">
     <label>
-      <span>API key</span>
+      <span>{{ 'settings.connections.mataroa.apiKeyLabel' | transloco }}</span>
       <input
         type="password"
         name="apiKey"
         autocomplete="off"
-        placeholder="Mataroa API key"
+        [placeholder]="'settings.connections.mataroa.apiKeyPlaceholder' | transloco"
         [ngModel]="apiKey()"
         (ngModelChange)="apiKey.set($event)"
       />
     </label>
     <label>
-      <span>Public blog address</span>
+      <span>{{ 'settings.connections.mataroa.blogUrlLabel' | transloco }}</span>
       <input
         type="url"
         name="blogUrl"
-        placeholder="https://you.mataroa.blog/"
+        [placeholder]="'settings.connections.mataroa.blogUrlPlaceholder' | transloco"
         [ngModel]="blogUrl()"
         (ngModelChange)="blogUrl.set($event)"
       />
@@ -86,7 +92,7 @@
         [ngModel]="includeInProfile()"
         (ngModelChange)="includeInProfile.set($event)"
       />
-      <span>Include this blog’s RSS feed in my profile feed</span>
+      <span>{{ 'settings.connections.mataroa.includeRssCheckbox' | transloco }}</span>
     </label>
 
     @if (proxyEntry(); as proxy) {
@@ -98,18 +104,19 @@
             [ngModel]="understandsProxy()"
             (ngModelChange)="understandsProxy.set($event)"
           />
-          <span
-            >I understand that {{ proxy.label }} can read my Mataroa API key and post
-            contents.</span
-          >
+          <span>{{
+            'settings.connections.mataroa.proxyConsent' | transloco: { proxy: proxy.label }
+          }}</span>
         </label>
       } @else {
         <p class="feed-error">
-          {{ proxy.label }} cannot forward the Authorization header Mataroa requires.
+          {{
+            'settings.connections.mataroa.proxyCannotForward' | transloco: { proxy: proxy.label }
+          }}
         </p>
       }
     } @else {
-      <p class="feed-error">No CORS proxy is configured.</p>
+      <p class="feed-error">{{ 'settings.connections.mataroa.noProxy' | transloco }}</p>
     }
 
     <button
@@ -119,7 +126,12 @@
         busy() || !apiKey().trim() || !blogUrl().trim() || !proxyReady() || !understandsProxy()
       "
     >
-      {{ busy() ? 'Testing…' : 'Save and test connection' }}
+      {{
+        (busy()
+          ? 'settings.connections.mataroa.testing'
+          : 'settings.connections.mataroa.saveAndTest'
+        ) | transloco
+      }}
     </button>
   </form>
 }

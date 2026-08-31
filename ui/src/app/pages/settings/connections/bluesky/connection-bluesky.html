@@ -1,10 +1,11 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.backLink' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>🦋 Bluesky</h1>
+  <h1>{{ 'settings.connections.bluesky.title' | transloco }}</h1>
   <p>
-    Your Bluesky timeline is merged into home, and replies, likes and reposts on 🦋 posts go back to
-    Bluesky.
+    {{ 'settings.connections.bluesky.intro' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
@@ -13,10 +14,7 @@
      Mastodon account at all, and anonymous is the mode people try first. -->
 @if (capabilities.active) {
   <p class="muted small">
-    This works while you're browsing anonymously — the app password goes straight to Bluesky and
-    doesn't involve a Mastodon account. Your Bluesky posts merge into home, and you can reply, like
-    and repost them. Bluesky DMs are the exception: those live in Chat, which anonymous sessions
-    don't have.
+    {{ 'settings.connections.bluesky.anonymousNote' | transloco }}
   </p>
 }
 
@@ -28,28 +26,31 @@
       <span class="name">{{ session.displayName || session.handle }}</span>
       <span class="muted small">&#64;{{ session.handle }}</span>
     </span>
-    <button class="btn btn-outline btn-sm" (click)="unlinkBluesky()">Unlink</button>
+    <button class="btn btn-outline btn-sm" (click)="unlinkBluesky()">
+      {{ 'settings.connections.bluesky.unlink' | transloco }}
+    </button>
   </div>
   <p class="muted small">
-    Unlinking forgets the tokens here — you can also revoke the app password on bsky.app.
+    {{ 'settings.connections.bluesky.unlinkNote' | transloco }}
   </p>
   @if (expiryLabel(bsky.expiresAt()); as expiry) {
     <p class="muted small">
-      This link is dropped and the tokens deleted from this browser on {{ expiry }}.
+      {{ 'settings.connections.bluesky.expiresOn' | transloco: { date: expiry } }}
     </p>
   }
 } @else {
   <p class="muted">
-    Link with an <strong>app password</strong> — made at bsky.app → Settings → Privacy and security
-    → App Passwords. It's revocable and is never your real password. Check
-    <em>"Allow access to your direct messages"</em> when creating it if you want your Bluesky DMs in
-    Chat.
+    {{ 'settings.connections.bluesky.linkHint.a' | transloco }}
+    <strong>{{ 'settings.connections.bluesky.linkHint.appPassword' | transloco }}</strong>
+    {{ 'settings.connections.bluesky.linkHint.b' | transloco }}
+    <em>{{ 'settings.connections.bluesky.linkHint.allowDms' | transloco }}</em>
+    {{ 'settings.connections.bluesky.linkHint.c' | transloco }}
   </p>
   <form class="bsky-form" (ngSubmit)="linkBluesky()">
     <input
       type="text"
       name="bskyHandle"
-      placeholder="you.bsky.social"
+      [placeholder]="'settings.connections.bluesky.handlePlaceholder' | transloco"
       [ngModel]="bskyHandle()"
       (ngModelChange)="bskyHandle.set($event)"
       [disabled]="bskyLinking()"
@@ -57,7 +58,7 @@
     <input
       type="password"
       name="bskyPassword"
-      placeholder="app password"
+      [placeholder]="'settings.connections.bluesky.passwordPlaceholder' | transloco"
       autocomplete="off"
       [ngModel]="bskyPassword()"
       (ngModelChange)="bskyPassword.set($event)"
@@ -68,7 +69,12 @@
       type="submit"
       [disabled]="!bskyHandle().trim() || !bskyPassword() || bskyLinking()"
     >
-      {{ bskyLinking() ? 'Linking…' : 'Link Bluesky' }}
+      {{
+        (bskyLinking()
+          ? 'settings.connections.bluesky.linking'
+          : 'settings.connections.bluesky.link'
+        ) | transloco
+      }}
     </button>
   </form>
   @if (bskyError(); as msg) {

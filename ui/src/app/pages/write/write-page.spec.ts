@@ -26,14 +26,14 @@ import { WritingZen } from '../../writing-zen';
 import { DraftItem } from '../drafts/draft-items';
 import { DraftSources } from '../drafts/draft-sources';
 import { Segment, SplitMode } from './split-modes';
-import { WritePage } from './write-page';
+import { Notice, WritePage } from './write-page';
 import { WriteWorkspace } from './write-workspace';
 
 interface PageInternals {
   body: WritableSignal<string>;
   editing: WritableSignal<{ key: string; localId: string | null } | null>;
   dirty: WritableSignal<boolean>;
-  notice: WritableSignal<string | null>;
+  notice: WritableSignal<Notice | null>;
   pendingSwitch: WritableSignal<{ run: () => void } | null>;
   segments: Signal<Segment[]>;
   splitMode: Signal<SplitMode>;
@@ -346,7 +346,7 @@ describe('WritePage', () => {
     const drafts = TestBed.inject(Drafts).drafts();
     expect(drafts).toHaveLength(1);
     expect(drafts[0].segments).toEqual(['edited after the delete']);
-    expect(page.notice()).toContain('saved as a new one');
+    expect(page.notice()?.key).toBe('pages.write.saved.replacedDeleted');
   });
 
   it('splits on --- when saving', () => {

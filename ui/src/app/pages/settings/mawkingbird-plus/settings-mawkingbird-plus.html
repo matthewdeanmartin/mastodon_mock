@@ -37,18 +37,30 @@
       <h2>{{ 'settings.plus.account.title' | transloco }}</h2>
       <dl>
         <dt>{{ 'settings.plus.account.signIn' | transloco }}</dt>
-        <dd>{{ user.auth === 'email' ? ('settings.plus.account.auth.email' | transloco) : ('settings.plus.account.auth.full' | transloco) }}</dd>
+        <dd>
+          {{
+            user.auth === 'email'
+              ? ('settings.plus.account.auth.email' | transloco)
+              : ('settings.plus.account.auth.full' | transloco)
+          }}
+        </dd>
         <dt>{{ 'settings.plus.account.plan' | transloco }}</dt>
         <dd>
-          {{ plus.isSupporter() ? ('settings.plus.account.plan.plus' | transloco) : ('settings.plus.account.plan.free' | transloco) }}
+          {{
+            plus.isSupporter()
+              ? ('settings.plus.account.plan.plus' | transloco)
+              : ('settings.plus.account.plan.free' | transloco)
+          }}
           @if (plus.isSupporter() && plus.subscription(); as subscription) {
             @if (subscription.cancelAtPeriodEnd) {
               <span class="muted small">
-                {{ 'settings.plus.account.cancelledUntil' | transloco }} {{ subscription.renewsAt | date: 'longDate' }}
+                {{ 'settings.plus.account.cancelledUntil' | transloco }}
+                {{ subscription.renewsAt | date: 'longDate' }}
               </span>
             } @else {
               <span class="muted small">
-                {{ 'settings.plus.account.renews' | transloco }} {{ subscription.renewsAt | date: 'longDate' }}
+                {{ 'settings.plus.account.renews' | transloco }}
+                {{ subscription.renewsAt | date: 'longDate' }}
               </span>
             }
           }
@@ -62,7 +74,9 @@
       <p class="muted small">
         {{ 'settings.plus.account.signOutNote' | transloco }}
       </p>
-      <button class="btn btn-outline" type="button" (click)="signOut()">{{ 'settings.plus.account.signOut' | transloco }}</button>
+      <button class="btn btn-outline" type="button" (click)="signOut()">
+        {{ 'settings.plus.account.signOut' | transloco }}
+      </button>
     </section>
 
     <ng-template #vaultPanel>
@@ -82,7 +96,9 @@
                 [disabled]="!plus.isSupporter() || vaultBusy()"
                 (change)="setVaultEnabled($any($event.target).checked)"
               />
-              <span>{{ vaultPreference.enabled() ? 'On' : ('settings.plus.vault.off' | transloco) }}</span>
+              <span>{{
+                vaultPreference.enabled() ? 'On' : ('settings.plus.vault.off' | transloco)
+              }}</span>
             </label>
           </div>
 
@@ -95,10 +111,16 @@
               [class.connection-ok]="plus.isSupporter()"
               [class.config-error]="!plus.isSupporter()"
             >
-              {{ plus.isSupporter() ? ('settings.plus.vault.recognized' | transloco) : ('settings.plus.vault.notRecognized' | transloco) }}
+              {{
+                plus.isSupporter()
+                  ? ('settings.plus.vault.recognized' | transloco)
+                  : ('settings.plus.vault.notRecognized' | transloco)
+              }}
             </dd>
             <dt>{{ 'settings.plus.vault.syncSwitch' | transloco }}</dt>
-            <dd>{{ vaultPreference.enabled() ? 'On' : ('settings.plus.vault.offHere' | transloco) }}</dd>
+            <dd>
+              {{ vaultPreference.enabled() ? 'On' : ('settings.plus.vault.offHere' | transloco) }}
+            </dd>
             <dt>{{ 'settings.plus.vault.store' | transloco }}</dt>
             <dd>
               @switch (vault.state()) {
@@ -112,7 +134,9 @@
                   {{ 'settings.plus.vault.state.locked' | transloco }}
                 }
                 @case ('unlocked') {
-                  <span class="connection-ok">{{ 'settings.plus.vault.state.open' | transloco }}</span>
+                  <span class="connection-ok">{{
+                    'settings.plus.vault.state.open' | transloco
+                  }}</span>
                 }
                 @case ('unavailable') {
                   <span class="config-error">
@@ -154,16 +178,20 @@
           <h3>{{ 'settings.plus.vault.gettingTitle' | transloco }}</h3>
           @if (vault.unlocked()) {
             <p class="plus-vault-benefit">
-              <strong>{{ vault.count() }}</strong>
-              {{
-                (vault.count() === 1
-                  ? 'settings.plus.vault.credentials.one'
-                  : 'settings.plus.vault.credentials.other'
-                ) | transloco
-              }}
+              <span
+                [innerHTML]="
+                  (vault.count() === 1
+                    ? 'settings.plus.vault.credentials.one'
+                    : 'settings.plus.vault.credentials.other'
+                  ) | transloco: { count: vault.count() }
+                "
+              ></span>
             </p>
             @if (vaultConnectors().length > 0) {
-              <p class="muted small">{{ 'settings.plus.vault.storedFor' | transloco }} {{ vaultConnectors().join(', ') }}.</p>
+              <p class="muted small">
+                {{ 'settings.plus.vault.storedFor' | transloco }}
+                {{ vaultConnectors().join(', ') }}.
+              </p>
             } @else {
               <p class="muted small">
                 {{ 'settings.plus.vault.empty' | transloco }}
@@ -190,7 +218,11 @@
                   [disabled]="vaultBusy()"
                   (click)="refreshVault()"
                 >
-                  {{ vaultBusy() ? ('settings.plus.checking' | transloco) : ('settings.plus.vault.checkTest' | transloco) }}
+                  {{
+                    vaultBusy()
+                      ? ('settings.plus.checking' | transloco)
+                      : ('settings.plus.vault.checkTest' | transloco)
+                  }}
                 </button>
               }
               @case ('unavailable') {
@@ -200,12 +232,18 @@
                   [disabled]="vaultBusy()"
                   (click)="refreshVault()"
                 >
-                  {{ vaultBusy() ? ('settings.plus.checking' | transloco) : ('settings.plus.vault.retryDiagnostics' | transloco) }}
+                  {{
+                    vaultBusy()
+                      ? ('settings.plus.checking' | transloco)
+                      : ('settings.plus.vault.retryDiagnostics' | transloco)
+                  }}
                 </button>
               }
               @case ('absent') {
                 <form class="plus-vault-form" (submit)="$event.preventDefault(); createVault()">
-                  <label for="vault-new-passphrase">{{ 'settings.plus.vault.newPassphrase' | transloco }}</label>
+                  <label for="vault-new-passphrase">{{
+                    'settings.plus.vault.newPassphrase' | transloco
+                  }}</label>
                   <input
                     id="vault-new-passphrase"
                     type="password"
@@ -214,7 +252,9 @@
                     [value]="vaultPassphrase()"
                     (input)="vaultPassphrase.set($any($event.target).value)"
                   />
-                  <label for="vault-new-passphrase-again">{{ 'settings.plus.vault.repeatPassphrase' | transloco }}</label>
+                  <label for="vault-new-passphrase-again">{{
+                    'settings.plus.vault.repeatPassphrase' | transloco
+                  }}</label>
                   <input
                     id="vault-new-passphrase-again"
                     type="password"
@@ -224,13 +264,19 @@
                     (input)="vaultPassphraseAgain.set($any($event.target).value)"
                   />
                   <button class="btn" type="submit" [disabled]="vaultBusy()">
-                    {{ vaultBusy() ? ('settings.plus.vault.creating' | transloco) : ('settings.plus.vault.create' | transloco) }}
+                    {{
+                      vaultBusy()
+                        ? ('settings.plus.vault.creating' | transloco)
+                        : ('settings.plus.vault.create' | transloco)
+                    }}
                   </button>
                 </form>
               }
               @case ('locked') {
                 <form class="plus-vault-form" (submit)="$event.preventDefault(); unlockVault()">
-                  <label for="vault-passphrase">{{ 'settings.plus.vault.passphrase' | transloco }}</label>
+                  <label for="vault-passphrase">{{
+                    'settings.plus.vault.passphrase' | transloco
+                  }}</label>
                   <input
                     id="vault-passphrase"
                     type="password"
@@ -240,7 +286,11 @@
                     (input)="vaultPassphrase.set($any($event.target).value)"
                   />
                   <button class="btn" type="submit" [disabled]="vaultBusy()">
-                    {{ vaultBusy() ? ('settings.plus.vault.unlocking' | transloco) : ('settings.plus.vault.unlock' | transloco) }}
+                    {{
+                      vaultBusy()
+                        ? ('settings.plus.vault.unlocking' | transloco)
+                        : ('settings.plus.vault.unlock' | transloco)
+                    }}
                   </button>
                 </form>
               }
@@ -284,27 +334,39 @@
                   </div>
                 </div>
 
-                <label class="plus-vault-policy" for="vault-policy"
-                  >{{ 'settings.plus.vault.delete' | transloco }}</label
-                >
+                <label class="plus-vault-policy" for="vault-policy">{{
+                  'settings.plus.vault.delete' | transloco
+                }}</label>
                 <select
                   id="vault-policy"
                   [disabled]="vaultBusy()"
                   [value]="vaultPolicyValue()"
                   (change)="setVaultPolicy($any($event.target).value)"
                 >
-                  <option value="idle-90">{{ 'settings.plus.vault.policy.idle90' | transloco }}</option>
-                  <option value="idle-365">{{ 'settings.plus.vault.policy.idle365' | transloco }}</option>
-                  <option value="absolute-90">{{ 'settings.plus.vault.policy.age90' | transloco }}</option>
-                  <option value="absolute-365">{{ 'settings.plus.vault.policy.age365' | transloco }}</option>
-                  <option value="never">{{ 'settings.plus.vault.policy.never' | transloco }}</option>
+                  <option value="idle-90">
+                    {{ 'settings.plus.vault.policy.idle90' | transloco }}
+                  </option>
+                  <option value="idle-365">
+                    {{ 'settings.plus.vault.policy.idle365' | transloco }}
+                  </option>
+                  <option value="absolute-90">
+                    {{ 'settings.plus.vault.policy.age90' | transloco }}
+                  </option>
+                  <option value="absolute-365">
+                    {{ 'settings.plus.vault.policy.age365' | transloco }}
+                  </option>
+                  <option value="never">
+                    {{ 'settings.plus.vault.policy.never' | transloco }}
+                  </option>
                 </select>
 
                 <form
                   class="plus-vault-form"
                   (submit)="$event.preventDefault(); changeVaultPassphrase()"
                 >
-                  <label for="vault-next-passphrase">{{ 'settings.plus.vault.changePassphrase' | transloco }}</label>
+                  <label for="vault-next-passphrase">{{
+                    'settings.plus.vault.changePassphrase' | transloco
+                  }}</label>
                   <input
                     id="vault-next-passphrase"
                     type="password"
@@ -394,7 +456,9 @@
           <p class="muted small">
             {{ 'settings.plus.diagnostics.intro' | transloco }}
           </p>
-          <button class="btn btn-outline" type="button" (click)="loadDiagnostics()">{{ 'settings.plus.diagnostics.check' | transloco }}</button>
+          <button class="btn btn-outline" type="button" (click)="loadDiagnostics()">
+            {{ 'settings.plus.diagnostics.check' | transloco }}
+          </button>
         } @else if (diagnostics.state() === 'loading') {
           <p class="muted" role="status">{{ 'settings.plus.diagnostics.reading' | transloco }}</p>
         } @else if (diagnostics.state() === 'failed') {
@@ -404,7 +468,8 @@
           </button>
         } @else {
           <p>
-            <strong>{{ 'settings.plus.diagnostics.oneAccount' | transloco }}</strong> {{ 'settings.plus.diagnostics.oneAccount.body' | transloco }}
+            <strong>{{ 'settings.plus.diagnostics.oneAccount' | transloco }}</strong>
+            {{ 'settings.plus.diagnostics.oneAccount.body' | transloco }}
           </p>
 
           <h4>{{ 'settings.plus.diagnostics.sharedSettings' | transloco }}</h4>
@@ -420,15 +485,18 @@
               <tr>
                 <th scope="row">{{ 'settings.plus.diagnostics.settings' | transloco }}</th>
                 <td>
-                  {{ diagnostics.settings().localKeys }} {{ 'settings.plus.diagnostics.keysOpen' | transloco }}{{
-                    formatBytes(diagnostics.settings().localBytes)
-                  }})
+                  {{ diagnostics.settings().localKeys }}
+                  {{ 'settings.plus.diagnostics.keysOpen' | transloco
+                  }}{{ formatBytes(diagnostics.settings().localBytes) }})
                 </td>
                 <td>
                   @if (diagnostics.settings().remoteBytes === null) {
-                    <span class="muted">{{ 'settings.plus.diagnostics.nothingStored' | transloco }}</span>
+                    <span class="muted">{{
+                      'settings.plus.diagnostics.nothingStored' | transloco
+                    }}</span>
                   } @else {
-                    {{ formatBytes(diagnostics.settings().remoteBytes ?? 0) }}{{ 'settings.plus.diagnostics.revision' | transloco }}
+                    {{ formatBytes(diagnostics.settings().remoteBytes ?? 0)
+                    }}{{ 'settings.plus.diagnostics.revision' | transloco }}
                     {{ diagnostics.settings().remoteRevision }}
                   }
                 </td>
@@ -464,10 +532,14 @@
                   <th scope="row">
                     {{ account.label }}
                     @if (account.active) {
-                      <span class="muted small">{{ 'settings.plus.diagnostics.current' | transloco }}</span>
+                      <span class="muted small">{{
+                        'settings.plus.diagnostics.current' | transloco
+                      }}</span>
                     }
                     @if (!account.stored) {
-                      <br /><span class="muted small">{{ 'settings.plus.diagnostics.noneFromAccount' | transloco }}</span>
+                      <br /><span class="muted small">{{
+                        'settings.plus.diagnostics.noneFromAccount' | transloco
+                      }}</span>
                     }
                   </th>
                   <td>{{ account.trust }}</td>
@@ -480,14 +552,19 @@
 
           <h4>{{ 'settings.plus.diagnostics.comparison' | transloco }}</h4>
           <p class="muted small">
-            {{ 'settings.plus.diagnostics.syncAffects' | transloco }} {{ diagnostics.activeAccountLabel() }}{{ 'settings.plus.diagnostics.syncAffects.after' | transloco }}
+            {{ 'settings.plus.diagnostics.syncAffects' | transloco }}
+            {{ diagnostics.activeAccountLabel()
+            }}{{ 'settings.plus.diagnostics.syncAffects.after' | transloco }}
           </p>
           <table class="plus-diag-table">
             <thead>
               <tr>
                 <th scope="col">{{ 'settings.plus.diagnostics.data' | transloco }}</th>
                 <th scope="col">{{ 'settings.plus.diagnostics.thisBrowser' | transloco }}</th>
-                <th scope="col">{{ 'settings.plus.diagnostics.savedFor' | transloco }} {{ diagnostics.activeAccountLabel() }}</th>
+                <th scope="col">
+                  {{ 'settings.plus.diagnostics.savedFor' | transloco }}
+                  {{ diagnostics.activeAccountLabel() }}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -502,7 +579,9 @@
                       @if (row.error; as reason) {
                         <span class="config-error small">{{ reason }}</span>
                       } @else {
-                        <span class="muted">{{ 'settings.plus.diagnostics.couldNotRead' | transloco }}</span>
+                        <span class="muted">{{
+                          'settings.plus.diagnostics.couldNotRead' | transloco
+                        }}</span>
                       }
                     } @else {
                       {{ row.remote }}
@@ -514,11 +593,15 @@
           </table>
 
           @if (diagnostics.settings().remoteUpdatedAt; as updated) {
-            <p class="muted small">{{ 'settings.plus.diagnostics.lastUpdated' | transloco }} {{ updated | date: 'medium' }}.</p>
+            <p class="muted small">
+              {{ 'settings.plus.diagnostics.lastUpdated' | transloco }}
+              {{ updated | date: 'medium' }}.
+            </p>
           }
           @if (diagnostics.quota(); as quota) {
             <p class="muted small">
-              {{ 'settings.plus.diagnostics.using' | transloco }} {{ formatBytes(quota.used) }} {{ 'settings.plus.diagnostics.of' | transloco }} {{ formatBytes(quota.limit) }}.
+              {{ 'settings.plus.diagnostics.using' | transloco }} {{ formatBytes(quota.used) }}
+              {{ 'settings.plus.diagnostics.of' | transloco }} {{ formatBytes(quota.limit) }}.
             </p>
           }
 
@@ -556,10 +639,16 @@
               "
               (click)="syncNow()"
             >
-              {{ syncing() ? ('settings.plus.diagnostics.syncing' | transloco) : ('settings.plus.diagnostics.syncNow' | transloco) }}
+              {{
+                syncing()
+                  ? ('settings.plus.diagnostics.syncing' | transloco)
+                  : ('settings.plus.diagnostics.syncNow' | transloco)
+              }}
             </button>
           } @else {
-            <p class="muted small" role="status">{{ 'settings.plus.diagnostics.matches' | transloco }}</p>
+            <p class="muted small" role="status">
+              {{ 'settings.plus.diagnostics.matches' | transloco }}
+            </p>
           }
           @if (syncMessage(); as message) {
             <p class="muted small" role="status">{{ message }}</p>
@@ -581,16 +670,21 @@
           So the free-tier remainder is not rendered for a supporter at all,
           and the headline number is one that only ever grows.
         -->
-        <h3>What you are getting</h3>
+        <h3>{{ 'settings.plus.usage.gettingTitle' | transloco }}</h3>
         <table class="plus-usage-table">
           <tbody>
             <tr>
               <th scope="row">
                 Articles you've read in Mawkingbird
                 @if (tally.localOnly()) {
-                  <span class="muted small">{{ 'settings.plus.usage.countedHere' | transloco }}</span>
+                  <span class="muted small">{{
+                    'settings.plus.usage.countedHere' | transloco
+                  }}</span>
                 } @else if (tally.since(); as since) {
-                  <span class="muted small">{{ 'settings.plus.usage.since' | transloco }} {{ since | date: 'longDate' }}</span>
+                  <span class="muted small"
+                    >{{ 'settings.plus.usage.since' | transloco }}
+                    {{ since | date: 'longDate' }}</span
+                  >
                 }
               </th>
               <td>{{ tally.total() | number }}</td>
@@ -598,7 +692,9 @@
             <tr>
               <th scope="row">
                 {{ 'settings.plus.usage.openedToday' | transloco }}
-                <span class="muted small">{{ 'settings.plus.usage.resetsMidnight' | transloco }}</span>
+                <span class="muted small">{{
+                  'settings.plus.usage.resetsMidnight' | transloco
+                }}</span>
               </th>
               <td>{{ articleQuota.plusFetches() + articleQuota.freeFetches() | number }}</td>
             </tr>
@@ -622,7 +718,9 @@
             </tr>
             @for (row of diagnostics.collectionRows(); track row.collection) {
               <tr>
-                <th scope="row">{{ row.label }} {{ 'settings.plus.usage.keptOnAccount' | transloco }}</th>
+                <th scope="row">
+                  {{ row.label }} {{ 'settings.plus.usage.keptOnAccount' | transloco }}
+                </th>
                 <td>{{ row.local | number }}</td>
               </tr>
             }
@@ -638,7 +736,8 @@
       <section class="plus-offer">
         <h2>{{ 'settings.plus.offer.title' | transloco }}</h2>
         <p>
-          <strong>${{ priceUsd }} {{ 'settings.plus.offer.aYear' | transloco }}</strong> {{ 'settings.plus.offer.staysFree' | transloco }}
+          <strong>${{ priceUsd }} {{ 'settings.plus.offer.aYear' | transloco }}</strong>
+          {{ 'settings.plus.offer.staysFree' | transloco }}
         </p>
         <p>
           {{ 'settings.plus.offer.buysTwoThings' | transloco }}
@@ -675,7 +774,8 @@
           full, for the reader who wants it.
         -->
         <p class="muted small">
-          <a routerLink="/plans">{{ 'settings.plus.offer.seeExactly' | transloco }}</a> {{ 'settings.plus.offer.seeExactly.after' | transloco }}
+          <a routerLink="/plans">{{ 'settings.plus.offer.seeExactly' | transloco }}</a>
+          {{ 'settings.plus.offer.seeExactly.after' | transloco }}
         </p>
         <p class="muted small">
           {{ 'settings.plus.offer.moreMayFollow' | transloco }}
@@ -761,7 +861,11 @@
             (input)="email.set($any($event.target).value)"
           />
           <button class="btn" type="submit" [disabled]="session.sendingLink()">
-            {{ session.sendingLink() ? ('settings.plus.signin.sending' | transloco) : ('settings.plus.signin.sendLink' | transloco) }}
+            {{
+              session.sendingLink()
+                ? ('settings.plus.signin.sending' | transloco)
+                : ('settings.plus.signin.sendLink' | transloco)
+            }}
           </button>
         </form>
       }

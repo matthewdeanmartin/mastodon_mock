@@ -211,8 +211,12 @@
        it ran the search on screen. -->
   @if (webDropped().length) {
     <p class="muted small web-dropped" role="status">
-      {{ webEngineLabel() }} can't filter by {{ webDropped().join(', ') }} — the web search ignored
-      {{ webDropped().length === 1 ? 'that' : 'those' }}.
+      {{
+        (webDropped().length === 1
+          ? 'pages.search.webDropped.note.one'
+          : 'pages.search.webDropped.note.other'
+        ) | transloco: { engine: webEngineLabel(), criteria: webDroppedLabels().join(', ') }
+      }}
     </p>
   }
 
@@ -606,18 +610,19 @@
            for zero results, alongside Explain. -->
           @if (chips().length) {
             <div class="chips">
-              @for (chip of chips(); track chip.key + chip.label) {
+              @for (chip of chips(); track chip.key + chip.labelKey) {
                 <span
                   class="chip"
                   [class.chip-server]="chip.origin === 'server'"
                   [class.chip-loaded]="chip.origin === 'loaded'"
                   [title]="
-                    chip.origin === 'server'
-                      ? 'Sent to Mastodon — changing this needs a new search'
-                      : 'Applied to loaded results'
+                    (chip.origin === 'server'
+                      ? 'pages.search.chip.sentToServer'
+                      : 'pages.search.chip.appliedToLoaded'
+                    ) | transloco
                   "
                 >
-                  {{ chip.label }}
+                  {{ chip.labelKey | transloco: chip.labelParams }}
                 </span>
               }
             </div>
@@ -671,7 +676,7 @@
                 </summary>
                 @for (facet of facets(); track facet.kind) {
                   <div class="facet">
-                    <div class="facet-label muted small">{{ facet.label }}</div>
+                    <div class="facet-label muted small">{{ facet.labelKey | transloco }}</div>
                     @for (v of facet.values.slice(0, 5); track v.value) {
                       <label class="facet-value">
                         <input
@@ -679,7 +684,7 @@
                           [checked]="isFacetSelected(facet.kind, v.value)"
                           (change)="toggleFacet(facet.kind, v.value)"
                         />
-                        <span>{{ v.label }}</span>
+                        <span>{{ v.labelKey ? (v.labelKey | transloco) : v.text }}</span>
                         <span class="muted facet-count">{{ v.count }}</span>
                       </label>
                     }
@@ -790,39 +795,49 @@
            server vs. filtered locally, and any anonymous hashtag transform. -->
           @if (explain(); as ex) {
             <details class="explain" [open]="explainOpen()">
-              <summary (click)="explainOpen.set(!explainOpen())">Explain this search</summary>
+              <summary (click)="explainOpen.set(!explainOpen())">
+                {{ 'pages.search.explain.summary' | transloco }}
+              </summary>
 
               <div class="explain-section">
-                <div class="explain-head muted small">Endpoint</div>
+                <div class="explain-head muted small">
+                  {{ 'pages.search.explain.endpoint' | transloco }}
+                </div>
                 <code>{{ ex.endpoint }}</code>
               </div>
 
               @if (ex.mastodonQuery) {
                 <div class="explain-section">
-                  <div class="explain-head muted small">Mastodon query</div>
+                  <div class="explain-head muted small">
+                    {{ 'pages.search.explain.mastodonQuery' | transloco }}
+                  </div>
                   <code>{{ ex.mastodonQuery }}</code>
                 </div>
               }
 
               @if (ex.anonymousTags?.length) {
                 <div class="explain-section">
-                  <div class="explain-head muted small">Anonymous transformation</div>
+                  <div class="explain-head muted small">
+                    {{ 'pages.search.explain.anonymousTransformation' | transloco }}
+                  </div>
                   <p class="small">
-                    Searched as hashtags
+                    {{ 'pages.search.explain.searchedAsHashtags.a' | transloco }}
                     @for (t of ex.anonymousTags; track t) {
                       <span class="tag-lit">#{{ t }}</span>
                     }
-                    — Mastodon does not provide anonymous full-text post search.
+                    {{ 'pages.search.explain.searchedAsHashtags.b' | transloco }}
                   </p>
                 </div>
               }
 
               @if (ex.serverCriteria.length) {
                 <div class="explain-section">
-                  <div class="explain-head muted small">Server-side criteria</div>
+                  <div class="explain-head muted small">
+                    {{ 'pages.search.explain.serverCriteria' | transloco }}
+                  </div>
                   <ul class="small">
-                    @for (c of ex.serverCriteria; track c) {
-                      <li>{{ c }}</li>
+                    @for (c of ex.serverCriteria; track $index) {
+                      <li>{{ c.labelKey | transloco: c.labelParams }}</li>
                     }
                   </ul>
                 </div>
@@ -830,24 +845,37 @@
 
               @if (ex.loadedCriteria.length) {
                 <div class="explain-section">
-                  <div class="explain-head muted small">Filters applied to loaded results</div>
+                  <div class="explain-head muted small">
+                    {{ 'pages.search.explain.loadedCriteria' | transloco }}
+                  </div>
                   <ul class="small">
-                    @for (c of ex.loadedCriteria; track c) {
-                      <li>{{ c }}</li>
+                    @for (c of ex.loadedCriteria; track $index) {
+                      <li>{{ c.labelKey | transloco: c.labelParams }}</li>
                     }
                   </ul>
                 </div>
               }
 
               <div class="explain-section">
-                <div class="explain-head muted small">API usage</div>
+                <div class="explain-head muted small">
+                  {{ 'pages.search.explain.apiUsage' | transloco }}
+                </div>
                 <ul class="small">
-                  <li>Maximum: {{ ex.apiUsage.maximum }} calls</li>
-                  <li>Used: {{ ex.apiUsage.used }} calls</li>
+                  <li>
+                    {{
+                      'pages.search.explain.maximumCalls'
+                        | transloco: { count: ex.apiUsage.maximum }
+                    }}
+                  </li>
+                  <li>
+                    {{ 'pages.search.explain.usedCalls' | transloco: { count: ex.apiUsage.used } }}
+                  </li>
                   @if (ex.apiUsage.tagsDropped) {
                     <li>
-                      Truncated: {{ ex.apiUsage.tagsDropped }} hashtag(s) dropped to stay within the
-                      API-call budget.
+                      {{
+                        'pages.search.explain.truncated'
+                          | transloco: { count: ex.apiUsage.tagsDropped }
+                      }}
                     </li>
                   }
                 </ul>
@@ -936,7 +964,7 @@
               </summary>
               @for (facet of accountFacets(); track facet.kind) {
                 <div class="facet">
-                  <div class="facet-label muted small">{{ facet.label }}</div>
+                  <div class="facet-label muted small">{{ facet.labelKey | transloco }}</div>
                   <!-- `showAll` facets are bounded ordered ladders where the
                        last row matters as much as the first — see AccountFacet. -->
                   @for (
@@ -949,7 +977,7 @@
                         [checked]="isAccountFacetSelected(facet.kind, v.value)"
                         (change)="toggleAccountFacet(facet.kind, v.value)"
                       />
-                      <span>{{ v.label }}</span>
+                      <span>{{ v.labelKey ? (v.labelKey | transloco) : v.text }}</span>
                       <span class="muted facet-count">{{ v.count }}</span>
                     </label>
                   }
@@ -1106,7 +1134,9 @@
             <div class="page-head">Posts</div>
             @for (group of groups(); track group.key) {
               @if (group.label) {
-                <div class="group-head">{{ group.label }}</div>
+                <div class="group-head">
+                  {{ group.labelIsKey ? (group.label | transloco) : group.label }}
+                </div>
               }
               @for (s of group.statuses; track s.id) {
                 <app-status-card

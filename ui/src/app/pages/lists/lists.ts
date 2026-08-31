@@ -26,6 +26,7 @@ import { ProfileList, ProfileLists } from '../../providers/account/profile-lists
 import { CopyPreview, ProfileListCopy } from '../../providers/account/profile-list-copy';
 import { SupporterStatus } from '../../providers/account/supporter-status';
 import { writeBlockMessage } from '../../providers/account/write-block';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
  * Which sections the Feeds page shows. `/feeds` shows everything; `/feeds/lists`
@@ -65,33 +66,158 @@ export type FeedSection =
   | 'bsky-popular';
 
 /** Picker options, in the order the sections appear down the page. */
-export const FEED_SECTIONS: readonly { id: FeedSection; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'lists', label: 'Lists' },
-  { id: 'client-lists', label: 'Client lists' },
-  { id: 'searches', label: 'Saved searches' },
-  { id: 'server', label: 'Server feeds' },
-  { id: 'tags', label: 'Followed hashtags' },
-  { id: 'tag-bundles', label: 'Tag bundles' },
-  { id: 'featured-tags', label: 'Featured hashtags' },
-  { id: 'collections', label: 'Collections' },
-  { id: 'endorsements', label: 'Endorsed accounts' },
-  { id: 'rss', label: 'RSS feeds' },
-  { id: 'twitter', label: 'Twitter accounts' },
+export const FEED_SECTIONS: readonly { id: FeedSection; key: string }[] = [
+  { id: 'all', key: 'pages.lists.sections.all' },
+  { id: 'lists', key: 'pages.lists.title.lists' },
+  { id: 'client-lists', key: 'pages.lists.clientList.heading' },
+  { id: 'searches', key: 'pages.lists.savedSearches.heading' },
+  { id: 'server', key: 'pages.lists.serverFeeds.heading' },
+  { id: 'tags', key: 'pages.lists.tags.heading' },
+  { id: 'tag-bundles', key: 'pages.lists.tagBundles.heading' },
+  { id: 'featured-tags', key: 'pages.lists.sections.featuredTags' },
+  { id: 'collections', key: 'pages.lists.collections.heading' },
+  { id: 'endorsements', key: 'pages.lists.endorsements.heading' },
+  { id: 'rss', key: 'pages.lists.rss.heading' },
+  { id: 'twitter', key: 'pages.lists.twitter.heading' },
   // Pinned is its own section rather than a sort order, because that is what
   // pinning means upstream: promoted to a top-level tab, not merged into a
   // stream. An entry appears here or under its kind, never both.
-  { id: 'bsky-pinned', label: 'Pinned on Bluesky' },
-  { id: 'bsky-feeds', label: 'Bluesky feeds' },
-  { id: 'bsky-lists', label: 'Bluesky lists' },
+  { id: 'bsky-pinned', key: 'pages.lists.bsky.pinnedHeading' },
+  { id: 'bsky-feeds', key: 'pages.lists.bsky.feedsHeading' },
+  { id: 'bsky-lists', key: 'pages.lists.bsky.listsHeading' },
   // Last: it is discovery rather than something the reader owns, and every
   // other section on this page is theirs.
-  { id: 'bsky-popular', label: 'Popular on Bluesky' },
+  { id: 'bsky-popular', key: 'pages.lists.bsky.popularHeading' },
 ];
 
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n pages.lists.title.lists: Lists
+// i18n pages.lists.title.tags: Tags
+// i18n pages.lists.title.backToFeeds: ← Feeds
+// i18n pages.lists.title.feeds: Feeds
+// i18n pages.lists.landing.allFeeds: All feeds
+// i18n pages.lists.landing.allFeedsHint: everything on one page
+// i18n pages.lists.sections.all: All
+// i18n pages.lists.sections.featuredTags: Featured hashtags
+// i18n pages.lists.create: Create
+// i18n pages.lists.loading: Loading…
+// i18n pages.lists.emptyCreateAbove: None yet — create one above.
+// i18n pages.lists.serverList.newNamePlaceholder: New list name
+// i18n pages.lists.serverList.deleteTitle: Delete list
+// i18n pages.lists.serverList.empty: No lists yet — create one above.
+// i18n pages.lists.clientList.heading: Client lists
+// i18n pages.lists.clientList.hint: Kept in this browser, so anyone can go in one — you don't have to follow them, and it works signed out. Server lists (above) only accept accounts you follow.
+// i18n pages.lists.clientList.newNamePlaceholder: New client list name
+// i18n pages.lists.clientList.members.one: {{count}} member
+// i18n pages.lists.clientList.members.other: {{count}} members
+// i18n pages.lists.profileList.heading: Mawkingbird lists
+// i18n pages.lists.profileList.hint: Kept on your Mawkingbird account, so they follow you to your other browsers. Client lists (above) stay in this browser. A list lives in one place — nothing is copied between them unless you ask.
+// i18n pages.lists.profileList.newNamePlaceholder: New Mawkingbird list name
+// i18n pages.lists.profileList.readOnly: These are read-only right now.
+// i18n pages.lists.copyOffer.summary.one: This browser has {{lists}} client list ({{accounts}} account). Copy it to your Mawkingbird account?
+// i18n pages.lists.copyOffer.summary.other: This browser has {{lists}} client lists ({{accounts}} accounts). Copy them to your Mawkingbird account?
+// i18n pages.lists.copyOffer.keepsCopies: Your browser keeps its own copies — nothing is moved or deleted.
+// i18n pages.lists.copyOffer.copying: Copying…
+// i18n pages.lists.copyOffer.copyToAccount: Copy to my account
+// i18n pages.lists.copyOffer.noThanks: No thanks
+// i18n pages.lists.copyOffer.showPrompt: Copy this browser's lists?
+// i18n pages.lists.savedSearches.heading: Saved searches
+// i18n pages.lists.savedSearches.emptyPrefix: None yet — save one from
+// i18n pages.lists.savedSearches.emptyLink: search
+// i18n pages.lists.savedSearches.badge: · saved search
+// i18n pages.lists.savedSearches.anonBadge: · anon
+// i18n pages.lists.serverFeeds.heading: Server feeds
+// i18n pages.lists.serverFeeds.directoryTitle: Server directory
+// i18n pages.lists.serverFeeds.directoryHint: · accounts here who opted into discovery
+// i18n pages.lists.tags.heading: Followed hashtags
+// i18n pages.lists.tags.peekPlaceholder: Look at a hashtag first…
+// i18n pages.lists.tags.peekAriaLabel: Hashtag to preview before following
+// i18n pages.lists.tags.viewPosts: View posts
+// i18n pages.lists.tags.empty: You don't follow any hashtags yet.
+// i18n pages.lists.tags.unfollowTitle: Unfollow
+// i18n pages.lists.tags.bulkPrompt: Arriving with a list?
+// i18n pages.lists.tags.bulkLink: Import or export hashtags in bulk
+// i18n pages.lists.tagsPub.prompt: Missing posts on these tags?
+// i18n pages.lists.tagsPub.name: tags.pub
+// i18n pages.lists.tagsPub.hint: runs a relay account per hashtag that boosts from across the network — following one fills in what this server never saw.
+// i18n pages.lists.tagsPub.checking: Checking…
+// i18n pages.lists.tagsPub.check: Check tags.pub
+// i18n pages.lists.tagsPub.stop: Stop
+// i18n pages.lists.tagsPub.followRelays.one: Follow {{count}} relay
+// i18n pages.lists.tagsPub.followRelays.other: Follow {{count}} relays
+// i18n pages.lists.tagBundles.heading: Tag bundles
+// i18n pages.lists.tagBundles.hint: Several hashtags read as one feed, without folding them into Home. Up to {{maxTags}} tags each.
+// i18n pages.lists.tagBundles.newNamePlaceholder: New tag bundle name
+// i18n pages.lists.tagBundles.deleteTitle: Delete bundle
+// i18n pages.lists.tagBundles.empty: None yet — create one above, then add tags to it.
+// i18n pages.lists.tagBundles.noTagsYet: · no tags yet
+// i18n pages.lists.featuredTags.heading: Featured on your profile
+// i18n pages.lists.featuredTags.empty: No featured hashtags.
+// i18n pages.lists.collections.heading: Collections
+// i18n pages.lists.collections.newNamePlaceholder: New collection name
+// i18n pages.lists.collections.deleteTitle: Delete collection
+// i18n pages.lists.collections.unsupported: This server doesn't support collections (Mastodon 4.6+).
+// i18n pages.lists.collections.starterTitle: Starter collection
+// i18n pages.lists.collections.starterHint: · 24 members · built in
+// i18n pages.lists.collections.empty: No collections yet — a public, curated set of accounts you recommend.
+// i18n pages.lists.collections.members.one: · {{count}} member
+// i18n pages.lists.collections.members.other: · {{count}} members
+// i18n pages.lists.collections.featuringMe: Collections featuring me
+// i18n pages.lists.endorsements.heading: Endorsed accounts
+// i18n pages.lists.endorsements.accountsYouEndorse: Accounts you endorse
+// i18n pages.lists.endorsements.membersMergedFeed.one: · {{count}} member · merged feed
+// i18n pages.lists.endorsements.membersMergedFeed.other: · {{count}} members · merged feed
+// i18n pages.lists.endorsements.empty: None yet — endorse accounts from their profile to build a merged feed.
+// i18n pages.lists.rss.heading: RSS feeds
+// i18n pages.lists.rss.emptyPrefix: None yet — subscribe to any blog or news feed in
+// i18n pages.lists.rss.settingsLink: settings
+// i18n pages.lists.rss.manageFeedsPrefix: Add or remove feeds in
+// i18n pages.lists.rss.unsubscribeTitle: Unsubscribe
+// i18n pages.lists.rss.items.one: · {{count}} item
+// i18n pages.lists.rss.items.other: · {{count}} items
+// i18n pages.lists.rss.newestPrefix: · newest
+// i18n pages.lists.rss.inHomeSuffix: in Home
+// i18n pages.lists.rss.viaProxy: · via proxy
+// i18n pages.lists.rss.off: · off
+// i18n pages.lists.twitter.heading: Twitter accounts
+// i18n pages.lists.twitter.off: · off
+// i18n pages.lists.twitter.settingsLink: settings
+// i18n pages.lists.twitter.manageHint.a: Follow or unfollow accounts in
+// i18n pages.lists.twitter.manageHint.b: . Opening one costs a request unless it was loaded in the last few minutes.
+// i18n pages.lists.bsky.heading: Bluesky feeds
+// i18n pages.lists.bsky.loading: Loading your Bluesky feeds…
+// i18n pages.lists.bsky.pinnedHeading: 📌 Pinned on Bluesky
+// i18n pages.lists.bsky.feedsHeading: 🦋 Bluesky feeds
+// i18n pages.lists.bsky.listsHeading: 🦋 Bluesky lists
+// i18n pages.lists.bsky.popularHeading: 🦋 Popular on Bluesky
+// i18n pages.lists.bsky.popularHint: Feeds other people built and published. Anyone can read them — no Bluesky account needed.
+// i18n pages.lists.bsky.savedHint: Saved on Bluesky. Pin and unpin them in the Bluesky app — Mockingbird reads this list but never rewrites it.
+// i18n pages.lists.bsky.byList: · list by &#64;{{handle}}
+// i18n pages.lists.bsky.byFeed: · feed by &#64;{{handle}}
+// i18n pages.lists.bsky.byHandle: · by &#64;{{handle}}
+// i18n pages.lists.bsky.membersByHandle.one: · {{count}} member · by &#64;{{handle}}
+// i18n pages.lists.bsky.membersByHandle.other: · {{count}} members · by &#64;{{handle}}
+// i18n pages.lists.confirm.deleteList.title: Delete this list?
+// i18n pages.lists.confirm.deleteList.message: "{{name}}" will be permanently deleted. This cannot be undone.
+// i18n pages.lists.confirm.deleteList.confirm: Delete list
+// i18n pages.lists.confirm.deleteBundle.title: Delete this tag bundle?
+// i18n pages.lists.confirm.deleteBundle.message: "{{name}}" will be removed from this browser. This cannot be undone.
+// i18n pages.lists.confirm.deleteBundle.confirm: Delete bundle
+// i18n pages.lists.confirm.deleteClientList.title: Delete this client list?
+// i18n pages.lists.confirm.deleteClientList.message: "{{name}}" will be removed from this browser. This cannot be undone.
+// i18n pages.lists.confirm.deleteClientList.confirm: Delete list
+// i18n pages.lists.confirm.deleteProfileList.title: Delete this Mawkingbird list?
+// i18n pages.lists.confirm.deleteProfileList.message: "{{name}}" will be removed from your Mawkingbird account, on every browser. This cannot be undone.
+// i18n pages.lists.confirm.deleteProfileList.confirm: Delete list
+// i18n pages.lists.confirm.unsubscribeRss.title: Unsubscribe from this feed?
+// i18n pages.lists.confirm.unsubscribeRss.message: "{{name}}" will be removed from your feeds. You can subscribe again at any time.
+// i18n pages.lists.confirm.unsubscribeRss.confirm: Unsubscribe
+// i18n pages.lists.confirm.deleteCollection.title: Delete this collection?
+// i18n pages.lists.confirm.deleteCollection.message: "{{name}}" will be permanently deleted. This cannot be undone.
+// i18n pages.lists.confirm.deleteCollection.confirm: Delete collection
 @Component({
   selector: 'app-lists',
-  imports: [RouterLink, FormsModule, ConfirmDialog],
+  imports: [RouterLink, FormsModule, ConfirmDialog, TranslocoPipe],
   templateUrl: './lists.html',
   styleUrl: './lists.css',
 })

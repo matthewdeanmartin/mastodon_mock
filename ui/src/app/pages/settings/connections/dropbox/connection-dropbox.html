@@ -1,31 +1,40 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.backLink' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>📦 Dropbox</h1>
+  <h1>{{ 'settings.connections.dropbox.title' | transloco }}</h1>
   <p>
-    Connect an app-specific Dropbox folder with OAuth. Authorization and file access happen directly
-    between this browser and Dropbox; Mockingbird never receives a client secret or your files.
+    {{ 'settings.connections.dropbox.intro' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
 @if (!dropbox.configured) {
   <p class="feed-error">
-    Dropbox is not configured for this build. Add the public Dropbox app key to the Angular
-    environment first.
+    {{ 'settings.connections.dropbox.notConfigured' | transloco }}
   </p>
 } @else if (dropbox.connected()) {
   <div class="dropbox-actions">
     <button class="btn" type="button" (click)="listDropbox()" [disabled]="dropboxBusy()">
-      {{ dropboxBusy() ? 'Listing…' : 'List files and folders' }}
+      {{
+        (dropboxBusy()
+          ? 'settings.connections.dropbox.listing'
+          : 'settings.connections.dropbox.list'
+        ) | transloco
+      }}
     </button>
-    <button class="btn btn-outline" type="button" (click)="disconnectDropbox()">Disconnect</button>
+    <button class="btn btn-outline" type="button" (click)="disconnectDropbox()">
+      {{ 'settings.connections.dropbox.disconnect' | transloco }}
+    </button>
   </div>
   <p class="muted small">
-    This short-lived connection is kept only for this browser session. Reconnect after it expires.
+    {{ 'settings.connections.dropbox.sessionOnly' | transloco }}
   </p>
 } @else {
-  <button class="btn" type="button" (click)="connectDropbox()">Connect Dropbox</button>
+  <button class="btn" type="button" (click)="connectDropbox()">
+    {{ 'settings.connections.dropbox.connect' | transloco }}
+  </button>
 }
 @if (dropboxNotice(); as msg) {
   <p class="connection-ok" role="status">{{ msg }}</p>
@@ -43,11 +52,11 @@
       aria-labelledby="dropbox-list-title"
     >
       <div class="dropbox-modal-head">
-        <h2 id="dropbox-list-title">Dropbox files and folders</h2>
+        <h2 id="dropbox-list-title">{{ 'settings.connections.dropbox.modalTitle' | transloco }}</h2>
         <button
           class="icon-close"
           type="button"
-          aria-label="Close"
+          [aria-label]="'settings.connections.dropbox.closeAriaLabel' | transloco"
           (click)="dropboxEntries.set(null)"
         >
           ×
@@ -63,10 +72,12 @@
           }
         </ul>
       } @else {
-        <p class="muted">This Dropbox folder is empty.</p>
+        <p class="muted">{{ 'settings.connections.dropbox.empty' | transloco }}</p>
       }
       <div class="dropbox-modal-foot">
-        <button class="btn" type="button" (click)="dropboxEntries.set(null)">Close</button>
+        <button class="btn" type="button" (click)="dropboxEntries.set(null)">
+          {{ 'settings.connections.dropbox.close' | transloco }}
+        </button>
       </div>
     </section>
   </div>

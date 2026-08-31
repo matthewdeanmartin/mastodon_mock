@@ -86,7 +86,9 @@ export function stepTitleKey(step: WizardStep): string {
   }
 }
 
-/** The label on the button that leaves this step forwards. */
+// i18n wizard.forward.publish: Publish
+// i18n wizard.forward.continue: Continue
+/** Translation key for the button that leaves this step forwards. */
 export function forwardLabel(step: WizardStep, enabled: WizardSteps): string {
-  return isLastStep(step, enabled) ? 'Publish' : 'Continue';
+  return isLastStep(step, enabled) ? 'wizard.forward.publish' : 'wizard.forward.continue';
 }

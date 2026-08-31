@@ -333,7 +333,7 @@
         </summary>
         @for (facet of facets(); track facet.kind) {
           <div class="facet">
-            <div class="facet-label muted small">{{ facet.label }}</div>
+            <div class="facet-label muted small">{{ facet.labelKey | transloco }}</div>
             @for (v of facet.values.slice(0, 5); track v.value) {
               <label class="facet-value">
                 <input
@@ -341,7 +341,7 @@
                   [checked]="isFacetSelected(facet.kind, v.value)"
                   (change)="toggleFacet(facet.kind, v.value)"
                 />
-                <span>{{ v.label }}</span>
+                <span>{{ v.labelKey ? (v.labelKey | transloco) : v.text }}</span>
                 <span class="muted facet-count">{{ v.count }}</span>
               </label>
             }
@@ -413,7 +413,7 @@
           <div class="facet-group-label muted small">Bluesky only</div>
           @for (facet of postFacets(); track facet.kind) {
             <div class="facet">
-              <div class="facet-label muted small">{{ facet.label }}</div>
+              <div class="facet-label muted small">{{ facet.labelKey | transloco }}</div>
               @for (v of facet.values.slice(0, 5); track v.value) {
                 <label class="facet-value">
                   <input
@@ -421,7 +421,7 @@
                     [checked]="isPostFacetSelected(facet.kind, v.value)"
                     (change)="togglePostFacet(facet.kind, v.value)"
                   />
-                  <span>{{ v.label }}</span>
+                  <span>{{ v.labelKey ? (v.labelKey | transloco) : v.text }}</span>
                   <span class="muted facet-count">{{ v.count }}</span>
                 </label>
               }
@@ -447,7 +447,7 @@
 
         @for (facet of accountFacets(); track facet.kind) {
           <div class="facet">
-            <div class="facet-label muted small">{{ facet.label }}</div>
+            <div class="facet-label muted small">{{ facet.labelKey | transloco }}</div>
             @for (v of facet.showAll ? facet.values : facet.values.slice(0, 5); track v.value) {
               <label class="facet-value">
                 <input
@@ -455,7 +455,7 @@
                   [checked]="isAccountFacetSelected(facet.kind, v.value)"
                   (change)="toggleAccountFacet(facet.kind, v.value)"
                 />
-                <span>{{ v.label }}</span>
+                <span>{{ v.labelKey ? (v.labelKey | transloco) : v.text }}</span>
                 <span class="muted facet-count">{{ v.count }}</span>
               </label>
             }
@@ -606,7 +606,9 @@
     <div class="page-head">{{ words().Posts }}</div>
     @for (group of groups(); track group.key) {
       @if (group.label) {
-        <div class="group-head">{{ group.label }}</div>
+        <div class="group-head">
+          {{ group.labelIsKey ? (group.label | transloco) : group.label }}
+        </div>
       }
       @for (s of group.statuses; track s.id) {
         <app-status-card [status]="s" [showSource]="true" />

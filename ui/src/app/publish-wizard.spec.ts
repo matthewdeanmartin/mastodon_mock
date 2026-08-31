@@ -91,18 +91,18 @@ describe('previousStep', () => {
 describe('isLastStep and forwardLabel', () => {
   it('the final enabled step publishes', () => {
     expect(isLastStep('when', ALL_STEPS_ON)).toBe(true);
-    expect(forwardLabel('when', ALL_STEPS_ON)).toBe('Publish');
+    expect(forwardLabel('when', ALL_STEPS_ON)).toBe('wizard.forward.publish');
   });
 
   it('moves the Publish button when the last step is switched off', () => {
     const enabled = steps({ when: false });
     expect(isLastStep('targets', enabled)).toBe(true);
-    expect(forwardLabel('targets', enabled)).toBe('Publish');
+    expect(forwardLabel('targets', enabled)).toBe('wizard.forward.publish');
   });
 
   it('an earlier step continues rather than publishing', () => {
     expect(isLastStep('preview', ALL_STEPS_ON)).toBe(false);
-    expect(forwardLabel('preview', ALL_STEPS_ON)).toBe('Continue');
+    expect(forwardLabel('preview', ALL_STEPS_ON)).toBe('wizard.forward.continue');
   });
 
   it('a lone enabled step both opens the wizard and publishes from it', () => {

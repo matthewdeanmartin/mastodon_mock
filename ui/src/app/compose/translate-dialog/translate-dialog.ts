@@ -1,3 +1,4 @@
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Component, computed, HostListener, inject, input, output, signal } from '@angular/core';
 import { AiTranslate } from '../../ai-translate';
 import { POSTING_LANGUAGE_OPTIONS } from '../../language-detect';
@@ -27,8 +28,22 @@ export interface TranslateResult {
  * an editable box first and the user chooses **Replace** or **Append** —
  * append being the bilingual-post case, where both versions ship together.
  */
+// i18n compose.translateDialog.append: Append
+// i18n compose.translateDialog.cancel: Cancel
+// i18n compose.translateDialog.close: Close
+// i18n compose.translateDialog.into: Translate into
+// i18n compose.translateDialog.intro: Writes your post in another language. The result is editable — check it before you post, especially anything the model could take literally.
+// i18n compose.translateDialog.replace: Replace
+// i18n compose.translateDialog.retry: Try again
+// i18n compose.translateDialog.title: 🤖🌐 Translate this post
+// i18n compose.translateDialog.toButton: Translate to
+// i18n compose.translateDialog.translatedBy: Translated by
+// i18n compose.translateDialog.translatingInto: Translating into
+// i18n compose.translateDialog.writeFirst: Write something first.
+
 @Component({
   selector: 'app-translate-dialog',
+  imports: [TranslocoPipe],
   templateUrl: './translate-dialog.html',
   styleUrl: './translate-dialog.css',
 })

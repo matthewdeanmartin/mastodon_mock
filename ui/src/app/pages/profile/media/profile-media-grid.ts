@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { TrustedAccounts } from '../../../trusted-accounts';
 import { ProfileMediaItem } from './profile-media-item';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
  * The photo wall on a profile's Media tab.
@@ -13,8 +14,18 @@ import { ProfileMediaItem } from './profile-media-item';
  * more arrive only when the reader presses "More". No infinite scroll anywhere
  * in this feature.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n pages.profile.media.loadingPictures: Loading pictures…
+// i18n pages.profile.media.nothingToShow: Nothing to show here.
+// i18n pages.profile.media.noPicturesYet: No pictures yet.
+// i18n pages.profile.media.sensitiveImageReveal: Sensitive image, click to reveal
+// i18n pages.profile.media.openPicture: Open picture
+// i18n pages.profile.media.sensitiveBadge: Sensitive
+// i18n pages.profile.media.loading: Loading…
+// i18n pages.profile.media.more: More
 @Component({
   selector: 'app-profile-media-grid',
+  imports: [TranslocoPipe],
   templateUrl: './profile-media-grid.html',
   styleUrl: './profile-media-grid.css',
 })

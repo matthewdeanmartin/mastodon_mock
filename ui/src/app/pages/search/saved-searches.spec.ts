@@ -16,6 +16,21 @@ function postSearch(words: string): MawkingbirdSearch {
 
 const ctx = { instance: 'mastodon.social', authenticated: true };
 
+/**
+ * A second instance that re-reads from storage.
+ *
+ * `new SavedSearches()` would be simpler, but the service injects
+ * `TranslocoService` (its cap and untitled-name messages are translated), and
+ * `inject()` outside an injection context throws NG0203. Resetting the module
+ * and asking the injector again gives a genuinely fresh instance the supported
+ * way.
+ */
+function reloadedFromStorage(): SavedSearches {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({});
+  return TestBed.inject(SavedSearches);
+}
+
 describe('SavedSearches', () => {
   let svc: SavedSearches;
 
@@ -30,7 +45,7 @@ describe('SavedSearches', () => {
     svc.save('Second', postSearch('b'), ctx);
     expect(svc.all().map((s) => s.name)).toEqual(['Second', 'First']);
     // A fresh instance re-reads from storage.
-    const reloaded = new SavedSearches();
+    const reloaded = reloadedFromStorage();
     expect(reloaded.all().map((s) => s.name)).toEqual(['Second', 'First']);
   });
 
@@ -150,7 +165,7 @@ describe('SavedSearches', () => {
         }),
       );
 
-      const reloaded = new SavedSearches();
+      const reloaded = reloadedFromStorage();
       const row = reloaded.all()[0];
       expect(row?.name).toBe('From before');
       expect(row?.network).toBe('mastodon');

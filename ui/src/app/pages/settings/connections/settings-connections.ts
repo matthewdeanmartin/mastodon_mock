@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Auth } from '../../../auth';
 import { BlueskySession } from '../../../providers/bluesky/bluesky-session';
 import { MastodonConnector } from '../../../providers/mastodon/mastodon-connector';
@@ -63,14 +64,40 @@ export interface ConnectionCatalogRow {
  * The credential-retention policy stays here rather than on any child because
  * it governs all of them at once.
  */
+// i18n settings.connections.title: Connections
+// i18n settings.connections.intro: Follow your people wherever they post. Mastodon is home — a connection is one account somewhere else, merged in as a guest. Credentials work from this browser first; supported low-churn keys can also be encrypted with Mawkingbird Plus and synced to your other devices. Each connected card says which is true.
+// i18n settings.connections.rssBefore: Subscribing to many feeds at once isn't a connection — that lives under
+// i18n settings.connections.rssLink: RSS feeds
+// i18n settings.connections.vaultClosed: The encrypted inventory is closed, so some badges cannot be verified.
+// i18n settings.connections.openPlus: Open Mawkingbird Plus
+// i18n settings.connections.openPlusAfter: once to unlock it or see why it is unavailable.
+// i18n settings.connections.catalogAriaLabel: Available connections
+// i18n settings.connections.pillTurnedOff: Turned off
+// i18n settings.connections.pillUnavailable: Unavailable
+// i18n settings.connections.pillConnected: Connected
+// i18n settings.connections.pillNotConnected: Not connected
+// i18n settings.connections.turnBackOn: Turn it back on in feature flags
+// i18n settings.connections.doctorHeading: 🩺 Connection doctor
+// i18n settings.connections.doctorBody: Some networks block whole categories of site. Rather than finding that out after making an account, buying credits and pasting in a key, check first: the doctor asks every service above whether this network will let your browser reach it. It needs no keys and uses none of the ones you have saved.
+// i18n settings.connections.doctorLink: Check what this network allows
+// i18n settings.connections.retentionHeading: 🔑 How long to keep credentials
+// i18n settings.connections.retentionBody: GitHub and Raindrop.io use a pasted long-lived token. Bluesky exchanges the one-time login secret you enter for rotating session tokens, then discards that secret. There is no unencrypted server copy: credentials sit in this browser until something removes them. Supported low-churn credentials may also have an end-to-end encrypted Mawkingbird Plus copy; Bluesky's rotating session tokens do not. The badges above report the difference. Pick how long the local copy should remain — a Plus-backed credential locks here at the limit, while a browser-only credential disconnects. Reconnecting restarts the clock.
+// i18n settings.connections.retentionDropboxNote: This does not apply to Dropbox, which uses a proper OAuth flow with short-lived tokens that expire on their own.
+// i18n settings.connections.retentionAriaLabel: Credential retention
+// i18n settings.connections.retentionNeverWarning: Nothing will expire on its own. Revoke tokens at the provider when you stop using a connection.
+// i18n settings.connections.mastodonAnonymousActive: Anonymous browsing already reads a Mastodon server — change it in Settings → Anonymous.
+// i18n settings.connections.mastodonAlreadySignedIn: You are signed in to Mastodon already — it is your account here, not a connector.
+// i18n settings.connections.blueskyAlreadySignedIn: You are signed in to Bluesky already — it is your account here, not a connector.
+// i18n settings.connections.dropboxNotConfigured: Not configured for this build — the Dropbox app key is missing.
 @Component({
   selector: 'app-settings-connections',
-  imports: [RouterLink, StorageBadge],
+  imports: [RouterLink, StorageBadge, TranslocoPipe],
   templateUrl: './settings-connections.html',
   styleUrl: './settings-connections.css',
 })
 export class SettingsConnections implements OnInit {
   private auth = inject(Auth);
+  private transloco = inject(TranslocoService);
   private bsky = inject(BlueskySession);
   private mastodon = inject(MastodonConnector);
   private dropbox = inject(DropboxSession);
@@ -183,8 +210,8 @@ export class SettingsConnections implements OnInit {
               entry,
               connected: false,
               unavailableReason: this.auth.isAnonymous
-                ? 'Anonymous browsing already reads a Mastodon server — change it in Settings → Anonymous.'
-                : 'You are signed in to Mastodon already — it is your account here, not a connector.',
+                ? this.transloco.translate<string>('settings.connections.mastodonAnonymousActive')
+                : this.transloco.translate<string>('settings.connections.mastodonAlreadySignedIn'),
             };
           }
           return { entry, connected: this.mastodon.optedIn(), unavailableReason: null };
@@ -197,8 +224,9 @@ export class SettingsConnections implements OnInit {
             return {
               entry,
               connected: false,
-              unavailableReason:
-                'You are signed in to Bluesky already — it is your account here, not a connector.',
+              unavailableReason: this.transloco.translate<string>(
+                'settings.connections.blueskyAlreadySignedIn',
+              ),
             };
           }
           // Available to every other account including Anonymous: the app
@@ -216,7 +244,7 @@ export class SettingsConnections implements OnInit {
             connected: this.dropbox.connected(),
             unavailableReason: this.dropbox.configured
               ? null
-              : 'Not configured for this build — the Dropbox app key is missing.',
+              : this.transloco.translate<string>('settings.connections.dropboxNotConfigured'),
           };
         case 'cors-proxy':
           // "Connected" here means a proxy is selected *and* complete enough to

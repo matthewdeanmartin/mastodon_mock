@@ -1,5 +1,6 @@
 import { Component, computed, input, output, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Account, Relationship, Status } from '../../models';
 import { HumanCountPipe } from '../../human-count.pipe';
 import { VerifiedBadge } from '../../verified-badge/verified-badge';
@@ -7,6 +8,42 @@ import { StatusCard } from '../../status-card/status-card';
 import { AccountWithMatches } from './account-refine';
 import { RenderedHtmlLinks } from '../../rendered-html-links';
 import { Terminology } from '../../terminology';
+
+// i18n pages.search.card.muteFor1Hour: 1 hour
+// i18n pages.search.card.muteFor1Day: 1 day
+// i18n pages.search.card.muteFor7Days: 7 days
+// i18n pages.search.card.muteForever: forever
+// i18n pages.search.card.neverPosted: never posted
+// i18n pages.search.card.activeToday: active today
+// i18n pages.search.card.activeYesterday: active yesterday
+// i18n pages.search.card.activeDaysAgo: active {{days}} days ago
+// i18n pages.search.card.activeMonthsAgo: active {{months}} mo ago
+// i18n pages.search.card.activeYearsAgo: active {{years}}y ago
+// i18n pages.search.card.requested: Requested
+// i18n pages.search.card.mutuals: Mutuals
+// i18n pages.search.card.following: Following
+// i18n pages.search.card.request: Request
+// i18n pages.search.card.follow: Follow
+// i18n pages.search.card.automatedAccount: Automated account
+// i18n pages.search.card.requiresFollowApproval: Requires follow approval
+// i18n pages.search.card.followsYou: Follows you
+// i18n pages.search.card.whySeeingThis: Why you’re seeing this:
+// i18n pages.search.card.postsCount: <strong>{{count}}</strong> posts
+// i18n pages.search.card.following: Following
+// i18n pages.search.card.followingCount: <strong>{{count}}</strong> following
+// i18n pages.search.card.followers: Followers
+// i18n pages.search.card.followersCount: <strong>{{count}}</strong> followers
+// i18n pages.search.card.lastPostedTitle: Last posted: {{date}}
+// i18n pages.search.card.never: never
+// i18n pages.search.card.arrivedWithoutDate: This result arrived without a last-{{post}} date
+// i18n pages.search.card.activityUnknown: activity unknown
+// i18n pages.search.card.moreAccountActions: More account actions
+// i18n pages.search.card.muteFor: Mute for…
+// i18n pages.search.card.blockAccount: Block account
+// i18n pages.search.card.matchedOn: Matched on
+// i18n pages.search.card.showFewerPosts: Show fewer posts
+// i18n pages.search.card.moreMatchingPost.one: + {{count}} more matching post
+// i18n pages.search.card.moreMatchingPost.other: + {{count}} more matching posts
 
 /**
  * One account in the search results, built for discovery rather than lookup: the
@@ -24,7 +61,14 @@ import { Terminology } from '../../terminology';
  */
 @Component({
   selector: 'app-account-result-card',
-  imports: [RouterLink, HumanCountPipe, VerifiedBadge, StatusCard, RenderedHtmlLinks],
+  imports: [
+    RouterLink,
+    HumanCountPipe,
+    VerifiedBadge,
+    StatusCard,
+    RenderedHtmlLinks,
+    TranslocoPipe,
+  ],
   templateUrl: './account-result-card.html',
   styleUrl: './account-result-card.css',
 })
@@ -79,32 +123,44 @@ export class AccountResultCard {
    * `null` = the account has never posted, `undefined` = nobody has told us yet
    * (the card offers to find out), and a date = an answer.
    */
-  protected lastPosted = computed<{ text: string; stale: boolean } | null>(() => {
+  protected lastPosted = computed<{
+    labelKey: string;
+    labelParams?: Record<string, number>;
+    stale: boolean;
+  } | null>(() => {
     const raw = this.account().last_status_at;
     if (raw === undefined) {
       return null;
     }
     if (raw === null) {
-      return { text: 'never posted', stale: true };
+      return { labelKey: 'pages.search.card.neverPosted', stale: true };
     }
     const when = Date.parse(raw);
     if (!Number.isFinite(when)) {
       return null;
     }
     const days = Math.floor((Date.now() - when) / 86_400_000);
-    const text =
+    const labelKey =
       days <= 0
-        ? 'active today'
+        ? 'pages.search.card.activeToday'
         : days === 1
-          ? 'active yesterday'
+          ? 'pages.search.card.activeYesterday'
           : days < 30
-            ? `active ${days} days ago`
+            ? 'pages.search.card.activeDaysAgo'
             : days < 365
-              ? `active ${Math.floor(days / 30)} mo ago`
-              : `active ${Math.floor(days / 365)}y ago`;
+              ? 'pages.search.card.activeMonthsAgo'
+              : 'pages.search.card.activeYearsAgo';
+    const labelParams: Record<string, number> | undefined =
+      days <= 0 || days === 1
+        ? undefined
+        : days < 30
+          ? { days }
+          : days < 365
+            ? { months: Math.floor(days / 30) }
+            : { years: Math.floor(days / 365) };
     // Six months of silence is the line where "still around?" becomes the
     // question the reader is actually asking of a search result.
-    return { text, stale: days >= 180 };
+    return { labelKey, labelParams, stale: days >= 180 };
   });
 
   /** True when this card could show activity but nobody has fetched it yet. */
@@ -116,24 +172,24 @@ export class AccountResultCard {
   protected requested = computed(() => !!this.relationship()?.requested);
 
   protected readonly muteDurations: { label: string; seconds: number | null }[] = [
-    { label: '1 hour', seconds: 3600 },
-    { label: '1 day', seconds: 86400 },
-    { label: '7 days', seconds: 604800 },
-    { label: 'forever', seconds: null },
+    { label: 'pages.search.card.muteFor1Hour', seconds: 3600 },
+    { label: 'pages.search.card.muteFor1Day', seconds: 86400 },
+    { label: 'pages.search.card.muteFor7Days', seconds: 604800 },
+    { label: 'pages.search.card.muteForever', seconds: null },
   ];
 
   /** The label on the follow button, reflecting the current relationship. */
   protected followLabel = computed(() => {
     if (this.requested()) {
-      return 'Requested';
+      return 'pages.search.card.requested';
     }
     if (this.mutual()) {
-      return 'Mutuals';
+      return 'pages.search.card.mutuals';
     }
     if (this.following()) {
-      return 'Following';
+      return 'pages.search.card.following';
     }
-    return this.account().locked ? 'Request' : 'Follow';
+    return this.account().locked ? 'pages.search.card.request' : 'pages.search.card.follow';
   });
 
   /** True when clicking the button unfollows (it currently shows a followed state). */

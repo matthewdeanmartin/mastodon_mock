@@ -12,10 +12,9 @@
   aria-labelledby="pw-title"
   aria-describedby="pw-intro"
 >
-  <h2 id="pw-title">You're signed in to Mawkingbird Plus</h2>
+  <h2 id="pw-title">{{ 'settings.plus.welcome.title' | transloco }}</h2>
   <p id="pw-intro" class="pw-intro">
-    Here's what your subscription switches on. Everything is on to begin with — turn off anything
-    you'd rather not use. You can change any of this later in Settings.
+    {{ 'settings.plus.welcome.intro' | transloco }}
   </p>
 
   <ul class="pw-list">
@@ -54,6 +53,8 @@
   </ul>
 
   <div class="pw-actions">
-    <button class="btn" type="button" (click)="save()">Save</button>
+    <button class="btn" type="button" (click)="save()">
+      {{ 'settings.plus.welcome.save' | transloco }}
+    </button>
   </div>
 </section>

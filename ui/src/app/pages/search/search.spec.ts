@@ -16,6 +16,7 @@ import { Search } from './search';
 import { Auth } from '../../auth';
 import { SearchServer } from '../../search-server';
 import { RecentSearches } from './recent-searches';
+import { WebDroppedItem } from './web-query-serializer';
 
 /** Exposes Search's protected signals for white-box testing. */
 interface SearchInternals {
@@ -51,7 +52,7 @@ interface SearchInternals {
   typeUnavailable(type: 'accounts' | 'statuses' | 'hashtags'): boolean;
   blueskyTarget(): 'accounts' | 'statuses';
   queryPlaceholder(): string;
-  webDropped: WritableSignal<string[]>;
+  webDropped: WritableSignal<WebDroppedItem[]>;
   replies: WritableSignal<'include' | 'only' | 'exclude'>;
   followFilter: WritableSignal<'all' | 'following' | 'not-following'>;
   relationships: WritableSignal<Record<string, Relationship>>;
@@ -1041,7 +1042,7 @@ describe('Search', () => {
 
       internals(fixture).onTypeSelect('duckduckgo');
 
-      expect(internals(fixture).webDropped()).toContain('no replies');
+      expect(internals(fixture).webDropped()).toContainEqual({ code: 'noReplies' });
       // Dropped, not approximated: the operator must not reach the engine.
       expect(decodeURIComponent(opened[0])).not.toContain('is:reply');
     });

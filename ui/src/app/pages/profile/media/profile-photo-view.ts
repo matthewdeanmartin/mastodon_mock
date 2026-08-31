@@ -30,6 +30,7 @@ import { Status } from '../../../models';
 import { ProfileMediaItem } from './profile-media-item';
 import { BlueskyApi } from '../../../providers/bluesky/bluesky-api';
 import { BskyRef } from '../../../providers/bluesky/bluesky-types';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
  * The photo-first viewer behind a profile's media wall.
@@ -45,9 +46,51 @@ import { BskyRef } from '../../../providers/bluesky/bluesky-types';
  * whole posts, so a four-photo album costs one keypress to skip rather than
  * four.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n pages.profile.media.viewerAriaLabel: Picture viewer
+// i18n pages.profile.media.closeViewer: Close viewer
+// i18n pages.profile.media.previousPicture: Previous picture
+// i18n pages.profile.media.nextPicture: Next picture
+// i18n pages.profile.media.sensitiveImage: Sensitive image
+// i18n pages.profile.media.clickToView: Click to view
+// i18n pages.profile.media.videoUnsupported: Your browser cannot play this video.
+// i18n pages.profile.media.positionOfTotal: {{position}} of {{total}}
+// i18n pages.profile.media.keyboardHint: ← → picture · ↑ ↓ post · Esc close
+// i18n pages.profile.media.cwLabel: CW:
+// i18n pages.profile.media.showLess: Show less
+// i18n pages.profile.media.showMore: Show more
+// i18n pages.profile.media.undoLike: Undo like
+// i18n pages.profile.media.like: Like
+// i18n pages.profile.media.undoBoost: Undo boost
+// i18n pages.profile.media.boost: Boost
+// i18n pages.profile.media.replyToThis: Reply to this {{term}}
+// i18n pages.profile.media.moreActions: More actions
+// i18n pages.profile.media.openThread: Open thread
+// i18n pages.profile.media.removeBookmark: Remove bookmark
+// i18n pages.profile.media.bookmark: Bookmark
+// i18n pages.profile.media.copyLinkToPost: Copy link to post
+// i18n pages.profile.media.copyImageAddress: Copy image address
+// i18n pages.profile.media.openImageInNewTab: Open image in new tab
+// i18n pages.profile.media.deletePost: Delete post
+// i18n pages.profile.media.report: Report…
+// i18n pages.profile.media.muteHandle: Mute &#64;{{handle}}
+// i18n pages.profile.media.blockHandle: Block &#64;{{handle}}
+// i18n pages.profile.media.addCommentPlaceholder: Add a comment…
+// i18n pages.profile.media.cancel: Cancel
+// i18n pages.profile.media.loadingComments: Loading comments…
+// i18n pages.profile.media.noComments: No comments yet.
+// i18n pages.profile.media.replyToHandle: Reply to @{{handle}}
 @Component({
   selector: 'app-profile-photo-view',
-  imports: [FocusTrap, RouterLink, HumanTimePipe, HumanCountPipe, RenderedHtmlLinks, Compose],
+  imports: [
+    FocusTrap,
+    RouterLink,
+    HumanTimePipe,
+    HumanCountPipe,
+    RenderedHtmlLinks,
+    Compose,
+    TranslocoPipe,
+  ],
   templateUrl: './profile-photo-view.html',
   styleUrl: './profile-photo-view.css',
 })

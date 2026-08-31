@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { credentialLocation, StorageBadge } from '../storage-badge';
 import { VaultBridge } from '../../../../providers/vault/vault-bridge';
 
@@ -54,14 +55,61 @@ import { PageDiagnostics } from '../../../../page-diagnostics';
  * actually configured. Without one there is nothing to consent to, so the page
  * says what to go and do instead.
  */
+// i18n settings.connections.linkShortener.title: 🔗 Link shortener
+// i18n settings.connections.linkShortener.intro: Shorten the URLs you post, and keep track of the links you have made. Connect one or more services; the active one is used whenever you shorten something.
+// i18n settings.connections.linkShortener.credentialWarning: These API keys are stored in this browser's localStorage, because Mawkingbird has no server to keep them on. A key here can create and delete links in your account, so use a key scoped to link management if the service offers one, and only on a device you trust. You can revoke it on the provider's own site at any time.
+// i18n settings.connections.linkShortener.servicesHeading: Services
+// i18n settings.connections.linkShortener.activePill: Active
+// i18n settings.connections.linkShortener.connectedPill: Connected
+// i18n settings.connections.linkShortener.signInToBefore: Sign in to
+// i18n settings.connections.linkShortener.signInToAnd: and open
+// i18n settings.connections.linkShortener.apiSettingsLink: your API settings
+// i18n settings.connections.linkShortener.createKey: Create a {{keyLabel}} and copy it.
+// i18n settings.connections.linkShortener.domainNeeded: Note the short domain on your account — {{label}} needs it to make links.
+// i18n settings.connections.linkShortener.pasteBelow: Paste it below. Mawkingbird tests the key before saving the connection.
+// i18n settings.connections.linkShortener.noAccountNeeded: {{label}} has no accounts and needs no setup — choose it and start shortening. Because there is no account, it cannot list, edit or delete links afterwards; Mawkingbird keeps its own record of the ones you make here.
+// i18n settings.connections.linkShortener.worksWithNoSetup: {{label}} works with no setup at all.
+// i18n settings.connections.linkShortener.keySaved: Key saved
+// i18n settings.connections.linkShortener.readyNoAccount: Ready — no account needed
+// i18n settings.connections.linkShortener.makeActive: Make active
+// i18n settings.connections.linkShortener.testing: Testing…
+// i18n settings.connections.linkShortener.testAgain: Test again
+// i18n settings.connections.linkShortener.disconnect: Disconnect
+// i18n settings.connections.linkShortener.setUpProxyLink: Set up a CORS proxy
+// i18n settings.connections.linkShortener.keyDeletedOn: This key is deleted from this browser on {{date}}.
+// i18n settings.connections.linkShortener.consentBefore: You have allowed this key to be sent through
+// i18n settings.connections.linkShortener.consentAfter: when a direct request fails.
+// i18n settings.connections.linkShortener.withdraw: Withdraw that
+// i18n settings.connections.linkShortener.workspaceLabel: Workspace
+// i18n settings.connections.linkShortener.shortDomainLabel: Short domain
+// i18n settings.connections.linkShortener.optional: (optional)
+// i18n settings.connections.linkShortener.workspaceIdPlaceholder: Workspace ID
+// i18n settings.connections.linkShortener.shortDomainPlaceholder: go.example.com
+// i18n settings.connections.linkShortener.keyPlaceholder: {{label}} {{keyLabel}}
+// i18n settings.connections.linkShortener.saveAndTest: Save and test connection
+// i18n settings.connections.linkShortener.use: Use {{label}}
+// i18n settings.connections.linkShortener.readPrivacyBefore: Read {{label}}'s
+// i18n settings.connections.linkShortener.privacyPolicyLink: privacy policy
+// i18n settings.connections.linkShortener.readPrivacyAfter: to see what they record about the links you create and the people who click them.
+// i18n settings.connections.linkShortener.nowActive: {{label}} is now the active shortener.
+// i18n settings.connections.linkShortener.pasteKeyFirst: Paste your {{label}} {{keyLabel}} first.
+// i18n settings.connections.linkShortener.needsDomain: {{label}} needs the short domain from your account.
+// i18n settings.connections.linkShortener.connectedFull: Connected to {{label}}. Your key works from this browser.
+// i18n settings.connections.linkShortener.couldNotReach: Couldn't reach {{label}}.
+// i18n settings.connections.linkShortener.needsProxy: {{label}}'s API doesn't answer web browsers directly, so Mawkingbird needs a CORS proxy to reach it. Set one up under CORS proxy, then come back and test again.
+// i18n settings.connections.linkShortener.notSentThroughProxy: Not sent through {{proxy}}. The direct attempt also failed. Retry later, or choose a different CORS proxy.
+// i18n settings.connections.linkShortener.probeResult: {{label}}: {{message}}
+// i18n settings.connections.linkShortener.consentWithdrawn: Consent withdrawn. You will be asked again next time.
+// i18n settings.connections.linkShortener.disconnectedFull: {{label}} disconnected and its saved links cleared.
 @Component({
   selector: 'app-connection-link-shortener',
-  imports: [FormsModule, RouterLink, ProxyConsentDialog, StorageBadge],
+  imports: [FormsModule, RouterLink, ProxyConsentDialog, StorageBadge, TranslocoPipe],
   templateUrl: './connection-link-shortener.html',
   styleUrls: ['../connection-page.css', './connection-link-shortener.css'],
 })
 export class ConnectionLinkShortener {
   private readonly diagnostics = inject(PageDiagnostics);
+  private readonly transloco = inject(TranslocoService);
   protected settings = inject(ShortenerSettings);
   protected registry = inject(ShortenerRegistry);
   protected consent = inject(ShortenerProxyConsent);
@@ -145,7 +193,11 @@ export class ConnectionLinkShortener {
   /** Make an already-configured provider the active one. */
   protected activate(id: ShortenerId): void {
     this.settings.activate(id);
-    this.notice.set(`${this.entryFor(id).label} is now the active shortener.`);
+    this.notice.set(
+      this.transloco.translate<string>('settings.connections.linkShortener.nowActive', {
+        label: this.entryFor(id).label,
+      }),
+    );
     this.error.set(null);
   }
 
@@ -161,11 +213,20 @@ export class ConnectionLinkShortener {
     const entry = this.entry();
     const key = this.keyDraft().trim();
     if (entry.keyPolicy === 'required' && !key) {
-      this.error.set(`Paste your ${entry.label} ${entry.keyLabel} first.`);
+      this.error.set(
+        this.transloco.translate<string>('settings.connections.linkShortener.pasteKeyFirst', {
+          label: entry.label,
+          keyLabel: entry.keyLabel,
+        }),
+      );
       return;
     }
     if (entry.domainRequired && !this.domainDraft().trim()) {
-      this.error.set(`${entry.label} needs the short domain from your account.`);
+      this.error.set(
+        this.transloco.translate<string>('settings.connections.linkShortener.needsDomain', {
+          label: entry.label,
+        }),
+      );
       return;
     }
 
@@ -199,7 +260,11 @@ export class ConnectionLinkShortener {
     try {
       await firstValueFrom(provider.verify());
       this.keyDraft.set('');
-      this.notice.set(`Connected to ${entry.label}. Your key works from this browser.`);
+      this.notice.set(
+        this.transloco.translate<string>('settings.connections.linkShortener.connectedFull', {
+          label: entry.label,
+        }),
+      );
     } catch (error: unknown) {
       if (error instanceof ProxyConsentRequired) {
         this.handleProxyNeeded(error, entry);
@@ -210,7 +275,14 @@ export class ConnectionLinkShortener {
         // A key that does not work is not kept. See the class note.
         this.settings.clearKey(entry.id);
       }
-      this.error.set(describeError(error, `Couldn't reach ${entry.label}.`));
+      this.error.set(
+        describeError(
+          error,
+          this.transloco.translate<string>('settings.connections.linkShortener.couldNotReach', {
+            label: entry.label,
+          }),
+        ),
+      );
     } finally {
       this.busy.set(false);
     }
@@ -226,8 +298,9 @@ export class ConnectionLinkShortener {
   private handleProxyNeeded(error: ProxyConsentRequired, entry: ShortenerCatalogEntry): void {
     if (error.noProxyConfigured) {
       this.error.set(
-        `${entry.label}'s API doesn't answer web browsers directly, so Mawkingbird needs a CORS ` +
-          `proxy to reach it. Set one up under CORS proxy, then come back and test again.`,
+        this.transloco.translate<string>('settings.connections.linkShortener.needsProxy', {
+          label: entry.label,
+        }),
       );
       return;
     }
@@ -262,8 +335,9 @@ export class ConnectionLinkShortener {
     this.consentPrompt.set(null);
     if (prompt) {
       this.error.set(
-        `Not sent through ${prompt.proxy.label}. The direct attempt also failed. Retry later, or ` +
-          `choose a different CORS proxy.`,
+        this.transloco.translate<string>('settings.connections.linkShortener.notSentThroughProxy', {
+          proxy: prompt.proxy.label,
+        }),
       );
     }
   }
@@ -309,7 +383,12 @@ export class ConnectionLinkShortener {
       const result = await firstValueFrom(this.reachability.probe(entry.id));
       this.lastProbe.set(result);
       if (result.status === 'direct' || result.status === 'proxy') {
-        this.notice.set(`${entry.label}: ${result.message}`);
+        this.notice.set(
+          this.transloco.translate<string>('settings.connections.linkShortener.probeResult', {
+            label: entry.label,
+            message: result.message,
+          }),
+        );
       } else if (result.status === 'needs-consent') {
         const proxy = this.proxy.entry();
         if (proxy) {
@@ -321,7 +400,12 @@ export class ConnectionLinkShortener {
           });
         }
       } else {
-        this.error.set(`${entry.label}: ${result.message}`);
+        this.error.set(
+          this.transloco.translate<string>('settings.connections.linkShortener.probeResult', {
+            label: entry.label,
+            message: result.message,
+          }),
+        );
       }
     } finally {
       this.busy.set(false);
@@ -333,7 +417,9 @@ export class ConnectionLinkShortener {
     const proxy = this.proxy.entry();
     if (proxy) {
       this.consent.revoke(shortener, proxy.id);
-      this.notice.set('Consent withdrawn. You will be asked again next time.');
+      this.notice.set(
+        this.transloco.translate<string>('settings.connections.linkShortener.consentWithdrawn'),
+      );
     }
   }
 
@@ -349,7 +435,11 @@ export class ConnectionLinkShortener {
     this.history.clearProvider(id);
     this.keyDraft.set('');
     this.domainDraft.set('');
-    this.notice.set(`${this.entryFor(id).label} disconnected and its saved links cleared.`);
+    this.notice.set(
+      this.transloco.translate<string>('settings.connections.linkShortener.disconnectedFull', {
+        label: this.entryFor(id).label,
+      }),
+    );
     this.error.set(null);
   }
 

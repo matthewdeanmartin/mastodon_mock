@@ -1,23 +1,23 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.backLink' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>🔗 Link shortener</h1>
+  <h1>{{ 'settings.connections.linkShortener.title' | transloco }}</h1>
   <p>
-    Shorten the URLs you post, and keep track of the links you have made. Connect one or more
-    services; the active one is used whenever you shorten something.
+    {{ 'settings.connections.linkShortener.intro' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
 <p class="credential-warning small">
-  These API keys are stored in this browser's localStorage, because Mawkingbird has no server to
-  keep them on. A key here can create and delete links in your account, so use a key scoped to link
-  management if the service offers one, and only on a device you trust. You can revoke it on the
-  provider's own site at any time.
+  {{ 'settings.connections.linkShortener.credentialWarning' | transloco }}
 </p>
 
 <section class="picker">
-  <h2 class="section-title">Services</h2>
+  <h2 class="section-title">
+    {{ 'settings.connections.linkShortener.servicesHeading' | transloco }}
+  </h2>
   <ul class="provider-list">
     @for (item of catalog; track item.id) {
       <li>
@@ -32,9 +32,13 @@
             <span class="provider-name">
               {{ item.label }}
               @if (isActive(item.id)) {
-                <span class="pill pill-active">Active</span>
+                <span class="pill pill-active">{{
+                  'settings.connections.linkShortener.activePill' | transloco
+                }}</span>
               } @else if (connected(item.id)) {
-                <span class="pill">Connected</span>
+                <span class="pill">{{
+                  'settings.connections.linkShortener.connectedPill' | transloco
+                }}</span>
               }
             </span>
             <span class="provider-pitch muted small">{{ item.pitch }}</span>
@@ -54,50 +58,76 @@
   @if (entry().keyPolicy !== 'none') {
     <ol class="setup-steps muted small">
       <li>
-        Sign in to
+        {{ 'settings.connections.linkShortener.signInToBefore' | transloco }}
         <a [href]="entry().homepage" target="_blank" rel="noopener noreferrer">{{
           entry().label
         }}</a>
-        and open
-        <a [href]="entry().keyUrl" target="_blank" rel="noopener noreferrer">your API settings</a>.
+        {{ 'settings.connections.linkShortener.signInToAnd' | transloco }}
+        <a [href]="entry().keyUrl" target="_blank" rel="noopener noreferrer">{{
+          'settings.connections.linkShortener.apiSettingsLink' | transloco
+        }}</a
+        >.
       </li>
-      <li>Create a {{ entry().keyLabel }} and copy it.</li>
+      <li>
+        {{
+          'settings.connections.linkShortener.createKey' | transloco: { keyLabel: entry().keyLabel }
+        }}
+      </li>
       @if (entry().domainRequired) {
-        <li>Note the short domain on your account — {{ entry().label }} needs it to make links.</li>
+        <li>
+          {{
+            'settings.connections.linkShortener.domainNeeded' | transloco: { label: entry().label }
+          }}
+        </li>
       }
-      <li>Paste it below. Mawkingbird tests the key before saving the connection.</li>
+      <li>{{ 'settings.connections.linkShortener.pasteBelow' | transloco }}</li>
     </ol>
   }
 
   @if (entry().keyPolicy === 'none') {
     <p class="muted small">
-      {{ entry().label }} has no accounts and needs no setup — choose it and start shortening.
-      Because there is no account, it cannot list, edit or delete links afterwards; Mawkingbird
-      keeps its own record of the ones you make here.
+      {{
+        'settings.connections.linkShortener.noAccountNeeded' | transloco: { label: entry().label }
+      }}
     </p>
   } @else if (entry().keyPolicy === 'optional') {
     <p class="muted small">
-      {{ entry().label }} works with no setup at all. {{ entry().keyBenefit }}
+      {{
+        'settings.connections.linkShortener.worksWithNoSetup' | transloco: { label: entry().label }
+      }}
+      {{ entry().keyBenefit }}
     </p>
   }
 
   @if (connected(entry().id)) {
     <div class="conn-actions">
       <span class="connection-ok">
-        {{ settings.hasKey(entry().id) ? 'Key saved' : 'Ready — no account needed' }}
+        {{
+          (settings.hasKey(entry().id)
+            ? 'settings.connections.linkShortener.keySaved'
+            : 'settings.connections.linkShortener.readyNoAccount'
+          ) | transloco
+        }}
       </span>
       @if (settings.hasKey(entry().id) || where(entry().id) === 'locked') {
         <app-storage-badge [where]="where(entry().id)" />
       }
       @if (!isActive(entry().id)) {
         <button class="btn btn-outline" type="button" (click)="activate(entry().id)">
-          Make active
+          {{ 'settings.connections.linkShortener.makeActive' | transloco }}
         </button>
       }
       <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="test()">
-        {{ busy() ? 'Testing…' : 'Test again' }}
+        {{
+          (busy()
+            ? 'settings.connections.linkShortener.testing'
+            : 'settings.connections.linkShortener.testAgain'
+          ) | transloco
+        }}
       </button>
-      <button class="btn btn-outline" type="button" (click)="forget(entry().id)">Disconnect</button>
+      <button class="btn btn-outline" type="button" (click)="forget(entry().id)">
+        {{ 'settings.connections.linkShortener.disconnect' | transloco }}
+      </button>
     </div>
     <!-- The reachability verdict. Deliberately says only what was observed: a
          browser cannot tell CORS from DNS from offline, so no cause is claimed. -->
@@ -105,21 +135,26 @@
       @if (probe.status === 'needs-proxy') {
         <p class="muted small">
           {{ probe.message }}
-          <a routerLink="/settings/connections/cors-proxy">Set up a CORS proxy</a>
+          <a routerLink="/settings/connections/cors-proxy">{{
+            'settings.connections.linkShortener.setUpProxyLink' | transloco
+          }}</a>
         </p>
       } @else {
         <p class="muted small">{{ probe.message }}</p>
       }
     }
     @if (settings.hasKey(entry().id) && expiryLabel(settings.expiresAt()); as expiry) {
-      <p class="muted small">This key is deleted from this browser on {{ expiry }}.</p>
+      <p class="muted small">
+        {{ 'settings.connections.linkShortener.keyDeletedOn' | transloco: { date: expiry } }}
+      </p>
     }
     @if (hasConsent(entry().id) && proxyEntry(); as proxy) {
       <p class="muted small consent-note">
-        You have allowed this key to be sent through <strong>{{ proxy.label }}</strong> when a
-        direct request fails.
+        {{ 'settings.connections.linkShortener.consentBefore' | transloco }}
+        <strong>{{ proxy.label }}</strong>
+        {{ 'settings.connections.linkShortener.consentAfter' | transloco }}
         <button class="linkish" type="button" (click)="revokeConsent(entry().id)">
-          Withdraw that
+          {{ 'settings.connections.linkShortener.withdraw' | transloco }}
         </button>
       </p>
     }
@@ -130,16 +165,28 @@
     @if (entry().domainHint) {
       <label class="field">
         <span class="field-label">
-          {{ entry().id === 'rebrandly' ? 'Workspace' : 'Short domain' }}
+          {{
+            (entry().id === 'rebrandly'
+              ? 'settings.connections.linkShortener.workspaceLabel'
+              : 'settings.connections.linkShortener.shortDomainLabel'
+            ) | transloco
+          }}
           @if (!entry().domainRequired) {
-            <span class="muted small">(optional)</span>
+            <span class="muted small">{{
+              'settings.connections.linkShortener.optional' | transloco
+            }}</span>
           }
         </span>
         <input
           type="text"
           name="shortenerDomain"
           autocomplete="off"
-          [placeholder]="entry().id === 'rebrandly' ? 'Workspace ID' : 'go.example.com'"
+          [placeholder]="
+            (entry().id === 'rebrandly'
+              ? 'settings.connections.linkShortener.workspaceIdPlaceholder'
+              : 'settings.connections.linkShortener.shortDomainPlaceholder'
+            ) | transloco
+          "
           [ngModel]="domainDraft()"
           (ngModelChange)="domainDraft.set($event)"
         />
@@ -152,14 +199,19 @@
         <span class="field-label">
           {{ entry().keyLabel }}
           @if (entry().keyPolicy === 'optional') {
-            <span class="muted small">(optional)</span>
+            <span class="muted small">{{
+              'settings.connections.linkShortener.optional' | transloco
+            }}</span>
           }
         </span>
         <input
           type="password"
           name="shortenerKey"
           autocomplete="off"
-          [placeholder]="entry().label + ' ' + entry().keyLabel"
+          [placeholder]="
+            'settings.connections.linkShortener.keyPlaceholder'
+              | transloco: { label: entry().label, keyLabel: entry().keyLabel }
+          "
           [ngModel]="keyDraft()"
           (ngModelChange)="keyDraft.set($event)"
         />
@@ -171,19 +223,23 @@
 
     <button class="btn" type="submit" [disabled]="busy() || !canSubmit()">
       @if (busy()) {
-        Testing…
+        {{ 'settings.connections.linkShortener.testing' | transloco }}
       } @else if (entry().keyPolicy === 'required') {
-        Save and test connection
+        {{ 'settings.connections.linkShortener.saveAndTest' | transloco }}
       } @else {
-        Use {{ entry().label }}
+        {{ 'settings.connections.linkShortener.use' | transloco: { label: entry().label } }}
       }
     </button>
   </form>
 
   <p class="muted small">
-    Read {{ entry().label }}'s
-    <a [href]="entry().privacyUrl" target="_blank" rel="noopener noreferrer">privacy policy</a>
-    to see what they record about the links you create and the people who click them.
+    {{
+      'settings.connections.linkShortener.readPrivacyBefore' | transloco: { label: entry().label }
+    }}
+    <a [href]="entry().privacyUrl" target="_blank" rel="noopener noreferrer">{{
+      'settings.connections.linkShortener.privacyPolicyLink' | transloco
+    }}</a>
+    {{ 'settings.connections.linkShortener.readPrivacyAfter' | transloco }}
   </p>
 </section>
 

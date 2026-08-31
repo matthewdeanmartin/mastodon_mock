@@ -1,66 +1,83 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.hugo.back' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>✍️ Blog (Hugo)</h1>
+  <h1>{{ 'settings.connections.hugo.title' | transloco }}</h1>
   <p>
-    Publish Markdown posts to your own Hugo site on GitHub. A post is a file: Mawkingbird commits it
-    to your repository, and GitHub builds the site. Nobody else hosts your writing, and there is no
-    blog service that can close your account.
+    {{ 'settings.connections.hugo.intro' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
 <ol class="setup-steps muted small">
   <li>
-    Have a Hugo site in a GitHub repository. Starting from scratch?
+    {{ 'settings.connections.hugo.step1.a' | transloco }}
     <a href="https://gohugo.io/getting-started/quick-start/" target="_blank" rel="noopener">
-      Hugo's quick start ↗
+      {{ 'settings.connections.hugo.step1.link' | transloco }}
     </a>
-    — or fork any Hugo theme's example site, then turn on GitHub Pages for it.
+    {{ 'settings.connections.hugo.step1.b' | transloco }}
   </li>
   <li>
-    <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener"
-      >Create a fine-grained personal access token ↗</a
-    >. Under <strong>Repository access</strong> pick <strong>Only select repositories</strong> and
-    choose your blog repo. Under <strong>Permissions → Repository</strong> set
-    <code>Contents</code> to <strong>Read and write</strong>, and <code>Actions</code> to
-    <strong>Read-only</strong> (that one is for showing build status later).
+    <a
+      href="https://github.com/settings/personal-access-tokens/new"
+      target="_blank"
+      rel="noopener"
+      >{{ 'settings.connections.hugo.step2.link' | transloco }}</a
+    >{{ 'settings.connections.hugo.step2.a' | transloco }}
+    <strong>{{ 'settings.connections.hugo.repositoryAccess' | transloco }}</strong>
+    {{ 'settings.connections.hugo.step2.b' | transloco }}
+    <strong>{{ 'settings.connections.hugo.onlySelectRepositories' | transloco }}</strong>
+    {{ 'settings.connections.hugo.step2.c' | transloco }}
+    <strong>{{ 'settings.connections.hugo.permissionsRepository' | transloco }}</strong>
+    {{ 'settings.connections.hugo.step2.d' | transloco }} <code>Contents</code>
+    {{ 'settings.connections.hugo.step2.e' | transloco }}
+    <strong>{{ 'settings.connections.hugo.readAndWrite' | transloco }}</strong
+    >{{ 'settings.connections.hugo.step2.f' | transloco }} <code>Actions</code>
+    {{ 'settings.connections.hugo.step2.e' | transloco }}
+    <strong>{{ 'settings.connections.hugo.readOnly' | transloco }}</strong>
+    {{ 'settings.connections.hugo.step2.g' | transloco }}
   </li>
-  <li>Paste it below with your repository details, then save. We check them before storing.</li>
+  <li>{{ 'settings.connections.hugo.step3' | transloco }}</li>
 </ol>
 
 <p class="credential-warning small">
-  This token can commit files to the repository you scope it to. It is stored in this browser's
-  localStorage, never sent to Mawkingbird, and sent only to <code>api.github.com</code> — no CORS
-  proxy is involved, because GitHub's API accepts browser requests directly. Scope it to the one
-  blog repository, and revoke it in GitHub to invalidate it.
+  {{ 'settings.connections.hugo.warning.a' | transloco }} <code>api.github.com</code>
+  {{ 'settings.connections.hugo.warning.b' | transloco }}
 </p>
 
 @if (settings.connected()) {
   <div class="connected-row">
-    <span class="connection-ok">Connected</span>
+    <span class="connection-ok">{{ 'settings.connections.hugo.connected' | transloco }}</span>
     <app-storage-badge [where]="where()" />
     <a [href]="'https://github.com/' + settings.slug()" target="_blank" rel="noopener noreferrer"
       >{{ settings.slug() }} ↗</a
     >
     @if (settings.siteUrl(); as site) {
-      <a [href]="site" target="_blank" rel="noopener noreferrer">View site ↗</a>
+      <a [href]="site" target="_blank" rel="noopener noreferrer">{{
+        'settings.connections.hugo.viewSite' | transloco
+      }}</a>
     }
-    <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
+    <button class="btn btn-outline" type="button" (click)="disconnect()">
+      {{ 'settings.connections.hugo.disconnect' | transloco }}
+    </button>
   </div>
   @if (settings.repo(); as repo) {
     <p class="muted small">
-      Publishing to <code>{{ repo.contentPath }}/</code> on <code>{{ repo.branch }}</code
+      {{ 'settings.connections.hugo.publishingTo' | transloco }}
+      <code>{{ repo.contentPath }}/</code> {{ 'settings.connections.hugo.on' | transloco }}
+      <code>{{ repo.branch }}</code
       >.
     </p>
   }
   @if (expiryLabel(settings.expiresAt()); as expiry) {
-    <p class="muted small">This token is deleted from this browser on {{ expiry }}.</p>
+    <p class="muted small">
+      {{ 'settings.connections.hugo.deletedOn' | transloco: { date: expiry } }}
+    </p>
   }
-  <h2 class="section-head">Read your blog back</h2>
+  <h2 class="section-head">{{ 'settings.connections.hugo.readBack.title' | transloco }}</h2>
   <p class="muted small">
-    Your Hugo site publishes an RSS feed, so Mawkingbird can read your own posts the same way it
-    reads any other feed — no special handling, and no CORS proxy if your site is on GitHub Pages.
+    {{ 'settings.connections.hugo.readBack.body' | transloco }}
   </p>
 
   <label class="profile-feed-option">
@@ -71,12 +88,12 @@
       [disabled]="!settings.siteUrl()"
     />
     <span>
-      <strong>Include my blog's posts on my profile</strong>
+      <strong>{{ 'settings.connections.hugo.includeInProfile' | transloco }}</strong>
       <span class="muted small">
         @if (settings.siteUrl()) {
-          Your published posts appear alongside your Mawkingbird posts on your own profile.
+          {{ 'settings.connections.hugo.includeInProfile.on' | transloco }}
         } @else {
-          Add your site address above to turn this on.
+          {{ 'settings.connections.hugo.includeInProfile.off' | transloco }}
         }
       </span>
     </span>
@@ -84,9 +101,11 @@
 
   <div class="feed-row">
     @if (feed.subscribed()) {
-      <span class="connection-ok">In your home timeline</span>
+      <span class="connection-ok">{{
+        'settings.connections.hugo.inHomeTimeline' | transloco
+      }}</span>
       <button class="btn btn-outline btn-sm" type="button" (click)="unsubscribeFeed()">
-        Remove from feeds
+        {{ 'settings.connections.hugo.removeFromFeeds' | transloco }}
       </button>
     } @else {
       <button
@@ -95,10 +114,14 @@
         (click)="subscribeFeed()"
         [disabled]="feedBusy() || !settings.siteUrl()"
       >
-        {{ feedBusy() ? 'Looking for your feed…' : 'Add my blog to my home timeline' }}
+        {{
+          feedBusy()
+            ? ('settings.connections.hugo.lookingForFeed' | transloco)
+            : ('settings.connections.hugo.addToHomeTimeline' | transloco)
+        }}
       </button>
       @if (!settings.siteUrl()) {
-        <span class="muted small">Add your site address above first.</span>
+        <span class="muted small">{{ 'settings.connections.hugo.addSiteFirst' | transloco }}</span>
       }
     }
   </div>
@@ -109,46 +132,49 @@
     <p class="feed-error" role="alert">{{ message }}</p>
   }
 
-  <h2 class="section-head">Record what you like and boost</h2>
+  <h2 class="section-head">{{ 'settings.connections.hugo.posse.title' | transloco }}</h2>
   <label class="profile-feed-option">
     <input type="checkbox" [ngModel]="settings.posseEnabled()" (ngModelChange)="setPosse($event)" />
     <span>
-      <strong>Record interactions on my blog</strong>
+      <strong>{{ 'settings.connections.hugo.posse.label' | transloco }}</strong>
       <span class="muted small">
-        Liking or boosting a post also keeps a record of it on your own site, so it survives whether
-        or not the other server does. The post is still liked normally — this is additional. Records
-        collect under
-        <a [routerLink]="['/posse']">Waiting to publish</a> and are committed when you say so, not
-        one commit per like.
+        {{ 'settings.connections.hugo.posse.hintA' | transloco }}
+        <a [routerLink]="['/posse']">{{
+          'settings.connections.hugo.waitingToPublish' | transloco
+        }}</a>
+        {{ 'settings.connections.hugo.posse.hintB' | transloco }}
       </span>
       <span class="muted small">
-        Turn this on once your blog is set up to receive: a webmention endpoint, a template that
-        renders these records, and the scheduled job that pulls mentions in. Before that, it writes
-        files nothing displays.
+        {{ 'settings.connections.hugo.posse.hintC' | transloco }}
       </span>
     </span>
   </label>
 
   <div class="posts-head">
-    <h2>Posts in this repository</h2>
+    <h2>{{ 'settings.connections.hugo.postsHeading' | transloco }}</h2>
     <button
       class="btn btn-outline btn-sm"
       type="button"
       (click)="refresh()"
       [disabled]="posts.loading()"
     >
-      {{ posts.loading() ? 'Reading…' : 'Refresh' }}
+      {{
+        posts.loading()
+          ? ('settings.connections.hugo.reading' | transloco)
+          : ('settings.connections.hugo.refresh' | transloco)
+      }}
     </button>
   </div>
 
   @if (posts.error(); as message) {
     <p class="feed-error" role="alert">{{ message }}</p>
   } @else if (posts.loading()) {
-    <p class="muted small">Reading your posts folder…</p>
+    <p class="muted small">{{ 'settings.connections.hugo.readingFolder' | transloco }}</p>
   } @else if (!posts.rows().length) {
     <p class="muted small">
-      No posts yet in <code>{{ settings.repo()?.contentPath }}/</code>. Publish one from the
-      composer and it will show up here.
+      {{ 'settings.connections.hugo.noPostsYet.a' | transloco }}
+      <code>{{ settings.repo()?.contentPath }}/</code
+      >{{ 'settings.connections.hugo.noPostsYet.b' | transloco }}
     </p>
   } @else {
     <ul class="hugo-posts">
@@ -158,7 +184,9 @@
             <span class="hugo-post-title">
               {{ row.title }}
               @if (row.draft) {
-                <span class="pill pill-off">Draft</span>
+                <span class="pill pill-off">{{
+                  'settings.connections.hugo.draft' | transloco
+                }}</span>
               }
             </span>
             <span class="muted small">
@@ -169,11 +197,10 @@
               @if (row.source === 'filename') {
                 <span
                   [title]="
-                    'Read from the file name — this ' +
-                    words().post +
-                    ' own title and date have not been loaded yet.'
+                    'settings.connections.hugo.fromFilenameTitle'
+                      | transloco: { post: words().post }
                   "
-                  >· from file name</span
+                  >{{ 'settings.connections.hugo.fromFilename' | transloco }}</span
                 >
               }
             </span>
@@ -184,7 +211,11 @@
             (click)="edit(row)"
             [disabled]="!!opening()"
           >
-            {{ opening() === row.path ? 'Opening…' : 'Edit' }}
+            {{
+              opening() === row.path
+                ? ('settings.connections.hugo.opening' | transloco)
+                : ('settings.connections.hugo.edit' | transloco)
+            }}
           </button>
         </li>
       }
@@ -196,10 +227,14 @@
         (click)="showMore()"
         [disabled]="posts.hydrating()"
       >
-        {{ posts.hydrating() ? 'Reading…' : 'Load more titles' }}
+        {{
+          posts.hydrating()
+            ? ('settings.connections.hugo.reading' | transloco)
+            : ('settings.connections.hugo.loadMoreTitles' | transloco)
+        }}
       </button>
       <p class="muted small">
-        Titles and dates are read one file at a time, so only the newest are loaded up front.
+        {{ 'settings.connections.hugo.titlesHint' | transloco }}
       </p>
     }
   }
@@ -209,80 +244,86 @@
 } @else {
   @if (needsToken()) {
     <p class="muted small">
-      Your repository details are saved, but the token is gone — either it aged out under the
-      retention policy, or these settings were imported from another browser. Paste a token to
-      publish again.
+      {{ 'settings.connections.hugo.needsToken' | transloco }}
     </p>
   }
   <form class="hugo-form" (ngSubmit)="connect()">
     <label>
-      <span>GitHub token</span>
+      <span>{{ 'settings.connections.hugo.githubTokenLabel' | transloco }}</span>
       <input
         type="password"
         name="hugoToken"
         autocomplete="off"
-        placeholder="github_pat_…"
+        [placeholder]="'settings.connections.hugo.tokenPlaceholder' | transloco"
         [ngModel]="token()"
         (ngModelChange)="token.set($event)"
         [disabled]="busy()"
       />
     </label>
     <label>
-      <span>Repository</span>
+      <span>{{ 'settings.connections.hugo.repositoryLabel' | transloco }}</span>
       <input
         type="text"
         name="repo"
-        placeholder="you/your-blog"
+        [placeholder]="'settings.connections.hugo.repositoryPlaceholder' | transloco"
         [ngModel]="repoInput()"
         (ngModelChange)="repoInput.set($event)"
         [disabled]="busy()"
       />
-      <span class="muted small">Or paste the repository's address from your browser.</span>
+      <span class="muted small">{{ 'settings.connections.hugo.repositoryHint' | transloco }}</span>
     </label>
     <label>
-      <span>Branch</span>
+      <span>{{ 'settings.connections.hugo.branchLabel' | transloco }}</span>
       <input
         type="text"
         name="branch"
-        placeholder="main"
+        [placeholder]="'settings.connections.hugo.branchPlaceholder' | transloco"
         [ngModel]="branch()"
         (ngModelChange)="branch.set($event)"
         [disabled]="busy()"
       />
-      <span class="muted small">The branch your site is built from.</span>
+      <span class="muted small">{{ 'settings.connections.hugo.branchHint' | transloco }}</span>
     </label>
     <label>
-      <span>Posts folder</span>
+      <span>{{ 'settings.connections.hugo.postsFolderLabel' | transloco }}</span>
       <input
         type="text"
         name="contentPath"
-        placeholder="content/posts"
+        [placeholder]="'settings.connections.hugo.postsFolderPlaceholder' | transloco"
         [ngModel]="contentPath()"
         (ngModelChange)="contentPath.set($event)"
         [disabled]="busy()"
       />
       <span class="muted small">
-        Where your posts live in the repository. Some themes use
-        <code>content/post</code> or <code>content/blog</code>.
+        {{ 'settings.connections.hugo.postsFolderHint.a' | transloco }}
+        <code>content/post</code> {{ 'settings.connections.hugo.postsFolderHint.or' | transloco }}
+        <code>content/blog</code>.
       </span>
     </label>
     <label>
-      <span>Site address <span class="muted">(optional)</span></span>
+      <span
+        >{{ 'settings.connections.hugo.siteAddressLabel' | transloco }}
+        <span class="muted">{{ 'settings.connections.hugo.optional' | transloco }}</span></span
+      >
       <input
         type="url"
         name="siteUrl"
-        placeholder="https://you.github.io/your-blog/"
+        [placeholder]="'settings.connections.hugo.siteAddressPlaceholder' | transloco"
         [ngModel]="siteUrl()"
         (ngModelChange)="siteUrl.set($event)"
         [disabled]="busy()"
       />
       <span class="muted small">
-        Used to link to a published post. Without it, posts link to the file on GitHub.
+        {{ 'settings.connections.hugo.siteAddressHint' | transloco }}
       </span>
     </label>
 
     <button class="btn" type="submit" [disabled]="!canSubmit()">
-      {{ busy() ? 'Checking…' : 'Save and check repository' }}
+      {{
+        busy()
+          ? ('settings.connections.hugo.checking' | transloco)
+          : ('settings.connections.hugo.saveAndCheck' | transloco)
+      }}
     </button>
   </form>
 }

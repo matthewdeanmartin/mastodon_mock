@@ -236,30 +236,64 @@ export function insertSplitAt(text: string, caret: number): { text: string; care
   return { text: `${before}${marker}${after}`, caret: before.length + marker.length };
 }
 
-/** Human label for a mode, for the picker and its help text. */
+// i18n pages.write.splitMode.rule.label: Split on ---
+// i18n pages.write.splitMode.demand.label: Split on demand
+// i18n pages.write.splitMode.auto.label: Autosplit
+// i18n pages.write.splitMode.boxes.label: A box per post
+/** Translation key for a mode's label, for the picker. */
 export function splitModeLabel(mode: SplitMode): string {
   switch (mode) {
     case 'rule':
-      return 'Split on ---';
+      return 'pages.write.splitMode.rule.label';
     case 'demand':
-      return 'Split on demand';
+      return 'pages.write.splitMode.demand.label';
     case 'auto':
-      return 'Autosplit';
+      return 'pages.write.splitMode.auto.label';
     case 'boxes':
-      return 'A box per post';
+      return 'pages.write.splitMode.boxes.label';
   }
 }
 
+// i18n pages.write.splitMode.rule.noun: split on ---
+// i18n pages.write.splitMode.demand.noun: split on demand
+// i18n pages.write.splitMode.auto.noun: autosplit
+// i18n pages.write.splitMode.boxes.noun: a box per post
+/**
+ * Translation key for a mode's name as it reads mid-sentence ("split by …").
+ *
+ * A separate key rather than `| lowercase` on {@link splitModeLabel}: casing a
+ * translated string in the pipeline assumes an alphabet with case at all, which
+ * is not true generally, and a German noun stays capitalised regardless of
+ * where it sits in the sentence.
+ */
+export function splitModeNoun(mode: SplitMode): string {
+  switch (mode) {
+    case 'rule':
+      return 'pages.write.splitMode.rule.noun';
+    case 'demand':
+      return 'pages.write.splitMode.demand.noun';
+    case 'auto':
+      return 'pages.write.splitMode.auto.noun';
+    case 'boxes':
+      return 'pages.write.splitMode.boxes.noun';
+  }
+}
+
+// i18n pages.write.splitMode.rule.hint: A line containing only --- starts a new post.
+// i18n pages.write.splitMode.demand.hint: One post, until you split it yourself.
+// i18n pages.write.splitMode.auto.hint: Broken up to fit, at paragraph or sentence breaks.
+// i18n pages.write.splitMode.boxes.hint: One box per post. Needed to give a post its own poll or images.
+/** Translation key for a mode's help text, shown under the picker. */
 export function splitModeHint(mode: SplitMode): string {
   switch (mode) {
     case 'rule':
-      return 'A line containing only --- starts a new post.';
+      return 'pages.write.splitMode.rule.hint';
     case 'demand':
-      return 'One post, until you split it yourself.';
+      return 'pages.write.splitMode.demand.hint';
     case 'auto':
-      return 'Broken up to fit, at paragraph or sentence breaks.';
+      return 'pages.write.splitMode.auto.hint';
     case 'boxes':
-      return 'One box per post. Needed to give a post its own poll or images.';
+      return 'pages.write.splitMode.boxes.hint';
   }
 }
 

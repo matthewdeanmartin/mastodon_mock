@@ -1,10 +1,11 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.backLink' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>🐘 Mastodon</h1>
+  <h1>{{ 'settings.connections.mastodon.title' | transloco }}</h1>
   <p>
-    Read Mastodon alongside Bluesky — Explore, trending posts and hashtag timelines. You can do that
-    without a Mastodon account, or sign in to one you already have.
+    {{ 'settings.connections.mastodon.intro' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
@@ -14,68 +15,78 @@
        situation the reader is in rather than just refusing. -->
   <p class="muted">
     @if (auth.isAnonymous) {
-      You're browsing anonymously, which already reads a Mastodon server — change it in
-      <a [routerLink]="['/settings/anonymous']">Settings → Anonymous</a>.
+      {{ 'settings.connections.mastodon.anonymousActiveBefore' | transloco }}
+      <a [routerLink]="['/settings/anonymous']">{{
+        'settings.connections.mastodon.anonymousSettingsLink' | transloco
+      }}</a
+      >.
     } @else {
-      You're signed in to Mastodon already, so it's your account here rather than a connector. This
-      page is for accounts whose identity lives on Bluesky.
+      {{ 'settings.connections.mastodon.alreadySignedIn' | transloco }}
     }
   </p>
 } @else if (state() === 'absent') {
   <p class="muted">
-    Nothing is connected, so Mawkingbird isn't calling Mastodon at all and no Mastodon widgets take
-    up space in your sidebar. Turning it on adds Explore, trends and hashtag timelines.
+    {{ 'settings.connections.mastodon.nothingConnected' | transloco }}
   </p>
   <p>
     <button class="btn" (click)="enableAnonymous()">
-      Read {{ defaultServer.replace('https://', '') }} without an account
+      {{
+        'settings.connections.mastodon.readWithoutAccount'
+          | transloco: { server: defaultServer.replace('https://', '') }
+      }}
     </button>
   </p>
   <p class="muted small">
-    No account, no token, nothing to sign up for — it reads what that server shows the public. You
-    can point it at a different server, or sign in, afterwards.
+    {{ 'settings.connections.mastodon.noAccountNeeded' | transloco }}
   </p>
 } @else {
   <div class="conn-state">
     <p>
       @if (state() === 'signed-in') {
-        Signed in to <strong>{{ serverLabel() }}</strong
-        >.
+        {{ 'settings.connections.mastodon.signedInToBefore' | transloco }}
+        <strong>{{ serverLabel() }}</strong
+        >{{ 'settings.connections.mastodon.signedInToAfter' | transloco }}
       } @else {
-        Reading <strong>{{ serverLabel() }}</strong> anonymously.
+        {{ 'settings.connections.mastodon.readingAnonymouslyBefore' | transloco }}
+        <strong>{{ serverLabel() }}</strong>
+        {{ 'settings.connections.mastodon.readingAnonymouslyAfter' | transloco }}
       }
     </p>
     @if (state() === 'anonymous') {
       <p class="muted small">
-        Anonymous reading covers Explore, trends and hashtags. Your home timeline stays
-        Bluesky-only: an anonymous connection has no follows, so its "home" is a public firehose of
-        strangers. Signing in merges Mastodon into home.
+        {{ 'settings.connections.mastodon.anonymousReadingNote' | transloco }}
       </p>
     } @else {
       <p class="muted small">
-        Mastodon posts from the people you follow are merged into your home timeline.
+        {{ 'settings.connections.mastodon.signedInMergeNote' | transloco }}
       </p>
     }
   </div>
 
   @if (state() === 'anonymous') {
-    <h2>Sign in</h2>
+    <h2>{{ 'settings.connections.mastodon.signInHeading' | transloco }}</h2>
     <p class="muted">
-      Paste an access token for <strong>{{ serverLabel() }}</strong
-      >. On Mastodon you can make one at Preferences → Development → New application.
+      {{ 'settings.connections.mastodon.pasteTokenFor' | transloco }}
+      <strong>{{ serverLabel() }}</strong
+      >{{ 'settings.connections.mastodon.pasteTokenAfter' | transloco }}
     </p>
     <form class="conn-form" (ngSubmit)="signIn()">
       <input
         type="password"
         name="mastodonToken"
-        placeholder="access token"
+        [placeholder]="'settings.connections.mastodon.tokenPlaceholder' | transloco"
         autocomplete="off"
         [ngModel]="token()"
         (ngModelChange)="token.set($event)"
         [disabled]="signingIn()"
       />
       <button class="btn" type="submit" [disabled]="!token().trim() || signingIn()">
-        {{ signingIn() ? 'Checking…' : 'Sign in' }}
+        {{
+          (signingIn()
+            ? 'settings.connections.mastodon.checking'
+            : 'settings.connections.mastodon.signIn'
+          ) | transloco
+        }}
       </button>
     </form>
     @if (error(); as msg) {
@@ -83,15 +94,18 @@
     }
   } @else {
     <p>
-      <button class="btn btn-outline btn-sm" (click)="signOut()">Sign out</button>
+      <button class="btn btn-outline btn-sm" (click)="signOut()">
+        {{ 'settings.connections.mastodon.signOut' | transloco }}
+      </button>
     </p>
     <p class="muted small">
-      Signing out keeps reading {{ serverLabel() }} anonymously — it drops the token, not the
-      connection.
+      {{
+        'settings.connections.mastodon.signOutKeepsReading' | transloco: { server: serverLabel() }
+      }}
     </p>
   }
 
-  <h2>Server</h2>
+  <h2>{{ 'settings.connections.mastodon.serverHeading' | transloco }}</h2>
   @if (changingServer()) {
     <app-server-discovery
       [currentServer]="connector.server() ?? ''"
@@ -99,24 +113,28 @@
       (selected)="chooseServer($event)"
     />
     <p>
-      <button class="btn btn-outline btn-sm" (click)="changingServer.set(false)">Cancel</button>
+      <button class="btn btn-outline btn-sm" (click)="changingServer.set(false)">
+        {{ 'settings.connections.mastodon.cancel' | transloco }}
+      </button>
     </p>
   } @else {
     <p>
       <button class="btn btn-outline btn-sm" (click)="changingServer.set(true)">
-        Change server
+        {{ 'settings.connections.mastodon.changeServer' | transloco }}
       </button>
     </p>
     <p class="muted small">
-      Changing servers signs you out of this one — a token only works on the server that issued it.
+      {{ 'settings.connections.mastodon.changeServerNote' | transloco }}
     </p>
   }
 
-  <h2>Turn it off</h2>
+  <h2>{{ 'settings.connections.mastodon.turnOffHeading' | transloco }}</h2>
   <p>
-    <button class="btn btn-outline btn-sm" (click)="disable()">Disconnect Mastodon</button>
+    <button class="btn btn-outline btn-sm" (click)="disable()">
+      {{ 'settings.connections.mastodon.disconnect' | transloco }}
+    </button>
   </p>
   <p class="muted small">
-    Forgets the server and any token, and takes the Mastodon widgets back out of your sidebar.
+    {{ 'settings.connections.mastodon.disconnectNote' | transloco }}
   </p>
 }

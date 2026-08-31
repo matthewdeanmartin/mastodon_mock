@@ -8,8 +8,7 @@ import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const sha =
-  process.env.GITHUB_SHA ?? execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+const sha = process.env.GITHUB_SHA ?? execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
 const server = process.env.GITHUB_SERVER_URL ?? 'https://github.com';
 const repo = process.env.GITHUB_REPOSITORY ?? 'matthewdeanmartin/mastodon_mock';
 const runId = process.env.GITHUB_RUN_ID;

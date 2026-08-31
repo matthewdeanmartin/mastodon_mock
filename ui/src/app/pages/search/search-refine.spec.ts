@@ -186,7 +186,12 @@ describe('groupResults', () => {
       makeStatus({ id: 'old', created_at: '2026-01-01T09:00:00' }),
     ];
     const groups = groupResults(statuses, 'date', now);
-    expect(groups.map((g) => g.label)).toEqual(['Today', 'Yesterday', 'Earlier']);
+    expect(groups.map((g) => g.label)).toEqual([
+      'pages.search.group.today',
+      'pages.search.group.yesterday',
+      'pages.search.group.earlier',
+    ]);
+    expect(groups.map((g) => g.labelIsKey)).toEqual([true, true, true]);
     expect(groups[2].statuses[0].id).toBe('old');
   });
 });

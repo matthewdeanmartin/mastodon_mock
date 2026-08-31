@@ -1,31 +1,31 @@
 <div class="spage-head">
-  <h1>Connections</h1>
+  <h1>{{ 'settings.connections.title' | transloco }}</h1>
   <p>
-    Follow your people wherever they post. Mastodon is home — a connection is one account somewhere
-    else, merged in as a guest. Credentials work from this browser first; supported low-churn keys
-    can also be encrypted with Mawkingbird Plus and synced to your other devices. Each connected
-    card says which is true.
+    {{ 'settings.connections.intro' | transloco }}
   </p>
   <p class="muted small">
-    Subscribing to many feeds at once isn't a connection — that lives under
-    <a [routerLink]="['/settings/rss']">RSS feeds</a>.
+    {{ 'settings.connections.rssBefore' | transloco }}
+    <a [routerLink]="['/settings/rss']">{{ 'settings.connections.rssLink' | transloco }}</a
+    >.
   </p>
 </div>
 
 <div class="spage-body">
   @if (vaultInventoryNeedsAttention()) {
     <p class="muted small">
-      The encrypted inventory is closed, so some badges cannot be verified.
+      {{ 'settings.connections.vaultClosed' | transloco }}
       <!-- The unlock route is flag-gated; with the flag off this link led
            nowhere, so the sentence stops at the symptom rather than offering a
            fix the reader cannot reach. -->
       @if (flags.enabled('mawkingbird-plus')) {
-        <a [routerLink]="['/settings/mawkingbird-plus']">Open Mawkingbird Plus</a> once to unlock it
-        or see why it is unavailable.
+        <a [routerLink]="['/settings/mawkingbird-plus']">{{
+          'settings.connections.openPlus' | transloco
+        }}</a>
+        {{ 'settings.connections.openPlusAfter' | transloco }}
       }
     </p>
   }
-  <ul class="catalog" aria-label="Available connections">
+  <ul class="catalog" [aria-label]="'settings.connections.catalogAriaLabel' | transloco">
     @for (row of rows(); track row.entry.id) {
       <li>
         <a
@@ -38,13 +38,19 @@
             <span class="catalog-title">
               <span class="catalog-label">{{ row.entry.label }}</span>
               @if (row.flagged) {
-                <span class="pill pill-off">Turned off</span>
+                <span class="pill pill-off">{{
+                  'settings.connections.pillTurnedOff' | transloco
+                }}</span>
               } @else if (row.unavailableReason) {
-                <span class="pill pill-off">Unavailable</span>
+                <span class="pill pill-off">{{
+                  'settings.connections.pillUnavailable' | transloco
+                }}</span>
               } @else if (row.connected) {
-                <span class="pill pill-on">Connected</span>
+                <span class="pill pill-on">{{
+                  'settings.connections.pillConnected' | transloco
+                }}</span>
               } @else {
-                <span class="pill">Not connected</span>
+                <span class="pill">{{ 'settings.connections.pillNotConnected' | transloco }}</span>
               }
               <span class="pill pill-scope" [title]="scopeCopy[row.entry.scope].detail">
                 {{ scopeCopy[row.entry.scope].label }}
@@ -70,7 +76,9 @@
            still worth opening — its page explains what the connector does. -->
         @if (row.flagged) {
           <p class="muted small catalog-flag-link">
-            <a [routerLink]="['/settings/feature-flags']">Turn it back on in feature flags</a>
+            <a [routerLink]="['/settings/feature-flags']">{{
+              'settings.connections.turnBackOn' | transloco
+            }}</a>
           </p>
         }
       </li>
@@ -78,36 +86,30 @@
   </ul>
 
   <section class="conn-section">
-    <h2>🩺 Connection doctor</h2>
+    <h2>{{ 'settings.connections.doctorHeading' | transloco }}</h2>
     <p class="muted">
-      Some networks block whole categories of site. Rather than finding that out after making an
-      account, buying credits and pasting in a key, check first: the doctor asks every service above
-      whether this network will let your browser reach it. It needs no keys and uses none of the
-      ones you have saved.
+      {{ 'settings.connections.doctorBody' | transloco }}
     </p>
     <p>
       <a class="btn doctor-link" [routerLink]="['/settings/connections/doctor']">
-        Check what this network allows
+        {{ 'settings.connections.doctorLink' | transloco }}
       </a>
     </p>
   </section>
 
   <section class="conn-section">
-    <h2>🔑 How long to keep credentials</h2>
+    <h2>{{ 'settings.connections.retentionHeading' | transloco }}</h2>
     <p class="muted">
-      GitHub and Raindrop.io use a pasted long-lived token. Bluesky exchanges the one-time login
-      secret you enter for rotating session tokens, then discards that secret. There is no
-      unencrypted server copy: credentials sit in this browser until something removes them.
-      Supported low-churn credentials may also have an end-to-end encrypted Mawkingbird Plus copy;
-      Bluesky's rotating session tokens do not. The badges above report the difference. Pick how
-      long the local copy should remain — a Plus-backed credential locks here at the limit, while a
-      browser-only credential disconnects. Reconnecting restarts the clock.
+      {{ 'settings.connections.retentionBody' | transloco }}
     </p>
     <p class="muted">
-      This does not apply to Dropbox, which uses a proper OAuth flow with short-lived tokens that
-      expire on their own.
+      {{ 'settings.connections.retentionDropboxNote' | transloco }}
     </p>
-    <div class="lifetime-options" role="group" aria-label="Credential retention">
+    <div
+      class="lifetime-options"
+      role="group"
+      [aria-label]="'settings.connections.retentionAriaLabel' | transloco"
+    >
       @for (option of lifetimeOptions; track option.value) {
         <label class="lifetime-option">
           <input
@@ -123,8 +125,7 @@
     </div>
     @if (lifetimes.lifetime() === 'never') {
       <p class="muted lifetime-warning">
-        Nothing will expire on its own. Revoke tokens at the provider when you stop using a
-        connection.
+        {{ 'settings.connections.retentionNeverWarning' | transloco }}
       </p>
     }
   </section>

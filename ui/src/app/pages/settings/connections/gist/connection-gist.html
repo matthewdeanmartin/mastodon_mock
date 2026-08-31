@@ -1,66 +1,83 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.gist.back' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>📝 GitHub Gist</h1>
+  <h1>{{ 'settings.connections.gist.title' | transloco }}</h1>
   <p>
-    Publish pastes as gists on your GitHub account. Gist becomes one more option wherever you can
-    post a paste — and because every paste service is also a draft source, anything you create shows
-    up in <a [routerLink]="['/drafts']">Drafts</a> and in
-    <a [routerLink]="['/write']">Write</a> alongside the rest of your unpublished writing.
+    {{ 'settings.connections.gist.intro.a' | transloco }}
+    <a [routerLink]="['/drafts']">{{ 'settings.connections.gist.drafts' | transloco }}</a>
+    {{ 'settings.connections.gist.intro.b' | transloco }}
+    <a [routerLink]="['/write']">{{ 'settings.connections.gist.write' | transloco }}</a>
+    {{ 'settings.connections.gist.intro.c' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
 <ol class="setup-steps muted small">
   <li>
-    Open
+    {{ 'settings.connections.gist.step1.open' | transloco }}
     <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
-      GitHub → Settings → Developer settings → Personal access tokens ↗
+      {{ 'settings.connections.gist.step1.link' | transloco }}
     </a>
-    and generate a classic token.
+    {{ 'settings.connections.gist.step1.after' | transloco }}
   </li>
   <li>
-    Tick <strong>gist</strong>, and nothing else. This connector needs no repository access at all.
+    {{ 'settings.connections.gist.step2.tick' | transloco }}
+    <strong>{{ 'settings.connections.gist.step2.scope' | transloco }}</strong
+    >{{ 'settings.connections.gist.step2.rest' | transloco }}
   </li>
-  <li>Paste it below and connect.</li>
+  <li>{{ 'settings.connections.gist.step3' | transloco }}</li>
 </ol>
 
 <p class="credential-warning small">
-  This token can create, edit, and delete gists on your account. It is deliberately separate from
-  the token used by the
-  <a [routerLink]="['/settings/connections/github']">GitHub connector</a> (read-only) and the one
-  used by <a [routerLink]="['/settings/connections/hugo']">Hugo</a> (one repository) — so that no
-  single stored string reaches more of your account than the feature it belongs to.
+  {{ 'settings.connections.gist.warning.a' | transloco }}
+  <a [routerLink]="['/settings/connections/github']">{{
+    'settings.connections.gist.githubConnector' | transloco
+  }}</a>
+  {{ 'settings.connections.gist.warning.b' | transloco }}
+  <a [routerLink]="['/settings/connections/hugo']">{{
+    'settings.connections.gist.hugo' | transloco
+  }}</a>
+  {{ 'settings.connections.gist.warning.c' | transloco }}
 </p>
 
 @if (settings.connected()) {
   <div class="connected-row">
-    <span class="connection-ok">Connected</span>
+    <span class="connection-ok">{{ 'settings.connections.gist.connected' | transloco }}</span>
     <app-storage-badge [where]="where()" />
     @if (settings.profile()?.login; as login) {
       <a [href]="'https://gist.github.com/' + login" target="_blank" rel="noopener noreferrer">
-        View your gists ↗
+        {{ 'settings.connections.gist.viewGists' | transloco }}
       </a>
     }
-    <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
+    <button class="btn btn-outline" type="button" (click)="disconnect()">
+      {{ 'settings.connections.gist.disconnect' | transloco }}
+    </button>
   </div>
   @if (expiryLabel(settings.expiresAt()); as expiry) {
-    <p class="muted small">This token is deleted from this browser on {{ expiry }}.</p>
+    <p class="muted small">
+      {{ 'settings.connections.gist.deletedOn' | transloco: { date: expiry } }}
+    </p>
   }
 } @else {
   <div class="connect-form">
-    <label for="gist-token">Personal access token (classic, gist scope)</label>
+    <label for="gist-token">{{ 'settings.connections.gist.tokenLabel' | transloco }}</label>
     <input
       id="gist-token"
       type="password"
       autocomplete="off"
-      placeholder="ghp_…"
+      [placeholder]="'settings.connections.gist.tokenPlaceholder' | transloco"
       [ngModel]="token()"
       (ngModelChange)="token.set($event)"
       name="gistToken"
     />
     <button class="btn" type="button" [disabled]="busy()" (click)="connect()">
-      {{ busy() ? 'Checking…' : 'Connect' }}
+      {{
+        busy()
+          ? ('settings.connections.gist.checking' | transloco)
+          : ('settings.connections.gist.connect' | transloco)
+      }}
     </button>
   </div>
 }
@@ -72,19 +89,19 @@
   <p class="conn-notice" role="status">{{ notice() }}</p>
 }
 
-<h2>What a gist paste is</h2>
+<h2>{{ 'settings.connections.gist.whatIsTitle' | transloco }}</h2>
 <ul class="muted small">
   <li>
-    <strong>Public</strong> gists are listed on your GitHub profile. <strong>Unlisted</strong> ones
-    are GitHub's "secret" gists — not listed anywhere, but anyone with the link can read them.
-    Neither is private.
+    <strong>{{ 'settings.connections.gist.public' | transloco }}</strong>
+    {{ 'settings.connections.gist.publicDesc' | transloco }}
+    <strong>{{ 'settings.connections.gist.unlisted' | transloco }}</strong>
+    {{ 'settings.connections.gist.unlistedDesc' | transloco }}
   </li>
-  <li>Gists never expire. There is no burn-after-reading and no time limit.</li>
+  <li>{{ 'settings.connections.gist.noExpiry' | transloco }}</li>
   <li>
-    Editing works from here, unlike the anonymous paste services: the gist belongs to your account
-    rather than to an edit code saved in this browser. Losing this browser does not lose the gist.
+    {{ 'settings.connections.gist.editingWorks' | transloco }}
   </li>
   <li>
-    Only gists with a single file are listed back — a multi-file gist is a project, not a note.
+    {{ 'settings.connections.gist.singleFileOnly' | transloco }}
   </li>
 </ul>

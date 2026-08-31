@@ -1,3 +1,4 @@
+import { TranslocoPipe } from '@jsverse/transloco';
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -75,9 +76,137 @@ import { Terminology } from '../../../../terminology';
  * and showing a green tick would be a lie in the *normal* case rather than an
  * edge case.
  */
+// i18n settings.connections.twitter.refreshOldest.one: Refresh oldest {{count}} ({{count}} request, ~{{duration}})
+// i18n settings.connections.twitter.refreshOldest.other: Refresh oldest {{count}} ({{count}} requests, ~{{duration}})
+// i18n settings.connections.twitter.refreshAll.one: Refresh all ({{count}} request, ~{{duration}})
+// i18n settings.connections.twitter.refreshAll.other: Refresh all ({{count}} requests, ~{{duration}})
+// i18n settings.connections.twitter.followPasted.one: Follow {{count}} account
+// i18n settings.connections.twitter.followPasted.other: Follow {{count}} accounts
+// i18n settings.connections.twitter.importSummary.one: <strong>{{keeping}}</strong> to import · {{skipped}} skipped · {{requests}} request spent
+// i18n settings.connections.twitter.importSummary.other: <strong>{{keeping}}</strong> to import · {{skipped}} skipped · {{requests}} requests spent
+// i18n settings.connections.twitter.importAccounts.one: Import {{count}} account
+// i18n settings.connections.twitter.importAccounts.other: Import {{count}} accounts
+
+// i18n settings.connections.twitter.active: Active
+// i18n settings.connections.twitter.apiKey: API key
+// i18n settings.connections.twitter.back: ‹ All connections
+// i18n settings.connections.twitter.cancel: Cancel
+// i18n settings.connections.twitter.checkBalance: Check balance
+// i18n settings.connections.twitter.checking: Checking…
+// i18n settings.connections.twitter.credentialWarning: This API key is stored in this browser's localStorage, because Mawkingbird has no server to keep it on. The key spends credits you have paid for, so use one you can rotate, and only on a device you trust. You can revoke it on the provider's own site at any time.
+// i18n settings.connections.twitter.disconnect: Disconnect
+// i18n settings.connections.twitter.follows.atMax.a: You are following
+// i18n settings.connections.twitter.follows.atMax.b: accounts, the maximum. Remove one to add another.
+// i18n settings.connections.twitter.follows.confirm: Is this the right account?
+// i18n settings.connections.twitter.follows.followHandle: Follow &#64;
+// i18n settings.connections.twitter.follows.followers: followers ·
+// i18n settings.connections.twitter.follows.handleLabel: Twitter handle
+// i18n settings.connections.twitter.follows.intro.a: Following stores the handle in this browser so their posts show up on your Feeds page. It is not a follow on Twitter — nobody is notified. Up to
+// i18n settings.connections.twitter.follows.intro.b: accounts.
+// i18n settings.connections.twitter.follows.lookUp: Look up (1 request)
+// i18n settings.connections.twitter.follows.lookingUp: Looking up…
+// i18n settings.connections.twitter.follows.setupFirst: Finish the setup above first. Once the connection works you can follow Twitter accounts here.
+// i18n settings.connections.twitter.follows.slowRefresh.a: You follow
+// i18n settings.connections.twitter.follows.slowRefresh.b: accounts. Refreshing them all takes a while — requests go one at a time to stay under your CORS proxy's rate limit — so expect a full refresh to run for a minute or more.
+// i18n settings.connections.twitter.follows.title: Accounts you follow
+// i18n settings.connections.twitter.follows.viewOnTwitter: View on Twitter ↗
+// i18n settings.connections.twitter.getKeyFrom: Get an API key from
+// i18n settings.connections.twitter.honesty.followMeaning: "Follow" here means a subscription stored in this browser. It is not a follow on Twitter, and nobody on Twitter is notified.
+// i18n settings.connections.twitter.honesty.intro: This connector is more work to set up than the others, and it is fair to know why before you start.
+// i18n settings.connections.twitter.honesty.noFreeApi.body: , so Mawkingbird reads through a third-party service that resells public Twitter data. You bring your own key and pay them per request.
+// i18n settings.connections.twitter.honesty.noFreeApi.lead: Twitter has no free API
+// i18n settings.connections.twitter.honesty.readOnly.body: You can read posts and follow accounts locally. You cannot like, repost or reply — those need a real Twitter login, which this app never asks for.
+// i18n settings.connections.twitter.honesty.readOnly.lead: It is read-only.
+// i18n settings.connections.twitter.honesty.refuseBrowsers.body: , so every request also has to go through a CORS proxy. You will see this happen when you press Test.
+// i18n settings.connections.twitter.honesty.refuseBrowsers.lead: Those services refuse web browsers
+// i18n settings.connections.twitter.honesty.title: Read this first
+// i18n settings.connections.twitter.importer.allChecked: All checked
+// i18n settings.connections.twitter.importer.checking.a: Checking
+// i18n settings.connections.twitter.importer.checking.of: of
+// i18n settings.connections.twitter.importer.checkingNote: Checking costs one request per account. How long that takes depends on your plan — the free tier allows one request every five seconds, paid plans are far quicker — so the estimate above adjusts as it runs. You can stop at any point and keep what has been checked so far.
+// i18n settings.connections.twitter.importer.clear: Clear
+// i18n settings.connections.twitter.importer.days: days
+// i18n settings.connections.twitter.importer.fetch: Fetch list
+// i18n settings.connections.twitter.importer.fetching: Fetching…
+// i18n settings.connections.twitter.importer.include: Include
+// i18n settings.connections.twitter.importer.intro: Enter a Twitter handle and pull in the accounts they follow. Nothing is followed until you press Import, so you can look at the list first. Fetching the list is effectively free — 200 accounts per request.
+// i18n settings.connections.twitter.importer.lastPosted: Last posted
+// i18n settings.connections.twitter.importer.skip: Skip
+// i18n settings.connections.twitter.importer.skipDead.a: Skip dead accounts (
+// i18n settings.connections.twitter.importer.skipDead.b: requests, ~
+// i18n settings.connections.twitter.importer.skipSilent: Skip if silent for
+// i18n settings.connections.twitter.importer.stop: Stop
+// i18n settings.connections.twitter.importer.stopAfter: Stop after
+// i18n settings.connections.twitter.importer.throttled: The service is currently throttling, so this has slowed down.
+// i18n settings.connections.twitter.importer.whose: Whose follows?
+// i18n settings.connections.twitter.intro: Read public posts from Twitter, so the people who never left don't drop out of your reading. Follow accounts by handle and their posts show up here — no Twitter account needed, and nothing you do here touches Twitter itself.
+// i18n settings.connections.twitter.keyExpiry: It is removed from this browser on
+// i18n settings.connections.twitter.keySaved: Key saved
+// i18n settings.connections.twitter.keySavedNote: A key is saved. Paste a new one to replace it.
+// i18n settings.connections.twitter.limits.countedNote: Counted per request, including retries. Mawkingbird records only how many — never which accounts you looked up.
+// i18n settings.connections.twitter.limits.intro: The warning is advisory; the limit is enforced. The limit exists mainly to stop a bug or a stuck refresh from spending while you are not looking — set it as high as you like.
+// i18n settings.connections.twitter.limits.reset: Reset counters
+// i18n settings.connections.twitter.limits.save: Save limits
+// i18n settings.connections.twitter.limits.stopAt: Stop at
+// i18n settings.connections.twitter.limits.title: Change the daily limits
+// i18n settings.connections.twitter.limits.warnAt: Warn at
+// i18n settings.connections.twitter.nextStep: Next:
+// i18n settings.connections.twitter.posts.clear: Clear saved posts (
+// i18n settings.connections.twitter.posts.none: No saved posts
+// i18n settings.connections.twitter.posts.note: Posts are saved on this device for a day so reopening Mawkingbird costs nothing. Refreshing is the only thing here that spends a request.
+// i18n settings.connections.twitter.proxy.consented.a: You have agreed to send your
+// i18n settings.connections.twitter.proxy.consented.b: key through it.
+// i18n settings.connections.twitter.proxy.none.a: No CORS proxy is configured.
+// i18n settings.connections.twitter.proxy.none.b: cannot be reached from a browser without one, so this connector will not work until you set one up.
+// i18n settings.connections.twitter.proxy.notConsented: You have not yet agreed to send your API key through it.
+// i18n settings.connections.twitter.proxy.openDashboard.a: Open the
+// i18n settings.connections.twitter.proxy.openDashboard.b: dashboard ↗
+// i18n settings.connections.twitter.proxy.setUp: Set up a CORS proxy →
+// i18n settings.connections.twitter.proxy.stripsHeaders.a: does not forward custom headers, so it cannot carry an API key — requests through it arrive at
+// i18n settings.connections.twitter.proxy.stripsHeaders.b: with no key, which looks exactly like a rejected key. Pick a different proxy under
+// i18n settings.connections.twitter.proxy.title: CORS proxy
+// i18n settings.connections.twitter.proxy.using: Using
+// i18n settings.connections.twitter.proxy.withdraw: Withdraw consent
+// i18n settings.connections.twitter.refresh.busy: Refreshing…
+// i18n settings.connections.twitter.refresh.refreshing.a: Refreshing
+// i18n settings.connections.twitter.refresh.refreshing.b: oldest…
+// i18n settings.connections.twitter.refresh.upToDate: Everything is up to date
+// i18n settings.connections.twitter.saveAndTest: Save and test
+// i18n settings.connections.twitter.services: Services
+// i18n settings.connections.twitter.spend.past.a: Past
+// i18n settings.connections.twitter.spend.past.b: requests today. Nothing is blocked — this is just a heads-up that you are spending more than a usual day's reading.
+// i18n settings.connections.twitter.spend.remaining: left before today's limit
+// i18n settings.connections.twitter.spend.title: What this has cost
+// i18n settings.connections.twitter.spend.today: requests today
+// i18n settings.connections.twitter.spend.total: since you connected
+// i18n settings.connections.twitter.testConnection: Test connection
+// i18n settings.connections.twitter.testCost.a: Testing costs up to two requests against your
+// i18n settings.connections.twitter.testCost.b: credits — one direct attempt (which usually fails before it reaches them, costing nothing) and one through your proxy.
+// i18n settings.connections.twitter.testing: Testing…
+// i18n settings.connections.twitter.title: 🐦 Twitter
+// i18n settings.connections.twitter.workingOk: Set up and working. Add accounts to follow from the Feeds page.
+
+// i18n settings.connections.twitter.balanceFree: Free — this is an account call, not a data one.
+// i18n settings.connections.twitter.paste.title: Paste a list of accounts
+// i18n settings.connections.twitter.paste.handles: Handles
+// i18n settings.connections.twitter.importer.title: Import someone's following list
+
+// i18n settings.connections.twitter.follows.show: Show
+// i18n settings.connections.twitter.follows.unfollow: Unfollow
+// i18n settings.connections.twitter.follows.empty: No accounts yet. Add the people you would miss if you stopped opening Twitter.
+// i18n settings.connections.twitter.paste.readyToFollow: Ready to follow {{count}}: {{names}}
+// i18n settings.connections.twitter.paste.hint: One per line, or separated by commas. The <code>&#64;</code> is optional, and profile links work too. Nothing is fetched — following is local and free, so a typo just shows up as an account that fails to load, and you can remove it.
+
 @Component({
   selector: 'app-connection-twitter',
-  imports: [DecimalPipe, FormsModule, RouterLink, TwitterConsentDialog, StorageBadge],
+  imports: [
+    DecimalPipe,
+    FormsModule,
+    RouterLink,
+    TwitterConsentDialog,
+    StorageBadge,
+    TranslocoPipe,
+  ],
   templateUrl: './connection-twitter.html',
   styleUrls: ['../connection-page.css', './connection-twitter.css'],
 })

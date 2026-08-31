@@ -56,21 +56,30 @@ export function groupByColumn(
   return BOARD_COLUMNS.map((id) => ({ id, items: buckets.get(id)! }));
 }
 
+// i18n pages.write.board.column.ideas.label: Ideas
+// i18n pages.write.board.column.writing.label: Writing
+// i18n pages.write.board.column.editing.label: Editing
+// i18n pages.write.board.column.scheduled.label: Scheduled
+/** Translation key for a column's heading. */
 export function columnLabel(column: WriteColumn): string {
   switch (column) {
     case 'ideas':
-      return 'Ideas';
+      return 'pages.write.board.column.ideas.label';
     case 'writing':
-      return 'Writing';
+      return 'pages.write.board.column.writing.label';
     case 'editing':
-      return 'Editing';
+      return 'pages.write.board.column.editing.label';
     case 'scheduled':
-      return 'Scheduled';
+      return 'pages.write.board.column.scheduled.label';
   }
 }
 
+// i18n pages.write.board.column.ideas.hint: Anything jotted down but not started.
+// i18n pages.write.board.column.writing.hint: In progress — a draft you are still adding to.
+// i18n pages.write.board.column.editing.hint: Written, and waiting to be read back.
+// i18n pages.write.board.column.scheduled.hint: Parked or scheduled. Cards arrive here by being scheduled, not by being moved.
 /**
- * What belongs in a column, for its empty state.
+ * Translation key for what belongs in a column, for its empty state.
  *
  * This is the only place the four columns' meanings are ever written down, so
  * an empty column keeps its heading and says this — an unexplained empty
@@ -79,13 +88,13 @@ export function columnLabel(column: WriteColumn): string {
 export function columnHint(column: WriteColumn): string {
   switch (column) {
     case 'ideas':
-      return 'Anything jotted down but not started.';
+      return 'pages.write.board.column.ideas.hint';
     case 'writing':
-      return 'In progress — a draft you are still adding to.';
+      return 'pages.write.board.column.writing.hint';
     case 'editing':
-      return 'Written, and waiting to be read back.';
+      return 'pages.write.board.column.editing.hint';
     case 'scheduled':
-      return 'Parked or scheduled. Cards arrive here by being scheduled, not by being moved.';
+      return 'pages.write.board.column.scheduled.hint';
   }
 }
 

@@ -1,22 +1,31 @@
 <!-- A real button, not a div: clicking away must also be reachable by keyboard.
      Escape closes too, via the host listener. -->
-<button class="sh-backdrop" type="button" aria-label="Close" (click)="close()"></button>
+<button
+  class="sh-backdrop"
+  type="button"
+  [attr.aria-label]="'pages.search.helper.close' | transloco"
+  (click)="close()"
+></button>
 <section class="sh-dialog" role="dialog" aria-modal="true" aria-labelledby="sh-title">
   <div class="sh-head">
-    <h2 id="sh-title">🤖 Help me search</h2>
-    <button class="icon-close" type="button" aria-label="Close" (click)="close()">×</button>
+    <h2 id="sh-title">{{ 'pages.search.helper.title' | transloco }}</h2>
+    <button
+      class="icon-close"
+      type="button"
+      [attr.aria-label]="'pages.search.helper.close' | transloco"
+      (click)="close()"
+    >
+      ×
+    </button>
   </div>
 
-  <p class="muted">
-    Describe what you're after in a sentence. You'll get a Mastodon search query you can edit before
-    running it.
-  </p>
+  <p class="muted">{{ 'pages.search.helper.intro' | transloco }}</p>
 
   <form class="sh-ask" (ngSubmit)="ask()">
     <textarea
       rows="3"
       name="request"
-      aria-label="What are you looking for?"
+      [attr.aria-label]="'pages.search.helper.whatAreYouLookingFor' | transloco"
       [ngModel]="request()"
       (ngModelChange)="request.set($event)"
       [disabled]="busy()"
@@ -26,16 +35,19 @@
          to have produced something. -->
     <div class="sh-actions">
       <button class="btn" type="submit" [disabled]="!request().trim() || busy()">
-        {{ busy() ? 'Thinking…' : 'Suggest queries' }}
+        {{
+          (busy() ? 'pages.search.helper.thinking' : 'pages.search.helper.suggestQueries')
+            | transloco
+        }}
       </button>
-      <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
+      <button class="btn btn-outline" type="button" (click)="close()">
+        {{ 'pages.search.helper.cancel' | transloco }}
+      </button>
     </div>
   </form>
 
   @if (busy()) {
-    <p class="muted small" role="status">
-      Asking the model, then trying its suggestions until one returns results.
-    </p>
+    <p class="muted small" role="status">{{ 'pages.search.helper.busyStatus' | transloco }}</p>
   }
 
   @if (error(); as msg) {
@@ -69,13 +81,10 @@
           </li>
         }
       </ul>
-      <p class="muted small">
-        Suggestions are tried in order and stop at the first that works, so later ones may be
-        untried. Click any of them to use it instead.
-      </p>
+      <p class="muted small">{{ 'pages.search.helper.tryInOrderNote' | transloco }}</p>
 
       <label class="sh-edit">
-        <span>Your query</span>
+        <span>{{ 'pages.search.helper.yourQuery' | transloco }}</span>
         <textarea
           rows="2"
           name="draft"
@@ -86,9 +95,11 @@
 
       <div class="sh-actions">
         <button class="btn" type="button" (click)="use()" [disabled]="!draft().trim()">
-          Use search
+          {{ 'pages.search.helper.useSearch' | transloco }}
         </button>
-        <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
+        <button class="btn btn-outline" type="button" (click)="close()">
+          {{ 'pages.search.helper.cancel' | transloco }}
+        </button>
       </div>
     }
   }

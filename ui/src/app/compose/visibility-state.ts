@@ -7,6 +7,47 @@ export const VISIBILITIES = ['public', 'unlisted', 'private', 'direct'] as const
 
 export type PostVisibility = (typeof VISIBILITIES)[number];
 
+// i18n compose.visibility.public.label: public
+// i18n compose.visibility.unlisted.label: unlisted
+// i18n compose.visibility.private.label: private
+// i18n compose.visibility.direct.label: direct
+/**
+ * Translation key for a visibility's name, as shown next to its icon.
+ *
+ * Shared between `/write` and the compact composer so the two surfaces cannot
+ * drift into naming the same value differently.
+ */
+export function visibilityLabel(value: string): string {
+  switch (value) {
+    case 'public':
+      return 'compose.visibility.public.label';
+    case 'unlisted':
+      return 'compose.visibility.unlisted.label';
+    case 'private':
+      return 'compose.visibility.private.label';
+    default:
+      return 'compose.visibility.direct.label';
+  }
+}
+
+// i18n compose.visibility.public.hint: Anyone, and it appears in public timelines.
+// i18n compose.visibility.unlisted.hint: Anyone with the link, but kept out of public timelines.
+// i18n compose.visibility.private.hint: Your followers only.
+// i18n compose.visibility.direct.hint: Only the people you mention.
+/** Translation key for a visibility's explanation. */
+export function visibilityHint(value: string): string {
+  switch (value) {
+    case 'public':
+      return 'compose.visibility.public.hint';
+    case 'unlisted':
+      return 'compose.visibility.unlisted.hint';
+    case 'private':
+      return 'compose.visibility.private.hint';
+    default:
+      return 'compose.visibility.direct.hint';
+  }
+}
+
 /**
  * The visibility a composing surface is working with, and the stash that keeps
  * a deliberate choice alive across a target change.

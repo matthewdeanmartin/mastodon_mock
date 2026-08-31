@@ -17,6 +17,34 @@ import { Account, Relationship, Status } from '../../models';
 import { NumericRange } from './mawkingbird-search';
 import { acctDomain, plainText } from './search-refine';
 
+// Facet/bucket labels are translation keys, not English — see the
+// `migrate-i18n` skill's "indirect keys" idiom (a `key:` property rendered as
+// `{{ option.key | transloco }}` rather than displayed directly).
+// i18n pages.search.count.under100: < 100
+// i18n pages.search.count.100to1k: 100 – 1k
+// i18n pages.search.count.1kTo10k: 1k – 10k
+// i18n pages.search.count.10kPlus: 10k+
+// i18n pages.search.activity.today: Today
+// i18n pages.search.activity.thisWeek: This week
+// i18n pages.search.activity.thisMonth: This month
+// i18n pages.search.activity.last3Months: Last 3 months
+// i18n pages.search.activity.last6Months: Last 6 months
+// i18n pages.search.activity.lastYear: Last year
+// i18n pages.search.activity.oneToTwoYears: 1 – 2 years ago
+// i18n pages.search.activity.overTwoYears: Over 2 years ago
+// i18n pages.search.activity.notKnown: Not known
+// i18n pages.search.facet.authorDomain: Author domain
+// i18n pages.search.facet.thisServer: This server
+// i18n pages.search.facet.accountType: Account type
+// i18n pages.search.facet.bots: Bots
+// i18n pages.search.facet.people: People
+// i18n pages.search.facet.followPolicy: Follow policy
+// i18n pages.search.facet.requiresApproval: Requires approval
+// i18n pages.search.facet.open: Open
+// i18n pages.search.facet.followers: Followers
+// i18n pages.search.facet.posts: Posts
+// i18n pages.search.facet.lastActive: Last active
+
 /** An account paired with the statuses that made it surface (topic mode). Empty
  *  `matchingPosts` for accounts found via the plain account endpoint. */
 export interface AccountWithMatches {
@@ -128,7 +156,10 @@ export function mergeAuthors(
 
 export interface AccountFacetValue {
   value: string;
-  label: string;
+  /** The key to translate, or null when the label is data (a domain name). */
+  labelKey: string | null;
+  /** The literal label, set only when `labelKey` is null. */
+  text?: string;
   count: number;
 }
 
@@ -136,7 +167,7 @@ export type AccountFacetKind = 'domain' | 'bot' | 'locked' | 'followers' | 'stat
 
 export interface AccountFacet {
   kind: AccountFacetKind;
-  label: string;
+  labelKey: string;
   values: AccountFacetValue[];
   /**
    * How many values to show before truncating.
@@ -154,15 +185,19 @@ export interface AccountFacet {
 /** Count bucket for a follower/post total. Keys are stable; labels are shown. */
 interface Bucket {
   key: string;
-  label: string;
+  labelKey: string;
   test: (n: number) => boolean;
 }
 
 const COUNT_BUCKETS: Bucket[] = [
-  { key: '0-99', label: '< 100', test: (n) => n < 100 },
-  { key: '100-999', label: '100 – 1k', test: (n) => n >= 100 && n < 1_000 },
-  { key: '1000-9999', label: '1k – 10k', test: (n) => n >= 1_000 && n < 10_000 },
-  { key: '10000+', label: '10k+', test: (n) => n >= 10_000 },
+  { key: '0-99', labelKey: 'pages.search.count.under100', test: (n) => n < 100 },
+  { key: '100-999', labelKey: 'pages.search.count.100to1k', test: (n) => n >= 100 && n < 1_000 },
+  {
+    key: '1000-9999',
+    labelKey: 'pages.search.count.1kTo10k',
+    test: (n) => n >= 1_000 && n < 10_000,
+  },
+  { key: '10000+', labelKey: 'pages.search.count.10kPlus', test: (n) => n >= 10_000 },
 ];
 
 function bucketFor(n: number): Bucket {
@@ -190,20 +225,20 @@ const DAY_MS = 86_400_000;
  */
 interface ActivityBin {
   key: string;
-  label: string;
+  labelKey: string;
   withinDays: number;
 }
 
 /** The ladder, finest first. Boundaries are the ones humans name. */
 const ACTIVITY_BINS: readonly ActivityBin[] = [
-  { key: 'd1', label: 'Today', withinDays: 1 },
-  { key: 'd7', label: 'This week', withinDays: 7 },
-  { key: 'd30', label: 'This month', withinDays: 30 },
-  { key: 'd90', label: 'Last 3 months', withinDays: 90 },
-  { key: 'd180', label: 'Last 6 months', withinDays: 180 },
-  { key: 'd365', label: 'Last year', withinDays: 365 },
-  { key: 'd730', label: '1 – 2 years ago', withinDays: 730 },
-  { key: 'older', label: 'Over 2 years ago', withinDays: Infinity },
+  { key: 'd1', labelKey: 'pages.search.activity.today', withinDays: 1 },
+  { key: 'd7', labelKey: 'pages.search.activity.thisWeek', withinDays: 7 },
+  { key: 'd30', labelKey: 'pages.search.activity.thisMonth', withinDays: 30 },
+  { key: 'd90', labelKey: 'pages.search.activity.last3Months', withinDays: 90 },
+  { key: 'd180', labelKey: 'pages.search.activity.last6Months', withinDays: 180 },
+  { key: 'd365', labelKey: 'pages.search.activity.lastYear', withinDays: 365 },
+  { key: 'd730', labelKey: 'pages.search.activity.oneToTwoYears', withinDays: 730 },
+  { key: 'older', labelKey: 'pages.search.activity.overTwoYears', withinDays: Infinity },
 ];
 
 /**
@@ -214,7 +249,11 @@ const ACTIVITY_BINS: readonly ActivityBin[] = [
  * action for exactly this), and dropping them would make the facet counts
  * quietly disagree with the result count. It sorts last, after the tail.
  */
-const UNKNOWN_ACTIVITY: ActivityBin = { key: 'unknown', label: 'Not known', withinDays: Infinity };
+const UNKNOWN_ACTIVITY: ActivityBin = {
+  key: 'unknown',
+  labelKey: 'pages.search.activity.notKnown',
+  withinDays: Infinity,
+};
 
 /**
  * Days since this account last posted, or null when it can't be known.
@@ -263,7 +302,7 @@ function activityBins(accounts: Account[], now: number): AccountFacetValue[] {
   }
   return [...ACTIVITY_BINS, UNKNOWN_ACTIVITY]
     .filter((b) => counts.has(b.key))
-    .map((b) => ({ value: b.key, label: b.label, count: counts.get(b.key)! }));
+    .map((b) => ({ value: b.key, labelKey: b.labelKey, count: counts.get(b.key)! }));
 }
 
 /**
@@ -282,8 +321,8 @@ export function buildAccountFacets(accounts: Account[], now: number = Date.now()
 
   const tally = (
     kind: AccountFacetKind,
-    label: string,
-    pick: (a: Account) => { value: string; label: string } | null,
+    labelKey: string,
+    pick: (a: Account) => { value: string; labelKey: string | null; text?: string } | null,
   ): void => {
     const counts = new Map<string, AccountFacetValue>();
     for (const a of accounts) {
@@ -295,19 +334,24 @@ export function buildAccountFacets(accounts: Account[], now: number = Date.now()
       if (existing) {
         existing.count++;
       } else {
-        counts.set(hit.value, { value: hit.value, label: hit.label, count: 1 });
+        counts.set(hit.value, {
+          value: hit.value,
+          labelKey: hit.labelKey,
+          text: hit.text,
+          count: 1,
+        });
       }
     }
     const values = [...counts.values()].sort((a, b) => b.count - a.count);
     if (values.length > 1) {
-      facets.push({ kind, label, values });
+      facets.push({ kind, labelKey, values });
     }
   };
 
   // Count buckets keep their natural order (small → large), not count order.
   const bucketFacet = (
     kind: AccountFacetKind,
-    label: string,
+    labelKey: string,
     pick: (a: Account) => number,
   ): void => {
     const counts = new Map<string, number>();
@@ -317,32 +361,45 @@ export function buildAccountFacets(accounts: Account[], now: number = Date.now()
     }
     const values: AccountFacetValue[] = COUNT_BUCKETS.filter((b) => counts.has(b.key)).map((b) => ({
       value: b.key,
-      label: b.label,
+      labelKey: b.labelKey,
       count: counts.get(b.key)!,
     }));
     if (values.length > 1) {
-      facets.push({ kind, label, values });
+      facets.push({ kind, labelKey, values });
     }
   };
 
-  tally('domain', 'Author domain', (a) => {
+  // A domain is data — it is the same word in every language — so it carries
+  // its own text rather than a key. `labelKey: null` is how a value says so.
+  tally('domain', 'pages.search.facet.authorDomain', (a) => {
     const d = acctDomain(a.acct);
-    return d ? { value: d, label: d } : { value: 'local', label: 'This server' };
+    return d
+      ? { value: d, labelKey: null, text: d }
+      : { value: 'local', labelKey: 'pages.search.facet.thisServer' };
   });
-  tally('bot', 'Account type', (a) =>
-    a.bot ? { value: 'bot', label: 'Bots' } : { value: 'human', label: 'People' },
+  tally('bot', 'pages.search.facet.accountType', (a) =>
+    a.bot
+      ? { value: 'bot', labelKey: 'pages.search.facet.bots' }
+      : { value: 'human', labelKey: 'pages.search.facet.people' },
   );
-  tally('locked', 'Follow policy', (a) =>
-    a.locked ? { value: 'locked', label: 'Requires approval' } : { value: 'open', label: 'Open' },
+  tally('locked', 'pages.search.facet.followPolicy', (a) =>
+    a.locked
+      ? { value: 'locked', labelKey: 'pages.search.facet.requiresApproval' }
+      : { value: 'open', labelKey: 'pages.search.facet.open' },
   );
-  bucketFacet('followers', 'Followers', (a) => a.followers_count);
-  bucketFacet('statuses', 'Posts', (a) => a.statuses_count);
+  bucketFacet('followers', 'pages.search.facet.followers', (a) => a.followers_count);
+  bucketFacet('statuses', 'pages.search.facet.posts', (a) => a.statuses_count);
 
   // Last activity keeps ladder order (recent → stale) rather than count order:
   // the rows are a timeline, and sorting them by popularity would scramble it.
   const activity = activityBins(accounts, now);
   if (activity.length > 1) {
-    facets.push({ kind: 'activity', label: 'Last active', values: activity, showAll: true });
+    facets.push({
+      kind: 'activity',
+      labelKey: 'pages.search.facet.lastActive',
+      values: activity,
+      showAll: true,
+    });
   }
 
   return facets;

@@ -1,5 +1,6 @@
 import { Component, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 /**
  * What you can type when searching for people.
@@ -47,102 +48,101 @@ import { RouterLink } from '@angular/router';
  * the question someone staring at an empty *search* box has is "what do I type
  * here?", the same question the post tab already answers.
  */
+// i18n pages.search.accountHelp.title: Searching for people
+// i18n pages.search.accountHelp.intro: Two searches at once: one over names and bios, one over what people <em>post</em> — with the posts grouped by who wrote them. So you can look someone up by name, or find people by what they talk about.
+// i18n pages.search.accountHelp.whatYouCanType: What you can type
+// i18n pages.search.accountHelp.fullAddress: A full address. This is the reliable one: your server goes and fetches that exact account even if it has never seen it before.
+// i18n pages.search.accountHelp.profileLink: A link to someone's profile, pasted whole. Resolved the same way as an address.
+// i18n pages.search.accountHelp.handleOrName: A handle or display name. Matches accounts your server already knows about, so results depend on which server you are searching.
+// i18n pages.search.accountHelp.anyWords: Any words. Searches bios <em>and</em> posts, so you get people who describe themselves this way plus people who write about it.
+// i18n pages.search.accountHelp.postOperators: Post operators work here too — they run against the posts half of the search. <code>has:media</code>, <code>after:</code>, <code>-is:reply</code> and the rest all apply.
+// i18n pages.search.accountHelp.caveat: One caveat worth knowing: operators only narrow the <em>posts</em> half. The names-and-bios half is a plain text match and ignores them, so a heavily-operatored query still returns whatever accounts matched the words by name.
+// i18n pages.search.accountHelp.seeAllOperators: See all post operators
+// i18n pages.search.accountHelp.narrowingItDown: Narrowing it down
+// i18n pages.search.accountHelp.narrowingIntro: These are controls, not things you type — they are under <strong>Advanced&nbsp;▾</strong>, and beside the results once a search has run.
+// i18n pages.search.accountHelp.searchIn: Search in
+// i18n pages.search.accountHelp.searchInDetail: Which half runs: <strong>Bio and posts</strong> (both, the default), <strong>Name &amp; bio only</strong>, or <strong>What they post</strong>. Pick the last one when you want people by subject and don't care what their bio says.
+// i18n pages.search.accountHelp.followers: Followers
+// i18n pages.search.accountHelp.followersDetail: A minimum, a maximum, or both — for skipping past the very large accounts.
+// i18n pages.search.accountHelp.posts: Posts
+// i18n pages.search.accountHelp.postsDetail: Filters out accounts that registered and never wrote anything.
+// i18n pages.search.accountHelp.filters: Filters
+// i18n pages.search.accountHelp.filtersDetail: After results arrive: by server, by whether you already follow them, by how recently they posted.
+// i18n pages.search.accountHelp.footer.a: Searching for a name and finding nothing usually means your server has not met that account yet, rather than that it does not exist — the full <code>&#64;name&#64;server</code> address finds it anyway. Browsing rather than looking for someone specific?
+// i18n pages.search.accountHelp.footer.findFriends: Find friends
+// i18n pages.search.accountHelp.footer.b: has directories and follow-list imports.
 @Component({
   selector: 'app-account-search-help',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   template: `
     <section aria-labelledby="account-search-help-title">
-      <h3 id="account-search-help-title">Searching for people</h3>
-      <p class="muted note">
-        Two searches at once: one over names and bios, one over what people
-        <em>post</em> — with the posts grouped by who wrote them. So you can look someone up by
-        name, or find people by what they talk about.
-      </p>
+      <h3 id="account-search-help-title">{{ 'pages.search.accountHelp.title' | transloco }}</h3>
+      <p class="muted note" [innerHTML]="'pages.search.accountHelp.intro' | transloco"></p>
 
       <div class="groups">
         <section>
-          <h4>What you can type</h4>
+          <h4>{{ 'pages.search.accountHelp.whatYouCanType' | transloco }}</h4>
           <table>
             <tbody>
               <tr>
                 <td class="syntax"><code>&#64;name&#64;server.social</code></td>
                 <td>
-                  A full address. This is the reliable one: your server goes and fetches that exact
-                  account even if it has never seen it before.
+                  <span [innerHTML]="'pages.search.accountHelp.fullAddress' | transloco"></span>
                   <span class="example"><code>&#64;Gargron&#64;mastodon.social</code></span>
                 </td>
               </tr>
               <tr>
                 <td class="syntax"><code>https://…</code></td>
-                <td>
-                  A link to someone's profile, pasted whole. Resolved the same way as an address.
-                </td>
+                <td>{{ 'pages.search.accountHelp.profileLink' | transloco }}</td>
               </tr>
               <tr>
                 <td class="syntax"><code>name</code></td>
-                <td>
-                  A handle or display name. Matches accounts your server already knows about, so
-                  results depend on which server you are searching.
-                </td>
+                <td>{{ 'pages.search.accountHelp.handleOrName' | transloco }}</td>
               </tr>
               <tr>
                 <td class="syntax"><code>baking cookies</code></td>
-                <td>
-                  Any words. Searches bios <em>and</em> posts, so you get people who describe
-                  themselves this way plus people who write about it.
-                </td>
+                <td [innerHTML]="'pages.search.accountHelp.anyWords' | transloco"></td>
               </tr>
               <tr>
                 <td class="syntax"><code>from:&#64;name&#64;server</code></td>
                 <td>
-                  Post operators work here too — they run against the posts half of the search.
-                  <code>has:media</code>, <code>after:</code>, <code>-is:reply</code> and the rest
-                  all apply.
+                  <span [innerHTML]="'pages.search.accountHelp.postOperators' | transloco"></span>
                   <span class="example"><code>rust -is:reply has:media</code></span>
                 </td>
               </tr>
             </tbody>
           </table>
           <p class="muted group-note">
-            One caveat worth knowing: operators only narrow the <em>posts</em> half. The
-            names-and-bios half is a plain text match and ignores them, so a heavily-operatored
-            query still returns whatever accounts matched the words by name.
+            <span [innerHTML]="'pages.search.accountHelp.caveat' | transloco"></span>
             <button type="button" class="linklike" (click)="syntaxHelp.emit()">
-              See all post operators
+              {{ 'pages.search.accountHelp.seeAllOperators' | transloco }}
             </button>
           </p>
         </section>
 
         <section>
-          <h4>Narrowing it down</h4>
-          <p class="muted group-note">
-            These are controls, not things you type — they are under
-            <strong>Advanced&nbsp;▾</strong>, and beside the results once a search has run.
-          </p>
+          <h4>{{ 'pages.search.accountHelp.narrowingItDown' | transloco }}</h4>
+          <p
+            class="muted group-note"
+            [innerHTML]="'pages.search.accountHelp.narrowingIntro' | transloco"
+          ></p>
           <table>
             <tbody>
               <tr>
-                <td class="syntax">Search in</td>
-                <td>
-                  Which half runs: <strong>Bio and posts</strong> (both, the default),
-                  <strong>Name &amp; bio only</strong>, or <strong>What they post</strong>. Pick the
-                  last one when you want people by subject and don't care what their bio says.
-                </td>
+                <td class="syntax">{{ 'pages.search.accountHelp.searchIn' | transloco }}</td>
+                <td [innerHTML]="'pages.search.accountHelp.searchInDetail' | transloco"></td>
               </tr>
               <tr>
-                <td class="syntax">Followers</td>
-                <td>A minimum, a maximum, or both — for skipping past the very large accounts.</td>
+                <td class="syntax">{{ 'pages.search.accountHelp.followers' | transloco }}</td>
+                <td>{{ 'pages.search.accountHelp.followersDetail' | transloco }}</td>
               </tr>
               <tr>
-                <td class="syntax">Posts</td>
-                <td>Filters out accounts that registered and never wrote anything.</td>
+                <td class="syntax">{{ 'pages.search.accountHelp.posts' | transloco }}</td>
+                <td>{{ 'pages.search.accountHelp.postsDetail' | transloco }}</td>
               </tr>
               <tr>
-                <td class="syntax">Filters</td>
-                <td>
-                  After results arrive: by server, by whether you already follow them, by how
-                  recently they posted.
-                </td>
+                <td class="syntax">{{ 'pages.search.accountHelp.filters' | transloco }}</td>
+                <td>{{ 'pages.search.accountHelp.filtersDetail' | transloco }}</td>
               </tr>
             </tbody>
           </table>
@@ -150,10 +150,11 @@ import { RouterLink } from '@angular/router';
       </div>
 
       <p class="muted note footer-note">
-        Searching for a name and finding nothing usually means your server has not met that account
-        yet, rather than that it does not exist — the full <code>&#64;name&#64;server</code> address
-        finds it anyway. Browsing rather than looking for someone specific?
-        <a routerLink="/find-friends">Find friends</a> has directories and follow-list imports.
+        {{ 'pages.search.accountHelp.footer.a' | transloco }}
+        <a routerLink="/find-friends">{{
+          'pages.search.accountHelp.footer.findFriends' | transloco
+        }}</a>
+        {{ 'pages.search.accountHelp.footer.b' | transloco }}
       </p>
     </section>
   `,

@@ -19,8 +19,10 @@ export type QualitySeverity = 'info' | 'warn';
 export interface QualityFinding {
   id: string;
   severity: QualitySeverity;
-  /** One line, in the user's terms, naming the thing rather than scolding. */
-  message: string;
+  /** Translation key for one line, in the user's terms, naming the thing rather than scolding. */
+  messageKey: string;
+  /** Interpolation parameters for {@link messageKey}. */
+  messageParams?: Record<string, unknown>;
   /** The offending fragments, where naming them helps. */
   samples?: string[];
 }
@@ -35,6 +37,14 @@ export interface QualityContext {
   missingAltText?: boolean;
   /** Whether the user asked to be told about that. */
   requireAltText?: boolean;
+  /**
+   * Resolve a translation key to its text, for embedding inside another
+   * finding's message. {@link readabilityBand} returns a key rather than
+   * English, so the readability finding needs this to fill in `{{band}}`.
+   * Defaults to the identity function, which is only correct in specs that
+   * don't care about the rendered band text.
+   */
+  translateBand?: (key: string) => string;
 }
 
 /** Words per sentence and syllables per word, for the readability score. */
@@ -106,17 +116,22 @@ export const MIN_WORDS_FOR_READABILITY = 60;
 /** Where a reading-ease score stops being comfortable. */
 export const DENSE_READING_EASE = 40;
 
+// i18n pages.write.readability.plain: plain
+// i18n pages.write.readability.ordinary: ordinary
+// i18n pages.write.readability.firmGoing: firm going
+// i18n pages.write.readability.dense: dense
+/** Translation key for a reading-ease score's band. */
 export function readabilityBand(score: number): string {
   if (score >= 70) {
-    return 'plain';
+    return 'pages.write.readability.plain';
   }
   if (score >= 50) {
-    return 'ordinary';
+    return 'pages.write.readability.ordinary';
   }
   if (score >= DENSE_READING_EASE) {
-    return 'firm going';
+    return 'pages.write.readability.firmGoing';
   }
-  return 'dense';
+  return 'pages.write.readability.dense';
 }
 
 /** Consecutive repeats of the same word ("the the"). */
@@ -166,6 +181,15 @@ export function hashtagsIn(text: string): string[] {
  *
  * Ordered most-actionable first, because the step is skimmed rather than read.
  */
+// i18n pages.write.finding.overLimit.one: One post is over the length limit and will be refused.
+// i18n pages.write.finding.overLimit.other: {{count}} posts are over the length limit and will be refused.
+// i18n pages.write.finding.pkmTagged: This is tagged {{kinds}} — publishing sends it to your followers.
+// i18n pages.write.finding.missingAlt: An attached image has no description.
+// i18n pages.write.finding.repeatedWords: A word is repeated back to back.
+// i18n pages.write.finding.longLinks: Some links are long enough to look untidy. They cost the same either way — shortening is cosmetic.
+// i18n pages.write.finding.caps: A run of words is in capitals.
+// i18n pages.write.finding.tagCount: {{count}} hashtags. Past about {{threshold}} they stop helping people find this.
+// i18n pages.write.finding.readability: Reads as {{band}} ({{score}}/100). Shorter sentences would help.
 export function runQualityChecks(text: string, context: QualityContext): QualityFinding[] {
   const findings: QualityFinding[] = [];
 
@@ -174,10 +198,11 @@ export function runQualityChecks(text: string, context: QualityContext): Quality
     findings.push({
       id: 'over-limit',
       severity: 'warn',
-      message:
+      messageKey:
         over.length === 1
-          ? 'One post is over the length limit and will be refused.'
-          : `${over.length} posts are over the length limit and will be refused.`,
+          ? 'pages.write.finding.overLimit.one'
+          : 'pages.write.finding.overLimit.other',
+      messageParams: { count: over.length },
     });
   }
 
@@ -186,9 +211,8 @@ export function runQualityChecks(text: string, context: QualityContext): Quality
     findings.push({
       id: 'pkm-tagged',
       severity: 'warn',
-      message: `This is tagged ${pkm
-        .map((kind) => pkmLabel(kind, context.vocab))
-        .join(' and ')} — publishing sends it to your followers.`,
+      messageKey: 'pages.write.finding.pkmTagged',
+      messageParams: { kinds: pkm.map((kind) => pkmLabel(kind, context.vocab)).join(' and ') },
     });
   }
 
@@ -196,7 +220,7 @@ export function runQualityChecks(text: string, context: QualityContext): Quality
     findings.push({
       id: 'missing-alt',
       severity: 'warn',
-      message: 'An attached image has no description.',
+      messageKey: 'pages.write.finding.missingAlt',
     });
   }
 
@@ -205,7 +229,7 @@ export function runQualityChecks(text: string, context: QualityContext): Quality
     findings.push({
       id: 'repeated-words',
       severity: 'warn',
-      message: 'A word is repeated back to back.',
+      messageKey: 'pages.write.finding.repeatedWords',
       samples: repeats.map((word) => `${word} ${word}`),
     });
   }
@@ -215,8 +239,7 @@ export function runQualityChecks(text: string, context: QualityContext): Quality
     findings.push({
       id: 'long-links',
       severity: 'info',
-      message:
-        'Some links are long enough to look untidy. They cost the same either way — shortening is cosmetic.',
+      messageKey: 'pages.write.finding.longLinks',
       samples: long.map((entry) => entry.url),
     });
   }
@@ -226,7 +249,7 @@ export function runQualityChecks(text: string, context: QualityContext): Quality
     findings.push({
       id: 'caps',
       severity: 'info',
-      message: 'A run of words is in capitals.',
+      messageKey: 'pages.write.finding.caps',
       samples: shouting,
     });
   }
@@ -236,16 +259,19 @@ export function runQualityChecks(text: string, context: QualityContext): Quality
     findings.push({
       id: 'tag-count',
       severity: 'info',
-      message: `${tags.length} hashtags. Past about ${TAG_NOISE_THRESHOLD} they stop helping people find this.`,
+      messageKey: 'pages.write.finding.tagCount',
+      messageParams: { count: tags.length, threshold: TAG_NOISE_THRESHOLD },
     });
   }
 
   const ease = readingEase(text);
   if (ease !== null && ease < DENSE_READING_EASE) {
+    const translateBand = context.translateBand ?? ((key: string) => key);
     findings.push({
       id: 'readability',
       severity: 'info',
-      message: `Reads as ${readabilityBand(ease)} (${ease}/100). Shorter sentences would help.`,
+      messageKey: 'pages.write.finding.readability',
+      messageParams: { band: translateBand(readabilityBand(ease)), score: ease },
     });
   }
 

@@ -1,50 +1,57 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.openrouter.back' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>🧠 OpenRouter</h1>
+  <h1>{{ 'settings.connections.openrouter.title' | transloco }}</h1>
   <p>
-    One key, hundreds of AI models, billed by usage. Authorization happens directly between this
-    browser and OpenRouter — Mockingbird never sees a client secret, and the key it issues is yours.
+    {{ 'settings.connections.openrouter.intro' | transloco }}
   </p>
   <p class="muted small">{{ scopeDetail }}</p>
 </div>
 
 @if (openrouter.connected()) {
   <div class="or-actions">
-    <span class="connection-ok">Connected</span>
+    <span class="connection-ok">{{ 'settings.connections.openrouter.connected' | transloco }}</span>
     <app-storage-badge [where]="where()" />
-    <button class="btn btn-outline" type="button" (click)="disconnect()">Disconnect</button>
+    <button class="btn btn-outline" type="button" (click)="disconnect()">
+      {{ 'settings.connections.openrouter.disconnect' | transloco }}
+    </button>
   </div>
   @if (expiryLabel(openrouter.expiresAt()); as expiry) {
     <p class="muted small">
       @if (where() === 'local') {
-        This key is deleted from this browser on {{ expiry }}. The retention policy of the account
-        you are signed in as is the one that applies.
+        {{ 'settings.connections.openrouter.expiry.deleted.a' | transloco }} {{ expiry
+        }}{{ 'settings.connections.openrouter.expiry.deleted.b' | transloco }}
       } @else {
         <!-- Deleted is the wrong word once a stored copy exists: the plaintext
              leaves this browser and the connection stays. Saying "deleted" here
              sends people to reconnect something that never disconnected. -->
-        This key is cleared from this browser on {{ expiry }}, and fetched back from your vault the
-        next time it is needed. The retention policy of the account you are signed in as is the one
-        that applies.
+        {{ 'settings.connections.openrouter.expiry.cleared.a' | transloco }} {{ expiry
+        }}{{ 'settings.connections.openrouter.expiry.cleared.b' | transloco }}
       }
     </p>
   }
 
   <section class="or-section">
-    <h2>Credits</h2>
+    <h2>{{ 'settings.connections.openrouter.credits' | transloco }}</h2>
     @if (creditsState(); as state) {
       <p class="or-credits" [class.or-credits-unknown]="state.kind === 'unknown'">
         {{ describeCredits(state) }}
       </p>
       @if (state.kind === 'uncapped') {
         <p class="muted small">
-          Per-key spending caps are set at OpenRouter. Add one there if you want a ceiling this page
-          can show progress against.
+          {{ 'settings.connections.openrouter.credits.capNote' | transloco }}
         </p>
       }
     } @else {
-      <p class="muted">{{ creditsBusy() ? 'Checking…' : 'Not checked yet.' }}</p>
+      <p class="muted">
+        {{
+          creditsBusy()
+            ? ('settings.connections.openrouter.checking' | transloco)
+            : ('settings.connections.openrouter.notChecked' | transloco)
+        }}
+      </p>
     }
     <button
       class="btn btn-outline btn-sm"
@@ -52,16 +59,21 @@
       (click)="refreshCredits()"
       [disabled]="creditsBusy()"
     >
-      {{ creditsBusy() ? 'Checking…' : 'Refresh' }}
+      {{
+        creditsBusy()
+          ? ('settings.connections.openrouter.checking' | transloco)
+          : ('settings.connections.openrouter.refresh' | transloco)
+      }}
     </button>
   </section>
 } @else {
   <p class="credential-warning small">
-    The key OpenRouter issues can spend your OpenRouter credits. It is stored in this browser's
-    localStorage, never sent to Mockingbird, and sent only to <code>openrouter.ai</code>. Use a
-    browser profile and device you trust; revoke the key at OpenRouter to invalidate it.
+    {{ 'settings.connections.openrouter.keyWarning.a' | transloco }} <code>openrouter.ai</code
+    >{{ 'settings.connections.openrouter.keyWarning.b' | transloco }}
   </p>
-  <button class="btn" type="button" (click)="connect()">Connect OpenRouter</button>
+  <button class="btn" type="button" (click)="connect()">
+    {{ 'settings.connections.openrouter.connect' | transloco }}
+  </button>
 }
 @if (notice(); as msg) {
   <p class="connection-ok" role="status">{{ msg }}</p>
@@ -71,17 +83,18 @@
 }
 
 <section class="or-section">
-  <h2>Model</h2>
+  <h2>{{ 'settings.connections.openrouter.model' | transloco }}</h2>
   <p class="muted">
-    The model the search and tag helpers use. The default is
-    <code>{{ defaultModelId }}</code> — cheap, fast, and able to return structured JSON, which is
-    all these features ask of it.
+    {{ 'settings.connections.openrouter.model.default.a' | transloco }}
+    <code>{{ defaultModelId }}</code>
+    {{ 'settings.connections.openrouter.model.default.b' | transloco }}
   </p>
   <p class="or-current">
-    Using <code>{{ choice.modelId() }}</code>
+    {{ 'settings.connections.openrouter.model.using' | transloco }}
+    <code>{{ choice.modelId() }}</code>
     @if (!choice.isDefault()) {
       <button class="btn btn-outline btn-sm" type="button" (click)="choice.reset()">
-        Reset to default
+        {{ 'settings.connections.openrouter.resetToDefault' | transloco }}
       </button>
     }
   </p>
@@ -90,12 +103,16 @@
     <input
       type="search"
       name="modelQuery"
-      placeholder="Search models — e.g. gemma, haiku, mistral"
+      [placeholder]="'settings.connections.openrouter.model.searchPlaceholder' | transloco"
       [ngModel]="query()"
       (ngModelChange)="query.set($event)"
     />
     <button class="btn" type="submit" [disabled]="models.searching()">
-      {{ models.searching() ? 'Searching…' : 'Search' }}
+      {{
+        models.searching()
+          ? ('settings.connections.openrouter.searching' | transloco)
+          : ('settings.connections.openrouter.search' | transloco)
+      }}
     </button>
   </form>
   <label class="or-filter">
@@ -105,16 +122,16 @@
       (change)="toggleStructuredOnly(!structuredOnly())"
     />
     <span>
-      Only models that support structured output
+      {{ 'settings.connections.openrouter.model.structuredOnly' | transloco }}
       <span class="muted small">
-        — both helpers ask for JSON. Unchecking this also surfaces the <code>:free</code> variants,
-        which don't guarantee a schema.
+        {{ 'settings.connections.openrouter.model.structuredOnly.hint.a' | transloco }}
+        <code>:free</code>
+        {{ 'settings.connections.openrouter.model.structuredOnly.hint.b' | transloco }}
       </span>
     </span>
   </label>
   <p class="muted small">
-    OpenRouter lists hundreds of models, so this searches rather than lists. With an empty box it
-    shows the default.
+    {{ 'settings.connections.openrouter.model.searchNote' | transloco }}
   </p>
 
   @if (searchError(); as msg) {
@@ -130,41 +147,42 @@
               <code class="muted small">{{ model.id }}</code>
               <span class="muted small">
                 @if (model.contextLength) {
-                  {{ model.contextLength | number }} token context
+                  {{ model.contextLength | number }}
+                  {{ 'settings.connections.openrouter.model.tokenContext' | transloco }}
                 }
                 @if (perMillionTokens(model.promptPrice); as price) {
-                  · in {{ price }}
+                  {{ 'settings.connections.openrouter.model.in' | transloco }} {{ price }}
                 }
                 @if (perMillionTokens(model.completionPrice); as price) {
-                  · out {{ price }}
+                  {{ 'settings.connections.openrouter.model.out' | transloco }} {{ price }}
                 }
               </span>
             </span>
             @if (model.id === choice.modelId()) {
-              <span class="pill pill-on">In use</span>
+              <span class="pill pill-on">{{
+                'settings.connections.openrouter.model.inUse' | transloco
+              }}</span>
             } @else {
               <button class="btn btn-outline btn-sm" type="button" (click)="choose(model)">
-                Use this
+                {{ 'settings.connections.openrouter.model.useThis' | transloco }}
               </button>
             }
           </li>
         }
       </ul>
     } @else {
-      <p class="muted">No models matched. Try a shorter search — model names are like “gemma”.</p>
+      <p class="muted">{{ 'settings.connections.openrouter.model.noMatches' | transloco }}</p>
     }
   }
 </section>
 
 <section class="or-section">
-  <h2>Translation</h2>
+  <h2>{{ 'settings.connections.openrouter.translation' | transloco }}</h2>
   <p class="muted">
-    Which translator the 🌐 button on a post uses. Your server's own translation is the default: it
-    costs you nothing and it is what you already had. AI translation is opt-in.
+    {{ 'settings.connections.openrouter.translation.intro' | transloco }}
   </p>
   <p class="muted small">
-    Browsing without an account, this choice doesn't apply — server translation needs a login, so AI
-    is the only translator available and the 🤖🌐 button goes straight to it.
+    {{ 'settings.connections.openrouter.translation.anonNote' | transloco }}
   </p>
   <div class="or-translate-options">
     @for (option of translatePref.options; track option.value) {
@@ -186,17 +204,16 @@
 </section>
 
 <section class="or-section">
-  <h2>Prompts</h2>
+  <h2>{{ 'settings.connections.openrouter.prompts' | transloco }}</h2>
   <p class="muted">
-    What the model is actually asked. The search and tag helpers work in two passes — the model
-    proposes, the Mastodon API grades the proposals, and the model gets one chance to improve them —
-    so those two have a <code>{{ braced('feedback') }}</code> slot that is empty on the first pass.
-    The translator has no second pass: there is nothing to grade a translation against.
+    {{ 'settings.connections.openrouter.prompts.intro.a' | transloco }}
+    <code>{{ braced('feedback') }}</code>
+    {{ 'settings.connections.openrouter.prompts.intro.b' | transloco }}
   </p>
   <p class="muted small">
-    Each prompt lists the placeholders it accepts. An unknown one is left visible in the sent prompt
-    rather than silently dropped, so a typo shows up as a stray
-    <code>{{ braced('plcaeholder') }}</code> instead of quietly producing worse answers.
+    {{ 'settings.connections.openrouter.prompts.placeholderNote.a' | transloco }}
+    <code>{{ braced('plcaeholder') }}</code>
+    {{ 'settings.connections.openrouter.prompts.placeholderNote.b' | transloco }}
   </p>
 
   @for (template of prompts.templates; track template.id) {
@@ -204,12 +221,14 @@
       <div class="or-prompt-head">
         <h3>{{ template.label }}</h3>
         @if (prompts.isCustom(template.id)) {
-          <span class="pill">Customised</span>
+          <span class="pill">{{
+            'settings.connections.openrouter.prompts.customised' | transloco
+          }}</span>
         }
       </div>
       <p class="muted small">{{ template.description }}</p>
       <p class="muted small">
-        Placeholders:
+        {{ 'settings.connections.openrouter.prompts.placeholders' | transloco }}
         @for (name of template.placeholders; track name) {
           <code>{{ braced(name) }}</code>
         }
@@ -229,16 +248,16 @@
           (click)="savePrompt(template.id)"
           [disabled]="!promptDirty(template.id)"
         >
-          Save
+          {{ 'settings.connections.openrouter.save' | transloco }}
         </button>
         @if (promptDirty(template.id)) {
           <button class="btn btn-outline" type="button" (click)="revertPrompt(template.id)">
-            Cancel
+            {{ 'settings.connections.openrouter.cancel' | transloco }}
           </button>
         }
         @if (prompts.isCustom(template.id)) {
           <button class="btn btn-outline" type="button" (click)="resetPrompt(template.id)">
-            Reset to default
+            {{ 'settings.connections.openrouter.resetToDefault' | transloco }}
           </button>
         }
       </div>

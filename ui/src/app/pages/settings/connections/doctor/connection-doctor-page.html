@@ -1,44 +1,53 @@
-<a class="conn-back" [routerLink]="['/settings/connections']">‹ All connections</a>
+<a class="conn-back" [routerLink]="['/settings/connections']">{{
+  'settings.connections.doctor.back' | transloco
+}}</a>
 
 <div class="spage-head">
-  <h1>🩺 Connection doctor</h1>
+  <h1>{{ 'settings.connections.doctor.title' | transloco }}</h1>
   <p>
-    Some networks — offices, schools, hotels, some countries — block whole categories of site. This
-    checks every service Mawkingbird can talk to and tells you which ones this network will let your
-    browser reach, so you find out <em>before</em> making an account and paying for an API key,
-    rather than after.
+    {{ 'settings.connections.doctor.intro.a' | transloco }}
+    <em>{{ 'settings.connections.doctor.intro.before' | transloco }}</em>
+    {{ 'settings.connections.doctor.intro.b' | transloco }}
   </p>
   <p class="muted small">
-    Nothing here needs a key or a login, and no credential you have already saved is used or sent.
-    Every request is an unauthenticated public URL.
+    {{ 'settings.connections.doctor.noCredentials' | transloco }}
   </p>
 </div>
 
 <section class="doc-run">
   <button type="button" class="btn" (click)="run()" [disabled]="doctor.running()">
-    {{ doctor.running() ? 'Checking…' : hasRun() ? 'Check again' : 'Check all connections' }}
+    {{
+      doctor.running()
+        ? ('settings.connections.doctor.checking' | transloco)
+        : hasRun()
+          ? ('settings.connections.doctor.checkAgain' | transloco)
+          : ('settings.connections.doctor.checkAll' | transloco)
+    }}
   </button>
   @if (hasRun() && !doctor.running()) {
     <!-- Counted by usability, matching the rows. "Working" includes hosts
          reached through a proxy, because they work. -->
     <p class="muted small doc-summary">
-      {{ workingCount() }} working
-      @if (needsSetupCount()) {
-        , {{ needsSetupCount() }} need a proxy
-      }
-      @if (blockedCount()) {
-        , {{ blockedCount() }} blocked or unreachable
-      }
-      .
+      {{ 'settings.connections.doctor.summary.working' | transloco: { count: workingCount() }
+      }}{{
+        needsSetupCount()
+          ? ', ' +
+            ('settings.connections.doctor.summary.needsSetup'
+              | transloco: { count: needsSetupCount() })
+          : ''
+      }}{{
+        blockedCount()
+          ? ', ' +
+            ('settings.connections.doctor.summary.blocked' | transloco: { count: blockedCount() })
+          : ''
+      }}.
     </p>
   }
 </section>
 
 @if (controlFailed()) {
   <p class="doc-control-warning">
-    The control host failed too, and nobody blocks that one on purpose. Your browser is probably
-    offline, or something is blocking everything — treat the rest of this page as untrustworthy
-    until that row is green.
+    {{ 'settings.connections.doctor.controlFailed' | transloco }}
   </p>
 }
 
@@ -107,7 +116,9 @@
                 status.label
               }}</a>
               @if (!status.official) {
-                <span class="doc-status-third">third-party</span>
+                <span class="doc-status-third">{{
+                  'settings.connections.doctor.thirdParty' | transloco
+                }}</span>
               }
             </p>
           }
@@ -121,28 +132,28 @@
           ) {
             <div class="doc-followup">
               <p class="small">
-                Your browser could not fetch this in the background — but that alone cannot tell a
-                network block from a CORS rule or an ad blocker. Opening it in a tab can, because a
-                normal page load shows you the real reason.
+                {{ 'settings.connections.doctor.followup.explain' | transloco }}
               </p>
               <button type="button" class="btn btn-outline btn-sm" (click)="openInTab(row)">
-                Open {{ row.target.host }} in a tab ↗
+                {{ 'settings.connections.doctor.followup.openLabel' | transloco }}
+                {{ row.target.host }}
+                {{ 'settings.connections.doctor.followup.openSuffix' | transloco }}
               </button>
               @if (row.target.status; as status) {
                 <p class="muted small doc-followup-status">
-                  If it reports everything operational, the problem is more likely on your side than
-                  theirs — worth ruling out an outage first:
+                  {{ 'settings.connections.doctor.followup.statusIntro' | transloco }}
                   <a [href]="status.url" target="_blank" rel="noopener noreferrer">{{
                     status.label
                   }}</a>
                   @if (!status.official) {
-                    <span class="doc-status-third">third-party</span>
+                    <span class="doc-status-third">{{
+                      'settings.connections.doctor.thirdParty' | transloco
+                    }}</span>
                   }
                 </p>
               } @else {
                 <p class="muted small doc-followup-status">
-                  This service publishes no status page, so there is no way to check whether it is
-                  having an outage — the tab test above is the only signal available.
+                  {{ 'settings.connections.doctor.followup.noStatus' | transloco }}
                 </p>
               }
             </div>
@@ -150,7 +161,9 @@
 
           @if (isExpanded(row.target.id)) {
             <fieldset class="doc-report">
-              <legend class="small">What did that tab show you?</legend>
+              <legend class="small">
+                {{ 'settings.connections.doctor.report.legend' | transloco }}
+              </legend>
               @for (option of reportedOptions; track option.value) {
                 <label class="doc-report-option">
                   <input
@@ -177,9 +190,9 @@
 
 @if (hasRun() && corsBlockedRows().length) {
   <section class="doc-group">
-    <h2 class="section-title">About “just disable CORS”</h2>
+    <h2 class="section-title">{{ 'settings.connections.doctor.corsSection.title' | transloco }}</h2>
     <p class="muted small">
-      These hosts answer your browser but will not let this app read the reply:
+      {{ 'settings.connections.doctor.corsSection.intro' | transloco }}
     </p>
     <ul class="doc-cors-list">
       @for (row of corsBlockedRows(); track row.target.id) {
@@ -189,24 +202,24 @@
       }
     </ul>
     <p class="muted small">
-      It is tempting to reach for a browser extension that turns CORS off, and you will find people
-      recommending exactly that. It is a bad trade: those extensions cannot be scoped to a couple of
-      domains in any meaningful way, so you would be disabling a protection that applies to your
-      bank and your webmail in order to read a timeline — and the moment you forget it is on, every
-      site you visit is running with it.
+      {{ 'settings.connections.doctor.corsSection.badTrade' | transloco }}
     </p>
     <p class="muted small">
-      There is also nothing to whitelist. Refusing is the <em>host's</em> decision, made on their
-      server; nothing installed on this side changes their mind. That is exactly what a
-      <a [routerLink]="['/settings/connections/cors-proxy']">CORS proxy</a> is for — it fetches on
-      your behalf from somewhere the rule does not apply, and it is scoped to this app instead of to
-      your whole browser.
+      {{ 'settings.connections.doctor.corsSection.whitelist.a' | transloco }}
+      <em>{{ 'settings.connections.doctor.corsSection.hosts' | transloco }}</em>
+      {{ 'settings.connections.doctor.corsSection.whitelist.b' | transloco }}
+      <a [routerLink]="['/settings/connections/cors-proxy']">{{
+        'settings.connections.doctor.corsProxyLink' | transloco
+      }}</a>
+      {{ 'settings.connections.doctor.corsSection.whitelist.c' | transloco }}
     </p>
     @if (!hasProxy()) {
       <p class="muted small">
-        You do not have one configured, which is why these are listed as unusable rather than merely
-        indirect. <a [routerLink]="['/settings/connections/cors-proxy']">Set one up</a> and they can
-        work.
+        {{ 'settings.connections.doctor.corsSection.noProxy.a' | transloco }}
+        <a [routerLink]="['/settings/connections/cors-proxy']">{{
+          'settings.connections.doctor.setOneUp' | transloco
+        }}</a>
+        {{ 'settings.connections.doctor.corsSection.noProxy.b' | transloco }}
       </p>
     }
   </section>
@@ -214,10 +227,15 @@
 
 @if (hasRun() && proxyRefusedRows().length) {
   <section class="doc-group">
-    <h2 class="section-title">Hosts your proxy can't rescue</h2>
+    <h2 class="section-title">
+      {{ 'settings.connections.doctor.proxyRefused.title' | transloco }}
+    </h2>
     <p class="muted small">
-      {{ proxyLabel() ?? 'Your CORS proxy' }} is working — it answered when asked. These services
-      refused it anyway:
+      {{
+        'settings.connections.doctor.proxyRefused.intro'
+          | transloco
+            : { proxy: proxyLabel() ?? ('settings.connections.doctor.yourCorsProxy' | transloco) }
+      }}
     </p>
     <ul class="doc-cors-list">
       @for (row of proxyRefusedRows(); track row.target.id) {
@@ -227,55 +245,37 @@
       }
     </ul>
     <p class="muted small">
-      Proxies run in datacentres, and a lot of services block those address ranges while happily
-      answering home connections. Retrying will not help and the proxy is not misconfigured; the fix
-      is a <a [routerLink]="['/settings/connections/cors-proxy']">different proxy</a> — ideally one
-      you run yourself, on an address nobody has blocklisted.
+      {{ 'settings.connections.doctor.proxyRefused.fix.a' | transloco }}
+      <a [routerLink]="['/settings/connections/cors-proxy']">{{
+        'settings.connections.doctor.differentProxyLink' | transloco
+      }}</a>
+      {{ 'settings.connections.doctor.proxyRefused.fix.b' | transloco }}
     </p>
   </section>
 }
 
 <section class="doc-group">
-  <h2 class="section-title">What this can and cannot tell you</h2>
+  <h2 class="section-title">{{ 'settings.connections.doctor.explain.title' | transloco }}</h2>
   <p class="muted small">
-    A background request that fails reports nothing at all to JavaScript — not a status, not a
-    reason. That is the browser's own privacy rule, not a gap in this page: a site is not allowed to
-    learn what else your network can reach. So a red row means only "this did not answer", and the
-    cause could be a firewall, DNS filtering, an extension, a bot check, or a service having a bad
-    day.
+    {{ 'settings.connections.doctor.explain.p1' | transloco }}
   </p>
   <p class="muted small">
-    Opening the host in a tab is the missing half. A top-level page load isn't subject to those
-    rules, so the browser will show you the block page, the certificate warning or the DNS error
-    directly. Those pages are privileged and unreadable from script, which is why the page has to
-    ask you what you saw rather than detecting it.
+    {{ 'settings.connections.doctor.explain.p2' | transloco }}
   </p>
   <p class="muted small">
-    It also catches the case that isn't an error at all: if a service greets you with “verify you
-    are human”, your network is fine and the service simply doesn't want traffic it can't identify.
-    Worth knowing, because clearing that challenge in a tab does not make the connector start
-    working.
+    {{ 'settings.connections.doctor.explain.p3' | transloco }}
   </p>
   <p class="muted small">
-    Each row is checked twice, which is why “reachable” and “readable” are reported separately. The
-    first request only asks whether the bytes arrive; the second asks whether this app is allowed to
-    look at them. A red row failed the <em>first</em> question, so CORS was never involved and no
-    browser extension can rescue it — the traffic isn't getting through at all. How long a row took
-    is shown for the same reason: a refusal comes back in milliseconds, while traffic being silently
-    discarded takes seconds to give up.
+    {{ 'settings.connections.doctor.explain.p4a' | transloco }}
+    <em>{{ 'settings.connections.doctor.first' | transloco }}</em>
+    {{ 'settings.connections.doctor.explain.p4b' | transloco }}
   </p>
   <p class="muted small">
-    There is a third question this page cannot answer at all: whether the service is simply having a
-    bad day. A failed probe proves the bytes didn't arrive <em>here</em>, not whose fault that is —
-    so each row links to the vendor's own status page where one exists. Read those as the authority
-    on their own incidents, and anything marked third-party as a hint rather than a verdict: outage
-    aggregators covering small services are often stale, and were observed calling is.gd down while
-    it was demonstrably serving requests. That is why a few rows link nowhere.
+    {{ 'settings.connections.doctor.explain.p5a' | transloco }}
+    <em>{{ 'settings.connections.doctor.here' | transloco }}</em
+    >{{ 'settings.connections.doctor.explain.p5b' | transloco }}
   </p>
   <p class="muted small">
-    Anything that is reachable but unreadable gets a third check through your CORS proxy, if you
-    have one. That is the one that tells you whether a service is actually usable — and if the proxy
-    fetches it fine while the connector still fails, the problem is past the network entirely and
-    worth looking for in your API key, your credit balance or a consent you haven't given.
+    {{ 'settings.connections.doctor.explain.p6' | transloco }}
   </p>
 </section>

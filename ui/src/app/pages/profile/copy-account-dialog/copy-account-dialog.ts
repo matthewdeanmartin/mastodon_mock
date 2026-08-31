@@ -38,6 +38,7 @@ import {
   selectCollections,
 } from '../copy-collections';
 import { AnonymousLists } from '../../../providers/anonymous/anonymous-lists';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error' | 'hidden';
 
@@ -61,9 +62,55 @@ type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error' | 'hidden';
  *    absent for most accounts and unimplemented before Mastodon 4.6, so they load
  *    after the confirm screen is already up rather than in front of it.
  */
+/** English source strings; see scripts/extract-i18n.mjs. */
+// i18n pages.profile.copyAccount.closeAriaLabel: Close
+// i18n pages.profile.copyAccount.title: Copy {{handle}}
+// i18n pages.profile.copyAccount.readingFrom: Reading who {{handle}} follows, and their collections, from {{host}}…
+// i18n pages.profile.copyAccount.reading: Reading who {{handle}} follows, and their collections…
+// i18n pages.profile.copyAccount.pageOfMax: page {{page}} of up to {{max}}
+// i18n pages.profile.copyAccount.loadingNote: Accounts that stopped posting are skipped — following one costs an API call every time your feed refreshes.
+// i18n pages.profile.copyAccount.close: Close
+// i18n pages.profile.copyAccount.doesntShareFollows: {{handle}} doesn't share who they follow.
+// i18n pages.profile.copyAccount.hiddenExplain: Their profile lists {{count}} follows, but {{host}} returns none of them — Mastodon lets an account keep its follow list private. There is nothing to clone here.
+// i18n pages.profile.copyAccount.theirServer: their server
+// i18n pages.profile.copyAccount.partialList: Couldn't reach {{handle}}'s own server, so this list comes from {{host}} and shows only the follows that server knows about. The real list is probably longer.
+// i18n pages.profile.copyAccount.readFrom: Read from {{host}}, where the full list lives.
+// i18n pages.profile.copyAccount.whatToCopy: What to copy
+// i18n pages.profile.copyAccount.adoptUpTo: Adopt up to
+// i18n pages.profile.copyAccount.accountsUnit: accounts
+// i18n pages.profile.copyAccount.skipIfSilentOver: Skip if silent over
+// i18n pages.profile.copyAccount.daysUnit: days (0 = don't skip)
+// i18n pages.profile.copyAccount.skipIfFewerThan: Skip if fewer than
+// i18n pages.profile.copyAccount.postsUnit: posts (0 = don't skip)
+// i18n pages.profile.copyAccount.noQualityFiltering: No quality filtering — everyone they follow is a candidate, oldest accounts included.
+// i18n pages.profile.copyAccount.readingAnotherPage: Reading another page…
+// i18n pages.profile.copyAccount.readSoFar.one: Read {{count}} page so far. There are more to read if this isn't enough people.
+// i18n pages.profile.copyAccount.readSoFar.other: Read {{count}} pages so far. There are more to read if this isn't enough people.
+// i18n pages.profile.copyAccount.readAnotherPage: Read another page
+// i18n pages.profile.copyAccount.limitedBySlots: You have {{remaining}} of {{limit}} follow slots left, so only {{willAdd}} will be added.
+// i18n pages.profile.copyAccount.skipped.one: {{count}} skipped
+// i18n pages.profile.copyAccount.skipped.other: {{count}} skipped
+// i18n pages.profile.copyAccount.checkingCollections: Checking for collections to copy as local lists…
+// i18n pages.profile.copyAccount.andCollections.one: …and {{count}} collection as local lists
+// i18n pages.profile.copyAccount.andCollections.other: …and {{count}} collections as local lists
+// i18n pages.profile.copyAccount.listMembersFollowed: List members are followed too — that is how a local list builds its timeline — so they use the same follow slots.
+// i18n pages.profile.copyAccount.copyFollowsAndLists: Copy {{follows}} follows &amp; {{lists}} lists
+// i18n pages.profile.copyAccount.copyLists.one: Copy {{count}} list
+// i18n pages.profile.copyAccount.copyLists.other: Copy {{count}} lists
+// i18n pages.profile.copyAccount.followCount: Follow {{count}}
+// i18n pages.profile.copyAccount.cancel: Cancel
+// i18n pages.profile.copyAccount.followingProgress: Following… {{progress}} of {{total}}
+// i18n pages.profile.copyAccount.doneWithLists.oneOne: Followed {{accounts}} account, and made {{lists}} local list.
+// i18n pages.profile.copyAccount.doneWithLists.oneOther: Followed {{accounts}} account, and made {{lists}} local lists.
+// i18n pages.profile.copyAccount.doneWithLists.otherOne: Followed {{accounts}} accounts, and made {{lists}} local list.
+// i18n pages.profile.copyAccount.doneWithLists.otherOther: Followed {{accounts}} accounts, and made {{lists}} local lists.
+// i18n pages.profile.copyAccount.followedAccounts.one: Followed {{count}} account.
+// i18n pages.profile.copyAccount.followedAccounts.other: Followed {{count}} accounts.
+// i18n pages.profile.copyAccount.homeWillRebuild: Your home feed will rebuild the next time you open it.
+// i18n pages.profile.copyAccount.goToHome: Go to Home
 @Component({
   selector: 'app-copy-account-dialog',
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, TranslocoPipe],
   templateUrl: './copy-account-dialog.html',
   styleUrl: './copy-account-dialog.css',
 })

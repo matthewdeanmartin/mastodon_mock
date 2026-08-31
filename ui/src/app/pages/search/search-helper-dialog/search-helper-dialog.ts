@@ -1,7 +1,32 @@
 import { Component, HostListener, inject, input, effect, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { GradedQuery, SearchContext, SearchHelper, SearchHelperResult } from '../search-helper';
 import { PageDiagnostics } from '../../../page-diagnostics';
+
+// i18n pages.search.helper.notTried: not tried
+// i18n pages.search.helper.searchFailed: search failed
+// i18n pages.search.helper.noResults: no results
+// i18n pages.search.helper.result.one: {{count}} result
+// i18n pages.search.helper.result.other: {{count}} results
+// i18n pages.search.helper.summaryNothingWorked: Nothing returned {{threshold}}+ results, even after rewriting. Edit the best guess below — {{calls}} tried.
+// i18n pages.search.helper.summaryFirstWorked: The first suggestion worked{{rewritten}} — {{calls}} tried.
+// i18n pages.search.helper.summarySuggestionWorked: Suggestion {{position}} worked{{rewritten}} — {{calls}} tried.
+// i18n pages.search.helper.rewrittenNote: , after one rewrite
+// i18n pages.search.helper.callsUsed.one: {{count}} search
+// i18n pages.search.helper.callsUsed.other: {{count}} searches
+// i18n pages.search.helper.couldNotReachModel: Couldn't reach the model.
+// i18n pages.search.helper.title: 🤖 Help me search
+// i18n pages.search.helper.close: Close
+// i18n pages.search.helper.intro: Describe what you're after in a sentence. You'll get a Mastodon search query you can edit before running it.
+// i18n pages.search.helper.whatAreYouLookingFor: What are you looking for?
+// i18n pages.search.helper.thinking: Thinking…
+// i18n pages.search.helper.suggestQueries: Suggest queries
+// i18n pages.search.helper.cancel: Cancel
+// i18n pages.search.helper.busyStatus: Asking the model, then trying its suggestions until one returns results.
+// i18n pages.search.helper.tryInOrderNote: Suggestions are tried in order and stop at the first that works, so later ones may be untried. Click any of them to use it instead.
+// i18n pages.search.helper.yourQuery: Your query
+// i18n pages.search.helper.useSearch: Use search
 
 /**
  * "Describe what you're looking for" → a runnable Mastodon query.
@@ -14,13 +39,14 @@ import { PageDiagnostics } from '../../../page-diagnostics';
  */
 @Component({
   selector: 'app-search-helper-dialog',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './search-helper-dialog.html',
   styleUrl: './search-helper-dialog.css',
 })
 export class SearchHelperDialog {
   private helper = inject(SearchHelper);
   private diagnostics = inject(PageDiagnostics);
+  private transloco = inject(TranslocoService);
 
   /**
    * Whatever is in the search box, and the state of the widgets around it.
@@ -73,7 +99,11 @@ export class SearchHelperDialog {
       this.diagnostics.error('SearchHelper', 'run:error', error, {
         requestLength: request.length,
       });
-      this.error.set(error instanceof Error ? error.message : "Couldn't reach the model.");
+      this.error.set(
+        error instanceof Error
+          ? error.message
+          : this.transloco.translate<string>('pages.search.helper.couldNotReachModel'),
+      );
     } finally {
       this.busy.set(false);
     }
@@ -111,26 +141,47 @@ export class SearchHelperDialog {
   /** "3 results" / "no results" / "search failed" / "not tried" for one suggestion. */
   protected outcomeLabel(attempt: GradedQuery | undefined): string {
     if (!attempt) {
-      return 'not tried';
+      return this.transloco.translate<string>('pages.search.helper.notTried');
     }
     if (attempt.count === null) {
-      return 'search failed';
+      return this.transloco.translate<string>('pages.search.helper.searchFailed');
     }
     if (attempt.count === 0) {
-      return 'no results';
+      return this.transloco.translate<string>('pages.search.helper.noResults');
     }
-    return `${attempt.count} result${attempt.count === 1 ? '' : 's'}`;
+    return this.transloco.translate<string>(
+      attempt.count === 1 ? 'pages.search.helper.result.one' : 'pages.search.helper.result.other',
+      { count: attempt.count },
+    );
   }
 
   /** The one-line summary above the editor. */
   protected summary(result: SearchHelperResult): string {
-    const calls = `${result.callsUsed} search${result.callsUsed === 1 ? '' : 'es'}`;
+    const calls = this.transloco.translate<string>(
+      result.callsUsed === 1
+        ? 'pages.search.helper.callsUsed.one'
+        : 'pages.search.helper.callsUsed.other',
+      { count: result.callsUsed },
+    );
     if (!result.winner) {
-      return `Nothing returned ${result.threshold}+ results, even after rewriting. Edit the best guess below — ${calls} tried.`;
+      return this.transloco.translate<string>('pages.search.helper.summaryNothingWorked', {
+        threshold: result.threshold,
+        calls,
+      });
     }
     const position = result.attempts.length;
-    const which = position === 1 ? 'The first suggestion worked' : `Suggestion ${position} worked`;
-    const rewritten = result.refined ? ', after one rewrite' : '';
-    return `${which}${rewritten} — ${calls} tried.`;
+    const rewritten = result.refined
+      ? this.transloco.translate<string>('pages.search.helper.rewrittenNote')
+      : '';
+    return position === 1
+      ? this.transloco.translate<string>('pages.search.helper.summaryFirstWorked', {
+          rewritten,
+          calls,
+        })
+      : this.transloco.translate<string>('pages.search.helper.summarySuggestionWorked', {
+          position,
+          rewritten,
+          calls,
+        });
   }
 }

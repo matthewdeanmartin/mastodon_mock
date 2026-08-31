@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Api } from '../../../../api';
 import { Auth } from '../../../../auth';
 import { Server } from '../../../../server';
@@ -12,6 +13,39 @@ import {
   MastodonConnector,
 } from '../../../../providers/mastodon/mastodon-connector';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
+
+// i18n settings.connections.mastodon.title: 🐘 Mastodon
+// i18n settings.connections.mastodon.intro: Read Mastodon alongside Bluesky — Explore, trending posts and hashtag timelines. You can do that without a Mastodon account, or sign in to one you already have.
+// i18n settings.connections.mastodon.anonymousActiveBefore: You're browsing anonymously, which already reads a Mastodon server — change it in
+// i18n settings.connections.mastodon.anonymousSettingsLink: Settings → Anonymous
+// i18n settings.connections.mastodon.alreadySignedIn: You're signed in to Mastodon already, so it's your account here rather than a connector. This page is for accounts whose identity lives on Bluesky.
+// i18n settings.connections.mastodon.nothingConnected: Nothing is connected, so Mawkingbird isn't calling Mastodon at all and no Mastodon widgets take up space in your sidebar. Turning it on adds Explore, trends and hashtag timelines.
+// i18n settings.connections.mastodon.readWithoutAccount: Read {{server}} without an account
+// i18n settings.connections.mastodon.noAccountNeeded: No account, no token, nothing to sign up for — it reads what that server shows the public. You can point it at a different server, or sign in, afterwards.
+// i18n settings.connections.mastodon.signedInToBefore: Signed in to
+// i18n settings.connections.mastodon.signedInToAfter: .
+// i18n settings.connections.mastodon.readingAnonymouslyBefore: Reading
+// i18n settings.connections.mastodon.readingAnonymouslyAfter: anonymously.
+// i18n settings.connections.mastodon.anonymousReadingNote: Anonymous reading covers Explore, trends and hashtags. Your home timeline stays Bluesky-only: an anonymous connection has no follows, so its "home" is a public firehose of strangers. Signing in merges Mastodon into home.
+// i18n settings.connections.mastodon.signedInMergeNote: Mastodon posts from the people you follow are merged into your home timeline.
+// i18n settings.connections.mastodon.signInHeading: Sign in
+// i18n settings.connections.mastodon.pasteTokenFor: Paste an access token for
+// i18n settings.connections.mastodon.pasteTokenAfter: . On Mastodon you can make one at Preferences → Development → New application.
+// i18n settings.connections.mastodon.tokenPlaceholder: access token
+// i18n settings.connections.mastodon.checking: Checking…
+// i18n settings.connections.mastodon.signIn: Sign in
+// i18n settings.connections.mastodon.signOut: Sign out
+// i18n settings.connections.mastodon.signOutKeepsReading: Signing out keeps reading {{server}} anonymously — it drops the token, not the connection.
+// i18n settings.connections.mastodon.serverHeading: Server
+// i18n settings.connections.mastodon.cancel: Cancel
+// i18n settings.connections.mastodon.changeServer: Change server
+// i18n settings.connections.mastodon.changeServerNote: Changing servers signs you out of this one — a token only works on the server that issued it.
+// i18n settings.connections.mastodon.turnOffHeading: Turn it off
+// i18n settings.connections.mastodon.disconnect: Disconnect Mastodon
+// i18n settings.connections.mastodon.disconnectNote: Forgets the server and any token, and takes the Mastodon widgets back out of your sidebar.
+// i18n settings.connections.mastodon.tokenRejected: That server rejected the token. Check you copied all of it, and that it belongs to this server.
+// i18n settings.connections.mastodon.unreachable: Couldn't reach that server — network problem, or it refuses browser requests.
+// i18n settings.connections.mastodon.signInFailed: Signing in failed — check the token and the server.
 
 /**
  * Settings → Connections → Mastodon.
@@ -31,7 +65,7 @@ import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
  */
 @Component({
   selector: 'app-connection-mastodon',
-  imports: [FormsModule, RouterLink, ServerDiscovery],
+  imports: [FormsModule, RouterLink, ServerDiscovery, TranslocoPipe],
   templateUrl: './connection-mastodon.html',
   styleUrls: ['../connection-page.css'],
 })
@@ -40,6 +74,7 @@ export class ConnectionMastodon {
   protected connector = inject(MastodonConnector);
   private server = inject(Server);
   private api = inject(Api);
+  private transloco = inject(TranslocoService);
 
   protected readonly scopeDetail = CONNECTION_SCOPE_COPY.account.detail;
   protected readonly defaultServer = DEFAULT_CONNECTOR_SERVER;
@@ -129,7 +164,7 @@ export class ConnectionMastodon {
         // would make every later Mastodon call carry a credential the server
         // has already rejected.
         this.auth.disconnectMastodon();
-        this.error.set(describeError(err));
+        this.error.set(this.describeError(err));
       },
     });
   }
@@ -148,16 +183,16 @@ export class ConnectionMastodon {
     this.server.setBaseUrl('');
     this.error.set(null);
   }
-}
 
-function describeError(err: unknown): string {
-  if (err instanceof HttpErrorResponse) {
-    if (err.status === 401 || err.status === 403) {
-      return 'That server rejected the token. Check you copied all of it, and that it belongs to this server.';
+  private describeError(err: unknown): string {
+    if (err instanceof HttpErrorResponse) {
+      if (err.status === 401 || err.status === 403) {
+        return this.transloco.translate<string>('settings.connections.mastodon.tokenRejected');
+      }
+      if (err.status === 0) {
+        return this.transloco.translate<string>('settings.connections.mastodon.unreachable');
+      }
     }
-    if (err.status === 0) {
-      return "Couldn't reach that server — network problem, or it refuses browser requests.";
-    }
+    return this.transloco.translate<string>('settings.connections.mastodon.signInFailed');
   }
-  return 'Signing in failed — check the token and the server.';
 }

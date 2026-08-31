@@ -12,6 +12,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { catchError, EMPTY, Observable, of, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -74,6 +75,7 @@ import {
   isWebEngine,
   serializeWebQuery,
   WEB_ENGINES,
+  WebDroppedItem,
   WebEngine,
   webSearchUrl,
 } from './web-query-serializer';
@@ -154,6 +156,19 @@ const SLOW_SEARCH_MS = 5000;
  */
 const SEARCH_TIMEOUT_MS = 20000;
 
+// i18n pages.search.explain.summary: Explain this search
+// i18n pages.search.explain.endpoint: Endpoint
+// i18n pages.search.explain.mastodonQuery: Mastodon query
+// i18n pages.search.explain.anonymousTransformation: Anonymous transformation
+// i18n pages.search.explain.searchedAsHashtags.a: Searched as hashtags
+// i18n pages.search.explain.searchedAsHashtags.b: — Mastodon does not provide anonymous full-text post search.
+// i18n pages.search.explain.serverCriteria: Server-side criteria
+// i18n pages.search.explain.loadedCriteria: Filters applied to loaded results
+// i18n pages.search.explain.apiUsage: API usage
+// i18n pages.search.explain.maximumCalls: Maximum: {{count}} calls
+// i18n pages.search.explain.usedCalls: Used: {{count}} calls
+// i18n pages.search.explain.truncated: Truncated: {{count}} hashtag(s) dropped to stay within the API-call budget.
+
 @Component({
   selector: 'app-search',
   imports: [
@@ -166,6 +181,7 @@ const SEARCH_TIMEOUT_MS = 20000;
     SearchSyntaxHelp,
     SearchServerDiscovery,
     BlueskySearchPanel,
+    TranslocoPipe,
   ],
   templateUrl: './search.html',
   // The refine layer's styles are shared with the Bluesky panel, so they live in
@@ -652,9 +668,44 @@ export class Search implements OnInit, OnDestroy {
   protected readonly webEngines = WEB_ENGINES;
 
   /** The last web search's dropped criteria, shown as a note under the bar. */
-  protected webDropped = signal<string[]>([]);
+  protected webDropped = signal<WebDroppedItem[]>([]);
   /** Engine label for the note, so it reads "Google can't filter by…". */
   protected webEngineLabel = signal('');
+
+  private transloco = inject(TranslocoService);
+
+  /**
+   * `webDropped()`, rendered into the reader's language.
+   *
+   * Each dropped criterion carries a stable code rather than English prose (see
+   * `WebDroppedItem`), so the sentence is built here rather than in the
+   * serializer — a joined list of translated phrases, not a joined list of
+   * English ones with a key swapped in after the fact.
+   */
+  protected webDroppedLabels = computed(() =>
+    this.webDropped().map((item) => {
+      switch (item.code) {
+        case 'after':
+          return this.transloco.translate<string>('pages.search.webDropped.after', {
+            date: item.value,
+          });
+        case 'before':
+          return this.transloco.translate<string>('pages.search.webDropped.before', {
+            date: item.value,
+          });
+        case 'language':
+          return this.transloco.translate<string>('pages.search.webDropped.language', {
+            language: item.value,
+          });
+        case 'contentType':
+          return this.transloco.translate<string>('pages.search.webDropped.contentType', {
+            contentType: item.value,
+          });
+        default:
+          return this.transloco.translate<string>(`pages.search.webDropped.${item.code}`);
+      }
+    }),
+  );
 
   /**
    * Dropdown change: either a real search type, or an engine hand-off.

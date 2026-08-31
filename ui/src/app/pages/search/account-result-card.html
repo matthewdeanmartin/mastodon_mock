@@ -25,19 +25,25 @@
         <span class="muted acct-handle">&#64;{{ a.acct }}</span>
 
         @if (a.bot) {
-          <span class="badge-pill" title="Automated account">BOT</span>
+          <span class="badge-pill" [title]="'pages.search.card.automatedAccount' | transloco"
+            >BOT</span
+          >
         }
         @if (a.locked) {
-          <span class="badge-pill" title="Requires follow approval">🔒</span>
+          <span class="badge-pill" [title]="'pages.search.card.requiresFollowApproval' | transloco"
+            >🔒</span
+          >
         }
         @if (followedBy() && !mutual()) {
-          <span class="badge-pill soft" title="Follows you">Follows you</span>
+          <span class="badge-pill soft" [title]="'pages.search.card.followsYou' | transloco">{{
+            'pages.search.card.followsYou' | transloco
+          }}</span>
         }
       </div>
 
       @if (reason(); as why) {
         <div class="acct-reason small">
-          <span class="muted">Why you’re seeing this:</span>
+          <span class="muted">{{ 'pages.search.card.whySeeingThis' | transloco }}</span>
           @if (reasonLink(); as link) {
             <a [routerLink]="link">{{ why }}</a>
           } @else {
@@ -51,27 +57,36 @@
       }
 
       <div class="acct-stats muted small">
-        <span [title]="words().Posts"
-          ><strong>{{ a.statuses_count | humanCount }}</strong> posts</span
-        >
-        <span title="Following"
-          ><strong>{{ a.following_count | humanCount }}</strong> following</span
-        >
-        <span title="Followers"
-          ><strong>{{ a.followers_count | humanCount }}</strong> followers</span
-        >
+        @let postsCount = a.statuses_count | humanCount;
+        @let followingCount = a.following_count | humanCount;
+        @let followersCount = a.followers_count | humanCount;
+        <span
+          [title]="words().Posts"
+          [innerHTML]="'pages.search.card.postsCount' | transloco: { count: postsCount }"
+        ></span>
+        <span
+          [title]="'pages.search.card.following' | transloco"
+          [innerHTML]="'pages.search.card.followingCount' | transloco: { count: followingCount }"
+        ></span>
+        <span
+          [title]="'pages.search.card.followers' | transloco"
+          [innerHTML]="'pages.search.card.followersCount' | transloco: { count: followersCount }"
+        ></span>
         @if (lastPosted(); as last) {
           <span
             class="acct-activity"
             [class.stale]="last.stale"
-            [title]="'Last posted: ' + (a.last_status_at || 'never')"
-            >{{ last.text }}</span
+            [title]="
+              'pages.search.card.lastPostedTitle'
+                | transloco: { date: a.last_status_at || ('pages.search.card.never' | transloco) }
+            "
+            >{{ last.labelKey | transloco: last.labelParams }}</span
           >
         } @else if (activityUnknown()) {
           <span
             class="acct-activity unknown"
-            [title]="'This result arrived without a last-' + words().post + ' date'"
-            >activity unknown</span
+            [title]="'pages.search.card.arrivedWithoutDate' | transloco: { post: words().post }"
+            >{{ 'pages.search.card.activityUnknown' | transloco }}</span
           >
         }
       </div>
@@ -96,23 +111,28 @@
         [disabled]="followBusy()"
         (click)="onFollowClick()"
       >
-        {{ followBusy() ? '…' : followLabel() }}
+        {{ followBusy() ? '…' : (followLabel() | transloco) }}
       </button>
       @if (showModerationMenu()) {
         <details class="acct-danger-menu">
-          <summary class="btn btn-outline btn-sm" aria-label="More account actions">•••</summary>
+          <summary
+            class="btn btn-outline btn-sm"
+            [attr.aria-label]="'pages.search.card.moreAccountActions' | transloco"
+          >
+            •••
+          </summary>
           <div class="acct-danger-panel">
-            <div class="menu-note muted small">Mute for…</div>
+            <div class="menu-note muted small">{{ 'pages.search.card.muteFor' | transloco }}</div>
             @for (duration of muteDurations; track duration.label) {
               <button
                 type="button"
                 (click)="muteAccount.emit({ account: a, seconds: duration.seconds })"
               >
-                {{ duration.label }}
+                {{ duration.label | transloco }}
               </button>
             }
             <button class="danger-action" type="button" (click)="blockAccount.emit(a)">
-              Block account
+              {{ 'pages.search.card.blockAccount' | transloco }}
             </button>
           </div>
         </details>
@@ -124,16 +144,23 @@
        they came back with the search — so they show inline, not behind expand. -->
   @if (matchingPosts().length) {
     <div class="acct-matches">
-      <div class="acct-matches-head muted small">Matched on</div>
+      <div class="acct-matches-head muted small">
+        {{ 'pages.search.card.matchedOn' | transloco }}
+      </div>
       @for (s of inlinePosts(); track s.id) {
         <app-status-card [status]="s" />
       }
       @if (extraPostCount()) {
         <button class="acct-more-posts muted small" (click)="toggleExpand.emit()">
           @if (expanded()) {
-            Show fewer posts
+            {{ 'pages.search.card.showFewerPosts' | transloco }}
           } @else {
-            + {{ extraPostCount() }} more matching post{{ extraPostCount() === 1 ? '' : 's' }}
+            {{
+              (extraPostCount() === 1
+                ? 'pages.search.card.moreMatchingPost.one'
+                : 'pages.search.card.moreMatchingPost.other'
+              ) | transloco: { count: extraPostCount() }
+            }}
           }
         </button>
       }

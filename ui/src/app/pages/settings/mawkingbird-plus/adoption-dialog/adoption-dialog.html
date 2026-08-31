@@ -1,7 +1,12 @@
 <!-- Cancellable, unlike the welcome dialog: there is a real third answer here
      (leave it off and decide later), and forcing an irreversible data decision
      on the spot is how people lose things. -->
-<button class="ad-backdrop" type="button" aria-label="Cancel" (click)="cancel()"></button>
+<button
+  class="ad-backdrop"
+  type="button"
+  [aria-label]="'settings.plus.adoption.cancel' | transloco"
+  (click)="cancel()"
+></button>
 <section class="ad-dialog" role="dialog" aria-modal="true" aria-labelledby="ad-title">
   <!--
     Names both places, in the user's terms, in the heading.
@@ -15,33 +20,33 @@
 
   <p class="ad-summary">
     You're switching this on for the first time, so there are two sets to combine: the
-    <strong>{{ localCount() }}</strong> already in this browser, and the
-    <strong>{{ remoteCount() }}</strong> saved to your Mawkingbird account by another device.
+    <strong>{{ localCount() }}</strong> {{ 'settings.plus.adoption.counts.a' | transloco }}
+    <strong>{{ remoteCount() }}</strong> {{ 'settings.plus.adoption.counts.b' | transloco }}
   </p>
   <!-- Says plainly that nothing is wrong. This dialog appears at a moment the
        user chose, doing something ordinary, and should not read like an alert. -->
   <p class="ad-summary muted small">
-    Nothing has gone wrong, and you can't lose anything by picking either one — this only decides
-    what this browser shows from now on.
+    {{ 'settings.plus.adoption.reassure' | transloco }}
   </p>
 
   <div class="ad-choices">
     <div class="ad-choice">
       <button class="btn" type="button" [disabled]="busy()" (click)="choose('merge')">
-        Keep all {{ localCount() + remoteCount() }}
+        {{ 'settings.plus.adoption.keepAll' | transloco }} {{ localCount() + remoteCount() }}
       </button>
       <p class="ad-detail">
-        Everything from both. If the same thing is in both places, your account's copy is the one
-        kept. This is what most people want.
+        {{ 'settings.plus.adoption.keepAll.hint' | transloco }}
       </p>
     </div>
 
     <div class="ad-choice">
       <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="choose('replace')">
-        Just the {{ remoteCount() }} from my account
+        {{ 'settings.plus.adoption.justThe.a' | transloco }} {{ remoteCount() }}
+        {{ 'settings.plus.adoption.justThe.b' | transloco }}
       </button>
       <p class="ad-detail">
-        This browser's {{ localCount() }} are dropped and it matches your other devices exactly.
+        {{ 'settings.plus.adoption.justThe.hint.a' | transloco }} {{ localCount() }}
+        {{ 'settings.plus.adoption.justThe.hint.b' | transloco }}
       </p>
     </div>
   </div>
@@ -50,9 +55,7 @@
        "upload mine and overwrite theirs" should find out here that it does not
        exist, and why. -->
   <p class="ad-note">
-    There's no option to replace your account's copy with this browser's — that would delete things
-    from your other devices, and working out which change came first isn't something this app tries
-    to guess.
+    {{ 'settings.plus.adoption.noReplace' | transloco }}
   </p>
 
   <div class="ad-actions">
@@ -63,12 +66,11 @@
       rather than the timing.
     -->
     <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="cancel()">
-      Leave it off for now
+      {{ 'settings.plus.adoption.leaveOff' | transloco }}
     </button>
     <p class="muted small">
-      Keeps this browser's {{ localCount() }} exactly as they are and changes nothing on your
-      account. You can switch this on again whenever you like, and you'll be asked this same
-      question.
+      {{ 'settings.plus.adoption.leaveOff.hint.a' | transloco }} {{ localCount() }}
+      {{ 'settings.plus.adoption.leaveOff.hint.b' | transloco }}
     </p>
   </div>
 </section>

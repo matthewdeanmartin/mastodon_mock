@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { map, Observable, Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -58,6 +59,66 @@ const NUDGE_DISMISSED_KEY = 'mockingbird_follow_nudge_dismissed';
 /** How many saved bookmarks one press of "Review bookmarks" appends. */
 const BOOKMARK_PAGE_SIZE = 20;
 
+// i18n pages.home.nudge.title: Your timeline gets better with every follow.
+// i18n pages.home.nudge.follow.one: You follow {{count}} account — import a follow list or browse directories to fill your feed.
+// i18n pages.home.nudge.follow.other: You follow {{count}} accounts — import a follow list or browse directories to fill your feed.
+// i18n pages.home.nudge.cta: Find people
+// i18n pages.home.nudge.dismiss: Dismiss
+// i18n pages.home.anonPost.ariaLabel: Login or create an account to {{post}} content, reply and more
+// i18n pages.home.anonPost.pinned: Pinned
+// i18n pages.home.write.button: Write
+// i18n pages.home.write.quickPost: Quick post
+// i18n pages.home.filters.ariaLabel: Timeline filters
+// i18n pages.home.filters.retweets: Retweets
+// i18n pages.home.filters.replies: Replies
+// i18n pages.home.filters.windowAriaLabel: How far back to load
+// i18n pages.home.filters.window.today: Today
+// i18n pages.home.filters.window.week: This week
+// i18n pages.home.filters.window.all: Everything
+// i18n pages.home.filters.calm.title: Calm mode: hide {{posts}} that read as inflammatory — heated wording, quote-dunks, and ratioed {{posts}} (all detected on-device)
+// i18n pages.home.filters.calm.label: Calm
+// i18n pages.home.articles.ariaLabel: Articles from the loaded feed
+// i18n pages.home.articles.empty: No article links in the posts currently loaded.
+// i18n pages.home.loading.preparingServer: Preparing Just My Server…
+// i18n pages.home.loading.generic: Loading…
+// i18n pages.home.empty.lead: Your timeline is empty — you're not following anyone yet.
+// i18n pages.home.empty.cta: Find people to follow
+// i18n pages.home.allHidden.loaded.one: {{count}} post loaded, and your filters are hiding it.
+// i18n pages.home.allHidden.loaded.other: {{count}} posts loaded, and your filters are hiding them all.
+// i18n pages.home.allHidden.turnCalmOff: Turn Calm off to see {{count}}.
+// i18n pages.home.allHidden.showHidden: Show {{count}} hidden by Boosts/Replies.
+// i18n pages.home.allHidden.languagePicker: The language picker at the top of the feed is what is holding them back.
+// i18n pages.home.noneVisible.findFriends: Find friends to follow →
+// i18n pages.home.feedCap.savedRule: —— some posts you saved for later ——
+// i18n pages.home.feedCap.fromBookmarks: From your bookmarks
+// i18n pages.home.feedCap.endRule: —— that’s the end of your feed for now ——
+// i18n pages.home.feedCap.message: You’ve had enough for now, bub. Take it easy.
+// i18n pages.home.feedCap.resetsIn: Resets in ~{{minutes}} min, or on reload.
+// i18n pages.home.reviewBookmarks.loading: Loading…
+// i18n pages.home.reviewBookmarks.button: Review bookmarks
+// i18n pages.home.loadMore.loading: Loading more…
+// i18n pages.home.loadMore.button: Load more
+// i18n pages.home.windowEnd.everythingFrom: That’s everything from {{window}}. There are older posts.
+// i18n pages.home.windowEnd.loadOlder: Load older posts
+// i18n pages.home.feedEnd.matchingFilters: That’s everything matching your filters.
+// i18n pages.home.feedEnd.showHiddenByFilters: Show {{count}} more already loaded (hidden by Boosts/Replies).
+// i18n pages.home.feedEnd.calmLettingThrough: That’s everything Calm mode is letting through.
+// i18n pages.home.feedEnd.showHiddenByCalm: Show {{count}} more already loaded (hidden by Calm).
+// i18n pages.home.feedEnd.chosenLanguages: That’s everything in your chosen languages.
+// i18n pages.home.feedEnd.moreInAnotherLanguage.one: {{count}} more already loaded is in another language — the language picker is at the top of the feed.
+// i18n pages.home.feedEnd.moreInAnotherLanguage.other: {{count}} more already loaded are in another language — the language picker is at the top of the feed.
+// i18n pages.home.feedEnd.allCaughtUp: You’re all caught up. Were you expecting more?
+// i18n pages.home.feedEnd.checkDoctor: Check the Feed Doctor.
+// i18n pages.home.warnings.anonymousErrors.link: Review followed sources or retry the public API
+// i18n pages.home.twitterUnloaded.summary.one: {{count}} followed Twitter account has nothing saved yet, so it is not in this feed.
+// i18n pages.home.twitterUnloaded.summary.other: {{count}} followed Twitter accounts have nothing saved yet, so they are not in this feed.
+// i18n pages.home.twitterUnloaded.loadLink.one: Load it on the Twitter connector ({{count}} request)
+// i18n pages.home.twitterUnloaded.loadLink.other: Load them on the Twitter connector ({{count}} requests)
+// i18n pages.home.warnings.twitterPaused.message: Paused for a few minutes so it stops retrying. Saved tweets are still shown.
+// i18n pages.home.warnings.twitterPaused.retry: Try again now
+// i18n pages.home.window.lastDay: the last day
+// i18n pages.home.window.lastWeek: the last week
+// i18n pages.home.feedSource.query: your home timeline
 @Component({
   selector: 'app-home',
   imports: [
@@ -76,6 +137,7 @@ const BOOKMARK_PAGE_SIZE = 20;
     PreviewCardComponent,
     ReaderToolbar,
     PinnedServerFeeds,
+    TranslocoPipe,
   ],
   templateUrl: './home.html',
   styleUrl: './home.css',
@@ -84,6 +146,7 @@ export class Home implements OnInit, OnDestroy {
   /** post/tweet/florp vocabulary, per the Blue setting. */
   protected words = inject(Terminology).words;
 
+  private transloco = inject(TranslocoService);
   private api = inject(Api);
   protected auth = inject(Auth);
   protected prefs = inject(ClientPrefs);
@@ -127,7 +190,11 @@ export class Home implements OnInit, OnDestroy {
 
   /** The current window in words, for the end-of-feed note that names it. */
   protected windowLabel = computed(() =>
-    this.prefs.homeWindow() === 'today' ? 'the last day' : 'the last week',
+    this.transloco.translate<string>(
+      this.prefs.homeWindow() === 'today'
+        ? 'pages.home.window.lastDay'
+        : 'pages.home.window.lastWeek',
+    ),
   );
   private registry = inject(ProviderRegistry);
   private server = inject(Server);
@@ -305,7 +372,7 @@ export class Home implements OnInit, OnDestroy {
    */
   protected feedSource = computed<FeedSource>(() => ({
     type: 'home',
-    query: 'your home timeline',
+    query: this.transloco.translate<string>('pages.home.feedSource.query'),
     posts: this.visible(),
   }));
 

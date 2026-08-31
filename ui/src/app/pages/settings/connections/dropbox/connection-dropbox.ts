@@ -1,16 +1,33 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { DropboxEntry, DropboxSession } from '../../../../providers/dropbox/dropbox-session';
 import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { PageDiagnostics } from '../../../../page-diagnostics';
 
+// i18n settings.connections.dropbox.title: 📦 Dropbox
+// i18n settings.connections.dropbox.intro: Connect an app-specific Dropbox folder with OAuth. Authorization and file access happen directly between this browser and Dropbox; Mockingbird never receives a client secret or your files.
+// i18n settings.connections.dropbox.notConfigured: Dropbox is not configured for this build. Add the public Dropbox app key to the Angular environment first.
+// i18n settings.connections.dropbox.listing: Listing…
+// i18n settings.connections.dropbox.list: List files and folders
+// i18n settings.connections.dropbox.disconnect: Disconnect
+// i18n settings.connections.dropbox.sessionOnly: This short-lived connection is kept only for this browser session. Reconnect after it expires.
+// i18n settings.connections.dropbox.connect: Connect Dropbox
+// i18n settings.connections.dropbox.modalTitle: Dropbox files and folders
+// i18n settings.connections.dropbox.closeAriaLabel: Close
+// i18n settings.connections.dropbox.empty: This Dropbox folder is empty.
+// i18n settings.connections.dropbox.close: Close
+// i18n settings.connections.dropbox.connected: Dropbox connected.
+// i18n settings.connections.dropbox.authFailed: Dropbox authorization failed.
+// i18n settings.connections.dropbox.startFailed: Couldn't start Dropbox authorization.
+// i18n settings.connections.dropbox.listFailed: Couldn't list your Dropbox files.
 /**
  * Settings → Connections → Dropbox. The OAuth round trip lands back here (see
  * `pages/dropbox-callback`), so this page also reads the `?dropbox=` result.
  */
 @Component({
   selector: 'app-connection-dropbox',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './connection-dropbox.html',
   styleUrls: ['../connection-page.css', './connection-dropbox.css'],
 })
@@ -19,6 +36,7 @@ export class ConnectionDropbox implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private diagnostics = inject(PageDiagnostics);
+  private transloco = inject(TranslocoService);
 
   protected dropboxBusy = signal(false);
   protected dropboxError = signal<string | null>(null);
@@ -31,10 +49,13 @@ export class ConnectionDropbox implements OnInit {
   ngOnInit(): void {
     const result = this.route.snapshot.queryParamMap.get('dropbox');
     if (result === 'connected') {
-      this.dropboxNotice.set('Dropbox connected.');
+      this.dropboxNotice.set(
+        this.transloco.translate<string>('settings.connections.dropbox.connected'),
+      );
     } else if (result === 'error') {
       this.dropboxError.set(
-        this.route.snapshot.queryParamMap.get('message') ?? 'Dropbox authorization failed.',
+        this.route.snapshot.queryParamMap.get('message') ??
+          this.transloco.translate<string>('settings.connections.dropbox.authFailed'),
       );
     }
     if (result) {
@@ -49,7 +70,12 @@ export class ConnectionDropbox implements OnInit {
       await this.dropbox.connect();
     } catch (error: unknown) {
       this.diagnostics.error('Dropbox', 'connect:error', error);
-      this.dropboxError.set(describeError(error, "Couldn't start Dropbox authorization."));
+      this.dropboxError.set(
+        describeError(
+          error,
+          this.transloco.translate<string>('settings.connections.dropbox.startFailed'),
+        ),
+      );
     }
   }
 
@@ -63,7 +89,12 @@ export class ConnectionDropbox implements OnInit {
       this.dropboxEntries.set(await this.dropbox.listRoot());
     } catch (error: unknown) {
       this.diagnostics.error('Dropbox', 'list-root:error', error);
-      this.dropboxError.set(describeError(error, "Couldn't list your Dropbox files."));
+      this.dropboxError.set(
+        describeError(
+          error,
+          this.transloco.translate<string>('settings.connections.dropbox.listFailed'),
+        ),
+      );
     } finally {
       this.dropboxBusy.set(false);
     }

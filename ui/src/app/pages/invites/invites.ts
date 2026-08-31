@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { Auth } from '../../auth';
 import {
@@ -34,9 +35,69 @@ interface InviteCard {
 }
 
 /** Invitation builder rendered inside Mawkingbird's standard three-column shell. */
+// i18n pages.invites.title: Invite people
+// i18n pages.invites.intro: Send a personal invitation from wherever your friends still post. Mawkingbird opens a composer with your chosen text; it never posts for you.
+// i18n pages.invites.anon.title: Anonymous on {{host}}
+// i18n pages.invites.anon.body.a: Everything here works without an account.
+// i18n pages.invites.anon.signIn: Sign in
+// i18n pages.invites.anon.body.b: to add your profile, or share
+// i18n pages.invites.anon.body.c: to choose this default server.
+// i18n pages.invites.mode.ariaLabel: Invitation mode
+// i18n pages.invites.tabs.ariaLabel: Where to {{post}} the invitation
+// i18n pages.invites.mode.simple.title: Simple
+// i18n pages.invites.mode.simple.four: Four good defaults
+// i18n pages.invites.mode.simple.two: Two good defaults
+// i18n pages.invites.mode.advanced.title: Advanced
+// i18n pages.invites.mode.advanced.subtitle: Ten messages + link controls
+// i18n pages.invites.network.twitter: Twitter
+// i18n pages.invites.network.bluesky: Bluesky
+// i18n pages.invites.network.mastodonRally: Mastodon rally
+// i18n pages.invites.platformIntro.x.title: Invite friends who are still on Twitter.
+// i18n pages.invites.platformIntro.x.subtitle: These messages can be direct about leaving Twitter.
+// i18n pages.invites.platformIntro.bluesky.title: Invite Bluesky friends into another part of the open social web.
+// i18n pages.invites.platformIntro.bluesky.subtitle: These assume they already understand why open networks matter.
+// i18n pages.invites.platformIntro.mastodon.title: Ask Mastodon users to invite people from other platforms.
+// i18n pages.invites.platformIntro.mastodon.subtitle: These rally posts link back to this builder. They never advertise leaving one Mastodon server for another.
+// i18n pages.invites.advanced.summary: Invitation links and tracking
+// i18n pages.invites.advanced.startLabel: Where should people start?
+// i18n pages.invites.advanced.promoteJoinMastodon: Promote joining Mastodon
+// i18n pages.invites.advanced.promoteHomeServer: Promote my home server — {{host}}
+// i18n pages.invites.advanced.linksTo.homeServer: Links to <strong>{{url}}</strong>, the server's public homepage.
+// i18n pages.invites.advanced.linksTo.joinMastodon: Links to the Join Mastodon server picker.
+// i18n pages.invites.advanced.includeLink.builder: Include the invitation-builder link
+// i18n pages.invites.advanced.includeLink.whereToStart: Include the "where to start" link
+// i18n pages.invites.advanced.includeProfile: Include my Mastodon profile
+// i18n pages.invites.advanced.signInToAdd: sign in
+// i18n pages.invites.advanced.toAddOne: to add one.
+// i18n pages.invites.advanced.shortenWith: Shorten the link with {{shortener}}
+// i18n pages.invites.advanced.shortener.signIn: sign in
+// i18n pages.invites.advanced.shortener.thenConnect: , then connect a link shortener to track clicks.
+// i18n pages.invites.advanced.shortener.connect: connect a link shortener
+// i18n pages.invites.advanced.shortener.toTrack: to track clicks.
+// i18n pages.invites.advanced.shortening: — shortening…
+// i18n pages.invites.advanced.campaignTags: Add campaign tags for this wording
+// i18n pages.invites.advanced.campaignTagsHint: — counts clicks without identifying who clicked.
+// i18n pages.invites.toolbar.count.one: {{count}} {{network}} message — edit any one before opening the composer.
+// i18n pages.invites.toolbar.count.other: {{count}} {{network}} messages — edit any one before opening the composer.
+// i18n pages.invites.toolbar.shuffle: Shuffle — show a new one first
+// i18n pages.invites.card.editableLabel: {{title}} — invitation text, editable
+// i18n pages.invites.card.overLimit: Longer than {{network}} normally allows.
+// i18n pages.invites.card.rally: Rally Mastodon
+// i18n pages.invites.card.postOn: Post on {{network}}
+// i18n pages.invites.card.copyText: Copy text
+// i18n pages.invites.card.reset: Reset
+// i18n pages.invites.card.copied: ✓ Copied
+// i18n pages.invites.card.copyFailed: Couldn’t use the clipboard
+// i18n pages.invites.footnote.question: Need a server-generated signup code instead?
+// i18n pages.invites.footnote.link: Settings → Invite links
+// i18n pages.invites.fallback.title: Copy this by hand
+// i18n pages.invites.fallback.instructions: Select the text below and copy it yourself.
+// i18n pages.invites.fallback.done: Done
+// i18n pages.invites.actionLabel.rallyWith: Rally Mastodon with
+// i18n pages.invites.actionLabel.postOn: Post on {{network}}:
 @Component({
   selector: 'app-invites',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './invites.html',
   styleUrl: './invites.css',
 })
@@ -49,6 +110,7 @@ export class Invites implements OnInit {
   private readonly diagnostics = inject(PageDiagnostics);
   private readonly shorteners = inject(ShortenerRegistry);
   private readonly shortenerSettings = inject(ShortenerSettings);
+  private readonly transloco = inject(TranslocoService);
 
   protected readonly signedIn = this.auth.isAuthenticated && !this.auth.isAnonymous;
   protected readonly mode = signal<InviteMode>('simple');
@@ -319,7 +381,11 @@ export class Invites implements OnInit {
 
   protected actionLabel(card: InviteCard): string {
     const verb =
-      this.network() === 'mastodon' ? 'Rally Mastodon with' : `Post on ${this.networkLabel()}:`;
+      this.network() === 'mastodon'
+        ? this.transloco.translate<string>('pages.invites.actionLabel.rallyWith')
+        : this.transloco.translate<string>('pages.invites.actionLabel.postOn', {
+            network: this.networkLabel(),
+          });
     return `${verb} “${card.variation.title}”`;
   }
 

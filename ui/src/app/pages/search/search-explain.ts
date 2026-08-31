@@ -9,7 +9,33 @@
  * everything degrades to a loaded-result filter. This module is the single
  * place that classification lives, so the chips and the Explain panel never
  * disagree.
+ *
+ * Chip text is a translation key plus parameters rather than an assembled
+ * English string ("Exact: " + phrase): English word order is not universal, and
+ * a whole-string key with `{{value}}` lets every locale place the value where
+ * its own grammar wants it. See the `migrate-i18n` skill's case (a).
  */
+// i18n pages.search.chip.word: {{word}}
+// i18n pages.search.chip.exactPhrase: Exact: {{phrase}}
+// i18n pages.search.chip.excludeWord: Exclude: {{word}}
+// i18n pages.search.chip.author: From {{author}}
+// i18n pages.search.chip.after: After {{date}}
+// i18n pages.search.chip.before: Before {{date}}
+// i18n pages.search.chip.language: {{language}}
+// i18n pages.search.chip.repliesOnly: Replies only
+// i18n pages.search.chip.noReplies: Exclude replies
+// i18n pages.search.chip.sensitiveOnly: Sensitive only
+// i18n pages.search.chip.excludeSensitive: Exclude sensitive
+// i18n pages.search.chip.scopePublic: Public
+// i18n pages.search.chip.scopeLibrary: My library
+// i18n pages.search.contentType.media: Has media
+// i18n pages.search.contentType.image: Images only
+// i18n pages.search.contentType.video: Video only
+// i18n pages.search.contentType.audio: Audio only
+// i18n pages.search.contentType.poll: Polls only
+// i18n pages.search.contentType.link: Links only
+// i18n pages.search.contentType.text: Text only
+// i18n pages.search.contentType.any: Any
 
 import { MawkingbirdSearch, PostSearchCriteria } from './mawkingbird-search';
 import { serializeMastodonQuery } from './mastodon-query-serializer';
@@ -19,7 +45,10 @@ export type ChipOrigin = 'server' | 'loaded';
 export interface Chip {
   /** Field this chip represents, so removal can clear the right criterion. */
   key: string;
-  label: string;
+  /** Translation key for the chip's text. */
+  labelKey: string;
+  /** Parameters for `labelKey`, when it takes any. */
+  labelParams?: Record<string, string>;
   origin: ChipOrigin;
 }
 
@@ -46,67 +75,78 @@ const SERVER_POST_KEYS = new Set([
  */
 export function postChips(post: PostSearchCriteria, authenticated: boolean): Chip[] {
   const chips: Chip[] = [];
-  const push = (key: string, label: string): void => {
+  const push = (key: string, labelKey: string, labelParams?: Record<string, string>): void => {
     const isServerKey = authenticated && SERVER_POST_KEYS.has(key);
-    chips.push({ key, label, origin: isServerKey ? 'server' : 'loaded' });
+    chips.push({ key, labelKey, labelParams, origin: isServerKey ? 'server' : 'loaded' });
   };
 
   for (const w of (post.words ?? '').trim().split(/\s+/u).filter(Boolean)) {
-    push('words', w);
+    push('words', 'pages.search.chip.word', { word: w });
   }
   if (post.exactPhrase?.trim()) {
-    push('exactPhrase', `Exact: ${post.exactPhrase.trim()}`);
+    push('exactPhrase', 'pages.search.chip.exactPhrase', { phrase: post.exactPhrase.trim() });
   }
   for (const w of (post.excludeWords ?? '').trim().split(/\s+/u).filter(Boolean)) {
-    push('excludeWords', `Exclude: ${w}`);
+    push('excludeWords', 'pages.search.chip.excludeWord', { word: w });
   }
   if (post.author?.trim()) {
-    push('author', `From ${post.author.trim()}`);
+    push('author', 'pages.search.chip.author', { author: post.author.trim() });
   }
   if (post.dates?.after) {
-    push('after', `After ${post.dates.after}`);
+    push('after', 'pages.search.chip.after', { date: post.dates.after });
   }
   if (post.dates?.before) {
-    push('before', `Before ${post.dates.before}`);
+    push('before', 'pages.search.chip.before', { date: post.dates.before });
   }
   if (post.language) {
-    push('language', post.language.toUpperCase());
+    push('language', 'pages.search.chip.language', { language: post.language.toUpperCase() });
   }
   if (post.contentType && post.contentType !== 'any') {
     // Only `media`/`poll` are server-side; image/video/audio/text/link are always loaded.
     const serverBacked = post.contentType === 'media' || post.contentType === 'poll';
-    push(serverBacked ? post.contentType : 'contentType', contentTypeLabel(post.contentType));
+    push(serverBacked ? post.contentType : 'contentType', contentTypeLabelKey(post.contentType));
   }
   if (post.replies && post.replies !== 'include') {
-    push('replies', post.replies === 'only' ? 'Replies only' : 'Exclude replies');
+    push(
+      'replies',
+      post.replies === 'only' ? 'pages.search.chip.repliesOnly' : 'pages.search.chip.noReplies',
+    );
   }
   if (post.sensitive && post.sensitive !== 'include') {
-    push('sensitive', post.sensitive === 'only' ? 'Sensitive only' : 'Exclude sensitive');
+    push(
+      'sensitive',
+      post.sensitive === 'only'
+        ? 'pages.search.chip.sensitiveOnly'
+        : 'pages.search.chip.excludeSensitive',
+    );
   }
   if (post.scope && post.scope !== 'all') {
-    push('scope', post.scope === 'public' ? 'Public' : 'My library');
+    push(
+      'scope',
+      post.scope === 'public' ? 'pages.search.chip.scopePublic' : 'pages.search.chip.scopeLibrary',
+    );
   }
   return chips;
 }
 
-function contentTypeLabel(t: NonNullable<PostSearchCriteria['contentType']>): string {
+function contentTypeLabelKey(t: NonNullable<PostSearchCriteria['contentType']>): string {
   switch (t) {
     case 'media':
-      return 'Has media';
+      return 'pages.search.contentType.media';
     case 'image':
-      return 'Images only';
+      return 'pages.search.contentType.image';
     case 'video':
-      return 'Video only';
+      return 'pages.search.contentType.video';
     case 'audio':
-      return 'Audio only';
+      return 'pages.search.contentType.audio';
     case 'poll':
-      return 'Polls only';
+      return 'pages.search.contentType.poll';
     case 'link':
-      return 'Links only';
+      return 'pages.search.contentType.link';
     case 'text':
-      return 'Text only';
+      return 'pages.search.contentType.text';
     case 'any':
-      return 'Any';
+      return 'pages.search.contentType.any';
   }
 }
 
@@ -117,12 +157,18 @@ export interface ExplainApiUsage {
   tagsDropped: number;
 }
 
+/** A translatable line in the Explain panel's criteria lists. */
+export interface ExplainLine {
+  labelKey: string;
+  labelParams?: Record<string, string>;
+}
+
 export interface ExplainPanel {
   endpoint: string;
   /** The serialized Mastodon query (authenticated only); empty string otherwise. */
   mastodonQuery: string;
-  serverCriteria: string[];
-  loadedCriteria: string[];
+  serverCriteria: ExplainLine[];
+  loadedCriteria: ExplainLine[];
   /** Non-null only in anonymous post search: the hashtags the words became. */
   anonymousTags: string[] | null;
   apiUsage: ExplainApiUsage;
@@ -141,8 +187,9 @@ export function explainPostSearch(
 ): ExplainPanel {
   const post = search.post ?? {};
   const chips = postChips(post, authenticated);
-  const serverCriteria = chips.filter((c) => c.origin === 'server').map((c) => c.label);
-  const loadedCriteria = chips.filter((c) => c.origin === 'loaded').map((c) => c.label);
+  const toLine = (c: Chip): ExplainLine => ({ labelKey: c.labelKey, labelParams: c.labelParams });
+  const serverCriteria = chips.filter((c) => c.origin === 'server').map(toLine);
+  const loadedCriteria = chips.filter((c) => c.origin === 'loaded').map(toLine);
 
   return {
     endpoint: authenticated

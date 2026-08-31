@@ -3,14 +3,21 @@
     class="photo-overlay"
     role="dialog"
     aria-modal="true"
-    aria-label="Picture viewer"
+    [aria-label]="'pages.profile.media.viewerAriaLabel' | transloco"
     tabindex="-1"
     appFocusTrap
     [appFocusTrapCloseOnEscape]="false"
     (click)="onOverlayClick($event)"
     (keydown.escape)="close()"
   >
-    <button type="button" class="photo-close" (click)="close()" aria-label="Close viewer">✕</button>
+    <button
+      type="button"
+      class="photo-close"
+      (click)="close()"
+      [aria-label]="'pages.profile.media.closeViewer' | transloco"
+    >
+      ✕
+    </button>
 
     <div class="photo-layout">
       <!-- The picture is the point: it gets the room, and the conversation
@@ -21,7 +28,7 @@
             type="button"
             class="photo-arrow prev"
             (click)="go(-1)"
-            aria-label="Previous picture"
+            [aria-label]="'pages.profile.media.previousPicture' | transloco"
           >
             ‹
           </button>
@@ -30,8 +37,10 @@
         <figure class="photo-figure">
           @if (blurred()) {
             <button type="button" class="photo-sensitive" (click)="reveal()">
-              <span class="photo-sensitive-label">Sensitive image</span>
-              <span class="muted">Click to view</span>
+              <span class="photo-sensitive-label">{{
+                'pages.profile.media.sensitiveImage' | transloco
+              }}</span>
+              <span class="muted">{{ 'pages.profile.media.clickToView' | transloco }}</span>
             </button>
           } @else if (item.type === 'image') {
             <img class="photo-image" [src]="item.url" [alt]="item.description || ''" />
@@ -39,7 +48,7 @@
             <!-- Video support across the app is thin; a native player with
                  controls is the honest amount of support to claim here. -->
             <video class="photo-image" [src]="item.url" controls playsinline preload="metadata">
-              Your browser cannot play this video.
+              {{ 'pages.profile.media.videoUnsupported' | transloco }}
             </video>
           }
           @if (item.description && !blurred()) {
@@ -48,14 +57,22 @@
         </figure>
 
         @if (hasNext()) {
-          <button type="button" class="photo-arrow next" (click)="go(1)" aria-label="Next picture">
+          <button
+            type="button"
+            class="photo-arrow next"
+            (click)="go(1)"
+            [aria-label]="'pages.profile.media.nextPicture' | transloco"
+          >
             ›
           </button>
         }
 
         <div class="photo-counter muted">
-          {{ position() }} of {{ total() }}
-          <span class="photo-hint">← → picture · ↑ ↓ post · Esc close</span>
+          {{
+            'pages.profile.media.positionOfTotal'
+              | transloco: { position: position(), total: total() }
+          }}
+          <span class="photo-hint">{{ 'pages.profile.media.keyboardHint' | transloco }}</span>
         </div>
       </div>
 
@@ -84,7 +101,10 @@
         </header>
 
         @if (item.status.spoiler_text) {
-          <p class="photo-cw"><strong>CW:</strong> {{ item.status.spoiler_text }}</p>
+          <p class="photo-cw">
+            <strong>{{ 'pages.profile.media.cwLabel' | transloco }}</strong>
+            {{ item.status.spoiler_text }}
+          </p>
         }
 
         <!-- Server-sanitized HTML, same as the timeline renders. Clamped because
@@ -99,7 +119,11 @@
           ></div>
           @if (item.status.content && item.status.content.length > 220) {
             <button type="button" class="photo-more-text" (click)="toggleCaption()">
-              {{ captionExpanded() ? 'Show less' : 'Show more' }}
+              {{
+                captionExpanded()
+                  ? ('pages.profile.media.showLess' | transloco)
+                  : ('pages.profile.media.showMore' | transloco)
+              }}
             </button>
           }
         </div>
@@ -114,7 +138,11 @@
                 [disabled]="actionBusy()"
                 (click)="toggleFavourite()"
                 [attr.aria-pressed]="p.favourited"
-                [title]="p.favourited ? 'Undo like' : 'Like'"
+                [title]="
+                  p.favourited
+                    ? ('pages.profile.media.undoLike' | transloco)
+                    : ('pages.profile.media.like' | transloco)
+                "
               >
                 {{ p.favourited ? '♥' : '♡' }}
                 @if (p.favourites_count) {
@@ -130,7 +158,11 @@
                 [disabled]="actionBusy()"
                 (click)="toggleReblog()"
                 [attr.aria-pressed]="p.reblogged"
-                [title]="p.reblogged ? 'Undo boost' : 'Boost'"
+                [title]="
+                  p.reblogged
+                    ? ('pages.profile.media.undoBoost' | transloco)
+                    : ('pages.profile.media.boost' | transloco)
+                "
               >
                 ↺
                 @if (p.reblogs_count) {
@@ -143,7 +175,7 @@
                 type="button"
                 class="photo-action"
                 (click)="startReply(p)"
-                [title]="'Reply to this ' + words().post"
+                [title]="'pages.profile.media.replyToThis' | transloco: { term: words().post }"
               >
                 ↩
                 @if (p.replies_count) {
@@ -159,7 +191,7 @@
                 (click)="menuOpen.set(!menuOpen())"
                 [attr.aria-expanded]="menuOpen()"
                 aria-haspopup="menu"
-                title="More actions"
+                [title]="'pages.profile.media.moreActions' | transloco"
               >
                 ···
               </button>
@@ -167,36 +199,47 @@
                 <div class="photo-menu" role="menu">
                   @if (threadLink()) {
                     <button type="button" role="menuitem" (click)="openThread()">
-                      Open thread
+                      {{ 'pages.profile.media.openThread' | transloco }}
                     </button>
                   }
                   @if (!auth.isAnonymous) {
                     <button type="button" role="menuitem" (click)="toggleBookmark()">
-                      {{ p.bookmarked ? 'Remove bookmark' : 'Bookmark' }}
+                      {{
+                        p.bookmarked
+                          ? ('pages.profile.media.removeBookmark' | transloco)
+                          : ('pages.profile.media.bookmark' | transloco)
+                      }}
                     </button>
                   }
                   @if (p.url) {
                     <button type="button" role="menuitem" (click)="copyPostLink()">
-                      Copy link to post
+                      {{ 'pages.profile.media.copyLinkToPost' | transloco }}
                     </button>
                   }
                   <button type="button" role="menuitem" (click)="copyImageAddress()">
-                    Copy image address
+                    {{ 'pages.profile.media.copyImageAddress' | transloco }}
                   </button>
                   <button type="button" role="menuitem" (click)="openImageInNewTab()">
-                    Open image in new tab
+                    {{ 'pages.profile.media.openImageInNewTab' | transloco }}
                   </button>
                   @if (isOwnPost()) {
                     <button type="button" role="menuitem" class="danger" (click)="deletePost()">
-                      Delete post
+                      {{ 'pages.profile.media.deletePost' | transloco }}
                     </button>
                   } @else {
-                    <button type="button" role="menuitem" (click)="reportPost()">Report…</button>
+                    <button type="button" role="menuitem" (click)="reportPost()">
+                      {{ 'pages.profile.media.report' | transloco }}
+                    </button>
                     <button type="button" role="menuitem" (click)="muteAuthor()">
-                      Mute &#64;{{ p.account.username }}
+                      {{
+                        'pages.profile.media.muteHandle' | transloco: { handle: p.account.username }
+                      }}
                     </button>
                     <button type="button" role="menuitem" class="danger" (click)="blockAuthor()">
-                      Block &#64;{{ p.account.username }}
+                      {{
+                        'pages.profile.media.blockHandle'
+                          | transloco: { handle: p.account.username }
+                      }}
                     </button>
                   }
                 </div>
@@ -219,21 +262,23 @@
                 [inReplyToId]="p.id"
                 [replyToHandle]="replyToHandle()"
                 [compact]="true"
-                placeholder="Add a comment…"
+                [placeholder]="'pages.profile.media.addCommentPlaceholder' | transloco"
                 (posted)="onReplied($event)"
               />
-              <button type="button" class="photo-cancel" (click)="cancelReply()">Cancel</button>
+              <button type="button" class="photo-cancel" (click)="cancelReply()">
+                {{ 'pages.profile.media.cancel' | transloco }}
+              </button>
             </div>
           }
         }
 
         <div class="photo-thread">
           @if (repliesLoading()) {
-            <p class="muted">Loading comments…</p>
+            <p class="muted">{{ 'pages.profile.media.loadingComments' | transloco }}</p>
           } @else if (repliesError()) {
             <p class="muted">{{ repliesError() }}</p>
           } @else if (!replies().length) {
-            <p class="muted photo-nocomments">No comments yet.</p>
+            <p class="muted photo-nocomments">{{ 'pages.profile.media.noComments' | transloco }}</p>
           } @else {
             @for (reply of replies(); track reply.id) {
               <article class="photo-comment">
@@ -259,7 +304,10 @@
                         type="button"
                         class="photo-comment-reply"
                         (click)="startReply(reply)"
-                        [title]="'Reply to @' + reply.account.username"
+                        [title]="
+                          'pages.profile.media.replyToHandle'
+                            | transloco: { handle: reply.account.username }
+                        "
                       >
                         ↩
                       </button>
@@ -277,11 +325,11 @@
                         [inReplyToId]="reply.id"
                         [replyToHandle]="replyToHandle()"
                         [compact]="true"
-                        placeholder="Add a comment…"
+                        [placeholder]="'pages.profile.media.addCommentPlaceholder' | transloco"
                         (posted)="onReplied($event)"
                       />
                       <button type="button" class="photo-cancel" (click)="cancelReply()">
-                        Cancel
+                        {{ 'pages.profile.media.cancel' | transloco }}
                       </button>
                     </div>
                   }

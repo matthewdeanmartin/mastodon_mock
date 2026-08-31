@@ -1,3 +1,4 @@
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Component, computed, input, output, signal } from '@angular/core';
 import type { AdoptionChoice } from '../../../../providers/account/collection-adoption';
 import type { AdoptableCollection } from '../../../../providers/account/collection-adoption-runner';
@@ -21,8 +22,24 @@ import type { AdoptableCollection } from '../../../../providers/account/collecti
  * The consequence is stated in the copy, not buried: on a merge, anything held
  * in both places keeps the account's version.
  */
+// i18n settings.plus.adoption.cancel: Cancel
+// i18n settings.plus.adoption.counts.a: already in this browser, and the
+// i18n settings.plus.adoption.counts.b: saved to your Mawkingbird account by another device.
+// i18n settings.plus.adoption.justThe.a: Just the
+// i18n settings.plus.adoption.justThe.b: from my account
+// i18n settings.plus.adoption.justThe.hint.a: This browser's
+// i18n settings.plus.adoption.justThe.hint.b: are dropped and it matches your other devices exactly.
+// i18n settings.plus.adoption.keepAll.hint: Everything from both. If the same thing is in both places, your account's copy is the one kept. This is what most people want.
+// i18n settings.plus.adoption.keepAll: Keep all
+// i18n settings.plus.adoption.leaveOff.hint.a: Keeps this browser's
+// i18n settings.plus.adoption.leaveOff.hint.b: exactly as they are and changes nothing on your account. You can switch this on again whenever you like, and you'll be asked this same question.
+// i18n settings.plus.adoption.leaveOff: Leave it off for now
+// i18n settings.plus.adoption.noReplace: There's no option to replace your account's copy with this browser's — that would delete things from your other devices, and working out which change came first isn't something this app tries to guess.
+// i18n settings.plus.adoption.reassure: Nothing has gone wrong, and you can't lose anything by picking either one — this only decides what this browser shows from now on.
+
 @Component({
   selector: 'app-adoption-dialog',
+  imports: [TranslocoPipe],
   templateUrl: './adoption-dialog.html',
   styleUrl: './adoption-dialog.css',
 })

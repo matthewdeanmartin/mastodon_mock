@@ -19,15 +19,15 @@ describe('postChips', () => {
 
   it('marks server-backed criteria as origin=server when authenticated', () => {
     const chips = postChips(post, true);
-    const words = chips.find((c) => c.label === 'angular');
+    const words = chips.find((c) => c.labelParams?.['word'] === 'angular');
     expect(words?.origin).toBe('server');
-    const lang = chips.find((c) => c.label === 'EN');
+    const lang = chips.find((c) => c.labelParams?.['language'] === 'EN');
     expect(lang?.origin).toBe('server');
   });
 
   it('keeps finer media types as loaded even when authenticated', () => {
     const chips = postChips(post, true);
-    const image = chips.find((c) => c.label === 'Images only');
+    const image = chips.find((c) => c.labelKey === 'pages.search.contentType.image');
     expect(image?.origin).toBe('loaded'); // image/video/audio are always loaded-result filters
   });
 
@@ -48,8 +48,15 @@ describe('explainPostSearch', () => {
     const explain = explainPostSearch(search, true, null);
     expect(explain.endpoint).toBe('GET /api/v2/search');
     expect(explain.mastodonQuery).toBe('+angular language:en');
-    expect(explain.serverCriteria).toEqual(expect.arrayContaining(['angular', 'EN']));
-    expect(explain.loadedCriteria).toContain('Images only'); // finer media stays loaded
+    expect(explain.serverCriteria).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ labelParams: { word: 'angular' } }),
+        expect.objectContaining({ labelParams: { language: 'EN' } }),
+      ]),
+    );
+    expect(explain.loadedCriteria).toContainEqual(
+      expect.objectContaining({ labelKey: 'pages.search.contentType.image' }),
+    ); // finer media stays loaded
     expect(explain.anonymousTags).toBeNull();
   });
 
@@ -61,7 +68,9 @@ describe('explainPostSearch', () => {
     expect(explain.anonymousTags).toEqual(['cats', 'dogs']);
     // Nothing may be claimed as server-side when anonymous.
     expect(explain.serverCriteria).toEqual([]);
-    expect(explain.loadedCriteria).toContain('cats');
+    expect(explain.loadedCriteria).toContainEqual(
+      expect.objectContaining({ labelParams: { word: 'cats' } }),
+    );
   });
 
   it('defaults api usage to the search budget when not supplied', () => {

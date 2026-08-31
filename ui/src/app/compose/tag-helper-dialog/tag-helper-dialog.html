@@ -1,27 +1,38 @@
 <!-- A real button, not a div: clicking away must be reachable by keyboard too. -->
-<button class="th-backdrop" type="button" aria-label="Close" (click)="close()"></button>
+<button
+  class="th-backdrop"
+  type="button"
+  [aria-label]="'compose.tagHelper.close' | transloco"
+  (click)="close()"
+></button>
 <section class="th-dialog" role="dialog" aria-modal="true" aria-labelledby="th-title">
   <div class="th-head">
-    <h2 id="th-title">🤖#️⃣ Suggest hashtags</h2>
-    <button class="icon-close" type="button" aria-label="Close" (click)="close()">×</button>
+    <h2 id="th-title">{{ 'compose.tagHelper.title' | transloco }}</h2>
+    <button
+      class="icon-close"
+      type="button"
+      [aria-label]="'compose.tagHelper.close' | transloco"
+      (click)="close()"
+    >
+      ×
+    </button>
   </div>
 
   <p class="muted">
-    Tags are how people find posts outside their follows. These are checked against this server, so
-    you can tell a tag people read from one that only sounds right.
+    {{ 'compose.tagHelper.intro' | transloco }}
   </p>
 
   @if (!result() && !busy()) {
     <button class="btn" type="button" (click)="suggest()" [disabled]="!post().trim()">
-      Suggest tags for this post
+      {{ 'compose.tagHelper.suggest' | transloco }}
     </button>
     @if (!post().trim()) {
-      <p class="muted small">Write something first.</p>
+      <p class="muted small">{{ 'compose.tagHelper.writeFirst' | transloco }}</p>
     }
   }
 
   @if (busy()) {
-    <p class="muted small" role="status">Asking the model, then checking each tag for activity…</p>
+    <p class="muted small" role="status">{{ 'compose.tagHelper.working' | transloco }}</p>
   }
 
   @if (error(); as msg) {
@@ -41,7 +52,7 @@
           <span class="muted small">
             {{ usesLabel(check) }}
             @if (check.similar.length) {
-              · also: {{ check.similar.join(', ') }}
+              {{ 'compose.tagHelper.also' | transloco }} {{ check.similar.join(', ') }}
             }
           </span>
         </li>
@@ -49,21 +60,23 @@
     </ul>
 
     <label class="th-edit">
-      <span>Your tags</span>
+      <span>{{ 'compose.tagHelper.yourTags' | transloco }}</span>
       <input
         type="text"
         name="draft"
         [ngModel]="draft()"
         (ngModelChange)="draft.set($event)"
-        placeholder="rust compilers"
+        [placeholder]="'compose.tagHelper.placeholder' | transloco"
       />
     </label>
 
     <div class="th-actions">
       <button class="btn" type="button" (click)="use()" [disabled]="!draft().trim()">
-        Use tags
+        {{ 'compose.tagHelper.useTags' | transloco }}
       </button>
-      <button class="btn btn-outline" type="button" (click)="close()">Cancel</button>
+      <button class="btn btn-outline" type="button" (click)="close()">
+        {{ 'compose.tagHelper.cancel' | transloco }}
+      </button>
     </div>
   }
 </section>

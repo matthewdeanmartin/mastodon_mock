@@ -8,7 +8,23 @@
  * flipping back to "Relevance" and the ties within any other sort both feel
  * predictable. The default option for each result type is 'relevance', which is
  * a no-op that hands back the server's order untouched.
+ *
+ * Labels are keys rather than English — see `en.json`/settings-anonymous.ts for
+ * the pattern — because a sort menu is read by every viewer, not just the ones
+ * who typed the query in English.
  */
+// i18n pages.search.sort.relevance: Relevance
+// i18n pages.search.sort.newest: Newest
+// i18n pages.search.sort.oldest: Oldest
+// i18n pages.search.sort.favourites: Most favourited
+// i18n pages.search.sort.reblogs: Most boosted
+// i18n pages.search.sort.replies: Most replies
+// i18n pages.search.sort.followers: Most followers
+// i18n pages.search.sort.following: Most following
+// i18n pages.search.sort.posts: Most posts
+// i18n pages.search.sort.name: Name (A–Z)
+// i18n pages.search.sort.matches: Most matching posts
+// i18n pages.search.sort.active: Recently active
 
 import { Account, Status } from '../../models';
 import { AccountWithMatches } from './account-refine';
@@ -37,23 +53,23 @@ export interface SortOption<K extends string> {
 
 /** Sort choices for the posts result list (order = display order in the bar). */
 export const STATUS_SORTS: SortOption<StatusSortKey>[] = [
-  { value: 'relevance', label: 'Relevance' },
-  { value: 'newest', label: 'Newest' },
-  { value: 'oldest', label: 'Oldest' },
-  { value: 'favourites', label: 'Most favourited' },
-  { value: 'reblogs', label: 'Most boosted' },
-  { value: 'replies', label: 'Most replies' },
+  { value: 'relevance', label: 'pages.search.sort.relevance' },
+  { value: 'newest', label: 'pages.search.sort.newest' },
+  { value: 'oldest', label: 'pages.search.sort.oldest' },
+  { value: 'favourites', label: 'pages.search.sort.favourites' },
+  { value: 'reblogs', label: 'pages.search.sort.reblogs' },
+  { value: 'replies', label: 'pages.search.sort.replies' },
 ];
 
 /** Sort choices for the account result list. */
 export const ACCOUNT_SORTS: SortOption<AccountSortKey>[] = [
-  { value: 'relevance', label: 'Relevance' },
-  { value: 'followers', label: 'Most followers' },
-  { value: 'following', label: 'Most following' },
-  { value: 'posts', label: 'Most posts' },
-  { value: 'name', label: 'Name (A–Z)' },
-  { value: 'matches', label: 'Most matching posts' },
-  { value: 'active', label: 'Recently active' },
+  { value: 'relevance', label: 'pages.search.sort.relevance' },
+  { value: 'followers', label: 'pages.search.sort.followers' },
+  { value: 'following', label: 'pages.search.sort.following' },
+  { value: 'posts', label: 'pages.search.sort.posts' },
+  { value: 'name', label: 'pages.search.sort.name' },
+  { value: 'matches', label: 'pages.search.sort.matches' },
+  { value: 'active', label: 'pages.search.sort.active' },
 ];
 
 /** Stable sort by a numeric key extractor, descending (bigger first). */
