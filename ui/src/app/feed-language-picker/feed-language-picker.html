@@ -5,16 +5,8 @@
   [attr.aria-expanded]="open()"
   aria-haspopup="menu"
   (click)="toggleOpen()"
-  [title]="
-    'Choose which languages the feed shows. ' +
-    words().Posts +
-    ' whose language cannot be determined are never hidden. Languages come from Settings → Internationalization.'
-  "
-  [attr.aria-label]="
-    'Choose which languages the feed shows. ' +
-    words().Posts +
-    ' whose language cannot be determined are never hidden. Languages come from Settings → Internationalization.'
-  "
+  [title]="'feedLanguagePicker.description' | transloco: { posts: words().Posts }"
+  [attr.aria-label]="'feedLanguagePicker.description' | transloco: { posts: words().Posts }"
 >
   <span aria-hidden="true">🌐</span> {{ label() }}
 </button>
@@ -29,7 +21,7 @@
       (click)="chooseAll()"
     >
       <span class="tick">{{ showingAll() ? '✓' : '' }}</span>
-      All languages
+      {{ 'feedLanguagePicker.allLanguages' | transloco }}
     </button>
 
     <button
@@ -40,7 +32,7 @@
       (click)="chooseKnown()"
     >
       <span class="tick">{{ !showingAll() && !selected().size ? '✓' : '' }}</span>
-      Every language I know
+      {{ 'feedLanguagePicker.everyKnown' | transloco }}
     </button>
 
     <hr />
@@ -54,7 +46,7 @@
         class="lang-row"
         [attr.aria-checked]="selected().has(option.code)"
         [disabled]="atCap(option.code)"
-        [title]="atCap(option.code) ? 'Pick at most ' + max + ' languages' : ''"
+        [title]="atCap(option.code) ? ('feedLanguagePicker.cap' | transloco: { count: max }) : ''"
         (click)="toggleLanguage(option.code)"
       >
         <span class="tick">{{ selected().has(option.code) ? '✓' : '' }}</span>
@@ -63,7 +55,7 @@
     }
 
     <p class="lang-note muted">
-      Choose up to {{ max }}. Add languages under Settings → Internationalization.
+      {{ 'feedLanguagePicker.note' | transloco: { count: max } }}
     </p>
   </div>
 }

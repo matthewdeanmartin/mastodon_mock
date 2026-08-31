@@ -8,19 +8,19 @@
     (dismissed)="closed.emit()"
     (click)="$event.stopPropagation()"
   >
-    <h3 id="report-title">Report &#64;{{ username() }}</h3>
+    <h3 id="report-title">{{ 'report.title' | transloco: { username: username() } }}</h3>
     @if (statusId()) {
-      <p class="muted small">Reporting a specific post.</p>
+      <p class="muted small">{{ 'report.specificPost' | transloco }}</p>
     }
     <p class="muted small">
-      Please review this carefully. Reports cannot be undone after they are sent.
+      {{ 'report.review' | transloco }}
     </p>
     @if (provider() === 'bluesky') {
-      <p class="muted small">This report will be sent to Bluesky's moderation service.</p>
+      <p class="muted small">{{ 'report.blueskyService' | transloco }}</p>
     }
 
     <label class="field">
-      Category
+      {{ 'report.category' | transloco }}
       <select [ngModel]="category()" (ngModelChange)="category.set($event)">
         @for (c of categories; track c) {
           <option [value]="c">{{ c }}</option>
@@ -29,12 +29,12 @@
     </label>
 
     <label class="field">
-      Comment (optional)
+      {{ 'report.comment' | transloco }}
       <textarea
         rows="3"
         [ngModel]="comment()"
         (ngModelChange)="comment.set($event)"
-        placeholder="What's wrong?"
+        [placeholder]="'report.placeholder' | transloco"
       ></textarea>
     </label>
 
@@ -43,9 +43,11 @@
     }
 
     <div class="dialog-actions">
-      <button class="btn btn-outline" (click)="closed.emit()">Cancel</button>
+      <button class="btn btn-outline" (click)="closed.emit()">
+        {{ 'report.cancel' | transloco }}
+      </button>
       <button class="btn warn" [disabled]="submitting()" (click)="submit()">
-        {{ submitting() ? 'Sending…' : 'Confirm report' }}
+        {{ submitting() ? ('report.sending' | transloco) : ('report.confirm' | transloco) }}
       </button>
     </div>
   </div>

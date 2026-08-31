@@ -11,19 +11,29 @@
         <p class="server-bio">{{ info.description }}</p>
       }
       <p class="muted small server-stats">
-        {{ info.usage.users.active_month }} active this month · v{{ info.version }} ·
-        {{ store.total() }} announcement{{ store.total() === 1 ? '' : 's' }}
+        {{
+          (store.total() === 1
+            ? 'serverAnnouncements.announcements.one'
+            : 'serverAnnouncements.announcements.other'
+          )
+            | transloco
+              : {
+                  active: info.usage.users.active_month,
+                  version: info.version,
+                  count: store.total(),
+                }
+        }}
       </p>
     </div>
   </header>
 } @else {
-  <div class="page-head">Server announcements</div>
+  <div class="page-head">{{ 'serverAnnouncements.title' | transloco }}</div>
 }
 
 <div class="server-announcement-actions">
   @if (store.activeCount()) {
     <button type="button" class="btn btn-outline btn-sm" (click)="store.dismissAll()">
-      Dismiss all ({{ store.activeCount() }})
+      {{ 'serverAnnouncements.dismissAll' | transloco: { count: store.activeCount() } }}
     </button>
   }
   <!-- The undo for the button beside it. Dismissing is per-browser and
@@ -31,15 +41,15 @@
        one about the outage" is the obvious next problem. -->
   @if (dismissedCount()) {
     <button type="button" class="btn btn-outline btn-sm" (click)="store.restoreAll()">
-      Undismiss all ({{ dismissedCount() }})
+      {{ 'serverAnnouncements.undismissAll' | transloco: { count: dismissedCount() } }}
     </button>
   }
 </div>
 
 @if (!store.loaded()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'serverAnnouncements.loading' | transloco }}</p>
 } @else if (!announcements().length) {
-  <p class="muted center small">This server hasn't posted any announcements.</p>
+  <p class="muted center small">{{ 'serverAnnouncements.empty' | transloco }}</p>
 } @else {
   @for (a of announcements(); track a.id) {
     <article class="server-announcement" [class.dismissed]="isDismissed(a.id)">
@@ -48,9 +58,9 @@
           <time [attr.datetime]="a.published_at">{{ a.published_at | date: 'mediumDate' }}</time>
         }
         @if (isDismissed(a.id)) {
-          <span class="muted small">dismissed</span>
+          <span class="muted small">{{ 'serverAnnouncements.dismissed' | transloco }}</span>
         } @else if (!a.read) {
-          <span class="announcement-new">new</span>
+          <span class="announcement-new">{{ 'serverAnnouncements.new' | transloco }}</span>
         }
       </div>
       <div class="content" [innerHTML]="a.content"></div>
@@ -64,7 +74,7 @@
           @for (e of quickReactions; track e) {
             <button
               class="add-reaction"
-              [title]="'React ' + e"
+              [title]="'serverAnnouncements.react' | transloco: { emoji: e }"
               (click)="store.toggleReaction(a, e)"
             >
               {{ e }}
@@ -74,7 +84,7 @@
       </div>
       @if (!isDismissed(a.id)) {
         <button class="link dismiss-one" type="button" (click)="store.dismiss(a.id)">
-          dismiss
+          {{ 'serverAnnouncements.dismiss' | transloco }}
         </button>
       }
     </article>

@@ -1,21 +1,28 @@
 <section class="trend-section">
-  <h2>Trending hashtags</h2>
+  <h2>{{ 'adminTrends.hashtags' | transloco }}</h2>
   @if (!tags().length) {
-    <p class="muted center">No trending tags.</p>
+    <p class="muted center">{{ 'adminTrends.emptyTags' | transloco }}</p>
   } @else {
     <div class="tag-list">
       @for (t of tags(); track t.id) {
         <div class="tag-chip">
           <a class="tag-chip-link" [routerLink]="['/tags', t.name]">
             <span class="tag-name">#{{ t.name }}</span>
-            <span class="tag-uses muted">{{ uses(t) }} uses</span>
+            <span class="tag-uses muted">{{
+              (uses(t) === 1 ? 'adminTrends.uses.one' : 'adminTrends.uses.other')
+                | transloco: { count: uses(t) }
+            }}</span>
           </a>
           @if (moderated()['tag-' + t.id]; as state) {
             <span class="moderated muted">{{ state }}</span>
           } @else {
             <span class="trend-actions">
-              <button class="op" (click)="approveTag(t)">Approve</button>
-              <button class="op warn" (click)="rejectTag(t)">Reject</button>
+              <button class="op" (click)="approveTag(t)">
+                {{ 'adminTrends.approve' | transloco }}
+              </button>
+              <button class="op warn" (click)="rejectTag(t)">
+                {{ 'adminTrends.reject' | transloco }}
+              </button>
             </span>
           }
         </div>
@@ -25,11 +32,11 @@
 </section>
 
 <section class="trend-section">
-  <h2>Trending posts</h2>
+  <h2>{{ 'adminTrends.posts' | transloco }}</h2>
   @if (loading()) {
-    <p class="muted center">Loading…</p>
+    <p class="muted center">{{ 'adminTrends.loading' | transloco }}</p>
   } @else if (!statuses().length) {
-    <p class="muted center">No trending posts.</p>
+    <p class="muted center">{{ 'adminTrends.emptyPosts' | transloco }}</p>
   } @else {
     @for (s of statuses(); track s.id) {
       <div class="trend-status">
@@ -38,8 +45,12 @@
           @if (moderated()['status-' + s.id]; as state) {
             <span class="moderated muted">{{ state }}</span>
           } @else {
-            <button class="op" (click)="approveStatus(s)">Approve</button>
-            <button class="op warn" (click)="rejectStatus(s)">Reject</button>
+            <button class="op" (click)="approveStatus(s)">
+              {{ 'adminTrends.approve' | transloco }}
+            </button>
+            <button class="op warn" (click)="rejectStatus(s)">
+              {{ 'adminTrends.reject' | transloco }}
+            </button>
           }
         </div>
       </div>

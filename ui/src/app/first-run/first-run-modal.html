@@ -5,42 +5,45 @@
 <div class="first-run-backdrop">
   <div class="first-run-panel">
     @if (step() === 'welcome') {
-      <h2 id="first-run-title">Welcome to Mawkingbird</h2>
-      <p class="first-run-pitch">A social media client for Mastodon, Bluesky and more.</p>
+      <h2 id="first-run-title">{{ 'firstRun.welcomeTitle' | transloco }}</h2>
+      <p class="first-run-pitch">{{ 'firstRun.pitch' | transloco }}</p>
       <!--
         Says out loud that the timeline behind the modal is a sample. Without
         this, three seeded follows read as "this app decided who I follow".
       -->
       <p class="first-run-note">
-        The posts behind this box are a small sample, so you can see what the app looks like before
-        you decide anything.
+        {{ 'firstRun.sampleNote' | transloco }}
       </p>
       <div class="first-run-actions">
-        <button type="button" class="first-run-primary" (click)="toNetwork()">Log in</button>
+        <button type="button" class="first-run-primary" (click)="toNetwork()">
+          {{ 'firstRun.logIn' | transloco }}
+        </button>
         <button type="button" class="first-run-secondary" (click)="pick('anonymous')">
-          Continue without logging in
+          {{ 'firstRun.continueAnonymous' | transloco }}
         </button>
       </div>
     } @else {
-      <h2 id="first-run-title">Which account do you have?</h2>
-      <p class="first-run-pitch">Pick the network you already use.</p>
+      <h2 id="first-run-title">{{ 'firstRun.accountQuestion' | transloco }}</h2>
+      <p class="first-run-pitch">{{ 'firstRun.pickNetwork' | transloco }}</p>
       <div class="first-run-actions">
         <button type="button" class="first-run-network" (click)="pick('bluesky')">
           <span class="first-run-emoji" aria-hidden="true">🦋</span>
           <span class="first-run-network-text">
-            <strong>Bluesky</strong>
-            <small>Sign in with your handle and an app password.</small>
+            <strong>{{ 'firstRun.bluesky' | transloco }}</strong>
+            <small>{{ 'firstRun.blueskyHint' | transloco }}</small>
           </span>
         </button>
         <button type="button" class="first-run-network" (click)="pick('mastodon')">
           <span class="first-run-emoji" aria-hidden="true">🐘</span>
           <span class="first-run-network-text">
-            <strong>Mastodon</strong>
-            <small>Sign in on your own server.</small>
+            <strong>{{ 'firstRun.mastodon' | transloco }}</strong>
+            <small>{{ 'firstRun.mastodonHint' | transloco }}</small>
           </span>
         </button>
       </div>
-      <button type="button" class="first-run-back" (click)="back()">Back</button>
+      <button type="button" class="first-run-back" (click)="back()">
+        {{ 'firstRun.back' | transloco }}
+      </button>
     }
   </div>
 </div>

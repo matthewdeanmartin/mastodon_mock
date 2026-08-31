@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Status } from '../../models';
@@ -7,9 +8,13 @@ import { adaptFeedItem } from '../../providers/bluesky/bluesky-adapter';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 import { StatusCard } from '../../status-card/status-card';
 
+// i18n favourites.loading: Loading…
+// i18n favourites.empty: You haven't liked anything yet.
+// i18n favourites.loadMore: Load more
+
 @Component({
   selector: 'app-favourites',
-  imports: [StatusCard],
+  imports: [StatusCard, TranslocoPipe],
   templateUrl: './favourites.html',
 })
 export class Favourites implements OnInit {

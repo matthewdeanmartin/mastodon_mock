@@ -1,12 +1,18 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Router, RouterLink } from '@angular/router';
 import { Auth } from '../../auth';
 import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 
+// i18n blueskyOauth.errorTitle: Bluesky sign-in did not finish
+// i18n blueskyOauth.back: Back to Bluesky sign-in
+// i18n blueskyOauth.finishing: Finishing Bluesky sign-in…
+// i18n blueskyOauth.exchange: Your PDS is exchanging the one-time authorization code.
+
 /** Completes the SDK-owned OAuth code exchange before Angular enters the app. */
 @Component({
   selector: 'app-bluesky-oauth-callback',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './bluesky-oauth-callback.html',
   styleUrl: './bluesky-oauth-callback.css',
 })

@@ -1,8 +1,18 @@
 import { Component, DestroyRef, inject, OnDestroy, OnInit, output, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { FormsModule } from '@angular/forms';
 import { MastodonServers, ServerSuggestion } from '../mastodon-servers';
 import { normalizeHostUrl } from '../host-url';
 import { probeServerAvailability } from '../server-availability';
+
+// i18n serverPicker.instanceAria: Server instance
+// i18n serverPicker.instancePlaceholder: mastodon.social — or type any instance
+// i18n serverPicker.checking: Checking {{server}}…
+// i18n serverPicker.connected: ✓ Connected to {{server}}
+// i18n serverPicker.mediaBlocked: , but {{media}} is blocked or down. Images will not load.
+// i18n serverPicker.mediaServer: its media server
+// i18n serverPicker.useAnyway: Use anyway
+// i18n serverPicker.unreachable: ⚠ Can't reach {{server}} — check the address.
 
 /**
  * Something that could plausibly be an instance host (with or without scheme): a
@@ -33,7 +43,7 @@ export type ServerStatus = 'idle' | 'checking' | 'ok' | 'degraded' | 'unreachabl
  */
 @Component({
   selector: 'app-server-picker',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './server-picker.html',
   styleUrl: './server-picker.css',
 })

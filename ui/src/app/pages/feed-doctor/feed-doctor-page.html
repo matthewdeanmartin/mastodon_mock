@@ -1,20 +1,20 @@
 <section class="fd-page">
   <header class="fd-head">
     <div>
-      <h1>Feed Doctor</h1>
+      <h1>{{ 'feedDoctor.title' | transloco }}</h1>
       <!-- The sample is the population. Every claim below is about these posts,
            never about "your feed" as an abstraction — and the Doctor states it
            louder than the analytics page because its claims sound more certain. -->
       <p class="muted small">
         @if (loading()) {
-          Reading your feed…
+          {{ 'feedDoctor.reading' | transloco }}
         } @else {
           {{ sampleLine() }}
         }
       </p>
     </div>
     <button class="btn btn-outline" type="button" [disabled]="loading()" (click)="run()">
-      Check again
+      {{ 'feedDoctor.checkAgain' | transloco }}
     </button>
   </header>
 
@@ -24,15 +24,16 @@
        even cover the same days". -->
   @if (!isAnonymous() && droppedByWindow() > 0) {
     <p class="fd-note">
-      Your reading window hid {{ droppedByWindow() }} older post{{
-        droppedByWindow() === 1 ? '' : 's'
-      }}. Everything below describes what the window let through.
-      <a routerLink="/settings/appearance">Widen the window</a>
+      {{
+        (droppedByWindow() === 1 ? 'feedDoctor.windowHidden.one' : 'feedDoctor.windowHidden.other')
+          | transloco: { count: droppedByWindow() }
+      }}
+      <a routerLink="/settings/appearance">{{ 'feedDoctor.widen' | transloco }}</a>
     </p>
   }
 
   @if (loading()) {
-    <p class="muted" role="status">Collecting a sample…</p>
+    <p class="muted" role="status">{{ 'feedDoctor.collecting' | transloco }}</p>
   } @else {
     @for (verdict of verdicts(); track verdict.id) {
       <!-- Healthy checks collapse to their headline. A page of green ticks is a page

@@ -12,11 +12,17 @@
         <p>{{ kit().description }}</p>
       }
       <span class="muted small">
-        {{ kit().itemCount }} {{ kit().itemCount === 1 ? 'account' : 'accounts' }}
+        {{
+          (kit().itemCount === 1 ? 'starterKitPost.account.one' : 'starterKitPost.account.other')
+            | transloco: { count: kit().itemCount }
+        }}
       </span>
     </div>
 
-    <div class="kit-members" aria-label="All accounts in {{ kit().title }}">
+    <div
+      class="kit-members"
+      [attr.aria-label]="'starterKitPost.accountsAria' | transloco: { title: kit().title }"
+    >
       @for (account of kit().accounts; track account.url) {
         <span
           class="kit-member-shell"
@@ -34,7 +40,10 @@
             class="kit-member"
             [disabled]="opening() !== null"
             (click)="openAccount(account)"
-            [attr.aria-label]="'Open ' + (account.display_name || account.acct) + ' in app'"
+            [attr.aria-label]="
+              'starterKitPost.openAccount'
+                | transloco: { name: account.display_name || account.acct }
+            "
           >
             <!-- These avatars are absolute CDN URLs frozen into the snapshot, and
                  files.mastodon.social is blocked on plenty of networks. Initials
@@ -74,18 +83,24 @@
           (click)="followAll()"
         >
           @if (importer.running()) {
-            Following… {{ completed() }}/{{ kit().accounts.length }}
+            {{
+              'starterKitPost.following'
+                | transloco: { completed: completed(), total: kit().accounts.length }
+            }}
           } @else if (completed() === kit().accounts.length) {
-            Followed {{ followed() }} of {{ kit().accounts.length }}
+            {{
+              'starterKitPost.followed'
+                | transloco: { followed: followed(), total: kit().accounts.length }
+            }}
           } @else {
-            Follow all
+            {{ 'starterKitPost.followAll' | transloco }}
           }
         </button>
         <a
           class="btn btn-outline btn-sm kit-link"
           [routerLink]="['/collections/preview', kit().id]"
         >
-          View collection
+          {{ 'starterKitPost.viewCollection' | transloco }}
         </a>
       </div>
       <!-- The failure worth naming: an anonymous session caps at 50 follows, so a
@@ -94,7 +109,7 @@
         <p class="kit-follow-error muted small" role="status">{{ message }}</p>
       }
       <a class="kit-home-link muted small" [href]="kit().url" target="_blank" rel="noopener">
-        Open original on {{ collectionHost() }} ↗
+        {{ 'starterKitPost.openOriginal' | transloco: { host: collectionHost() } }}
       </a>
     </div>
   </div>

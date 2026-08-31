@@ -1,10 +1,24 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
 import { Account, Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { ListFeedResolver, MERGE_MEMBER_CAP } from '../../lists/list-feed-resolver';
+
+// i18n endorsedList.titleSelf: Your endorsed accounts
+// i18n endorsedList.titleOther: Endorsed by {{name}}
+// i18n endorsedList.managedOn: Endorsements are managed on
+// i18n endorsedList.profileSuffix: 's profile. This is a read-only view of them as a feed.
+// i18n endorsedList.loadError: Could not load endorsed accounts for this profile.
+// i18n endorsedList.capped: Feed merges posts from the first {{count}} of {{total}} members.
+// i18n endorsedList.feed: Feed
+// i18n endorsedList.members: Members
+// i18n endorsedList.loading: Loading…
+// i18n endorsedList.empty: This profile hasn't endorsed anyone yet.
+// i18n endorsedList.loadingFeed: Loading feed…
+// i18n endorsedList.emptyFeed: No recent posts from these accounts.
 
 /**
  * An account's endorsed ("featured") accounts presented as a list: the members
@@ -14,7 +28,7 @@ import { ListFeedResolver, MERGE_MEMBER_CAP } from '../../lists/list-feed-resolv
  */
 @Component({
   selector: 'app-endorsed-list',
-  imports: [RouterLink, StatusCard],
+  imports: [RouterLink, StatusCard, TranslocoPipe],
   templateUrl: './endorsed-list.html',
   styleUrl: './endorsed-list.css',
 })
@@ -23,6 +37,7 @@ export class EndorsedList implements OnInit {
   private route = inject(ActivatedRoute);
   private resolver = inject(ListFeedResolver);
   protected auth = inject(Auth);
+  private transloco = inject(TranslocoService);
 
   protected accountId = signal('');
   protected owner = signal<Account | null>(null);
@@ -38,7 +53,9 @@ export class EndorsedList implements OnInit {
   protected title = computed(() => {
     const o = this.owner();
     const who = o ? o.display_name || o.username : 'this account';
-    return this.isSelf() ? 'Your endorsed accounts' : `Endorsed by ${who}`;
+    return this.isSelf()
+      ? this.transloco.translate('endorsedList.titleSelf')
+      : this.transloco.translate('endorsedList.titleOther', { name: who });
   });
 
   ngOnInit(): void {
@@ -76,7 +93,7 @@ export class EndorsedList implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.error.set('Could not load endorsed accounts for this profile.');
+        this.error.set(this.transloco.translate('endorsedList.loadError'));
       },
     });
   }
@@ -94,7 +111,10 @@ export class EndorsedList implements OnInit {
         this.feedLoading.set(false);
         this.cappedNote.set(
           merged.capped
-            ? `Feed merges posts from the first ${MERGE_MEMBER_CAP} of ${merged.cappedFrom} members.`
+            ? this.transloco.translate('endorsedList.capped', {
+                count: MERGE_MEMBER_CAP,
+                total: merged.cappedFrom,
+              })
             : '',
         );
       },

@@ -4,9 +4,11 @@
     [ngModel]="newEmail()"
     (ngModelChange)="newEmail.set($event)"
     (keyup.enter)="add()"
-    placeholder="email to block (canonicalized + hashed)"
+    [placeholder]="'adminCanonical.placeholder' | transloco"
   />
-  <button class="btn" [disabled]="!newEmail().trim() || submitting()" (click)="add()">Block</button>
+  <button class="btn" [disabled]="!newEmail().trim() || submitting()" (click)="add()">
+    {{ 'adminCanonical.block' | transloco }}
+  </button>
 </div>
 
 <div class="add-block">
@@ -15,31 +17,34 @@
     [ngModel]="testEmail()"
     (ngModelChange)="testEmail.set($event)"
     (keyup.enter)="test()"
-    placeholder="test an email against existing blocks"
+    [placeholder]="'adminCanonical.testPlaceholder' | transloco"
   />
   <button class="btn btn-outline" [disabled]="!testEmail().trim()" (click)="test()">
-    Test match
+    {{ 'adminCanonical.testMatch' | transloco }}
   </button>
 </div>
 @if (testResult(); as result) {
   <div class="test-result">
     @if (result.length) {
-      Matches {{ result.length }} block(s): canonicalizes to a blocked hash.
+      {{
+        (result.length === 1 ? 'adminCanonical.matches.one' : 'adminCanonical.matches.other')
+          | transloco: { count: result.length }
+      }}
     } @else {
-      No match — this email is not blocked.
+      {{ 'adminCanonical.noMatch' | transloco }}
     }
   </div>
 }
 
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'adminCanonical.loading' | transloco }}</p>
 } @else if (!blocks().length) {
-  <p class="muted center">No canonical email blocks.</p>
+  <p class="muted center">{{ 'adminCanonical.empty' | transloco }}</p>
 } @else {
   @for (b of blocks(); track b.id) {
     <div class="block-row">
       <span class="mono">{{ b.canonical_email_hash }}</span>
-      <button class="op warn" (click)="remove(b)">Remove</button>
+      <button class="op warn" (click)="remove(b)">{{ 'adminCanonical.remove' | transloco }}</button>
     </div>
   }
 }

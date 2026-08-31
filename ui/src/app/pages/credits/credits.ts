@@ -1,7 +1,10 @@
 import { Component } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { StatusCard } from '../../status-card/status-card';
 import { Status } from '../../models';
 import { MAWKINGBIRD_ACCOUNT, virtualTweet } from '../docs/static-status';
+
+// i18n credits.title: Credits &amp; Privacy
 
 /**
  * Credits & Privacy, rendered as a virtual tweet in the centre column. The body
@@ -38,7 +41,7 @@ const CREDITS_BODY = `
 
 @Component({
   selector: 'app-credits',
-  imports: [StatusCard],
+  imports: [StatusCard, TranslocoPipe],
   templateUrl: './credits.html',
   styleUrl: './credits.css',
 })

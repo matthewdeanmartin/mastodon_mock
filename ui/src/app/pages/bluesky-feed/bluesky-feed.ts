@@ -1,10 +1,23 @@
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { BlueskyFeedEntry, BlueskyFeeds } from '../../providers/bluesky/bluesky-feeds';
+
+// i18n blueskyFeed.back: ← Feeds
+// i18n blueskyFeed.kind.list: List
+// i18n blueskyFeed.kind.feed: Feed
+// i18n blueskyFeed.by: by @{{handle}}
+// i18n blueskyFeed.members.one: {{count}} member
+// i18n blueskyFeed.members.other: {{count}} members
+// i18n blueskyFeed.pinned: · 📌 pinned
+// i18n blueskyFeed.algorithm: This feed is an algorithm run by &#64;{{handle}}, not by Bluesky.
+// i18n blueskyFeed.loading: Loading…
+// i18n blueskyFeed.empty: This feed has no posts right now.
+// i18n blueskyFeed.loadMore: Load more
 
 /**
  * One saved Bluesky feed or list, as a timeline.
@@ -19,7 +32,7 @@ import { BlueskyFeedEntry, BlueskyFeeds } from '../../providers/bluesky/bluesky-
  */
 @Component({
   selector: 'app-bluesky-feed',
-  imports: [RouterLink, StatusCard],
+  imports: [RouterLink, StatusCard, TranslocoPipe],
   templateUrl: './bluesky-feed.html',
   styleUrl: './bluesky-feed.css',
 })

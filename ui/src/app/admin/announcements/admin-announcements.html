@@ -3,29 +3,29 @@
     rows="3"
     [ngModel]="newText()"
     (ngModelChange)="newText.set($event)"
-    placeholder="Announcement text (HTML allowed)"
+    [placeholder]="'adminAnnouncements.placeholder' | transloco"
   ></textarea>
   <div class="new-actions">
     <label class="publish-toggle">
       <input type="checkbox" [ngModel]="publishNow()" (ngModelChange)="publishNow.set($event)" />
-      Publish immediately
+      {{ 'adminAnnouncements.publishImmediately' | transloco }}
     </label>
     <button class="btn" [disabled]="!newText().trim() || submitting()" (click)="create()">
-      Create
+      {{ 'adminAnnouncements.create' | transloco }}
     </button>
   </div>
 </div>
 
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'adminAnnouncements.loading' | transloco }}</p>
 } @else if (!announcements().length) {
-  <p class="muted center">No announcements.</p>
+  <p class="muted center">{{ 'adminAnnouncements.empty' | transloco }}</p>
 } @else {
   @for (a of announcements(); track a.id) {
     <div class="announcement-row" [class.draft]="!a.published">
       <div class="ann-body">
         <span class="badge" [class.published]="a.published">{{
-          a.published ? 'Published' : 'Draft'
+          (a.published ? 'adminAnnouncements.published' : 'adminAnnouncements.draft') | transloco
         }}</span>
         <div class="ann-content" [innerHTML]="a.content"></div>
         @if (a.reactions.length) {
@@ -38,9 +38,14 @@
       </div>
       <div class="ann-ops">
         <button class="op" (click)="togglePublished(a)">
-          {{ a.published ? 'Unpublish' : 'Publish' }}
+          {{
+            (a.published ? 'adminAnnouncements.unpublish' : 'adminAnnouncements.publish')
+              | transloco
+          }}
         </button>
-        <button class="op warn" (click)="remove(a)">Delete</button>
+        <button class="op warn" (click)="remove(a)">
+          {{ 'adminAnnouncements.delete' | transloco }}
+        </button>
       </div>
     </div>
   }

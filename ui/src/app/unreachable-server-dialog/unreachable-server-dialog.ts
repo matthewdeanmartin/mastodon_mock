@@ -1,5 +1,5 @@
-import { Component, input, output } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { Component, inject, input, output } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { FocusTrap } from '../a11y/focus-trap';
 import { ServerDiscovery } from '../server-discovery/server-discovery';
 
@@ -23,6 +23,10 @@ import { ServerDiscovery } from '../server-discovery/server-discovery';
  * take the first working server offered.
  */
 // i18n unreachableServer.findAServerICanRead: Find a server I can read
+// i18n unreachableServer.title: {{server}} isn’t reachable
+// i18n unreachableServer.explanation: It may be blocked on this network, or having a bad day. Mawkingbird reads from any Mastodon server, so it’s looking for one that answers — you don’t need an account on it to read.
+// i18n unreachableServer.skip: Skip — I’ll sign in instead
+// i18n unreachableServer.thatServer: That server
 @Component({
   selector: 'app-unreachable-server-dialog',
   imports: [FocusTrap, ServerDiscovery, TranslocoPipe],
@@ -30,6 +34,7 @@ import { ServerDiscovery } from '../server-discovery/server-discovery';
   styleUrl: './unreachable-server-dialog.css',
 })
 export class UnreachableServerDialog {
+  private transloco = inject(TranslocoService);
   /** The server that failed, shown so the message names something concrete. */
   readonly attemptedServer = input('');
 
@@ -42,7 +47,7 @@ export class UnreachableServerDialog {
   protected attemptedHost(): string {
     const value = this.attemptedServer();
     if (!value) {
-      return 'That server';
+      return this.transloco.translate('unreachableServer.thatServer');
     }
     try {
       return new URL(value).host;

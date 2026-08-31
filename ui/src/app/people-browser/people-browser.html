@@ -1,7 +1,7 @@
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'peopleBrowser.loading' | transloco }}</p>
 } @else if (error()) {
-  <p class="muted center">Couldn't load this list.</p>
+  <p class="muted center">{{ 'peopleBrowser.loadError' | transloco }}</p>
 } @else if (!accounts().length) {
   <p class="muted center">{{ emptyLabel() }}</p>
 } @else {
@@ -26,9 +26,19 @@
             <div class="person-note" appRenderedHtmlLinks [innerHTML]="a.note"></div>
           }
           <div class="person-stats muted small">
-            <span>{{ a.followers_count.toLocaleString() }} followers</span>
+            <span>{{
+              (a.followers_count === 1
+                ? 'peopleBrowser.followers.one'
+                : 'peopleBrowser.followers.other'
+              ) | transloco: { count: a.followers_count.toLocaleString() }
+            }}</span>
             <span>·</span>
-            <span>{{ a.following_count.toLocaleString() }} following</span>
+            <span>{{
+              (a.following_count === 1
+                ? 'peopleBrowser.following.one'
+                : 'peopleBrowser.following.other'
+              ) | transloco: { count: a.following_count.toLocaleString() }
+            }}</span>
           </div>
         </div>
         <!-- No button when the source cannot write follows — an anonymous
@@ -45,7 +55,7 @@
             {{ isBusy(a) ? '…' : followLabel(a) }}
           </button>
         } @else if (isSelf(a)) {
-          <span class="follow-btn is-self muted">You</span>
+          <span class="follow-btn is-self muted">{{ 'peopleBrowser.you' | transloco }}</span>
         }
       </div>
     }
@@ -59,19 +69,21 @@
            Say which of the two happened. -->
       @if (shortOfReported()) {
         <span class="muted small">
-          Stopped at {{ accounts().length }} of {{ reportedCount() }} — this server did not send the
-          rest of its paging information.
+          {{
+            'peopleBrowser.stoppedAt'
+              | transloco: { count: accounts().length, total: reportedCount() }
+          }}
         </span>
       } @else if (approximate()) {
-        <span class="muted small"
-          >End of the list (approximate — paged without the server's cursor).</span
-        >
+        <span class="muted small">{{ 'peopleBrowser.endApproximate' | transloco }}</span>
       } @else {
-        <span class="muted small">End of the list.</span>
+        <span class="muted small">{{ 'peopleBrowser.end' | transloco }}</span>
       }
     } @else {
       <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ loadingMore() ? 'Loading…' : 'More' }}
+        {{
+          loadingMore() ? ('peopleBrowser.loading' | transloco) : ('peopleBrowser.more' | transloco)
+        }}
       </button>
     }
   </div>

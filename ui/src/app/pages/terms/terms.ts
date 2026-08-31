@@ -1,9 +1,16 @@
 import { Component, computed, inject, OnInit } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { SearchServer } from '../../search-server';
 import { SearchServerAbout } from '../../search-server-about';
 import { ServerAbout } from '../../server-about';
+
+// i18n terms.title: Terms of Service
+// i18n terms.bySearch: Terms published by {{host}}, your search server.
+// i18n terms.byMastodon: Terms published by this Mastodon server.
+// i18n terms.loading: Loading terms…
+// i18n terms.empty: This server has not published terms of service.
 
 /**
  * Terms of service published by a connected Mastodon instance.
@@ -16,6 +23,7 @@ import { ServerAbout } from '../../server-about';
   selector: 'app-terms',
   templateUrl: './terms.html',
   styleUrl: './terms.css',
+  imports: [TranslocoPipe],
 })
 export class Terms implements OnInit {
   private serverAbout = inject(ServerAbout);

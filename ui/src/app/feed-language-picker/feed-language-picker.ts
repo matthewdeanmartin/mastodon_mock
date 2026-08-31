@@ -1,8 +1,19 @@
 import { Component, computed, ElementRef, HostListener, inject, signal } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ClientPrefs, MAX_FEED_LANGUAGES } from '../client-prefs';
 import { LANG_NAMES, LangCode } from '../language-detect';
 import { KnownLanguages } from '../trend-language-filter';
 import { Terminology } from '../terminology';
+
+// i18n feedLanguagePicker.description: Choose which languages the feed shows. {{posts}} whose language cannot be determined are never hidden. Languages come from Settings → Internationalization.
+// i18n feedLanguagePicker.all: All
+// i18n feedLanguagePicker.myLanguages: My languages
+// i18n feedLanguagePicker.count.one: {{count}} language
+// i18n feedLanguagePicker.count.other: {{count}} languages
+// i18n feedLanguagePicker.allLanguages: All languages
+// i18n feedLanguagePicker.everyKnown: Every language I know
+// i18n feedLanguagePicker.cap: Pick at most {{count}} languages
+// i18n feedLanguagePicker.note: Choose up to {{count}}. Add languages under Settings → Internationalization.
 
 /**
  * The feed's language control: "All languages", or a chosen handful.
@@ -25,6 +36,7 @@ import { Terminology } from '../terminology';
  */
 @Component({
   selector: 'app-feed-language-picker',
+  imports: [TranslocoPipe],
   templateUrl: './feed-language-picker.html',
   styleUrl: './feed-language-picker.css',
 })
@@ -35,6 +47,7 @@ export class FeedLanguagePicker {
   private prefs = inject(ClientPrefs);
   private known = inject(KnownLanguages);
   private host = inject(ElementRef<HTMLElement>);
+  private transloco = inject(TranslocoService);
 
   protected readonly max = MAX_FEED_LANGUAGES;
   protected readonly open = signal(false);
@@ -61,14 +74,17 @@ export class FeedLanguagePicker {
    */
   protected readonly label = computed(() => {
     if (this.showingAll()) {
-      return 'All';
+      return this.transloco.translate('feedLanguagePicker.all');
     }
     const chosen = this.prefs.feedLanguages();
     if (!chosen.length) {
-      return 'My languages';
+      return this.transloco.translate('feedLanguagePicker.myLanguages');
     }
     if (chosen.length > 2) {
-      return `${chosen.length} languages`;
+      return this.transloco.translate(
+        chosen.length === 1 ? 'feedLanguagePicker.count.one' : 'feedLanguagePicker.count.other',
+        { count: chosen.length },
+      );
     }
     return chosen.map((code) => LANG_NAMES[code as LangCode] ?? code.toUpperCase()).join(' + ');
   });

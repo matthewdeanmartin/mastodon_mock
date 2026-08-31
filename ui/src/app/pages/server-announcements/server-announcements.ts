@@ -1,8 +1,21 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { InstanceInfo } from '../../models';
 import { Api } from '../../api';
 import { AnnouncementStore } from '../../announcements/announcement-store';
+
+// i18n serverAnnouncements.announcements.one: {{active}} active this month · v{{version}} · {{count}} announcement
+// i18n serverAnnouncements.announcements.other: {{active}} active this month · v{{version}} · {{count}} announcements
+// i18n serverAnnouncements.title: Server announcements
+// i18n serverAnnouncements.dismissAll: Dismiss all ({{count}})
+// i18n serverAnnouncements.undismissAll: Undismiss all ({{count}})
+// i18n serverAnnouncements.loading: Loading…
+// i18n serverAnnouncements.empty: This server hasn't posted any announcements.
+// i18n serverAnnouncements.dismissed: dismissed
+// i18n serverAnnouncements.new: new
+// i18n serverAnnouncements.dismiss: dismiss
+// i18n serverAnnouncements.react: React {{emoji}}
 
 // Same quick picks as the banner; the API accepts any unicode emoji.
 const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀'];
@@ -23,7 +36,7 @@ const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀'];
  */
 @Component({
   selector: 'app-server-announcements',
-  imports: [DatePipe],
+  imports: [DatePipe, TranslocoPipe],
   templateUrl: './server-announcements.html',
   styleUrl: './server-announcements.css',
 })

@@ -1,6 +1,11 @@
 import { Component, inject, OnInit } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Announcement } from '../models';
 import { AnnouncementStore } from './announcement-store';
+
+// i18n announcements.dismiss: Dismiss
+// i18n announcements.label: 📣 Announcement
+// i18n announcements.react: React {{emoji}}
 
 // A few quick-pick reactions; the API accepts any unicode emoji shortcode/char.
 const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀'];
@@ -15,7 +20,7 @@ const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀'];
  */
 @Component({
   selector: 'app-announcements',
-  imports: [],
+  imports: [TranslocoPipe],
   templateUrl: './announcements.html',
   styleUrl: './announcements.css',
 })

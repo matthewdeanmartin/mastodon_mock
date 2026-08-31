@@ -1,6 +1,13 @@
 import { Component } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { STARTER_KITS } from '../../starter-collection';
+
+// i18n bundledStarterKits.title: Bundled starter kits
+// i18n bundledStarterKits.intro: Curated lists assembled by the developer of Mawkingbird — not collections anyone published on a server, just a hand-picked set of accounts to get a new timeline off the ground. Follow the whole set or pick through it.
+// i18n bundledStarterKits.account.one: {{count}} account
+// i18n bundledStarterKits.account.other: {{count}} accounts
+// i18n bundledStarterKits.open: · open the kit →
 
 /**
  * Bundled starter kits: sets of accounts assembled by this app's developer.
@@ -16,7 +23,7 @@ import { STARTER_KITS } from '../../starter-collection';
  */
 @Component({
   selector: 'app-bundled-starter-kits',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './bundled-starter-kits.html',
   styleUrl: './bundled-starter-kits.css',
 })

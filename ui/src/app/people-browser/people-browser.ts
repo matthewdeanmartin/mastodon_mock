@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../auth';
 import { Account } from '../models';
@@ -7,6 +8,18 @@ import { RenderedHtmlLinks } from '../rendered-html-links';
 import { PeopleMode, PeopleSource } from './people-source';
 import { PeopleSourceFactory } from './people-sources';
 import { Relationship } from '../models';
+
+// i18n peopleBrowser.loading: Loading…
+// i18n peopleBrowser.loadError: Couldn't load this list.
+// i18n peopleBrowser.followers.one: {{count}} follower
+// i18n peopleBrowser.followers.other: {{count}} followers
+// i18n peopleBrowser.following.one: {{count}} following
+// i18n peopleBrowser.following.other: {{count}} following
+// i18n peopleBrowser.you: You
+// i18n peopleBrowser.stoppedAt: Stopped at {{count}} of {{total}} — this server did not send the rest of its paging information.
+// i18n peopleBrowser.endApproximate: End of the list (approximate — paged without the server's cursor).
+// i18n peopleBrowser.end: End of the list.
+// i18n peopleBrowser.more: More
 
 /**
  * One page of people, matching the `limit` the Mastodon sources request.
@@ -35,7 +48,7 @@ type FollowState = 'idle' | 'busy';
  */
 @Component({
   selector: 'app-people-browser',
-  imports: [RouterLink, VerifiedBadge, RenderedHtmlLinks],
+  imports: [RouterLink, VerifiedBadge, RenderedHtmlLinks, TranslocoPipe],
   templateUrl: './people-browser.html',
   styleUrl: './people-browser.css',
 })

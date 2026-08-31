@@ -8,18 +8,22 @@
     (dismissed)="closed.emit()"
     (click)="$event.stopPropagation()"
   >
-    <h3 id="history-title">Edit history</h3>
+    <h3 id="history-title">{{ 'history.title' | transloco }}</h3>
 
     @if (loading()) {
-      <p class="muted small">Loading…</p>
+      <p class="muted small">{{ 'history.loading' | transloco }}</p>
     } @else if (!edits().length) {
-      <p class="muted small">No history.</p>
+      <p class="muted small">{{ 'history.empty' | transloco }}</p>
     } @else {
       <ol class="history">
         @for (e of edits(); track $index) {
           <li class="snapshot">
             <div class="snapshot-meta muted small">
-              {{ $index === edits().length - 1 ? 'Current' : 'Version ' + ($index + 1) }}
+              {{
+                $index === edits().length - 1
+                  ? ('history.current' | transloco)
+                  : ('history.version' | transloco: { version: $index + 1 })
+              }}
               @if (e.created_at) {
                 · {{ e.created_at }}
               }
@@ -34,7 +38,9 @@
     }
 
     <div class="dialog-actions">
-      <button class="btn btn-outline" (click)="closed.emit()">Close</button>
+      <button class="btn btn-outline" (click)="closed.emit()">
+        {{ 'history.close' | transloco }}
+      </button>
     </div>
   </div>
 </div>

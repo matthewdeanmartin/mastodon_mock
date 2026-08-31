@@ -78,6 +78,10 @@ export class BulkAddDialog {
     return this.parseHandles(this.handles()).length;
   }
 
+  protected statusLabel(status: BulkResult['status']): string {
+    return this.transloco.translate(`bulkAdd.status.${status}`);
+  }
+
   add(): void {
     const handles = this.parseHandles(this.handles());
     if (!handles.length || this.busy()) {

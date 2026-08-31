@@ -20,7 +20,9 @@
       <p>{{ message() }}</p>
     }
     <div class="confirm-actions">
-      <button class="btn btn-outline" type="button" (click)="cancelled.emit()">Cancel</button>
+      <button class="btn btn-outline" type="button" (click)="cancelled.emit()">
+        {{ 'confirm.cancel' | transloco }}
+      </button>
       <button class="btn" [class.btn-danger]="danger()" type="button" (click)="confirmed.emit()">
         {{ confirmLabel() }}
       </button>

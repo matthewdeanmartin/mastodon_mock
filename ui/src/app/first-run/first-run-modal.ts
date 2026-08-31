@@ -1,4 +1,18 @@
 import { Component, output, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
+
+// i18n firstRun.welcomeTitle: Welcome to Mawkingbird
+// i18n firstRun.pitch: A social media client for Mastodon, Bluesky and more.
+// i18n firstRun.sampleNote: The posts behind this box are a small sample, so you can see what the app looks like before you decide anything.
+// i18n firstRun.logIn: Log in
+// i18n firstRun.continueAnonymous: Continue without logging in
+// i18n firstRun.accountQuestion: Which account do you have?
+// i18n firstRun.pickNetwork: Pick the network you already use.
+// i18n firstRun.blueskyHint: Sign in with your handle and an app password.
+// i18n firstRun.mastodonHint: Sign in on your own server.
+// i18n firstRun.bluesky: Bluesky
+// i18n firstRun.mastodon: Mastodon
+// i18n firstRun.back: Back
 
 /** Which network a visitor picked, or that they declined to sign in at all. */
 export type FirstRunChoice = 'anonymous' | 'mastodon' | 'bluesky';
@@ -21,6 +35,7 @@ export type FirstRunChoice = 'anonymous' | 'mastodon' | 'bluesky';
   selector: 'app-first-run-modal',
   templateUrl: './first-run-modal.html',
   styleUrl: './first-run-modal.css',
+  imports: [TranslocoPipe],
   host: {
     role: 'dialog',
     'aria-modal': 'true',

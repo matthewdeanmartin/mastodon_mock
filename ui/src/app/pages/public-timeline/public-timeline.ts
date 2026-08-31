@@ -1,4 +1,5 @@
 import { Component, effect, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Subscription } from 'rxjs';
 import { Api } from '../../api';
 import { ClientPrefs } from '../../client-prefs';
@@ -7,9 +8,14 @@ import { Status } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 import { Streaming } from '../../streaming';
 
+// i18n publicTimeline.all: All
+// i18n publicTimeline.local: Local
+// i18n publicTimeline.loading: Loading…
+// i18n publicTimeline.empty: No public statuses yet.
+
 @Component({
   selector: 'app-public-timeline',
-  imports: [CommandBar, StatusCard],
+  imports: [CommandBar, StatusCard, TranslocoPipe],
   templateUrl: './public-timeline.html',
 })
 export class PublicTimeline implements OnInit, OnDestroy {

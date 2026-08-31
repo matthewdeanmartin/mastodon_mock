@@ -3,7 +3,7 @@
     <input
       type="text"
       role="combobox"
-      aria-label="Server instance"
+      [attr.aria-label]="'serverPicker.instanceAria' | transloco"
       aria-autocomplete="list"
       aria-controls="picker-suggest-list"
       [attr.aria-expanded]="suggestOpen() && serverSuggestions().length > 0"
@@ -12,7 +12,7 @@
       (focus)="onServerFocus()"
       (blur)="onServerBlur()"
       (keyup.enter)="applyServerNow()"
-      placeholder="mastodon.social — or type any instance"
+      [placeholder]="'serverPicker.instancePlaceholder' | transloco"
       autocomplete="off"
       autocapitalize="off"
       spellcheck="false"
@@ -44,21 +44,26 @@
 <p class="server-status muted small" aria-live="polite">
   @switch (serverStatus()) {
     @case ('checking') {
-      Checking {{ customServer() }}…
+      {{ 'serverPicker.checking' | transloco: { server: customServer() } }}
     }
     @case ('ok') {
-      ✓ Connected to <strong>{{ hostLabel() }}</strong>
+      <strong>{{ 'serverPicker.connected' | transloco: { server: hostLabel() } }}</strong>
       @if (serverTitle()) {
         ({{ serverTitle() }})
       }
     }
     @case ('degraded') {
-      ⚠ Connected to <strong>{{ hostLabel() }}</strong
-      >, but {{ mediaHost() || 'its media server' }} is blocked or down. Images will not load.
-      <button class="text-button" type="button" (click)="useDegradedServer()">Use anyway</button>
+      ⚠ <strong>{{ 'serverPicker.connected' | transloco: { server: hostLabel() } }}</strong
+      ><span>{{
+        'serverPicker.mediaBlocked'
+          | transloco: { media: mediaHost() || ('serverPicker.mediaServer' | transloco) }
+      }}</span>
+      <button class="text-button" type="button" (click)="useDegradedServer()">
+        {{ 'serverPicker.useAnyway' | transloco }}
+      </button>
     }
     @case ('unreachable') {
-      ⚠ Can't reach {{ customServer() }} — check the address.
+      {{ 'serverPicker.unreachable' | transloco: { server: customServer() } }}
     }
   }
 </p>

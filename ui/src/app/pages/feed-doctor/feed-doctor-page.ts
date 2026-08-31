@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { Account, ProviderId, Status } from '../../models';
 import { ClientPrefs } from '../../client-prefs';
@@ -23,6 +24,14 @@ import { FeedLanguageFilter } from '../../trend-language-filter';
 import { feedSubject } from '../../feed-metrics';
 import { sampleFeed } from '../../feed-sample';
 
+// i18n feedDoctor.title: Feed Doctor
+// i18n feedDoctor.reading: Reading your feed…
+// i18n feedDoctor.checkAgain: Check again
+// i18n feedDoctor.windowHidden.one: Your reading window hid {{count}} older post. Everything below describes what the window let through.
+// i18n feedDoctor.windowHidden.other: Your reading window hid {{count}} older posts. Everything below describes what the window let through.
+// i18n feedDoctor.widen: Widen the window
+// i18n feedDoctor.collecting: Collecting a sample…
+
 /** Posts to diagnose. Enough for shares to mean something, small enough to be quick. */
 const SAMPLE_SIZE = 140;
 
@@ -39,7 +48,7 @@ const SAMPLE_SIZE = 140;
  */
 @Component({
   selector: 'app-feed-doctor-page',
-  imports: [RouterLink],
+  imports: [RouterLink, TranslocoPipe],
   templateUrl: './feed-doctor-page.html',
   styleUrl: './feed-doctor-page.css',
 })

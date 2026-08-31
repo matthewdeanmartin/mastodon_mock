@@ -5457,7 +5457,416 @@
     "sizeLabel.veryLarge": "sehr groß",
     "start": "Einen anderen Server finden"
   },
+  "about": {
+    "title": "Gestaltung"
+  },
+  "accountList": {
+    "close": "Schließen",
+    "empty": "Noch niemand.",
+    "loading": "Wird geladen…"
+  },
+  "adminAccounts": {
+    "actions.approve": "Genehmigen",
+    "actions.delete": "Löschen",
+    "actions.disable": "Deaktivieren",
+    "actions.enable": "Aktivieren",
+    "actions.reject": "Ablehnen",
+    "actions.silence": "Einschränken",
+    "actions.suspend": "Sperren",
+    "actions.unsensitive": "Nicht mehr als sensibel markieren",
+    "actions.unsilence": "Einschränkung aufheben",
+    "actions.unsuspend": "Sperrung aufheben",
+    "confirm.delete": "@{{username}} endgültig löschen? Dies kann nicht rückgängig gemacht werden.",
+    "confirm.reject": "Die ausstehende Registrierung von @{{username}} ablehnen und löschen?",
+    "empty": "Keine Konten mit Status „{{status}}“.",
+    "loading": "Wird geladen…",
+    "status.active": "aktiv",
+    "status.disabled": "deaktiviert",
+    "status.pending": "ausstehend",
+    "status.silenced": "eingeschränkt",
+    "status.suspended": "gesperrt"
+  },
+  "adminAnnouncements": {
+    "create": "Erstellen",
+    "delete": "Löschen",
+    "draft": "Entwurf",
+    "empty": "Keine Ankündigungen.",
+    "loading": "Wird geladen…",
+    "placeholder": "Ankündigungstext (HTML zulässig)",
+    "publish": "Veröffentlichen",
+    "publishImmediately": "Sofort veröffentlichen",
+    "published": "Veröffentlicht",
+    "unpublish": "Veröffentlichung zurückziehen"
+  },
+  "adminCanonical": {
+    "block": "Sperren",
+    "empty": "Keine Sperren für kanonische E-Mail-Adressen.",
+    "loading": "Wird geladen…",
+    "matches.one": "Stimmt mit {{count}} Sperre überein: Die kanonisierte Adresse ergibt einen gesperrten Hash.",
+    "matches.other": "Stimmt mit {{count}} Sperren überein: Die kanonisierte Adresse ergibt einen gesperrten Hash.",
+    "noMatch": "Keine Übereinstimmung — diese E-Mail-Adresse ist nicht gesperrt.",
+    "placeholder": "zu sperrende E-Mail-Adresse (kanonisiert + gehasht)",
+    "remove": "Entfernen",
+    "testMatch": "Übereinstimmung testen",
+    "testPlaceholder": "E-Mail-Adresse gegen vorhandene Sperren testen"
+  },
+  "adminDomainAllows": {
+    "allow": "Zulassen",
+    "empty": "Keine zugelassenen Domains.",
+    "loading": "Wird geladen…",
+    "placeholder": "zuzulassende Domain (z. B. friendly.example)",
+    "remove": "Entfernen"
+  },
+  "adminDomains": {
+    "block": "Sperren",
+    "empty": "Keine Domain-Sperren.",
+    "loading": "Wird geladen…",
+    "noop": "keine Aktion",
+    "placeholder": "zu sperrende Domain (z. B. spam.example)",
+    "remove": "Entfernen",
+    "silence": "einschränken",
+    "suspend": "sperren"
+  },
+  "adminEmailBlocks": {
+    "block": "Sperren",
+    "empty": "Keine gesperrten E-Mail-Domains.",
+    "loading": "Wird geladen…",
+    "placeholder": "zu sperrende E-Mail-Domain (z. B. mailinator.com)",
+    "remove": "Entfernen"
+  },
+  "adminIpBlocks": {
+    "block": "Sperren",
+    "commentPlaceholder": "Kommentar (optional)",
+    "empty": "Keine IP-Sperren.",
+    "ipPlaceholder": "IP oder CIDR (z. B. 203.0.113.0/24)",
+    "loading": "Wird geladen…",
+    "remove": "Entfernen"
+  },
+  "adminMetrics": {
+    "empty": "Keine Messwerte.",
+    "intro": "Serverstatistiken der letzten 30 Tage (der Mock liefert Messwerte mit dem Wert null).",
+    "loading": "Wird geladen…"
+  },
+  "adminShell": {
+    "accounts": "Konten",
+    "announcements": "Ankündigungen",
+    "canonicalEmails": "Kanonische E-Mail-Adressen",
+    "domainAllows": "Zugelassene Domains",
+    "domainBlocks": "Domain-Sperren",
+    "emailBlocks": "E-Mail-Sperren",
+    "ipBlocks": "IP-Sperren",
+    "metrics": "Messwerte",
+    "reports": "Meldungen",
+    "trends": "Trends"
+  },
+  "adminTrends": {
+    "approve": "Genehmigen",
+    "emptyPosts": "Keine angesagten Beiträge.",
+    "emptyTags": "Keine angesagten Tags.",
+    "hashtags": "Angesagte Hashtags",
+    "loading": "Wird geladen…",
+    "posts": "Angesagte Beiträge",
+    "reject": "Ablehnen",
+    "uses.one": "{{count}} Verwendung",
+    "uses.other": "{{count}} Verwendungen"
+  },
+  "analytics": {
+    "login": "Melde dich an, um deine Analysen zu sehen.",
+    "title": "Analysen"
+  },
+  "announcements": {
+    "dismiss": "Ausblenden",
+    "label": "📣 Ankündigung",
+    "react": "Mit {{emoji}} reagieren"
+  },
+  "blueskyFeed": {
+    "algorithm": "Dieser Feed beruht auf einem Algorithmus von &#64;{{handle}}, nicht von Bluesky.",
+    "back": "← Feeds",
+    "by": "von @{{handle}}",
+    "empty": "Dieser Feed enthält derzeit keine Beiträge.",
+    "kind.feed": "Feed",
+    "kind.list": "Liste",
+    "loadMore": "Mehr laden",
+    "loading": "Wird geladen…",
+    "members.one": "{{count}} Mitglied",
+    "members.other": "{{count}} Mitglieder",
+    "pinned": "· 📌 angeheftet"
+  },
+  "blueskyOauth": {
+    "back": "Zurück zur Bluesky-Anmeldung",
+    "errorTitle": "Die Bluesky-Anmeldung wurde nicht abgeschlossen",
+    "exchange": "Dein PDS tauscht den einmaligen Autorisierungscode aus.",
+    "finishing": "Bluesky-Anmeldung wird abgeschlossen…"
+  },
+  "bookmarkProvider": {
+    "browser": "Dieser Browser",
+    "close": "Schließen",
+    "noLink": "In diesem Beitrag wurde kein externer Link gefunden.",
+    "publicUrl": "Öffentliche URL des Beitrags als Lesezeichen speichern",
+    "raindrop": "Raindrop.io",
+    "removeNative": "Natives Lesezeichen entfernen",
+    "saveNative": "Als natives Lesezeichen speichern",
+    "savePost": "Beitrag speichern",
+    "title": "Wo soll dieses Lesezeichen gespeichert werden?",
+    "unwrap": "Ersten Link extrahieren und speichern"
+  },
+  "bugReport": {
+    "close": "Schließen",
+    "copied": "Kopiert ✓",
+    "copyReport": "Bericht kopieren",
+    "descriptionPlaceholder": "Was hast du gemacht und was ist schiefgelaufen?",
+    "includeDiagnostics": "Bis zu 100 der neuesten Diagnoseeinträge aus diesem Tab einschließen",
+    "includeErrors.one": "{{count}} zuletzt in diesem Tab erfassten Fehler einschließen",
+    "includeErrors.other": "Die {{count}} neuesten in diesem Tab erfassten Fehler einschließen",
+    "intro": "Hiermit wird ein Bericht erstellt, den du selbst einreichen oder einfügen kannst. Nichts wird automatisch gesendet — du prüfst ihn und kannst ihn dann kopieren oder ein vorausgefülltes GitHub-Issue öffnen.",
+    "openGithubIssue": "GitHub-Issue öffnen",
+    "title": "Fehler melden",
+    "toggle.hide": "Genauen Inhalt ausblenden",
+    "toggle.show": "Genauen Inhalt anzeigen",
+    "whatHappened": "Was ist passiert?"
+  },
+  "bulkAdd": {
+    "addCount.one": "{{count}} Person hinzufügen",
+    "addCount.other": "{{count}} Personen hinzufügen",
+    "adding": "Wird hinzugefügt…",
+    "cancel": "Abbrechen",
+    "dialogAria": "Personen nach Namen hinzufügen",
+    "done": "Fertig",
+    "heading.collection": "Personen zur Sammlung „{{name}}“ hinzufügen",
+    "heading.collectionNoName": "Personen zur Sammlung hinzufügen",
+    "heading.list": "Personen zur Liste „{{name}}“ hinzufügen",
+    "heading.listNoName": "Personen zur Liste hinzufügen",
+    "instructions": "Füge Handles ein, die durch Kommas, Leerzeichen oder Zeilenumbrüche getrennt sind. Sie werden nacheinander aufgelöst und hinzugefügt.",
+    "status.added": "hinzugefügt",
+    "status.error": "Fehler",
+    "status.notfound": "nicht gefunden"
+  },
+  "bundledCollections": {
+    "intro": "Dies sind echte Sammlungen, die von echten Personen auf ihren eigenen Servern zusammengestellt wurden — als Momentaufnahme in Mawkingbird enthalten, damit du sie überhaupt finden kannst. Mastodon kann Sammlungen noch nicht durchsuchen. Deshalb sind nur jene erreichbar, deren Link jemand geteilt hat. Öffne eine Sammlung, um ihre Mitglieder und eine Auswahl ihrer Beiträge zu sehen.",
+    "title": "Mitgelieferte Sammlungen"
+  },
+  "bundledStarterKits": {
+    "account.one": "{{count}} Konto",
+    "account.other": "{{count}} Konten",
+    "intro": "Vom Entwickler von Mawkingbird zusammengestellte Kontolisten — keine von anderen auf einem Server veröffentlichten Sammlungen, sondern handverlesene Konten als Ausgangspunkt für eine neue Timeline. Folge allen oder wähle einzelne aus.",
+    "open": "· Kontopaket öffnen →",
+    "title": "Mitgelieferte Kontopakete"
+  },
+  "confirm": {
+    "cancel": "Abbrechen"
+  },
+  "credits": {
+    "title": "Danksagungen &amp; Datenschutz"
+  },
+  "endorsedList": {
+    "capped": "Der Feed führt Beiträge der ersten {{count}} von {{total}} empfohlenen Konten zusammen.",
+    "empty": "Dieses Profil hat noch niemanden empfohlen.",
+    "emptyFeed": "Keine neuen Beiträge von diesen Konten.",
+    "feed": "Feed",
+    "loadError": "Die empfohlenen Konten dieses Profils konnten nicht geladen werden.",
+    "loading": "Wird geladen…",
+    "loadingFeed": "Feed wird geladen…",
+    "managedOn": "Empfehlungen werden im Profil von ",
+    "members": "Mitglieder",
+    "profileSuffix": " verwaltet. Dies ist eine schreibgeschützte Feed-Ansicht.",
+    "titleOther": "Von {{name}} empfohlen",
+    "titleSelf": "Von dir empfohlene Konten"
+  },
+  "favourites": {
+    "empty": "Du hast noch nichts favorisiert.",
+    "loadMore": "Mehr laden",
+    "loading": "Wird geladen…"
+  },
+  "feedDoctor": {
+    "checkAgain": "Erneut prüfen",
+    "collecting": "Eine Stichprobe wird zusammengestellt…",
+    "reading": "Dein Feed wird gelesen…",
+    "title": "Feed-Doktor",
+    "widen": "Zeitraum erweitern",
+    "windowHidden.one": "Dein Lesezeitraum hat {{count}} älteren Beitrag ausgeblendet. Alles Folgende beschreibt, was der Zeitraum durchgelassen hat.",
+    "windowHidden.other": "Dein Lesezeitraum hat {{count}} ältere Beiträge ausgeblendet. Alles Folgende beschreibt, was der Zeitraum durchgelassen hat."
+  },
+  "feedLanguagePicker": {
+    "all": "Alle",
+    "allLanguages": "Alle Sprachen",
+    "cap": "Wähle höchstens {{count}} Sprachen aus",
+    "count.one": "{{count}} Sprache",
+    "count.other": "{{count}} Sprachen",
+    "description": "Wähle aus, welche Sprachen der Feed anzeigt. {{posts}}, deren Sprache nicht bestimmt werden kann, werden nie ausgeblendet. Die Sprachen stammen aus Einstellungen → Internationalisierung.",
+    "everyKnown": "Alle Sprachen, die ich beherrsche",
+    "myLanguages": "Meine Sprachen",
+    "note": "Wähle bis zu {{count}} aus. Weitere Sprachen kannst du unter Einstellungen → Internationalisierung hinzufügen."
+  },
+  "feedMembers": {
+    "botTag.label": "Bot",
+    "botTag.title": "Dieses Konto ist als automatisiert gekennzeichnet",
+    "empty": "Hier hat noch niemand etwas gepostet.",
+    "error": "Dieser Feed konnte nicht untersucht werden — versuche es später erneut.",
+    "loading": "Es wird geprüft, wer hier postet…",
+    "postCount.one": "{{count}} {{posts}}",
+    "postCount.other": "{{count}} {{posts}}",
+    "sample.label": "Stichprobe:",
+    "sample.optionTitle": "{{count}} {{posts}} untersuchen",
+    "sample.refresh": "Erneut prüfen",
+    "sample.sizeAria": "Größe der Stichprobe",
+    "share.title": "{{pct}} % der untersuchten Beiträge",
+    "summary.one": "{{accountCount}} Konto hat die {{postCount}} {{posts}} verfasst, die aus diesem Feed untersucht wurden. Für einen solchen Feed gibt es keine Mitgliederliste — das sind nur die Personen, die gerade darin posten.",
+    "summary.other": "{{accountCount}} Konten haben die {{postCount}} {{posts}} verfasst, die aus diesem Feed untersucht wurden. Für einen solchen Feed gibt es keine Mitgliederliste — das sind nur die Personen, die gerade darin posten."
+  },
+  "firstRun": {
+    "accountQuestion": "Welches Konto hast du?",
+    "back": "Zurück",
+    "bluesky": "Bluesky",
+    "blueskyHint": "Melde dich mit deinem Handle und einem App-Passwort an.",
+    "continueAnonymous": "Ohne Anmeldung fortfahren",
+    "logIn": "Anmelden",
+    "mastodon": "Mastodon",
+    "mastodonHint": "Melde dich auf deinem eigenen Server an.",
+    "pickNetwork": "Wähle das Netzwerk aus, das du bereits nutzt.",
+    "pitch": "Ein Social-Media-Client für Mastodon, Bluesky und mehr.",
+    "sampleNote": "Die Beiträge hinter diesem Feld sind eine kleine Auswahl, damit du sehen kannst, wie die App aussieht, bevor du dich entscheidest.",
+    "welcomeTitle": "Willkommen bei Mawkingbird"
+  },
+  "funding": {
+    "title": "Finanzierung"
+  },
+  "history": {
+    "close": "Schließen",
+    "current": "Aktuell",
+    "empty": "Kein Verlauf.",
+    "loading": "Wird geladen…",
+    "title": "Bearbeitungsverlauf",
+    "version": "Version {{version}}"
+  },
+  "lightbox": {
+    "close": "Schließen",
+    "next": "Nächstes Bild",
+    "previous": "Vorheriges Bild",
+    "viewer": "Bildanzeige"
+  },
+  "loginChooser": {
+    "anonymousLink": "Ohne Konto umsehen",
+    "bluesky": "Bluesky",
+    "blueskyHint": "Ein Handle wie deinname.bsky.social oder deine eigene Domain.",
+    "countViews": "Meine Seitenaufrufe zählen",
+    "instead": "stattdessen.",
+    "mastodon": "Mastodon",
+    "mastodonHint": "Auch Fosstodon, mastodon.social, Hachyderm oder jeder andere Server, auf dem Mastodon läuft.",
+    "notSure": "Noch nicht sicher?",
+    "privacy": "Es werden nur anonyme Seitenaufrufe gezählt — welche Arten von Seiten genutzt werden, niemals welches Konto, welchen Beitrag oder welches Tag du angesehen hast. Wenn du dies abwählst, wird das Analyseskript nie geladen: Es wird nichts abgerufen, gezählt oder gesendet. Du kannst dies später in den Einstellungen ändern.",
+    "subtitle": "Wähle das Netzwerk aus, in dem sich dein Konto befindet. Du kannst das andere später verbinden und beide in derselben Timeline lesen.",
+    "title": "Wo ist dein Konto?"
+  },
+  "message": {
+    "back": "← Zurück zu Mawkingbird",
+    "shared": "Geteilte Nachricht",
+    "subtitle": "Eine als Kurzlink geteilte Nachricht",
+    "unreadable": "Dieser Link enthält keine lesbare Nachricht."
+  },
+  "peopleBrowser": {
+    "end": "Ende der Liste.",
+    "endApproximate": "Ende der Liste (ungefähr — seitenweise ohne Cursor des Servers geladen).",
+    "followers.one": "{{count}} Follower",
+    "followers.other": "{{count}} Follower",
+    "following.one": "Folgt {{count}}",
+    "following.other": "Folgt {{count}}",
+    "loadError": "Diese Liste konnte nicht geladen werden.",
+    "loading": "Wird geladen…",
+    "more": "Mehr",
+    "stoppedAt": "Bei {{count}} von {{total}} angehalten — dieser Server hat die restlichen Informationen zum seitenweisen Laden nicht gesendet.",
+    "you": "Du"
+  },
+  "publicTimeline": {
+    "all": "Alle",
+    "empty": "Noch keine öffentlichen Beiträge.",
+    "loading": "Wird geladen…",
+    "local": "Lokal"
+  },
+  "report": {
+    "blueskyService": "Diese Meldung wird an den Moderationsdienst von Bluesky gesendet.",
+    "cancel": "Abbrechen",
+    "category": "Kategorie",
+    "comment": "Kommentar (optional)",
+    "confirm": "Meldung bestätigen",
+    "errorAccount": "Das zu meldende Bluesky-Konto konnte nicht eindeutig bestimmt werden.",
+    "errorBluesky": "Diese Meldung konnte nicht an Bluesky gesendet werden. Möglicherweise musst du deine Autorisierung unter Einstellungen → Verbindungen erneuern.",
+    "errorExact": "Der genaue zu meldende Bluesky-Beitrag konnte nicht bestimmt werden.",
+    "errorMastodon": "Diese Meldung konnte nicht an Mastodon gesendet werden. Bitte versuche es erneut.",
+    "placeholder": "Was stimmt nicht?",
+    "review": "Bitte prüfe dies sorgfältig. Gesendete Meldungen können nicht rückgängig gemacht werden.",
+    "sending": "Wird gesendet…",
+    "specificPost": "Ein bestimmter Beitrag wird gemeldet.",
+    "title": "@{{username}} melden"
+  },
+  "serverAnnouncements": {
+    "announcements.one": "{{active}} diesen Monat aktiv · v{{version}} · {{count}} Ankündigung",
+    "announcements.other": "{{active}} diesen Monat aktiv · v{{version}} · {{count}} Ankündigungen",
+    "dismiss": "ausblenden",
+    "dismissAll": "Alle ausblenden ({{count}})",
+    "dismissed": "ausgeblendet",
+    "empty": "Dieser Server hat noch keine Ankündigungen veröffentlicht.",
+    "loading": "Wird geladen…",
+    "new": "neu",
+    "react": "Mit {{emoji}} reagieren",
+    "title": "Server-Ankündigungen",
+    "undismissAll": "Alle wieder einblenden ({{count}})"
+  },
+  "serverPicker": {
+    "checking": "{{server}} wird geprüft…",
+    "connected": "✓ Mit {{server}} verbunden",
+    "instanceAria": "Serverinstanz",
+    "instancePlaceholder": "mastodon.social — oder gib eine beliebige Instanz ein",
+    "mediaBlocked": ", aber {{media}} ist gesperrt oder ausgefallen. Bilder werden nicht geladen.",
+    "mediaServer": "der Medienserver",
+    "unreachable": "⚠ {{server}} ist nicht erreichbar — überprüfe die Adresse.",
+    "useAnyway": "Trotzdem verwenden"
+  },
+  "serverRules": {
+    "byMastodon": "Von diesem Mastodon-Server veröffentlichte Regeln.",
+    "bySearch": "Von {{host}}, deinem Suchserver, veröffentlichte Regeln.",
+    "empty": "Dieser Server hat keine Regeln veröffentlicht.",
+    "loading": "Serverregeln werden geladen…",
+    "title": "Serverregeln"
+  },
+  "starterCollection": {
+    "couldNotFollow": "Folgen nicht möglich",
+    "findFriends": "Freunde auf andere Weise finden",
+    "followAll": "Allen {{count}} folgen",
+    "followed.one": "{{count}} Konto gefolgt",
+    "followed.other": "{{count}} Konten gefolgt",
+    "followingDone": "Gefolgt ✓",
+    "followingProgress": "Folgen… {{completed}}/{{total}}",
+    "followingRow": "Wird gefolgt…",
+    "heading": "Eine Timeline mit nur einem Klick",
+    "lookingUp": "Wird gesucht…",
+    "membersAria": "Konten in {{title}}",
+    "notFound": "Nicht gefunden",
+    "note": "Beim anonymen Folgen wird sofort die in der Sammlung enthaltene Konto-Momentaufnahme verwendet. Wenn du angemeldet bist, löst dein Server die Konten auf, bevor die eigentliche Folgeanfrage gesendet wird.",
+    "opening": "Wird geöffnet…"
+  },
+  "starterKitPost": {
+    "account.one": "{{count}} Konto",
+    "account.other": "{{count}} Konten",
+    "accountsAria": "Alle Konten in {{title}}",
+    "followAll": "Allen folgen",
+    "followed": "{{followed}} von {{total}} gefolgt",
+    "following": "Folgen… {{completed}}/{{total}}",
+    "openAccount": "{{name}} in der App öffnen",
+    "openOriginal": "Original auf {{host}} öffnen ↗",
+    "viewCollection": "Sammlung anzeigen"
+  },
+  "terms": {
+    "byMastodon": "Von diesem Mastodon-Server veröffentlichte Nutzungsbedingungen.",
+    "bySearch": "Von {{host}}, deinem Suchserver, veröffentlichte Nutzungsbedingungen.",
+    "empty": "Dieser Server hat keine Nutzungsbedingungen veröffentlicht.",
+    "loading": "Nutzungsbedingungen werden geladen…",
+    "title": "Nutzungsbedingungen"
+  },
   "unreachableServer": {
-    "findAServerICanRead": "Einen Server finden, den ich lesen kann"
+    "explanation": "Er ist möglicherweise in diesem Netzwerk gesperrt oder hat gerade einen schlechten Tag. Mawkingbird liest von jedem Mastodon-Server und sucht deshalb nach einem, der antwortet — du brauchst dort kein Konto, um Beiträge zu lesen.",
+    "findAServerICanRead": "Einen Server finden, den ich lesen kann",
+    "skip": "Überspringen — ich melde mich stattdessen an",
+    "thatServer": "Dieser Server",
+    "title": "{{server}} ist nicht erreichbar"
   }
 }

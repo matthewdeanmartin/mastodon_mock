@@ -6,19 +6,26 @@
   (keydown.escape)="close()"
   role="dialog"
   aria-modal="true"
-  aria-label="Image viewer"
+  [attr.aria-label]="'lightbox.viewer' | transloco"
   tabindex="-1"
   appFocusTrap
   [appFocusTrapCloseOnEscape]="false"
 >
-  <button class="lightbox-close" type="button" (click)="close()" aria-label="Close">✕</button>
+  <button
+    class="lightbox-close"
+    type="button"
+    (click)="close()"
+    [attr.aria-label]="'lightbox.close' | transloco"
+  >
+    ✕
+  </button>
 
   @if (hasMultiple()) {
     <button
       class="lightbox-nav prev"
       type="button"
       (click)="prev($event)"
-      aria-label="Previous image"
+      [attr.aria-label]="'lightbox.previous' | transloco"
     >
       ‹
     </button>
@@ -42,7 +49,12 @@
   }
 
   @if (hasMultiple()) {
-    <button class="lightbox-nav next" type="button" (click)="next($event)" aria-label="Next image">
+    <button
+      class="lightbox-nav next"
+      type="button"
+      (click)="next($event)"
+      [attr.aria-label]="'lightbox.next' | transloco"
+    >
       ›
     </button>
   }

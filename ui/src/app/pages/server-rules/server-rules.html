@@ -1,16 +1,16 @@
 <header class="page-head">
-  <h1>Server rules</h1>
+  <h1>{{ 'serverRules.title' | transloco }}</h1>
   @if (host(); as searchHost) {
-    <p>Rules published by {{ searchHost }}, your search server.</p>
+    <p>{{ 'serverRules.bySearch' | transloco: { host: searchHost } }}</p>
   } @else {
-    <p>Rules published by this Mastodon server.</p>
+    <p>{{ 'serverRules.byMastodon' | transloco }}</p>
   }
 </header>
 
 @if (loading()) {
-  <p class="empty muted">Loading server rules…</p>
+  <p class="empty muted">{{ 'serverRules.loading' | transloco }}</p>
 } @else if (!(rules() ?? []).length) {
-  <p class="empty muted">This server has not published any rules.</p>
+  <p class="empty muted">{{ 'serverRules.empty' | transloco }}</p>
 } @else {
   <ol class="rules">
     @for (rule of rules() ?? []; track rule.id) {

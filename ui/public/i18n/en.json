@@ -1,4 +1,7 @@
 {
+  "about": {
+    "title": "Design"
+  },
   "accent": {
     "blue": "Blue",
     "green": "Green",
@@ -93,6 +96,11 @@
     "xOfY": "{{x}} of {{y}}",
     "zombieRate": "{{pct}}% zombie rate"
   },
+  "accountList": {
+    "close": "Close",
+    "empty": "Nobody yet.",
+    "loading": "Loading…"
+  },
   "adminAccounts": {
     "actions.approve": "Approve",
     "actions.delete": "Delete",
@@ -114,6 +122,67 @@
     "status.silenced": "silenced",
     "status.suspended": "suspended"
   },
+  "adminAnnouncements": {
+    "create": "Create",
+    "delete": "Delete",
+    "draft": "Draft",
+    "empty": "No announcements.",
+    "loading": "Loading…",
+    "placeholder": "Announcement text (HTML allowed)",
+    "publish": "Publish",
+    "publishImmediately": "Publish immediately",
+    "published": "Published",
+    "unpublish": "Unpublish"
+  },
+  "adminCanonical": {
+    "block": "Block",
+    "empty": "No canonical email blocks.",
+    "loading": "Loading…",
+    "matches.one": "Matches {{count}} block: canonicalizes to a blocked hash.",
+    "matches.other": "Matches {{count}} blocks: canonicalizes to a blocked hash.",
+    "noMatch": "No match — this email is not blocked.",
+    "placeholder": "email to block (canonicalized + hashed)",
+    "remove": "Remove",
+    "testMatch": "Test match",
+    "testPlaceholder": "test an email against existing blocks"
+  },
+  "adminDomainAllows": {
+    "allow": "Allow",
+    "empty": "No allowed domains.",
+    "loading": "Loading…",
+    "placeholder": "domain to allow (e.g. friendly.example)",
+    "remove": "Remove"
+  },
+  "adminDomains": {
+    "block": "Block",
+    "empty": "No domain blocks.",
+    "loading": "Loading…",
+    "noop": "noop",
+    "placeholder": "domain to block (e.g. spam.example)",
+    "remove": "Remove",
+    "silence": "silence",
+    "suspend": "suspend"
+  },
+  "adminEmailBlocks": {
+    "block": "Block",
+    "empty": "No email domain blocks.",
+    "loading": "Loading…",
+    "placeholder": "email domain to block (e.g. mailinator.com)",
+    "remove": "Remove"
+  },
+  "adminIpBlocks": {
+    "block": "Block",
+    "commentPlaceholder": "comment (optional)",
+    "empty": "No IP blocks.",
+    "ipPlaceholder": "IP or CIDR (e.g. 203.0.113.0/24)",
+    "loading": "Loading…",
+    "remove": "Remove"
+  },
+  "adminMetrics": {
+    "empty": "No measures.",
+    "intro": "Server statistics over the last 30 days (the mock returns zero-valued measures).",
+    "loading": "Loading…"
+  },
   "adminReports": {
     "actions.assignToMe": "Assign to me",
     "actions.reopen": "Reopen",
@@ -128,6 +197,69 @@
     "statusCount.other": "{{count}} reported statuses",
     "tabs.open": "Open",
     "tabs.resolved": "Resolved"
+  },
+  "adminShell": {
+    "accounts": "Accounts",
+    "announcements": "Announcements",
+    "canonicalEmails": "Canonical emails",
+    "domainAllows": "Domain allows",
+    "domainBlocks": "Domain blocks",
+    "emailBlocks": "Email blocks",
+    "ipBlocks": "IP blocks",
+    "metrics": "Metrics",
+    "reports": "Reports",
+    "trends": "Trends"
+  },
+  "adminTrends": {
+    "approve": "Approve",
+    "emptyPosts": "No trending posts.",
+    "emptyTags": "No trending tags.",
+    "hashtags": "Trending hashtags",
+    "loading": "Loading…",
+    "posts": "Trending posts",
+    "reject": "Reject",
+    "uses.one": "{{count}} use",
+    "uses.other": "{{count}} uses"
+  },
+  "analytics": {
+    "login": "Log in to see your analytics.",
+    "title": "Analytics"
+  },
+  "announcements": {
+    "dismiss": "Dismiss",
+    "label": "📣 Announcement",
+    "react": "React {{emoji}}"
+  },
+  "blueskyFeed": {
+    "algorithm": "This feed is an algorithm run by &#64;{{handle}}, not by Bluesky.",
+    "back": "← Feeds",
+    "by": "by @{{handle}}",
+    "empty": "This feed has no posts right now.",
+    "kind.feed": "Feed",
+    "kind.list": "List",
+    "loadMore": "Load more",
+    "loading": "Loading…",
+    "members.one": "{{count}} member",
+    "members.other": "{{count}} members",
+    "pinned": "· 📌 pinned"
+  },
+  "blueskyOauth": {
+    "back": "Back to Bluesky sign-in",
+    "errorTitle": "Bluesky sign-in did not finish",
+    "exchange": "Your PDS is exchanging the one-time authorization code.",
+    "finishing": "Finishing Bluesky sign-in…"
+  },
+  "bookmarkProvider": {
+    "browser": "This browser",
+    "close": "Close",
+    "noLink": "No external link was found in this post.",
+    "publicUrl": "Bookmark the post's public URL",
+    "raindrop": "Raindrop.io",
+    "removeNative": "Remove the native bookmark",
+    "saveNative": "Save the native bookmark",
+    "savePost": "Save the post",
+    "title": "Where should this bookmark go?",
+    "unwrap": "Unwrap and save the first link"
   },
   "bugReport": {
     "close": "Close",
@@ -265,6 +397,17 @@
     "status.error": "error",
     "status.notfound": "notfound"
   },
+  "bundledCollections": {
+    "intro": "These are real collections, curated by real people on their own instances — snapshotted and shipped with Mawkingbird so you can find them at all. Mastodon has no way to search for collections yet, so the only ones anyone can reach are the ones they were sent a link to. Open one to see its members and sample what they post.",
+    "title": "Bundled collections"
+  },
+  "bundledStarterKits": {
+    "account.one": "{{count}} account",
+    "account.other": "{{count}} accounts",
+    "intro": "Curated lists assembled by the developer of Mawkingbird — not collections anyone published on a server, just a hand-picked set of accounts to get a new timeline off the ground. Follow the whole set or pick through it.",
+    "open": "· open the kit →",
+    "title": "Bundled starter kits"
+  },
   "common": {
     "cancel": "Cancel",
     "close": "Close",
@@ -400,6 +543,12 @@
     "warn.scheduleTooSoon": "Times less than ~5 minutes out publish immediately instead of scheduling.",
     "warn.threadsNoSchedule": "Threads can't be scheduled — remove the extra posts."
   },
+  "confirm": {
+    "cancel": "Cancel"
+  },
+  "credits": {
+    "title": "Credits &amp; Privacy"
+  },
   "docs": {
     "credits.detail": "The software this client ships, and how it handles data.",
     "credits.title": "Credits &amp; Privacy",
@@ -467,6 +616,20 @@
     "zombieRate": "{{percent}}% zombie rate",
     "zombies": "Zombies"
   },
+  "endorsedList": {
+    "capped": "Feed merges posts from the first {{count}} of {{total}} members.",
+    "empty": "This profile hasn't endorsed anyone yet.",
+    "emptyFeed": "No recent posts from these accounts.",
+    "feed": "Feed",
+    "loadError": "Could not load endorsed accounts for this profile.",
+    "loading": "Loading…",
+    "loadingFeed": "Loading feed…",
+    "managedOn": "Endorsements are managed on",
+    "members": "Members",
+    "profileSuffix": "'s profile. This is a read-only view of them as a feed.",
+    "titleOther": "Endorsed by {{name}}",
+    "titleSelf": "Your endorsed accounts"
+  },
   "failWhale": {
     "build": "Build",
     "cantReachServer": "Can't reach the server",
@@ -493,6 +656,11 @@
     "tryAgain": "Try again",
     "unknown": "unknown",
     "whatWentWrong": "What went wrong?"
+  },
+  "favourites": {
+    "empty": "You haven't liked anything yet.",
+    "loadMore": "Load more",
+    "loading": "Loading…"
   },
   "feedAnalytics": {
     "accounts.appearingOnce": "Authors appearing once",
@@ -636,6 +804,26 @@
     "timing.title": "Timing",
     "units.hour": "h"
   },
+  "feedDoctor": {
+    "checkAgain": "Check again",
+    "collecting": "Collecting a sample…",
+    "reading": "Reading your feed…",
+    "title": "Feed Doctor",
+    "widen": "Widen the window",
+    "windowHidden.one": "Your reading window hid {{count}} older post. Everything below describes what the window let through.",
+    "windowHidden.other": "Your reading window hid {{count}} older posts. Everything below describes what the window let through."
+  },
+  "feedLanguagePicker": {
+    "all": "All",
+    "allLanguages": "All languages",
+    "cap": "Pick at most {{count}} languages",
+    "count.one": "{{count}} language",
+    "count.other": "{{count}} languages",
+    "description": "Choose which languages the feed shows. {{posts}} whose language cannot be determined are never hidden. Languages come from Settings → Internationalization.",
+    "everyKnown": "Every language I know",
+    "myLanguages": "My languages",
+    "note": "Choose up to {{count}}. Add languages under Settings → Internationalization."
+  },
   "feedMembers": {
     "botTag.label": "bot",
     "botTag.title": "This account is marked as automated",
@@ -651,6 +839,20 @@
     "share.title": "{{pct}}% of the sampled posts",
     "summary.one": "The {{accountCount}} account that wrote the {{postCount}} {{posts}} sampled from this feed. There's no membership list for a feed like this — these are just the people posting in it right now.",
     "summary.other": "The {{accountCount}} accounts that wrote the {{postCount}} {{posts}} sampled from this feed. There's no membership list for a feed like this — these are just the people posting in it right now."
+  },
+  "firstRun": {
+    "accountQuestion": "Which account do you have?",
+    "back": "Back",
+    "bluesky": "Bluesky",
+    "blueskyHint": "Sign in with your handle and an app password.",
+    "continueAnonymous": "Continue without logging in",
+    "logIn": "Log in",
+    "mastodon": "Mastodon",
+    "mastodonHint": "Sign in on your own server.",
+    "pickNetwork": "Pick the network you already use.",
+    "pitch": "A social media client for Mastodon, Bluesky and more.",
+    "sampleNote": "The posts behind this box are a small sample, so you can see what the app looks like before you decide anything.",
+    "welcomeTitle": "Welcome to Mawkingbird"
   },
   "flags": {
     "connectorBlogger.description": "Publishing posts and drafts to a Google Blogger blog.",
@@ -713,6 +915,17 @@
     "server": "Server",
     "source": "Mockingbird source"
   },
+  "funding": {
+    "title": "Funding"
+  },
+  "history": {
+    "close": "Close",
+    "current": "Current",
+    "empty": "No history.",
+    "loading": "Loading…",
+    "title": "Edit history",
+    "version": "Version {{version}}"
+  },
   "leaveDialog": {
     "backupDownloaded": "Backup downloaded",
     "backupError": "Couldn't build a backup file. You can still leave.",
@@ -733,6 +946,12 @@
     "stayDefault": "Your saved accounts and settings stay in this browser.",
     "whoAnonymous": "Anonymous",
     "whoThisAccount": "this account"
+  },
+  "lightbox": {
+    "close": "Close",
+    "next": "Next image",
+    "previous": "Previous image",
+    "viewer": "Image viewer"
   },
   "listDialog": {
     "cancel": "Cancel",
@@ -788,6 +1007,25 @@
   "localePicker": {
     "auto": "Automatic (browser)",
     "label": "Interface language"
+  },
+  "loginChooser": {
+    "anonymousLink": "Look around without an account",
+    "bluesky": "Bluesky",
+    "blueskyHint": "A handle like yourname.bsky.social, or your own domain.",
+    "countViews": "Count my page views",
+    "instead": "instead.",
+    "mastodon": "Mastodon",
+    "mastodonHint": "Also Fosstodon, mastodon.social, Hachyderm, or any other server that runs Mastodon.",
+    "notSure": "Not sure yet?",
+    "privacy": "Anonymous page counts only — which kinds of page get used, never which account, post or tag you looked at. Unchecking this means the analytics script is never loaded: nothing is fetched, counted or sent. You can change it later in Settings.",
+    "subtitle": "Pick the network your account is on. You can connect the other one later, and read both in the same timeline.",
+    "title": "Where's your account?"
+  },
+  "message": {
+    "back": "← Back to Mawkingbird",
+    "shared": "Shared message",
+    "subtitle": "A message shared as a short link",
+    "unreadable": "This link doesn’t carry a readable message."
   },
   "pages": {
     "algo.empty.anonymous": "Home and Algo only fetch when you ask them to.",
@@ -3116,6 +3354,19 @@
     "step2.open": "Open {{server}} sign-up ↗",
     "step2.title": "Sign up on {{server}}"
   },
+  "peopleBrowser": {
+    "end": "End of the list.",
+    "endApproximate": "End of the list (approximate — paged without the server's cursor).",
+    "followers.one": "{{count}} follower",
+    "followers.other": "{{count}} followers",
+    "following.one": "{{count}} following",
+    "following.other": "{{count}} following",
+    "loadError": "Couldn't load this list.",
+    "loading": "Loading…",
+    "more": "More",
+    "stoppedAt": "Stopped at {{count}} of {{total}} — this server did not send the rest of its paging information.",
+    "you": "You"
+  },
   "pkm": {
     "noun.cal": "calendar item",
     "noun.note": "note",
@@ -3158,6 +3409,28 @@
     "via": "via",
     "waiting": "{{count}} waiting"
   },
+  "publicTimeline": {
+    "all": "All",
+    "empty": "No public statuses yet.",
+    "loading": "Loading…",
+    "local": "Local"
+  },
+  "report": {
+    "blueskyService": "This report will be sent to Bluesky's moderation service.",
+    "cancel": "Cancel",
+    "category": "Category",
+    "comment": "Comment (optional)",
+    "confirm": "Confirm report",
+    "errorAccount": "Could not identify the Bluesky account to report.",
+    "errorBluesky": "Could not send this report to Bluesky. Your authorization may need to be renewed in Settings → Connections.",
+    "errorExact": "Could not identify the exact Bluesky post to report.",
+    "errorMastodon": "Could not send this report to Mastodon. Please try again.",
+    "placeholder": "What's wrong?",
+    "review": "Please review this carefully. Reports cannot be undone after they are sent.",
+    "sending": "Sending…",
+    "specificPost": "Reporting a specific post.",
+    "title": "Report @{{username}}"
+  },
   "searchServerDiscovery": {
     "candidate.allowsSearch": "{{domain}} allows anonymous search",
     "candidate.found": "Found {{accounts}} accounts and {{statuses}} {{posts}} for the test queries.",
@@ -3179,6 +3452,19 @@
     "sizeLabel.veryLarge": "very large",
     "start": "Find a search server"
   },
+  "serverAnnouncements": {
+    "announcements.one": "{{active}} active this month · v{{version}} · {{count}} announcement",
+    "announcements.other": "{{active}} active this month · v{{version}} · {{count}} announcements",
+    "dismiss": "dismiss",
+    "dismissAll": "Dismiss all ({{count}})",
+    "dismissed": "dismissed",
+    "empty": "This server hasn't posted any announcements.",
+    "loading": "Loading…",
+    "new": "new",
+    "react": "React {{emoji}}",
+    "title": "Server announcements",
+    "undismissAll": "Undismiss all ({{count}})"
+  },
   "serverDiscovery": {
     "acceptDegraded.label": "Accept degraded servers with blocked or down CDNs",
     "candidate.available": "{{domain}} is available",
@@ -3198,6 +3484,23 @@
     "sizeLabel.midSize": "mid-size",
     "sizeLabel.veryLarge": "very large",
     "start": "Find another server"
+  },
+  "serverPicker": {
+    "checking": "Checking {{server}}…",
+    "connected": "✓ Connected to {{server}}",
+    "instanceAria": "Server instance",
+    "instancePlaceholder": "mastodon.social — or type any instance",
+    "mediaBlocked": ", but {{media}} is blocked or down. Images will not load.",
+    "mediaServer": "its media server",
+    "unreachable": "⚠ Can't reach {{server}} — check the address.",
+    "useAnyway": "Use anyway"
+  },
+  "serverRules": {
+    "byMastodon": "Rules published by this Mastodon server.",
+    "bySearch": "Rules published by {{host}}, your search server.",
+    "empty": "This server has not published any rules.",
+    "loading": "Loading server rules…",
+    "title": "Server rules"
   },
   "settings": {
     "account.changePassword": "Change password",
@@ -5324,6 +5627,17 @@
     "note": "Anonymous follows use the collection’s built-in account snapshot immediately. Signed-in follows are resolved by your server before the real follow request is sent.",
     "opening": "Opening…"
   },
+  "starterKitPost": {
+    "account.one": "{{count}} account",
+    "account.other": "{{count}} accounts",
+    "accountsAria": "All accounts in {{title}}",
+    "followAll": "Follow all",
+    "followed": "Followed {{followed}} of {{total}}",
+    "following": "Following… {{completed}}/{{total}}",
+    "openAccount": "Open {{name}} in app",
+    "openOriginal": "Open original on {{host}} ↗",
+    "viewCollection": "View collection"
+  },
   "statusCard": {
     "actionFailure": "Couldn't {{verb}} — try again.",
     "actionFailureBluesky": "Couldn't {{verb}} on Bluesky — your link may have expired. Re-link in Settings → Connections.",
@@ -5510,6 +5824,13 @@
     "tagAlreadyIn": "That tag is already in this bundle.",
     "tagCount": "{{count}} of {{max}} tags"
   },
+  "terms": {
+    "byMastodon": "Terms published by this Mastodon server.",
+    "bySearch": "Terms published by {{host}}, your search server.",
+    "empty": "This server has not published terms of service.",
+    "loading": "Loading terms…",
+    "title": "Terms of Service"
+  },
   "twitter": {
     "consent.aboutSource": "About {{source}}",
     "consent.acceptRisk": "I accept the risk",
@@ -5534,7 +5855,11 @@
     "consent.whoHeading": "Who you would be trusting"
   },
   "unreachableServer": {
-    "findAServerICanRead": "Find a server I can read"
+    "explanation": "It may be blocked on this network, or having a bad day. Mawkingbird reads from any Mastodon server, so it’s looking for one that answers — you don’t need an account on it to read.",
+    "findAServerICanRead": "Find a server I can read",
+    "skip": "Skip — I’ll sign in instead",
+    "thatServer": "That server",
+    "title": "{{server}} isn’t reachable"
   },
   "wizard": {
     "forward.continue": "Continue",

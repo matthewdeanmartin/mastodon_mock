@@ -1,6 +1,10 @@
 import { Component, computed, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Auth } from '../../auth';
 import { AccountAnalytics } from '../../account-analytics/account-analytics';
+
+// i18n analytics.title: Analytics
+// i18n analytics.login: Log in to see your analytics.
 
 /**
  * The standalone /analytics page: analytics for the logged-in account. The
@@ -9,7 +13,7 @@ import { AccountAnalytics } from '../../account-analytics/account-analytics';
  */
 @Component({
   selector: 'app-analytics',
-  imports: [AccountAnalytics],
+  imports: [AccountAnalytics, TranslocoPipe],
   templateUrl: './analytics.html',
   styleUrl: './analytics.css',
 })

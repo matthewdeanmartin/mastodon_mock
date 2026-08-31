@@ -1,11 +1,18 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { FormsModule } from '@angular/forms';
 import { AdminApi } from '../admin-api';
 import { EmailDomainBlock } from '../../models';
 
+// i18n adminEmailBlocks.placeholder: email domain to block (e.g. mailinator.com)
+// i18n adminEmailBlocks.block: Block
+// i18n adminEmailBlocks.loading: Loading…
+// i18n adminEmailBlocks.empty: No email domain blocks.
+// i18n adminEmailBlocks.remove: Remove
+
 @Component({
   selector: 'app-admin-email-blocks',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './admin-email-blocks.html',
   styleUrl: './admin-lists.css',
 })

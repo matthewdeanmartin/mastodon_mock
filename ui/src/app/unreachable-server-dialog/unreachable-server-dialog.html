@@ -14,10 +14,11 @@
     appFocusTrap
     [appFocusTrapCloseOnEscape]="false"
   >
-    <h3 id="unreachable-title">{{ attemptedHost() }} isn’t reachable</h3>
+    <h3 id="unreachable-title">
+      {{ 'unreachableServer.title' | transloco: { server: attemptedHost() } }}
+    </h3>
     <p class="muted small">
-      It may be blocked on this network, or having a bad day. Mawkingbird reads from any Mastodon
-      server, so it’s looking for one that answers — you don’t need an account on it to read.
+      {{ 'unreachableServer.explanation' | transloco }}
     </p>
 
     <app-server-discovery
@@ -29,7 +30,7 @@
 
     <div class="unreachable-actions">
       <button class="text-button" type="button" (click)="cancelled.emit()">
-        Skip — I’ll sign in instead
+        {{ 'unreachableServer.skip' | transloco }}
       </button>
     </div>
   </div>

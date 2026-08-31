@@ -1,7 +1,10 @@
 import { Component } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { StatusCard } from '../../status-card/status-card';
 import { Status } from '../../models';
 import { MAWKINGBIRD_ACCOUNT, virtualTweet } from '../docs/static-status';
+
+// i18n funding.title: Funding
 
 /**
  * "Funding" — where the money comes from and where it goes. A sibling of Design
@@ -38,7 +41,7 @@ const FUNDING_BODY = `
 
 @Component({
   selector: 'app-funding',
-  imports: [StatusCard],
+  imports: [StatusCard, TranslocoPipe],
   templateUrl: './funding.html',
   styleUrl: './funding.css',
 })

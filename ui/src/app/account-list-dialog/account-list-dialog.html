@@ -11,9 +11,9 @@
     <h3 id="account-list-title">{{ title }}</h3>
 
     @if (loading()) {
-      <p class="muted small">Loading…</p>
+      <p class="muted small">{{ 'accountList.loading' | transloco }}</p>
     } @else if (!accounts().length) {
-      <p class="muted small">Nobody yet.</p>
+      <p class="muted small">{{ 'accountList.empty' | transloco }}</p>
     } @else {
       <ul class="account-list">
         @for (a of accounts(); track a.id) {
@@ -37,7 +37,9 @@
     }
 
     <div class="dialog-actions">
-      <button class="btn btn-outline" (click)="closed.emit()">Close</button>
+      <button class="btn btn-outline" (click)="closed.emit()">
+        {{ 'accountList.close' | transloco }}
+      </button>
     </div>
   </div>
 </div>

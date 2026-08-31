@@ -1,6 +1,10 @@
 import { Component } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { StarterKitPost } from '../../starter-kit-post/starter-kit-post';
 import { SHIPPED_STARTER_KITS } from '../../starter-kits';
+
+// i18n bundledCollections.title: Bundled collections
+// i18n bundledCollections.intro: These are real collections, curated by real people on their own instances — snapshotted and shipped with Mawkingbird so you can find them at all. Mastodon has no way to search for collections yet, so the only ones anyone can reach are the ones they were sent a link to. Open one to see its members and sample what they post.
 
 /**
  * Bundled collections: snapshots of real Mastodon collections, shipped in code.
@@ -21,7 +25,7 @@ import { SHIPPED_STARTER_KITS } from '../../starter-kits';
  */
 @Component({
   selector: 'app-bundled-collections',
-  imports: [StarterKitPost],
+  imports: [StarterKitPost, TranslocoPipe],
   templateUrl: './bundled-collections.html',
   styleUrl: './bundled-collections.css',
 })

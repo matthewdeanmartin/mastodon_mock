@@ -1,9 +1,14 @@
 @for (a of announcements(); track a.id) {
   <div class="announcement" [class.read]="a.read">
-    <button class="dismiss" title="Dismiss" (click)="dismiss(a)" aria-label="Dismiss">
+    <button
+      class="dismiss"
+      [title]="'announcements.dismiss' | transloco"
+      (click)="dismiss(a)"
+      [attr.aria-label]="'announcements.dismiss' | transloco"
+    >
       <span aria-hidden="true">✕</span>
     </button>
-    <div class="label">📣 Announcement</div>
+    <div class="label">{{ 'announcements.label' | transloco }}</div>
     <div class="content" [innerHTML]="a.content"></div>
     <div class="reactions">
       @for (r of a.reactions; track r.name) {
@@ -13,7 +18,11 @@
       }
       <span class="picker">
         @for (e of quickReactions; track e) {
-          <button class="add-reaction" [title]="'React ' + e" (click)="toggleReaction(a, e)">
+          <button
+            class="add-reaction"
+            [title]="'announcements.react' | transloco: { emoji: e }"
+            (click)="toggleReaction(a, e)"
+          >
             {{ e }}
           </button>
         }

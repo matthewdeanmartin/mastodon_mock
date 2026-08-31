@@ -1,16 +1,16 @@
 <main class="message-page">
   <header class="message-header">
-    <p class="eyebrow">Shared message</p>
-    <h1>A message shared as a short link</h1>
+    <p class="eyebrow">{{ 'message.shared' | transloco }}</p>
+    <h1>{{ 'message.subtitle' | transloco }}</h1>
   </header>
 
   @if (status(); as s) {
     <app-status-card [status]="s" filterContext="thread" />
   } @else {
-    <p class="message-status">This link doesn’t carry a readable message.</p>
+    <p class="message-status">{{ 'message.unreadable' | transloco }}</p>
   }
 
   <p class="message-back">
-    <a routerLink="/">← Back to Mawkingbird</a>
+    <a routerLink="/">{{ 'message.back' | transloco }}</a>
   </p>
 </main>

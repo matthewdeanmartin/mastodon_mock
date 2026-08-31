@@ -1,6 +1,12 @@
 import { Component, HostListener, computed, input, output, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { FocusTrap } from '../a11y/focus-trap';
 import { MediaAttachment } from '../models';
+
+// i18n lightbox.viewer: Image viewer
+// i18n lightbox.close: Close
+// i18n lightbox.previous: Previous image
+// i18n lightbox.next: Next image
 
 /**
  * How far a finger must travel to count as a swipe rather than a tap that
@@ -15,7 +21,7 @@ const SWIPE_MIN_PX = 40;
  */
 @Component({
   selector: 'app-lightbox',
-  imports: [FocusTrap],
+  imports: [FocusTrap, TranslocoPipe],
   templateUrl: './lightbox.html',
   styleUrl: './lightbox.css',
 })

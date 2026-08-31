@@ -1,9 +1,7 @@
-<div class="page-head">Bundled starter kits</div>
+<div class="page-head">{{ 'bundledStarterKits.title' | transloco }}</div>
 
 <p class="intro muted small">
-  Curated lists assembled by the developer of Mawkingbird — not collections anyone published on a
-  server, just a hand-picked set of accounts to get a new timeline off the ground. Follow the whole
-  set or pick through it.
+  {{ 'bundledStarterKits.intro' | transloco }}
 </p>
 
 @for (kit of kits; track kit.slug) {
@@ -13,7 +11,13 @@
       <strong>{{ kit.title }}</strong>
       <p class="muted small">{{ kit.blurb }}</p>
       <span class="muted small">
-        {{ kit.accounts.length }} account{{ kit.accounts.length === 1 ? '' : 's' }} · open the kit →
+        {{
+          (kit.accounts.length === 1
+            ? 'bundledStarterKits.account.one'
+            : 'bundledStarterKits.account.other'
+          ) | transloco: { count: kit.accounts.length }
+        }}
+        {{ 'bundledStarterKits.open' | transloco }}
       </span>
     </div>
   </a>

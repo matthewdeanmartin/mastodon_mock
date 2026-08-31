@@ -1,11 +1,21 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { FormsModule } from '@angular/forms';
 import { AdminApi } from '../admin-api';
 import { DomainBlock } from '../../models';
 
+// i18n adminDomains.placeholder: domain to block (e.g. spam.example)
+// i18n adminDomains.silence: silence
+// i18n adminDomains.suspend: suspend
+// i18n adminDomains.noop: noop
+// i18n adminDomains.block: Block
+// i18n adminDomains.loading: Loading…
+// i18n adminDomains.empty: No domain blocks.
+// i18n adminDomains.remove: Remove
+
 @Component({
   selector: 'app-admin-domains',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './admin-domains.html',
   styleUrl: './admin-domains.css',
 })

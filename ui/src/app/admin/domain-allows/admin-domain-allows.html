@@ -4,22 +4,24 @@
     [ngModel]="newDomain()"
     (ngModelChange)="newDomain.set($event)"
     (keyup.enter)="add()"
-    placeholder="domain to allow (e.g. friendly.example)"
+    [placeholder]="'adminDomainAllows.placeholder' | transloco"
   />
   <button class="btn" [disabled]="!newDomain().trim() || submitting()" (click)="add()">
-    Allow
+    {{ 'adminDomainAllows.allow' | transloco }}
   </button>
 </div>
 
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'adminDomainAllows.loading' | transloco }}</p>
 } @else if (!allows().length) {
-  <p class="muted center">No allowed domains.</p>
+  <p class="muted center">{{ 'adminDomainAllows.empty' | transloco }}</p>
 } @else {
   @for (a of allows(); track a.id) {
     <div class="block-row">
       <strong>{{ a.domain }}</strong>
-      <button class="op warn" (click)="remove(a)">Remove</button>
+      <button class="op warn" (click)="remove(a)">
+        {{ 'adminDomainAllows.remove' | transloco }}
+      </button>
     </div>
   }
 }

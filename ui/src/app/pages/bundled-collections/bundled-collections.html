@@ -1,10 +1,7 @@
-<div class="page-head">Bundled collections</div>
+<div class="page-head">{{ 'bundledCollections.title' | transloco }}</div>
 
 <p class="intro muted small">
-  These are real collections, curated by real people on their own instances — snapshotted and
-  shipped with Mawkingbird so you can find them at all. Mastodon has no way to search for
-  collections yet, so the only ones anyone can reach are the ones they were sent a link to. Open one
-  to see its members and sample what they post.
+  {{ 'bundledCollections.intro' | transloco }}
 </p>
 
 @for (c of collections; track c.id) {

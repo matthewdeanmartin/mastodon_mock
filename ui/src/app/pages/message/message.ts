@@ -1,8 +1,14 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Auth } from '../../auth';
 import { StatusCard } from '../../status-card/status-card';
 import { Status } from '../../models';
+
+// i18n message.shared: Shared message
+// i18n message.subtitle: A message shared as a short link
+// i18n message.unreadable: This link doesn’t carry a readable message.
+// i18n message.back: ← Back to Mawkingbird
 import {
   messageStatus,
   messageStatusRouteRef,
@@ -30,7 +36,7 @@ import {
  */
 @Component({
   selector: 'app-message',
-  imports: [StatusCard, RouterLink],
+  imports: [StatusCard, RouterLink, TranslocoPipe],
   templateUrl: './message.html',
   styleUrl: './message.css',
 })

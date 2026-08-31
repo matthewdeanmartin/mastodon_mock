@@ -1,4 +1,5 @@
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AccountHoverCard } from '../account-hover-card/account-hover-card';
@@ -9,9 +10,19 @@ import { ImportFollows } from '../import-follows';
 import { Account } from '../models';
 import { ShippedStarterKit } from '../starter-kits';
 
+// i18n starterKitPost.account.one: {{count}} account
+// i18n starterKitPost.account.other: {{count}} accounts
+// i18n starterKitPost.accountsAria: All accounts in {{title}}
+// i18n starterKitPost.openAccount: Open {{name}} in app
+// i18n starterKitPost.following: Following… {{completed}}/{{total}}
+// i18n starterKitPost.followed: Followed {{followed}} of {{total}}
+// i18n starterKitPost.followAll: Follow all
+// i18n starterKitPost.viewCollection: View collection
+// i18n starterKitPost.openOriginal: Open original on {{host}} ↗
+
 @Component({
   selector: 'app-starter-kit-post',
-  imports: [AccountHoverCard, AvatarFallback, RouterLink],
+  imports: [AccountHoverCard, AvatarFallback, RouterLink, TranslocoPipe],
   providers: [ImportFollows],
   templateUrl: './starter-kit-post.html',
   styleUrl: './starter-kit-post.css',

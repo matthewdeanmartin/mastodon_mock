@@ -1,23 +1,22 @@
 <div class="chooser-wrap">
   <div class="chooser-card">
-    <h1 class="chooser-title">Where's your account?</h1>
+    <h1 class="chooser-title">{{ 'loginChooser.title' | transloco }}</h1>
     <!--
       Copy has to work for someone who has never heard the word "fediverse", so
       each door describes what the user recognises — the name of the thing they
       signed up for — rather than the protocol underneath it.
     -->
     <p class="chooser-sub muted">
-      Pick the network your account is on. You can connect the other one later, and read both in the
-      same timeline.
+      {{ 'loginChooser.subtitle' | transloco }}
     </p>
 
     <div class="doors">
       <a class="door" routerLink="/login/mastodon" [queryParams]="adding ? { add: 1 } : null">
         <span class="door-badge" aria-hidden="true">🐘</span>
         <span class="door-body">
-          <span class="door-name">Mastodon</span>
+          <span class="door-name">{{ 'loginChooser.mastodon' | transloco }}</span>
           <span class="door-hint muted small">
-            Also Fosstodon, mastodon.social, Hachyderm, or any other server that runs Mastodon.
+            {{ 'loginChooser.mastodonHint' | transloco }}
           </span>
         </span>
       </a>
@@ -25,9 +24,9 @@
       <a class="door" routerLink="/login/bluesky" [queryParams]="adding ? { add: 1 } : null">
         <span class="door-badge" aria-hidden="true">🦋</span>
         <span class="door-body">
-          <span class="door-name">Bluesky</span>
+          <span class="door-name">{{ 'loginChooser.bluesky' | transloco }}</span>
           <span class="door-hint muted small">
-            A handle like yourname.bsky.social, or your own domain.
+            {{ 'loginChooser.blueskyHint' | transloco }}
           </span>
         </span>
       </a>
@@ -37,7 +36,9 @@
     <p class="chooser-out small">
       <!-- `/anonymous`, not `/`: someone declining the login question here has
            already been asked it. `/` would seed a preview and ask again. -->
-      Not sure yet? <a routerLink="/anonymous">Look around without an account</a> instead.
+      {{ 'loginChooser.notSure' | transloco }}
+      <a routerLink="/anonymous">{{ 'loginChooser.anonymousLink' | transloco }}</a>
+      {{ 'loginChooser.instead' | transloco }}
     </p>
 
     <!--
@@ -55,12 +56,10 @@
           [ngModel]="prefs.analytics()"
           (ngModelChange)="prefs.setAnalytics($event)"
         />
-        Count my page views
+        {{ 'loginChooser.countViews' | transloco }}
       </label>
       <p class="muted small">
-        Anonymous page counts only — which kinds of page get used, never which account, post or tag
-        you looked at. Unchecking this means the analytics script is never loaded: nothing is
-        fetched, counted or sent. You can change it later in Settings.
+        {{ 'loginChooser.privacy' | transloco }}
       </p>
     </div>
   </div>

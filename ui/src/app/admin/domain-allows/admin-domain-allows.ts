@@ -1,11 +1,18 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { FormsModule } from '@angular/forms';
 import { AdminApi } from '../admin-api';
 import { DomainAllow } from '../../models';
 
+// i18n adminDomainAllows.placeholder: domain to allow (e.g. friendly.example)
+// i18n adminDomainAllows.allow: Allow
+// i18n adminDomainAllows.loading: Loading…
+// i18n adminDomainAllows.empty: No allowed domains.
+// i18n adminDomainAllows.remove: Remove
+
 @Component({
   selector: 'app-admin-domain-allows',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   templateUrl: './admin-domain-allows.html',
   styleUrl: './admin-lists.css',
 })
