@@ -109,6 +109,7 @@ const MIGRATED = [
   'pages/settings/connections/twitter',
   'pages/settings/connections/blogger',
   'pages/settings/connections/openrouter',
+  'pages/settings',
 ];
 
 /**

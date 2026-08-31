@@ -1,12 +1,13 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Auth } from '../../auth';
 import { environment } from '../../../environments/environment';
 import { FeatureFlagId, FeatureFlags } from '../../feature-flags';
 import { SettingsPreloading } from './settings-preloading';
 
 interface SettingsNavItem {
-  label: string;
+  labelKey: string;
   path: string;
   /** Match child routes too (the Filters editor lives under /settings/filters/...). */
   exact: boolean;
@@ -22,7 +23,7 @@ interface SettingsNavItem {
 
 /** A heading in the sidebar, and the pages filed under it. */
 interface SettingsNavGroup {
-  title: string;
+  titleKey: string;
   /** Item paths, in the order they should appear under the heading. */
   paths: string[];
 }
@@ -43,9 +44,39 @@ interface SettingsNavGroup {
  * still appears there, so no page can fall out of the sidebar by being
  * forgotten here.
  */
+// i18n settings.groups.basic: Basic
+// i18n settings.groups.accounts: Accounts
+// i18n settings.groups.content: Content
+// i18n settings.groups.people: People
+// i18n settings.groups.advanced: Advanced
+// i18n settings.nav.publicProfile: Public profile
+// i18n settings.nav.server: Server
+// i18n settings.nav.mawkingbirdPlus: Mawkingbird Plus
+// i18n settings.nav.connections: Connections
+// i18n settings.nav.privacy: Privacy
+// i18n settings.nav.writing: Writing
+// i18n settings.nav.appearance: Appearance
+// i18n settings.nav.internationalization: Internationalization
+// i18n settings.nav.localStorage: Local storage
+// i18n settings.nav.endorsements: Endorsements
+// i18n settings.nav.signedInAccounts: Signed-in accounts
+// i18n settings.nav.emailNotifications: Email notifications
+// i18n settings.nav.approveFollowRequests: Approve follow requests
+// i18n settings.nav.mutedBlocked: Muted & Blocked
+// i18n settings.nav.trustCwSensitive: Trust: CW/Sensitive
+// i18n settings.nav.bulkModeration: Bulk moderation
+// i18n settings.nav.filters: Filters
+// i18n settings.nav.automaticPostDeletion: Automatic post deletion
+// i18n settings.nav.account: Account
+// i18n settings.nav.importExportFriendsTags: Import/Export Friends & Tags
+// i18n settings.nav.importExportConfig: Import/Export Config
+// i18n settings.nav.inviteLinks: Invite links
+// i18n settings.nav.featureFlags: Feature flags
+// i18n settings.nav.development: Development
+// i18n settings.sectionsAriaLabel: Settings sections
 const NAV_GROUPS: SettingsNavGroup[] = [
   {
-    title: 'Basic',
+    titleKey: 'settings.groups.basic',
     // Pages that belong here *as well as* under a more specific heading. Anything
     // not named in any group lands here too — see `groups` below — so this list
     // is only for deliberate cross-listing, not for the ordinary case.
@@ -54,7 +85,7 @@ const NAV_GROUPS: SettingsNavGroup[] = [
   {
     // Second, and 'mawkingbird-plus' first within it: an account page nobody
     // scrolls to is an account page nobody upgrades from.
-    title: 'Accounts',
+    titleKey: 'settings.groups.accounts',
     // Public profile already leads Basic. Repeating the same subgroup under
     // Accounts made the sidebar look like it contained two different editors.
     paths: ['mawkingbird-plus', 'accounts', 'account', 'connections', 'server'],
@@ -62,15 +93,15 @@ const NAV_GROUPS: SettingsNavGroup[] = [
   {
     // What gets shown to you and what gets shown about you — the filtering and
     // labelling rules, as opposed to the people they apply to.
-    title: 'Content',
+    titleKey: 'settings.groups.content',
     paths: ['filters', 'spotlight', 'content'],
   },
   {
-    title: 'People',
+    titleKey: 'settings.groups.people',
     paths: ['moderation', 'follows', 'bulk-actions', 'import-export', 'invites', 'privacy'],
   },
   {
-    title: 'Advanced',
+    titleKey: 'settings.groups.advanced',
     paths: ['storage', 'feature-flags', 'development', 'config', 'deletion'],
   },
 ];
@@ -83,7 +114,7 @@ const NAV_GROUPS: SettingsNavGroup[] = [
  */
 @Component({
   selector: 'app-settings-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TranslocoPipe],
   templateUrl: './settings-shell.html',
   styleUrl: './settings-shell.css',
 })
@@ -103,8 +134,14 @@ export class SettingsShell {
   // widens to `string` and stops being checked against `FeatureFlagId`.
   protected readonly nav: SettingsNavItem[] = (
     [
-      { label: 'Public profile', path: 'profile', exact: true, anonymous: true },
-      { label: 'Server', path: 'server', exact: true, anonymous: true, anonymousOnly: true },
+      { labelKey: 'settings.nav.publicProfile', path: 'profile', exact: true, anonymous: true },
+      {
+        labelKey: 'settings.nav.server',
+        path: 'server',
+        exact: true,
+        anonymous: true,
+        anonymousOnly: true,
+      },
       // 'blue' is deliberately absent. Appearance embeds the whole
       // <app-blue-controls> cluster, so every setting the Blue page showed is
       // already one click away under a heading that describes it — and the
@@ -113,7 +150,7 @@ export class SettingsShell {
       // the human, not to a Mastodon persona — the same reasoning that makes the
       // CORS proxy key account-unscoped in `cors-proxy-settings.ts`.
       {
-        label: 'Mawkingbird Plus',
+        labelKey: 'settings.nav.mawkingbirdPlus',
         path: 'mawkingbird-plus',
         exact: true,
         anonymous: true,
@@ -121,41 +158,56 @@ export class SettingsShell {
       },
       // Client-side (localStorage) accounts on other services: Bluesky, GitHub,
       // Raindrop.io, Dropbox. Not exact — the catalog's child pages live under it.
-      { label: 'Connections', path: 'connections', exact: false, anonymous: true },
+      { labelKey: 'settings.nav.connections', path: 'connections', exact: false, anonymous: true },
       // 'rss' is deliberately absent: RSS moved to the More menu, on its way to
       // becoming a miniapp of its own like Write. The route still resolves.
-      { label: 'Privacy', path: 'privacy', exact: true },
-      { label: 'Writing', path: 'writing', exact: true, anonymous: true },
+      { labelKey: 'settings.nav.privacy', path: 'privacy', exact: true },
+      { labelKey: 'settings.nav.writing', path: 'writing', exact: true, anonymous: true },
       // Appearance is client-side (theme/accent/undo-send in localStorage) and works
       // against any instance; the page hides its server-backed rows off-mock itself.
-      { label: 'Appearance', path: 'appearance', exact: true, anonymous: true },
-      { label: 'Internationalization', path: 'i18n', exact: true, anonymous: true },
-      { label: 'Local storage', path: 'storage', exact: true, anonymous: true },
+      { labelKey: 'settings.nav.appearance', path: 'appearance', exact: true, anonymous: true },
+      { labelKey: 'settings.nav.internationalization', path: 'i18n', exact: true, anonymous: true },
+      { labelKey: 'settings.nav.localStorage', path: 'storage', exact: true, anonymous: true },
       // Path is 'spotlight' on purpose — see the route's comment in app.routes.ts.
-      { label: 'Endorsements', path: 'spotlight', exact: true, anonymous: true },
-      { label: 'Signed-in accounts', path: 'accounts', exact: true, anonymous: true },
-      { label: 'Email notifications', path: 'notifications', exact: true, mockOnly: true },
-      { label: 'Approve follow requests', path: 'follows', exact: true },
-      { label: 'Muted & Blocked', path: 'moderation', exact: true },
+      { labelKey: 'settings.nav.endorsements', path: 'spotlight', exact: true, anonymous: true },
+      { labelKey: 'settings.nav.signedInAccounts', path: 'accounts', exact: true, anonymous: true },
+      {
+        labelKey: 'settings.nav.emailNotifications',
+        path: 'notifications',
+        exact: true,
+        mockOnly: true,
+      },
+      { labelKey: 'settings.nav.approveFollowRequests', path: 'follows', exact: true },
+      { labelKey: 'settings.nav.mutedBlocked', path: 'moderation', exact: true },
       // The flipside of the line above — accounts you want *without* a doorway in
       // front of them — so it sits next to it. Client-side, hence anonymous: true.
-      { label: 'Trust: CW/Sensitive', path: 'content', exact: true, anonymous: true },
+      { labelKey: 'settings.nav.trustCwSensitive', path: 'content', exact: true, anonymous: true },
       // Sits under the two lists it can empty, and next to the follow-wide
       // retweet switches, because that is what all four of them operate on.
-      { label: 'Bulk moderation', path: 'bulk-actions', exact: true },
-      { label: 'Filters', path: 'filters', exact: false },
-      { label: 'Automatic post deletion', path: 'deletion', exact: true, mockOnly: true },
+      { labelKey: 'settings.nav.bulkModeration', path: 'bulk-actions', exact: true },
+      { labelKey: 'settings.nav.filters', path: 'filters', exact: false },
+      {
+        labelKey: 'settings.nav.automaticPostDeletion',
+        path: 'deletion',
+        exact: true,
+        mockOnly: true,
+      },
       // mockOnly: against a real server the page is a read-only username row —
       // password changes and session revocation are not in the public API. An
       // entry that leads somewhere nothing can be done is worse than no entry.
-      { label: 'Account', path: 'account', exact: true, mockOnly: true },
-      { label: 'Import/Export Friends & Tags', path: 'import-export', exact: true },
-      { label: 'Import/Export Config', path: 'config', exact: true, anonymous: true },
+      { labelKey: 'settings.nav.account', path: 'account', exact: true, mockOnly: true },
+      { labelKey: 'settings.nav.importExportFriendsTags', path: 'import-export', exact: true },
+      { labelKey: 'settings.nav.importExportConfig', path: 'config', exact: true, anonymous: true },
       // "Invite links", not "Invite people": /invites is the page that invites
       // people, and two menu entries reading the same thing is a maze.
-      { label: 'Invite links', path: 'invites', exact: true, mockOnly: true },
-      { label: 'Feature flags', path: 'feature-flags', exact: true, anonymous: true },
-      { label: 'Development', path: 'development', exact: true, mockOnly: true },
+      { labelKey: 'settings.nav.inviteLinks', path: 'invites', exact: true, mockOnly: true },
+      {
+        labelKey: 'settings.nav.featureFlags',
+        path: 'feature-flags',
+        exact: true,
+        anonymous: true,
+      },
+      { labelKey: 'settings.nav.development', path: 'development', exact: true, mockOnly: true },
     ] satisfies SettingsNavItem[]
   ).filter(
     (item) =>
@@ -174,13 +226,13 @@ export class SettingsShell {
    * keeps the Anonymous account from staring at a "People" heading with nothing
    * under it.
    */
-  protected readonly groups: { title: string; items: SettingsNavItem[] }[] = (() => {
+  protected readonly groups: { titleKey: string; items: SettingsNavItem[] }[] = (() => {
     const byPath = new Map(this.nav.map((item) => [item.path, item]));
     const filed = new Set(NAV_GROUPS.flatMap((g) => g.paths));
     return NAV_GROUPS.map((group) => ({
-      title: group.title,
+      titleKey: group.titleKey,
       items:
-        group.title === 'Basic'
+        group.titleKey === 'settings.groups.basic'
           ? // Its own cross-listed pages first, then every page nobody filed
             // anywhere — a page left out of the lists is still a page the user
             // needs to reach, and silently dropping it is the one outcome this

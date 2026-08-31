@@ -106,8 +106,8 @@ describe('buildFacets', () => {
     ];
     const lang = buildFacets(statuses).find((f) => f.kind === 'language');
     expect(lang?.values).toEqual([
-      { value: 'en', label: 'EN', count: 2 },
-      { value: 'de', label: 'DE', count: 1 },
+      { value: 'en', labelKey: null, text: 'EN', count: 2 },
+      { value: 'de', labelKey: null, text: 'DE', count: 1 },
     ]);
   });
 

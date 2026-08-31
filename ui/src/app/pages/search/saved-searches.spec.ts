@@ -178,7 +178,7 @@ describe('SavedSearches', () => {
         JSON.stringify({ version: 99, searches: [{ id: 'x', search: {} }] }),
       );
 
-      expect(new SavedSearches().all()).toEqual([]);
+      expect(reloadedFromStorage().all()).toEqual([]);
     });
   });
 });

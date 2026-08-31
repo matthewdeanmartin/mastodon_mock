@@ -36,7 +36,7 @@
           <span class="catalog-emoji" aria-hidden="true">{{ row.entry.emoji }}</span>
           <span class="catalog-body">
             <span class="catalog-title">
-              <span class="catalog-label">{{ row.entry.label }}</span>
+              <span class="catalog-label">{{ row.entry.label | transloco }}</span>
               @if (row.flagged) {
                 <span class="pill pill-off">{{
                   'settings.connections.pillTurnedOff' | transloco
@@ -52,20 +52,20 @@
               } @else {
                 <span class="pill">{{ 'settings.connections.pillNotConnected' | transloco }}</span>
               }
-              <span class="pill pill-scope" [title]="scopeCopy[row.entry.scope].detail">
-                {{ scopeCopy[row.entry.scope].label }}
+              <span class="pill pill-scope" [title]="scopeCopy[row.entry.scope].detail | transloco">
+                {{ scopeCopy[row.entry.scope].label | transloco }}
               </span>
               @if (row.storage; as storage) {
                 <app-storage-badge [where]="storage" />
               }
             </span>
-            <span class="muted catalog-pitch">{{ row.entry.pitch }}</span>
+            <span class="muted catalog-pitch">{{ row.entry.pitch | transloco }}</span>
             @if (row.unavailableReason; as reason) {
               <span class="muted small catalog-reason">{{ reason }}</span>
             } @else {
               <span class="catalog-enables">
                 @for (feature of row.entry.enables; track feature) {
-                  <span class="enable">{{ feature }}</span>
+                  <span class="enable">{{ feature | transloco }}</span>
                 }
               </span>
             }

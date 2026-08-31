@@ -24,9 +24,9 @@
           (click)="ask(action.id)"
         >
           @if (running() && activeAction() === action.id) {
-            Running…
+            {{ 'common.running' | transloco }}
           } @else {
-            Review…
+            {{ 'settings.bulk.review' | transloco }}
           }
         </button>
       </div>

@@ -347,7 +347,7 @@ describe('last-activity facet', () => {
     ]);
     expect(facet?.values.at(-1)).toMatchObject({
       value: 'unknown',
-      labelKey: 'Not known',
+      labelKey: 'pages.search.activity.notKnown',
       count: 2,
     });
   });

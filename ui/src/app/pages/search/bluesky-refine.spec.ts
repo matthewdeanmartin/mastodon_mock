@@ -135,8 +135,8 @@ describe('buildBlueskyAccountFacets', () => {
   it('breaks handles down by domain', () => {
     const facet = buildBlueskyAccountFacets(mixed).find((f) => f.kind === 'handleDomain');
     expect(facet?.values).toEqual([
-      { value: 'bsky.social', labelKey: 'bsky.social', count: 2 },
-      { value: 'mozilla.org', labelKey: 'mozilla.org', count: 1 },
+      { value: 'bsky.social', labelKey: null, text: 'bsky.social', count: 2 },
+      { value: 'mozilla.org', labelKey: null, text: 'mozilla.org', count: 1 },
     ]);
   });
 
@@ -343,8 +343,8 @@ describe('buildBlueskyPostFacets', () => {
     ];
     const facet = buildBlueskyPostFacets(linked).find((f) => f.kind === 'linkDomain');
     expect(facet?.values).toEqual([
-      { value: 'github.com', labelKey: 'github.com', count: 2 },
-      { value: 'youtube.com', labelKey: 'youtube.com', count: 1 },
+      { value: 'github.com', labelKey: null, text: 'github.com', count: 2 },
+      { value: 'youtube.com', labelKey: null, text: 'youtube.com', count: 1 },
     ]);
   });
 

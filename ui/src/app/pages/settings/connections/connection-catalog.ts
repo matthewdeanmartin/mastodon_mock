@@ -76,6 +76,13 @@ export type ConnectionId =
  */
 export type ConnectionScope = 'account' | 'browser' | 'session';
 
+// i18n settings.connections.scope.account.label: One per account
+// i18n settings.connections.scope.account.detail: Stored against the account you are signed in as — including Anonymous. Each of your accounts links its own, or none.
+// i18n settings.connections.scope.browser.label: All accounts
+// i18n settings.connections.scope.browser.detail: Shared by every account in this browser, including Anonymous — it belongs to you, not to one profile.
+// i18n settings.connections.scope.session.label: All accounts, this tab
+// i18n settings.connections.scope.session.detail: Shared by every account in this browser, but never written to long-term storage — closing the tab disconnects it.
+
 export interface ConnectionScopeCopy {
   /** Badge text. Short enough to sit next to the connected pill. */
   label: string;
@@ -85,19 +92,16 @@ export interface ConnectionScopeCopy {
 
 export const CONNECTION_SCOPE_COPY: Record<ConnectionScope, ConnectionScopeCopy> = {
   account: {
-    label: 'One per account',
-    detail:
-      'Stored against the account you are signed in as — including Anonymous. Each of your accounts links its own, or none.',
+    label: 'settings.connections.scope.account.label',
+    detail: 'settings.connections.scope.account.detail',
   },
   browser: {
-    label: 'All accounts',
-    detail:
-      'Shared by every account in this browser, including Anonymous — it belongs to you, not to one profile.',
+    label: 'settings.connections.scope.browser.label',
+    detail: 'settings.connections.scope.browser.detail',
   },
   session: {
-    label: 'All accounts, this tab',
-    detail:
-      'Shared by every account in this browser, but never written to long-term storage — closing the tab disconnects it.',
+    label: 'settings.connections.scope.session.label',
+    detail: 'settings.connections.scope.session.detail',
   },
 };
 
@@ -129,6 +133,65 @@ export const CONNECTION_FLAGS: Record<ConnectionId, FeatureFlagId> = {
   'cors-proxy': 'connector-cors-proxy',
 };
 
+// i18n settings.connections.catalog.mastodon.label: Mastodon
+// i18n settings.connections.catalog.mastodon.pitch: Read Mastodon too — with or without a Mastodon account.
+// i18n settings.connections.catalog.mastodon.enables.explore: Explore, trending posts and hashtag timelines from a Mastodon server
+// i18n settings.connections.catalog.mastodon.enables.anonymous: No Mastodon account needed — reading anonymously is a real option
+// i18n settings.connections.catalog.mastodon.enables.signIn: Sign in later to merge Mastodon into your home timeline
+// i18n settings.connections.catalog.bluesky.label: Bluesky
+// i18n settings.connections.catalog.bluesky.pitch: Your Bluesky account, read and write.
+// i18n settings.connections.catalog.bluesky.enables.timeline: Bluesky posts merged into your home timeline
+// i18n settings.connections.catalog.bluesky.enables.interact: Reply, like and repost without leaving Mawkingbird
+// i18n settings.connections.catalog.bluesky.enables.dms: Bluesky DMs in Chat
+// i18n settings.connections.catalog.twitter.label: Twitter
+// i18n settings.connections.catalog.twitter.pitch: Read public tweets, so the friends who never left stay in your reading.
+// i18n settings.connections.catalog.twitter.enables.follow: Follow public Twitter accounts and read their posts here
+// i18n settings.connections.catalog.twitter.enables.readOnly: Read-only: no Twitter login, and nothing you do is sent to Twitter
+// i18n settings.connections.catalog.twitter.enables.credentials: Needs your own API key and a CORS proxy
+// i18n settings.connections.catalog.mataroa.label: Blog (Mataroa)
+// i18n settings.connections.catalog.mataroa.pitch: Your Mataroa blog, published from the composer.
+// i18n settings.connections.catalog.mataroa.enables.publish: Publish Markdown posts from the Blog composer target
+// i18n settings.connections.catalog.mataroa.enables.profile: Optionally include your blog RSS posts on your Mawkingbird profile
+// i18n settings.connections.catalog.mataroa.enables.credentials: Needs your own API key and a CORS proxy
+// i18n settings.connections.catalog.blogger.label: Blog (Blogger)
+// i18n settings.connections.catalog.blogger.pitch: Your Google Blogger blog, published from the composer.
+// i18n settings.connections.catalog.blogger.enables.publish: Publish posts from the composer, live or as a draft
+// i18n settings.connections.catalog.blogger.enables.choose: Choose which of your Blogger blogs to post to
+// i18n settings.connections.catalog.blogger.enables.signIn: Signs in with Google; no API key or CORS proxy needed
+// i18n settings.connections.catalog.hugo.label: Blog (Hugo)
+// i18n settings.connections.catalog.hugo.pitch: Your own static site on GitHub, published from the composer.
+// i18n settings.connections.catalog.hugo.enables.publish: Publish Markdown posts as commits to your Hugo repository
+// i18n settings.connections.catalog.hugo.enables.files: Your posts stay files in a repo you own, not on a blog service
+// i18n settings.connections.catalog.hugo.enables.credentials: Needs a GitHub token; no CORS proxy, unlike the other blogs
+// i18n settings.connections.catalog.openrouter.label: OpenRouter
+// i18n settings.connections.catalog.openrouter.pitch: One key, hundreds of AI models, billed by usage.
+// i18n settings.connections.catalog.openrouter.enables.search: Turn plain English into Mastodon search queries
+// i18n settings.connections.catalog.openrouter.enables.hashtags: Suggest hashtags that actually have activity
+// i18n settings.connections.catalog.raindrop.label: Raindrop.io
+// i18n settings.connections.catalog.raindrop.pitch: The Raindrop.io bookmarking service.
+// i18n settings.connections.catalog.raindrop.enables.bookmarks: A second place to save bookmarks
+// i18n settings.connections.catalog.raindrop.enables.externalLink: Save a post's first external link instead of the post itself
+// i18n settings.connections.catalog.github.label: GitHub
+// i18n settings.connections.catalog.github.pitch: Your GitHub account, read-only.
+// i18n settings.connections.catalog.github.enables.following: Find the people you follow on GitHub over here
+// i18n settings.connections.catalog.github.enables.notifications: Read your unread notifications
+// i18n settings.connections.catalog.gist.label: GitHub Gist
+// i18n settings.connections.catalog.gist.pitch: Publish pastes as gists on your GitHub account.
+// i18n settings.connections.catalog.gist.enables.option: A "GitHub Gist" option wherever you can post a paste
+// i18n settings.connections.catalog.gist.enables.drafts: Gists you create appear in Drafts and in Write, like any other paste
+// i18n settings.connections.catalog.gist.enables.edit: Edit and delete them later — they belong to your account, not to this browser
+// i18n settings.connections.catalog.dropbox.label: Dropbox
+// i18n settings.connections.catalog.dropbox.pitch: An app-specific folder in your Dropbox.
+// i18n settings.connections.catalog.dropbox.enables.browse: Browse those files from Mawkingbird
+// i18n settings.connections.catalog.linkShortener.label: Link shortener
+// i18n settings.connections.catalog.linkShortener.pitch: Dub, Short.io or T.LY, for shortening the URLs you post.
+// i18n settings.connections.catalog.linkShortener.enables.shorten: Shorten a URL as you write a post
+// i18n settings.connections.catalog.linkShortener.enables.history: Keep a list of every link you have made, and delete old ones
+// i18n settings.connections.catalog.corsProxy.label: CORS proxy
+// i18n settings.connections.catalog.corsProxy.pitch: A relay for sites that refuse to talk to browsers directly.
+// i18n settings.connections.catalog.corsProxy.enables.rss: Read RSS feeds whose publishers block cross-origin access
+// i18n settings.connections.catalog.corsProxy.enables.proxy: Use your own proxy, or a paid one, instead of a rate-limited free service
+
 export interface ConnectionCatalogEntry {
   id: ConnectionId;
   /** Display name of the service, as the service spells it. */
@@ -159,9 +222,9 @@ export interface ConnectionCatalogEntry {
 export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
   {
     id: 'mastodon',
-    label: 'Mastodon',
+    label: 'settings.connections.catalog.mastodon.label',
     emoji: '🐘',
-    pitch: 'Read Mastodon too — with or without a Mastodon account.',
+    pitch: 'settings.connections.catalog.mastodon.pitch',
     // The mirror image of the Bluesky entry, and the only connector that is
     // *not applicable* to some accounts rather than merely unconfigured: under a
     // Mastodon-primary account, Mastodon is the identity and there is nothing to
@@ -171,163 +234,166 @@ export const CONNECTION_CATALOG: readonly ConnectionCatalogEntry[] = [
     // server this particular persona reads, and an alt gets its own or none.
     scope: 'account',
     enables: [
-      'Explore, trending posts and hashtag timelines from a Mastodon server',
-      'No Mastodon account needed — reading anonymously is a real option',
-      'Sign in later to merge Mastodon into your home timeline',
+      'settings.connections.catalog.mastodon.enables.explore',
+      'settings.connections.catalog.mastodon.enables.anonymous',
+      'settings.connections.catalog.mastodon.enables.signIn',
     ],
   },
   {
     id: 'bluesky',
-    label: 'Bluesky',
+    label: 'settings.connections.catalog.bluesky.label',
     emoji: '🦋',
-    pitch: 'Your Bluesky account, read and write.',
+    pitch: 'settings.connections.catalog.bluesky.pitch',
     // The one genuinely per-persona connection: it asserts who this Mastodon
     // account also is. One Bluesky handle per Mastodon account, Anonymous
     // included — see AnonymousCapabilities.canUseBluesky.
     scope: 'account',
     enables: [
-      'Bluesky posts merged into your home timeline',
-      'Reply, like and repost without leaving Mawkingbird',
-      'Bluesky DMs in Chat',
+      'settings.connections.catalog.bluesky.enables.timeline',
+      'settings.connections.catalog.bluesky.enables.interact',
+      'settings.connections.catalog.bluesky.enables.dms',
     ],
   },
   {
     id: 'twitter',
-    label: 'Twitter',
+    label: 'settings.connections.catalog.twitter.label',
     emoji: '🐦',
-    pitch: 'Read public tweets, so the friends who never left stay in your reading.',
+    pitch: 'settings.connections.catalog.twitter.pitch',
     // The key belongs to whoever pays for the API credits, not to a persona —
     // same reasoning as OpenRouter and the CORS proxy. See TwitterSettings. The
     // *follows* built on top of it are account-scoped; the key is not.
     scope: 'browser',
     enables: [
-      'Follow public Twitter accounts and read their posts here',
-      'Read-only: no Twitter login, and nothing you do is sent to Twitter',
-      'Needs your own API key and a CORS proxy',
+      'settings.connections.catalog.twitter.enables.follow',
+      'settings.connections.catalog.twitter.enables.readOnly',
+      'settings.connections.catalog.twitter.enables.credentials',
     ],
   },
   {
     id: 'mataroa',
-    label: 'Blog (Mataroa)',
+    label: 'settings.connections.catalog.mataroa.label',
     emoji: '✍️',
-    pitch: 'Your Mataroa blog, published from the composer.',
+    pitch: 'settings.connections.catalog.mataroa.pitch',
     scope: 'account',
     enables: [
-      'Publish Markdown posts from the Blog composer target',
-      'Optionally include your blog RSS posts on your Mawkingbird profile',
-      'Needs your own API key and a CORS proxy',
+      'settings.connections.catalog.mataroa.enables.publish',
+      'settings.connections.catalog.mataroa.enables.profile',
+      'settings.connections.catalog.mataroa.enables.credentials',
     ],
   },
   {
     id: 'blogger',
-    label: 'Blog (Blogger)',
+    label: 'settings.connections.catalog.blogger.label',
     emoji: '✍️',
-    pitch: 'Your Google Blogger blog, published from the composer.',
+    pitch: 'settings.connections.catalog.blogger.pitch',
     // Sits alongside Mataroa rather than replacing it: they are different
     // blogs, and someone can reasonably keep both.
     scope: 'account',
     enables: [
-      'Publish posts from the composer, live or as a draft',
-      'Choose which of your Blogger blogs to post to',
-      'Signs in with Google; no API key or CORS proxy needed',
+      'settings.connections.catalog.blogger.enables.publish',
+      'settings.connections.catalog.blogger.enables.choose',
+      'settings.connections.catalog.blogger.enables.signIn',
     ],
   },
   {
     id: 'hugo',
-    label: 'Blog (Hugo)',
+    label: 'settings.connections.catalog.hugo.label',
     emoji: '✍️',
-    pitch: 'Your own static site on GitHub, published from the composer.',
+    pitch: 'settings.connections.catalog.hugo.pitch',
     // The third blog, and the only one where nobody hosts your writing: a post
     // is a file in a repository you own. Account-scoped like the other two —
     // a blog belongs to one public persona.
     scope: 'account',
     enables: [
-      'Publish Markdown posts as commits to your Hugo repository',
-      'Your posts stay files in a repo you own, not on a blog service',
-      'Needs a GitHub token; no CORS proxy, unlike the other blogs',
+      'settings.connections.catalog.hugo.enables.publish',
+      'settings.connections.catalog.hugo.enables.files',
+      'settings.connections.catalog.hugo.enables.credentials',
     ],
   },
   {
     id: 'openrouter',
-    label: 'OpenRouter',
+    label: 'settings.connections.catalog.openrouter.label',
     emoji: '🧠',
-    pitch: 'One key, hundreds of AI models, billed by usage.',
+    pitch: 'settings.connections.catalog.openrouter.pitch',
     // The only connector whose credential belongs to the human rather than to
     // a Mastodon persona — see OpenRouterSession for why it is unscoped.
     scope: 'browser',
     enables: [
-      'Turn plain English into Mastodon search queries',
-      'Suggest hashtags that actually have activity',
+      'settings.connections.catalog.openrouter.enables.search',
+      'settings.connections.catalog.openrouter.enables.hashtags',
     ],
   },
   {
     id: 'raindrop',
-    label: 'Raindrop.io',
+    label: 'settings.connections.catalog.raindrop.label',
     emoji: '💧',
-    pitch: 'The Raindrop.io bookmarking service.',
+    pitch: 'settings.connections.catalog.raindrop.pitch',
     // Your bookmark drawer, not one persona's — see RaindropSession for why the
     // token is stored unscoped.
     scope: 'browser',
     enables: [
-      'A second place to save bookmarks',
-      "Save a post's first external link instead of the post itself",
+      'settings.connections.catalog.raindrop.enables.bookmarks',
+      'settings.connections.catalog.raindrop.enables.externalLink',
     ],
   },
   {
     id: 'github',
-    label: 'GitHub',
+    label: 'settings.connections.catalog.github.label',
     emoji: '🐙',
-    pitch: 'Your GitHub account, read-only.',
+    pitch: 'settings.connections.catalog.github.pitch',
     scope: 'account',
-    enables: ['Find the people you follow on GitHub over here', 'Read your unread notifications'],
+    enables: [
+      'settings.connections.catalog.github.enables.following',
+      'settings.connections.catalog.github.enables.notifications',
+    ],
   },
   {
     id: 'gist',
-    label: 'GitHub Gist',
+    label: 'settings.connections.catalog.gist.label',
     emoji: '📝',
-    pitch: 'Publish pastes as gists on your GitHub account.',
+    pitch: 'settings.connections.catalog.gist.pitch',
     // One account, one credential under the retention policy — a connection by
     // the rule above, even though what it turns on is a *paste provider*. The
     // provider list is not a connection; the account behind this one is.
     scope: 'account',
     enables: [
-      'A "GitHub Gist" option wherever you can post a paste',
-      'Gists you create appear in Drafts and in Write, like any other paste',
-      'Edit and delete them later — they belong to your account, not to this browser',
+      'settings.connections.catalog.gist.enables.option',
+      'settings.connections.catalog.gist.enables.drafts',
+      'settings.connections.catalog.gist.enables.edit',
     ],
   },
   {
     id: 'dropbox',
-    label: 'Dropbox',
+    label: 'settings.connections.catalog.dropbox.label',
     emoji: '📦',
-    pitch: 'An app-specific folder in your Dropbox.',
+    pitch: 'settings.connections.catalog.dropbox.pitch',
     scope: 'session',
-    enables: ['Browse those files from Mawkingbird'],
+    enables: ['settings.connections.catalog.dropbox.enables.browse'],
   },
   {
     id: 'link-shortener',
-    label: 'Link shortener',
+    label: 'settings.connections.catalog.linkShortener.label',
     emoji: '🔗',
-    pitch: 'Dub, Short.io or T.LY, for shortening the URLs you post.',
+    pitch: 'settings.connections.catalog.linkShortener.pitch',
     // The subscription belongs to whoever pays for it, not to a persona — same
     // reasoning as OpenRouter and the CORS proxy. See ShortenerSettings.
     scope: 'browser',
     enables: [
-      'Shorten a URL as you write a post',
-      'Keep a list of every link you have made, and delete old ones',
+      'settings.connections.catalog.linkShortener.enables.shorten',
+      'settings.connections.catalog.linkShortener.enables.history',
     ],
   },
   {
     id: 'cors-proxy',
-    label: 'CORS proxy',
+    label: 'settings.connections.catalog.corsProxy.label',
     emoji: '🔀',
-    pitch: 'A relay for sites that refuse to talk to browsers directly.',
+    pitch: 'settings.connections.catalog.corsProxy.pitch',
     // The key belongs to whoever pays for the proxy, not to a persona — same
     // reasoning as OpenRouter. See CorsProxySettings.
     scope: 'browser',
     enables: [
-      'Read RSS feeds whose publishers block cross-origin access',
-      'Use your own proxy, or a paid one, instead of a rate-limited free service',
+      'settings.connections.catalog.corsProxy.enables.rss',
+      'settings.connections.catalog.corsProxy.enables.proxy',
     ],
   },
 ];

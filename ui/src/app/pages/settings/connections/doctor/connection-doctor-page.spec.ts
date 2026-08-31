@@ -165,7 +165,7 @@ describe('ConnectionDoctorPage', () => {
     await check(fixture);
 
     const text = el(fixture).textContent ?? '';
-    expect(text).toContain('About “just disable CORS”');
+    expect(text).toContain('About "just disable CORS"');
     // The specific host is named, since "which domains?" is the question asked.
     expect(el(fixture).querySelector('.doc-cors-list')?.textContent).toContain('openrouter.ai');
     // And the answer to it: there is nothing to whitelist, because the refusal

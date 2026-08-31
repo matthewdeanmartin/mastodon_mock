@@ -18,9 +18,9 @@
       </a>
     }
 
-    <nav class="settings-nav" aria-label="Settings sections">
-      @for (group of groups; track group.title) {
-        <h2 class="settings-nav-heading">{{ group.title }}</h2>
+    <nav class="settings-nav" [attr.aria-label]="'settings.sectionsAriaLabel' | transloco">
+      @for (group of groups; track group.titleKey) {
+        <h2 class="settings-nav-heading">{{ group.titleKey | transloco }}</h2>
         <!-- Tracked by path *within* a group: a page filed under two headings
              appears twice, so path alone is not unique across the whole nav. -->
         @for (item of group.items; track item.path) {
@@ -29,7 +29,7 @@
             routerLinkActive="active"
             [routerLinkActiveOptions]="{ exact: item.exact }"
           >
-            <span>{{ item.label }}</span>
+            <span>{{ item.labelKey | transloco }}</span>
             <span class="chev" aria-hidden="true">›</span>
           </a>
         }
