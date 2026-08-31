@@ -1,14 +1,24 @@
 @if (loading()) {
-  <p class="muted center">Loading…</p>
+  <p class="muted center">{{ 'pages.thread.loading' | transloco }}</p>
 } @else if (status(); as s) {
   <div class="reader-bar">
     @if (readerMode()) {
       <div class="reader-font">
-        <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(-1)" title="Smaller text">
+        <button
+          class="btn btn-outline btn-sm"
+          (click)="bumpReaderFont(-1)"
+          [title]="'pages.thread.reader.smallerText' | transloco"
+        >
           A−
         </button>
-        <span class="muted">{{ prefs.readerFontSize() }}px</span>
-        <button class="btn btn-outline btn-sm" (click)="bumpReaderFont(1)" title="Larger text">
+        <span class="muted">
+          {{ 'pages.thread.reader.fontSize' | transloco: { size: prefs.readerFontSize() } }}
+        </span>
+        <button
+          class="btn btn-outline btn-sm"
+          (click)="bumpReaderFont(1)"
+          [title]="'pages.thread.reader.largerText' | transloco"
+        >
           A+
         </button>
 
@@ -17,8 +27,8 @@
              persist through ClientPrefs. -->
         <select
           class="reader-select"
-          aria-label="Font family"
-          title="Font family"
+          [attr.aria-label]="'pages.thread.reader.fontFamily' | transloco"
+          [title]="'pages.thread.reader.fontFamily' | transloco"
           [value]="prefs.readerFontFamily()"
           (change)="setReaderFont($event)"
         >
@@ -29,16 +39,18 @@
 
         <select
           class="reader-select"
-          aria-label="Article theme"
-          title="Article theme — colours this article only"
+          [attr.aria-label]="'pages.thread.reader.articleTheme' | transloco"
+          [title]="'pages.thread.reader.articleThemeTitle' | transloco"
           [value]="prefs.readerTheme()"
           (change)="setReaderTheme($event)"
         >
-          <option value="app">Match app</option>
-          <option value="light">Light</option>
-          <option value="sepia">Sepia</option>
-          <option value="dark">Dark</option>
-          <option value="solarized">Solarized</option>
+          <option value="app">{{ 'pages.thread.reader.theme.matchApp' | transloco }}</option>
+          <option value="light">{{ 'pages.thread.reader.theme.light' | transloco }}</option>
+          <option value="sepia">{{ 'pages.thread.reader.theme.sepia' | transloco }}</option>
+          <option value="dark">{{ 'pages.thread.reader.theme.dark' | transloco }}</option>
+          <option value="solarized">
+            {{ 'pages.thread.reader.theme.solarized' | transloco }}
+          </option>
         </select>
       </div>
     }
@@ -52,11 +64,12 @@
       {{
         readerMode()
           ? isRss()
-            ? 'View as thread'
-            : 'Exit reader'
+            ? ('pages.thread.reader.viewAsThread' | transloco)
+            : ('pages.thread.reader.exit' | transloco)
           : chain().length > 1
-            ? 'Reader (' + chain().length + ' ' + words().posts + ')'
-            : 'Reader'
+            ? ('pages.thread.reader.withCount'
+              | transloco: { count: chain().length, posts: words().posts })
+            : ('pages.thread.reader.reader' | transloco)
       }}
     </button>
 
@@ -66,7 +79,7 @@
         [routerLink]="['/rss']"
         [queryParams]="rssFeedUrl() ? { feed: rssFeedUrl() } : {}"
       >
-        ← Return to RSS reader
+        {{ 'pages.thread.rss.return' | transloco }}
       </a>
     }
 
@@ -86,17 +99,17 @@
           class="btn btn-outline"
           [routerLink]="['/conversations']"
           [queryParams]="params"
-          title="Continue this conversation in chat"
+          [title]="'pages.thread.chat.continueTitle' | transloco"
         >
-          💬 Open in chat
+          💬 {{ 'pages.thread.chat.open' | transloco }}
         </a>
       } @else {
         <button
           class="btn btn-outline"
           disabled
-          title="Chat is only available for a two-person thread (you and one other)"
+          [title]="'pages.thread.chat.unavailableTitle' | transloco"
         >
-          💬 Open in chat
+          💬 {{ 'pages.thread.chat.open' | transloco }}
         </button>
       }
     }
@@ -118,7 +131,11 @@
             <div class="muted">
               &#64;{{ author.acct }} · {{ chain()[0].created_at | humanTime }}
               @if (!isRss()) {
-                · {{ chain().length }} {{ words().posts }}
+                ·
+                {{
+                  'pages.thread.reader.postCount'
+                    | transloco: { count: chain().length, posts: words().posts }
+                }}
               }
             </div>
           </div>
@@ -139,7 +156,7 @@
                  indistinguishable from the feature not existing. -->
             <p class="reader-expand-note">{{ blocker }}</p>
             <a class="btn btn-outline btn-sm" routerLink="/settings/connections/cors-proxy">
-              Choose a proxy
+              {{ 'pages.thread.article.chooseProxy' | transloco }}
             </a>
           } @else if (expansion(); as result) {
             @if (expansionNote(); as note) {
@@ -151,7 +168,7 @@
                  can actually say what happened. -->
             @if (expansionDebug().length) {
               <details class="reader-expand-debug">
-                <summary>What went wrong?</summary>
+                <summary>{{ 'pages.thread.article.whatWentWrong' | transloco }}</summary>
                 <ul>
                   @for (line of expansionDebug(); track line) {
                     <li>{{ line }}</li>
@@ -173,7 +190,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  ↗ Open {{ expandedHost() }}
+                  ↗
+                  {{ 'pages.thread.article.openHost' | transloco: { host: expandedHost() } }}
                 </a>
               }
               <!-- Disabled at zero quota rather than silently doing nothing:
@@ -184,7 +202,7 @@
                   [disabled]="expanding() || !quota.allowed()"
                   (click)="expandArticle(true)"
                 >
-                  Try again
+                  {{ 'pages.thread.article.tryAgain' | transloco }}
                 </button>
               }
             }
@@ -195,11 +213,11 @@
               (click)="expandArticle()"
             >
               @if (expanding()) {
-                Fetching article…
+                {{ 'pages.thread.article.fetching' | transloco }}
               } @else if (expandsRssTeaser()) {
-                📄 Fetch rest of article
+                📄 {{ 'pages.thread.article.fetchRest' | transloco }}
               } @else {
-                📄 Fetch article
+                📄 {{ 'pages.thread.article.fetch' | transloco }}
               }
             </button>
             <!-- Fetching a third-party page takes seconds. Without this a
@@ -207,7 +225,7 @@
                  and the article arriving, which reads as "nothing happened". -->
             <span class="sr-only" role="status">
               @if (expanding()) {
-                Fetching article, please wait.
+                {{ 'pages.thread.article.fetchingWait' | transloco }}
               }
             </span>
             <!-- Said plainly and without a countdown badge. The limit exists so
@@ -216,11 +234,12 @@
                  spent. -->
             @if (!quota.allowed()) {
               <span class="muted reader-expand-quota">
-                That's both of today's free articles. Mawkingbird Plus lifts the limit — or come
-                back tomorrow.
+                {{ 'pages.thread.article.quotaExhausted' | transloco }}
               </span>
             } @else if (!quota.unlimited() && quota.remaining() === 1) {
-              <span class="muted reader-expand-quota">One free article left today</span>
+              <span class="muted reader-expand-quota">
+                {{ 'pages.thread.article.quotaOneLeft' | transloco }}
+              </span>
             }
           }
         </section>
@@ -256,7 +275,13 @@
               [class.active]="post.bookmarked"
               (click)="toggleBookmark(post)"
             >
-              {{ post.bookmarked ? '🔖 Bookmarked' : '🔖 Bookmark' }}
+              🔖
+              {{
+                (post.bookmarked
+                  ? 'pages.thread.bookmark.bookmarked'
+                  : 'pages.thread.bookmark.bookmark'
+                ) | transloco
+              }}
             </button>
           }
         } @else {
@@ -265,8 +290,8 @@
               class="raction"
               [class.on]="replyingTo() === post.id"
               (click)="toggleReaderReply(post.id)"
-              title="Reply"
-              aria-label="Reply"
+              [title]="'pages.thread.reply.title' | transloco"
+              [attr.aria-label]="'pages.thread.reply.title' | transloco"
             >
               <span aria-hidden="true">💬</span> {{ post.replies_count }}
             </button>
@@ -283,8 +308,18 @@
               class="raction"
               [class.on]="post.favourited"
               (click)="toggleFavourite(post)"
-              [title]="post.favourited ? 'Undo favourite' : 'Favourite'"
-              [attr.aria-label]="post.favourited ? 'Undo favourite' : 'Favourite'"
+              [title]="
+                (post.favourited
+                  ? 'pages.thread.actions.undoFavourite'
+                  : 'pages.thread.actions.favourite'
+                ) | transloco
+              "
+              [attr.aria-label]="
+                (post.favourited
+                  ? 'pages.thread.actions.undoFavourite'
+                  : 'pages.thread.actions.favourite'
+                ) | transloco
+              "
             >
               <span aria-hidden="true">⭐</span> {{ post.favourites_count }}
             </button>
@@ -292,8 +327,18 @@
               class="raction"
               [class.on]="post.bookmarked"
               (click)="toggleBookmark(post)"
-              [title]="post.bookmarked ? 'Remove bookmark' : 'Bookmark'"
-              [attr.aria-label]="post.bookmarked ? 'Remove bookmark' : 'Bookmark'"
+              [title]="
+                (post.bookmarked
+                  ? 'pages.thread.actions.removeBookmark'
+                  : 'pages.thread.actions.bookmark'
+                ) | transloco
+              "
+              [attr.aria-label]="
+                (post.bookmarked
+                  ? 'pages.thread.actions.removeBookmark'
+                  : 'pages.thread.actions.bookmark'
+                ) | transloco
+              "
             >
               <span aria-hidden="true">🔖</span>
             </button>
@@ -309,7 +354,7 @@
                 <app-compose
                   [inReplyToId]="post.id"
                   [replyToHandle]="post.account.acct"
-                  placeholder="Post your reply"
+                  [placeholder]="'pages.thread.reply.placeholder' | transloco"
                   (posted)="onReaderReplied($event)"
                 />
               }
@@ -324,7 +369,9 @@
         <section
           #expandedArticle
           class="reader-article"
-          [attr.aria-label]="'Expanded article: ' + article.title"
+          [attr.aria-label]="
+            'pages.thread.article.expandedLabel' | transloco: { title: article.title }
+          "
           tabindex="-1"
         >
           <h2 class="reader-article-title">{{ article.title }}</h2>
@@ -335,9 +382,12 @@
             @if (article.byline) {
               {{ article.byline }} ·
             }
-            Expanded from {{ expandedHost() }}
+            {{ 'pages.thread.article.expandedFrom' | transloco: { host: expandedHost() } }}
             @if (article.metrics.wordCount) {
-              · {{ article.metrics.wordCount }} words
+              ·
+              {{
+                'pages.thread.article.wordCount' | transloco: { count: article.metrics.wordCount }
+              }}
             }
           </p>
           <!-- Safe by construction rather than by trust: this HTML came from a
@@ -346,14 +396,14 @@
           <div class="reader-article-body" [innerHTML]="expandedHtml()"></div>
           <div class="reader-article-actions">
             <button class="btn btn-outline btn-sm" (click)="collapseArticle()">
-              Collapse article
+              {{ 'pages.thread.article.collapse' | transloco }}
             </button>
             <button
               class="btn btn-outline btn-sm"
               [disabled]="expanding() || !quota.allowed()"
               (click)="expandArticle(true)"
             >
-              Re-fetch
+              {{ 'pages.thread.article.refetch' | transloco }}
             </button>
             <a
               class="btn btn-outline btn-sm"
@@ -361,7 +411,7 @@
               target="_blank"
               rel="noopener noreferrer"
             >
-              ↗ Read on the original site
+              ↗ {{ 'pages.thread.article.readOriginal' | transloco }}
             </a>
           </div>
         </section>
@@ -369,7 +419,14 @@
 
       @if (comments().length) {
         <section class="reader-comments">
-          <h2 class="comments-title">{{ comments().length }} comments</h2>
+          <h2 class="comments-title">
+            {{
+              (comments().length === 1
+                ? 'pages.thread.comments.one'
+                : 'pages.thread.comments.other'
+              ) | transloco: { count: comments().length }
+            }}
+          </h2>
           @for (c of comments(); track c.id) {
             <div class="comment">
               <img
@@ -397,12 +454,11 @@
       @if (isRss() && !comments().length) {
         <p class="muted reader-comments-note">
           @if (rssHasCommentFeed() && !rssCommentsUnavailable()) {
-            Loading comments…
+            {{ 'pages.thread.comments.loading' | transloco }}
           } @else if (rssHasCommentFeed()) {
-            Comments couldn't be loaded from this feed. Read and join the discussion on the original
-            site.
+            {{ 'pages.thread.comments.loadFailed' | transloco }}
           } @else {
-            This feed doesn't publish comments. Read the discussion on the original site.
+            {{ 'pages.thread.comments.noFeed' | transloco }}
           }
         </p>
       }
@@ -410,10 +466,11 @@
   } @else {
     @if (isAnonymousPublic() && publicContextUnavailable()) {
       <p class="muted center">
-        This server did not make the surrounding conversation available anonymously. The post is
-        still readable below.
+        {{ 'pages.thread.anonymous.contextUnavailable' | transloco }}
         @if (publicOriginalUrl(); as originalUrl) {
-          <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">Open the original</a>.
+          <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">
+            {{ 'pages.thread.anonymous.openOriginal' | transloco }} </a
+          >.
         }
       </p>
     }
@@ -449,9 +506,9 @@
       }
       @if (nitterThreadUrl(); as url) {
         <p class="muted center">
-          Replies only — Mawkingbird cannot post to Twitter.
+          {{ 'pages.thread.twitter.repliesOnly' | transloco }}
           <a [href]="url" target="_blank" rel="noopener noreferrer">
-            Read the full conversation on {{ nitterLabel }} ↗
+            {{ 'pages.thread.twitter.readConversation' | transloco: { host: nitterLabel } }} ↗
           </a>
         </p>
       }
@@ -459,7 +516,7 @@
       <app-compose
         [inReplyToId]="s.id"
         [replyToHandle]="s.account.acct"
-        placeholder="Post your reply"
+        [placeholder]="'pages.thread.reply.placeholder' | transloco"
         (posted)="onReply($event)"
       />
     }
@@ -484,17 +541,21 @@
     <div class="thread-error-actions">
       @if (publicOriginalUrl(); as originalUrl) {
         <a class="btn" [href]="originalUrl" target="_blank" rel="noopener noreferrer">
-          Open the original post
+          {{ 'pages.thread.error.openOriginal' | transloco }}
         </a>
       }
-      <a class="btn btn-outline" routerLink="/home">Go to your home feed</a>
+      <a class="btn btn-outline" routerLink="/home">
+        {{ 'pages.thread.error.home' | transloco }}
+      </a>
     </div>
   </div>
 } @else {
   <p class="muted center">
-    Status not found.
+    {{ 'pages.thread.error.notFound' | transloco }}
     @if (publicOriginalUrl(); as originalUrl) {
-      <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">Open the original post</a>.
+      <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">
+        {{ 'pages.thread.error.openOriginal' | transloco }} </a
+      >.
     }
   </p>
 }

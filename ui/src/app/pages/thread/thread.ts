@@ -58,6 +58,103 @@ import { ArticleDiagnosis, ArticleResult } from '../../providers/article/article
 import { renderMarkdown } from '../../providers/article/markdown-render';
 import { PreviewCardComponent } from '../../preview-card/preview-card';
 import { PageDiagnostics } from '../../page-diagnostics';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+
+// i18n pages.thread.loading: Loading…
+// i18n pages.thread.reader.smallerText: Smaller text
+// i18n pages.thread.reader.largerText: Larger text
+// i18n pages.thread.reader.fontSize: {{size}}px
+// i18n pages.thread.reader.fontFamily: Font family
+// i18n pages.thread.reader.articleTheme: Article theme
+// i18n pages.thread.reader.articleThemeTitle: Article theme — colours this article only
+// i18n pages.thread.reader.theme.matchApp: Match app
+// i18n pages.thread.reader.theme.light: Light
+// i18n pages.thread.reader.theme.sepia: Sepia
+// i18n pages.thread.reader.theme.dark: Dark
+// i18n pages.thread.reader.theme.solarized: Solarized
+// i18n pages.thread.reader.viewAsThread: View as thread
+// i18n pages.thread.reader.exit: Exit reader
+// i18n pages.thread.reader.withCount: Reader ({{count}} {{posts}})
+// i18n pages.thread.reader.reader: Reader
+// i18n pages.thread.reader.postCount: {{count}} {{posts}}
+// i18n pages.thread.rss.return: ← Return to RSS reader
+// i18n pages.thread.chat.continueTitle: Continue this conversation in chat
+// i18n pages.thread.chat.open: Open in chat
+// i18n pages.thread.chat.unavailableTitle: Chat is only available for a two-person thread (you and one other)
+// i18n pages.thread.article.chooseProxy: Choose a proxy
+// i18n pages.thread.article.whatWentWrong: What went wrong?
+// i18n pages.thread.article.openHost: Open {{host}}
+// i18n pages.thread.article.tryAgain: Try again
+// i18n pages.thread.article.fetching: Fetching article…
+// i18n pages.thread.article.fetchRest: Fetch rest of article
+// i18n pages.thread.article.fetch: Fetch article
+// i18n pages.thread.article.fetchingWait: Fetching article, please wait.
+// i18n pages.thread.article.quotaExhausted: That's both of today's free articles. Mawkingbird Plus lifts the limit — or come back tomorrow.
+// i18n pages.thread.article.quotaOneLeft: One free article left today
+// i18n pages.thread.bookmark.bookmarked: Bookmarked
+// i18n pages.thread.bookmark.bookmark: Bookmark
+// i18n pages.thread.reply.title: Reply
+// i18n pages.thread.actions.undoFavourite: Undo favourite
+// i18n pages.thread.actions.favourite: Favourite
+// i18n pages.thread.actions.removeBookmark: Remove bookmark
+// i18n pages.thread.actions.bookmark: Bookmark
+// i18n pages.thread.reply.placeholder: Post your reply
+// i18n pages.thread.article.expandedLabel: Expanded article: {{title}}
+// i18n pages.thread.article.expandedFrom: Expanded from {{host}}
+// i18n pages.thread.article.wordCount: {{count}} words
+// i18n pages.thread.article.collapse: Collapse article
+// i18n pages.thread.article.refetch: Re-fetch
+// i18n pages.thread.article.readOriginal: Read on the original site
+// i18n pages.thread.comments.one: {{count}} comment
+// i18n pages.thread.comments.other: {{count}} comments
+// i18n pages.thread.comments.loading: Loading comments…
+// i18n pages.thread.comments.loadFailed: Comments couldn't be loaded from this feed. Read and join the discussion on the original site.
+// i18n pages.thread.comments.noFeed: This feed doesn't publish comments. Read the discussion on the original site.
+// i18n pages.thread.anonymous.contextUnavailable: This server did not make the surrounding conversation available anonymously. The post is still readable below.
+// i18n pages.thread.anonymous.openOriginal: Open the original
+// i18n pages.thread.twitter.repliesOnly: Replies only — Mawkingbird cannot post to Twitter.
+// i18n pages.thread.twitter.readConversation: Read the full conversation on {{host}}
+// i18n pages.thread.error.openOriginal: Open the original post
+// i18n pages.thread.error.home: Go to your home feed
+// i18n pages.thread.error.notFound: Status not found.
+// i18n pages.thread.article.expansionBlocker: Article expansion needs a CORS proxy. Choose one in Settings › Connections.
+// i18n pages.thread.article.note.partial: This may be only part of the article — open the original if it stops short.
+// i18n pages.thread.article.note.paywall: This publisher asks for a subscription, so only the opening is readable here.
+// i18n pages.thread.article.note.botCheck: This site refuses automated requests. Opening it directly should work.
+// i18n pages.thread.article.note.consentWall: This site served a cookie notice instead of the article.
+// i18n pages.thread.article.note.needsJs: This page builds itself with JavaScript, so there is nothing to read yet.
+// i18n pages.thread.article.note.junk: Couldn't find an article on this page — it may be a homepage or an index.
+// i18n pages.thread.article.note.notHtml: This link is a file rather than a web page.
+// i18n pages.thread.article.note.tooLarge: This page is too big to expand. Open it on the original site.
+// i18n pages.thread.article.note.rateLimited: Too many requests through the shared proxy. Try again in a minute.
+// i18n pages.thread.article.note.siteRateLimited: This site is limiting how often it will answer. Try again later.
+// i18n pages.thread.article.note.siteError: This site answered with an error of its own. It may be having trouble.
+// i18n pages.thread.article.note.notFound: This page is gone — the link may be broken or the post removed.
+// i18n pages.thread.article.note.upstreamTimeout: This site took too long to answer.
+// i18n pages.thread.article.note.blockedDestination: This address can't be fetched.
+// i18n pages.thread.article.note.routeUnavailable: The article service is unavailable. Try again shortly.
+// i18n pages.thread.article.note.redirectLoop: This link redirects in a loop and never arrives anywhere.
+// i18n pages.thread.article.note.network: Couldn't reach this page. It may be down, or you may be offline.
+// i18n pages.thread.article.debug.upstream: The site answered.
+// i18n pages.thread.article.debug.upstreamStatus: The site answered (HTTP {{status}}).
+// i18n pages.thread.article.debug.proxy: The proxy refused this before contacting the site.
+// i18n pages.thread.article.debug.status: HTTP status: {{status}}
+// i18n pages.thread.article.debug.textFound: Text found on the page: {{count}} words
+// i18n pages.thread.article.debug.previewReadable: Link preview data was readable.
+// i18n pages.thread.article.debug.noPreview: No link preview data.
+// i18n pages.thread.article.debug.elapsed: Took {{seconds}}s
+// i18n pages.thread.article.debug.url: URL: {{url}}
+// i18n pages.thread.actions.like: like this post
+// i18n pages.thread.actions.repost: repost this post
+// i18n pages.thread.actions.bookmarkPost: bookmark this post
+// i18n pages.thread.actions.failureBluesky: Couldn't {{action}} on Bluesky — your link may have expired. Re-link in Settings → Connections.
+// i18n pages.thread.actions.failureMastodon: Couldn't {{action}} on Mastodon — try again.
+// i18n pages.thread.error.postNotOnServer: This post isn’t on the server you’re browsing. Post links only work on the server that hosts them.
+// i18n pages.thread.error.loadPost: Could not load this post.
+// i18n pages.thread.twitter.loadPost: Could not load this post.
+// i18n pages.thread.twitter.loadReplies: Could not load replies.
+// i18n pages.thread.readerOriginal.nitter: Read on Nitter
+// i18n pages.thread.readerOriginal.originalSite: Read on the original site
 /**
  * How many times "Try again" may re-fetch one article.
  *
@@ -87,6 +184,7 @@ function hostname(url: string): string | null {
     RouterLink,
     LocalCompose,
     PreviewCardComponent,
+    TranslocoPipe,
   ],
   templateUrl: './thread.html',
   styleUrl: './thread.css',
@@ -109,6 +207,7 @@ export class Thread implements OnInit {
   private destroyRef = inject(DestroyRef);
   private log = inject(PageDiagnostics);
   private readingZen = inject(ReadingZen);
+  private transloco = inject(TranslocoService);
   private loadSub = new Subscription();
   protected readonly readerFonts = READER_FONT_OPTIONS;
 
@@ -297,7 +396,7 @@ export class Thread implements OnInit {
    */
   protected expansionBlocker = computed<string | null>(() => {
     if (!this.articles.available()) {
-      return 'Article expansion needs a CORS proxy. Choose one in Settings › Connections.';
+      return this.transloco.translate('pages.thread.article.expansionBlocker');
     }
     return null;
   });
@@ -320,30 +419,31 @@ export class Thread implements OnInit {
     // of these it is genuinely the answer.
     const notes: Record<ArticleDiagnosis, string | null> = {
       ok: null,
-      partial: 'This may be only part of the article — open the original if it stops short.',
-      paywall: 'This publisher asks for a subscription, so only the opening is readable here.',
-      'bot-check': 'This site refuses automated requests. Opening it directly should work.',
-      'consent-wall': 'This site served a cookie notice instead of the article.',
-      'needs-js': 'This page builds itself with JavaScript, so there is nothing to read yet.',
-      junk: "Couldn't find an article on this page — it may be a homepage or an index.",
-      'not-html': 'This link is a file rather than a web page.',
-      'too-large': 'This page is too big to expand. Open it on the original site.',
-      'rate-limited': 'Too many requests through the shared proxy. Try again in a minute.',
+      partial: 'pages.thread.article.note.partial',
+      paywall: 'pages.thread.article.note.paywall',
+      'bot-check': 'pages.thread.article.note.botCheck',
+      'consent-wall': 'pages.thread.article.note.consentWall',
+      'needs-js': 'pages.thread.article.note.needsJs',
+      junk: 'pages.thread.article.note.junk',
+      'not-html': 'pages.thread.article.note.notHtml',
+      'too-large': 'pages.thread.article.note.tooLarge',
+      'rate-limited': 'pages.thread.article.note.rateLimited',
       // Distinguished from ours deliberately: waiting fixes our limit, and does
       // not necessarily fix theirs.
-      'site-rate-limited': 'This site is limiting how often it will answer. Try again later.',
-      'site-error': 'This site answered with an error of its own. It may be having trouble.',
-      'not-found': 'This page is gone — the link may be broken or the post removed.',
-      'upstream-timeout': 'This site took too long to answer.',
-      'blocked-destination': "This address can't be fetched.",
+      'site-rate-limited': 'pages.thread.article.note.siteRateLimited',
+      'site-error': 'pages.thread.article.note.siteError',
+      'not-found': 'pages.thread.article.note.notFound',
+      'upstream-timeout': 'pages.thread.article.note.upstreamTimeout',
+      'blocked-destination': 'pages.thread.article.note.blockedDestination',
       // Should never reach a reader: the fetch retries on the older route when
       // it sees this. Worded for the case where that retry also fails, which
       // means the proxy is genuinely misconfigured rather than merely behind.
-      'route-unavailable': 'The article service is unavailable. Try again shortly.',
-      'redirect-loop': 'This link redirects in a loop and never arrives anywhere.',
-      network: "Couldn't reach this page. It may be down, or you may be offline.",
+      'route-unavailable': 'pages.thread.article.note.routeUnavailable',
+      'redirect-loop': 'pages.thread.article.note.redirectLoop',
+      network: 'pages.thread.article.note.network',
     };
-    return notes[result.diagnosis];
+    const key = notes[result.diagnosis];
+    return key ? this.transloco.translate(key) : null;
   });
 
   /**
@@ -363,27 +463,49 @@ export class Thread implements OnInit {
     const lines: string[] = [];
     if (debug.source === 'upstream') {
       lines.push(
-        `The site answered${debug.upstreamStatus ? ` (HTTP ${debug.upstreamStatus})` : ''}.`,
+        debug.upstreamStatus
+          ? this.transloco.translate('pages.thread.article.debug.upstreamStatus', {
+              status: debug.upstreamStatus,
+            })
+          : this.transloco.translate('pages.thread.article.debug.upstream'),
       );
     } else if (debug.source === 'proxy') {
-      lines.push('The proxy refused this before contacting the site.');
+      lines.push(this.transloco.translate('pages.thread.article.debug.proxy'));
     }
     if (debug.status) {
-      lines.push(`HTTP status: ${debug.status}`);
+      lines.push(
+        this.transloco.translate('pages.thread.article.debug.status', { status: debug.status }),
+      );
     }
     if (debug.detail) {
       lines.push(debug.detail);
     }
     if (debug.documentWords !== undefined) {
-      lines.push(`Text found on the page: ${debug.documentWords} words`);
+      lines.push(
+        this.transloco.translate('pages.thread.article.debug.textFound', {
+          count: debug.documentWords,
+        }),
+      );
     }
     if (debug.hadMetadata !== undefined) {
-      lines.push(debug.hadMetadata ? 'Link preview data was readable.' : 'No link preview data.');
+      lines.push(
+        this.transloco.translate(
+          debug.hadMetadata
+            ? 'pages.thread.article.debug.previewReadable'
+            : 'pages.thread.article.debug.noPreview',
+        ),
+      );
     }
     if (debug.elapsedMs !== undefined) {
-      lines.push(`Took ${(debug.elapsedMs / 1000).toFixed(1)}s`);
+      lines.push(
+        this.transloco.translate('pages.thread.article.debug.elapsed', {
+          seconds: (debug.elapsedMs / 1000).toFixed(1),
+        }),
+      );
     }
-    lines.push(`URL: ${result.finalUrl}`);
+    lines.push(
+      this.transloco.translate('pages.thread.article.debug.url', { url: result.finalUrl }),
+    );
     return lines;
   });
 
@@ -604,7 +726,7 @@ export class Thread implements OnInit {
     this.readerActionError.set(null);
     this.actions.toggleFavourite(post).subscribe({
       next: (updated) => this.patch(updated),
-      error: () => this.readerActionError.set(this.actionFailureMessage(post, 'like this post')),
+      error: () => this.readerActionError.set(this.actionFailureMessage(post, 'like')),
     });
   }
 
@@ -612,14 +734,24 @@ export class Thread implements OnInit {
     this.readerActionError.set(null);
     this.actions.toggleReblog(post).subscribe({
       next: (updated) => this.patch(updated.reblog ?? updated),
-      error: () => this.readerActionError.set(this.actionFailureMessage(post, 'repost this post')),
+      error: () => this.readerActionError.set(this.actionFailureMessage(post, 'repost')),
     });
   }
 
-  private actionFailureMessage(post: Status, action: string): string {
-    return post.provider === 'bluesky'
-      ? `Couldn't ${action} on Bluesky — your link may have expired. Re-link in Settings → Connections.`
-      : `Couldn't ${action} on Mastodon — try again.`;
+  private actionFailureMessage(post: Status, action: 'like' | 'repost' | 'bookmark'): string {
+    const actionKey =
+      action === 'like'
+        ? 'pages.thread.actions.like'
+        : action === 'repost'
+          ? 'pages.thread.actions.repost'
+          : 'pages.thread.actions.bookmarkPost';
+    const actionText = this.transloco.translate(actionKey);
+    return this.transloco.translate(
+      post.provider === 'bluesky'
+        ? 'pages.thread.actions.failureBluesky'
+        : 'pages.thread.actions.failureMastodon',
+      { action: actionText },
+    );
   }
 
   /**
@@ -639,8 +771,7 @@ export class Thread implements OnInit {
         : this.bsky.createBookmark(ref.uri, ref.cid);
       call.subscribe({
         next: () => this.patch({ ...post, bookmarked: !post.bookmarked }),
-        error: () =>
-          this.readerActionError.set(this.actionFailureMessage(post, 'bookmark this post')),
+        error: () => this.readerActionError.set(this.actionFailureMessage(post, 'bookmark')),
       });
       return;
     }
@@ -656,8 +787,7 @@ export class Thread implements OnInit {
     const call = post.bookmarked ? this.api.unbookmark(post.id) : this.api.bookmark(post.id);
     call.subscribe({
       next: (updated) => this.patch(updated),
-      error: () =>
-        this.readerActionError.set(this.actionFailureMessage(post, 'bookmark this post')),
+      error: () => this.readerActionError.set(this.actionFailureMessage(post, 'bookmark')),
     });
   }
 
@@ -782,8 +912,8 @@ export class Thread implements OnInit {
           this.loading.set(false);
           this.loadError.set(
             status === 404
-              ? 'This post isn’t on the server you’re browsing. Post links only work on the server that hosts them.'
-              : 'Could not load this post.',
+              ? this.transloco.translate('pages.thread.error.postNotOnServer')
+              : this.transloco.translate('pages.thread.error.loadPost'),
           );
         },
       }),
@@ -915,7 +1045,9 @@ export class Thread implements OnInit {
           },
           error: (error: unknown) => {
             this.twitterError.set(
-              error instanceof Error ? error.message : 'Could not load this post.',
+              error instanceof Error
+                ? error.message
+                : this.transloco.translate('pages.thread.twitter.loadPost'),
             );
             this.loading.set(false);
           },
@@ -934,7 +1066,11 @@ export class Thread implements OnInit {
           this.loading.set(false);
         },
         error: (error: unknown) => {
-          this.twitterError.set(error instanceof Error ? error.message : 'Could not load replies.');
+          this.twitterError.set(
+            error instanceof Error
+              ? error.message
+              : this.transloco.translate('pages.thread.twitter.loadReplies'),
+          );
           this.loading.set(false);
         },
       }),
@@ -997,9 +1133,16 @@ export class Thread implements OnInit {
   protected readerOriginalLink(post: Status): { url: string; label: string } | null {
     if (post.provider === 'twitter') {
       const url = toNitterUrl(post.url);
-      return url ? { url, label: 'Read on Nitter' } : null;
+      return url
+        ? { url, label: this.transloco.translate('pages.thread.readerOriginal.nitter') }
+        : null;
     }
-    return post.url ? { url: post.url, label: 'Read on the original site' } : null;
+    return post.url
+      ? {
+          url: post.url,
+          label: this.transloco.translate('pages.thread.readerOriginal.originalSite'),
+        }
+      : null;
   }
 
   toggleReader(): void {

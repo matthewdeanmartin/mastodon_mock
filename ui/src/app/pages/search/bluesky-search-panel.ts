@@ -82,6 +82,10 @@ import { Terminology } from '../../terminology';
 // i18n pages.search.bluesky.postedBy: Posted by
 // i18n pages.search.bluesky.mentioning: Mentioning
 // i18n pages.search.bluesky.hashtags: Hashtags
+// i18n pages.search.bluesky.handlePlaceholder: handle.bsky.social
+// i18n pages.search.bluesky.hashtagPlaceholder: angular typescript
+// i18n pages.search.bluesky.domainPlaceholder: github.com
+// i18n pages.search.bluesky.urlPlaceholder: https://example.com/post
 // i18n pages.search.bluesky.postsWithAllTags: Posts with <em>all</em> of these tags.
 // i18n pages.search.bluesky.linksToDomain: Links to domain
 // i18n pages.search.bluesky.linksToUrl: Links to URL
@@ -176,8 +180,8 @@ import { Terminology } from '../../terminology';
 // i18n pages.search.bluesky.sortRelevance: Relevance
 // i18n pages.search.bluesky.sortNewest: Newest
 // i18n pages.search.bluesky.sortOldest: Oldest
-// i18n pages.search.bluesky.sortMostLiked: Most liked
-// i18n pages.search.bluesky.sortMostReposted: Most reposted
+// i18n pages.search.sort.mostLiked: Most liked
+// i18n pages.search.sort.mostReposted: Most reposted
 // i18n pages.search.bluesky.sortMostReplies: Most replies
 // i18n pages.search.bluesky.sortMostFollowers: Most followers
 // i18n pages.search.bluesky.sortMostFollowing: Most following
@@ -689,8 +693,8 @@ export class BlueskySearchPanel {
       relevance: 'pages.search.bluesky.sortRelevance',
       newest: 'pages.search.bluesky.sortNewest',
       oldest: 'pages.search.bluesky.sortOldest',
-      favourites: 'pages.search.bluesky.sortMostLiked',
-      reblogs: 'pages.search.bluesky.sortMostReposted',
+      favourites: 'pages.search.sort.mostLiked',
+      reblogs: 'pages.search.sort.mostReposted',
       replies: 'pages.search.bluesky.sortMostReplies',
     };
     return labels[value];

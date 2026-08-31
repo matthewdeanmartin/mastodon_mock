@@ -208,7 +208,7 @@
               @for (item of sel.skipped; track item.account.id) {
                 <li>
                   <span class="muted small">&#64;{{ item.account.acct }}</span>
-                  <span class="muted small">{{ item.reason }}</span>
+                  <span class="muted small">{{ reasonText(item.reason) }}</span>
                 </li>
               }
             </ul>

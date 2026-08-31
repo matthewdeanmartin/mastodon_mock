@@ -38,7 +38,7 @@
           type="text"
           [ngModel]="criteria().author"
           (ngModelChange)="set('author', $event)"
-          placeholder="handle.bsky.social"
+          [placeholder]="'pages.search.bluesky.handlePlaceholder' | transloco"
         />
       </label>
 
@@ -48,7 +48,7 @@
           type="text"
           [ngModel]="criteria().mentions"
           (ngModelChange)="set('mentions', $event)"
-          placeholder="handle.bsky.social"
+          [placeholder]="'pages.search.bluesky.handlePlaceholder' | transloco"
         />
       </label>
 
@@ -58,7 +58,7 @@
           type="text"
           [ngModel]="tagInput()"
           (ngModelChange)="tagInput.set($event)"
-          placeholder="angular typescript"
+          [placeholder]="'pages.search.bluesky.hashtagPlaceholder' | transloco"
         />
         <!-- Say "all", because the server ANDs them and readers assume OR. -->
         <small
@@ -73,7 +73,7 @@
           type="text"
           [ngModel]="criteria().domain"
           (ngModelChange)="set('domain', $event)"
-          placeholder="github.com"
+          [placeholder]="'pages.search.bluesky.domainPlaceholder' | transloco"
         />
       </label>
 
@@ -83,7 +83,7 @@
           type="url"
           [ngModel]="criteria().url"
           (ngModelChange)="set('url', $event)"
-          placeholder="https://example.com/post"
+          [placeholder]="'pages.search.bluesky.urlPlaceholder' | transloco"
         />
       </label>
 
@@ -133,8 +133,7 @@
           {{ 'pages.search.bluesky.minimumEngagement' | transloco }}
           <span class="muted small">
             {{
-              'pages.search.bluesky.loadedPostsNoNewSearch'
-                | transloco: { postType: words().posts }
+              'pages.search.bluesky.loadedPostsNoNewSearch' | transloco: { postType: words().posts }
             }}
           </span>
         </div>
@@ -158,7 +157,9 @@
               [placeholder]="'pages.search.bluesky.any' | transloco"
               [ngModel]="engagementBounds().minReposts ?? null"
               (ngModelChange)="setEngagementBound('minReposts', $event)"
-              [attr.aria-label]="'pages.search.bluesky.minimumBoosts' | transloco: { boostType: words().boosts }"
+              [attr.aria-label]="
+                'pages.search.bluesky.minimumBoosts' | transloco: { boostType: words().boosts }
+              "
             />
           </label>
           <label>
@@ -180,9 +181,9 @@
           {{ 'pages.search.bluesky.applyAndSearch' | transloco }}
         </button>
         @if (hasFilters()) {
-            <button class="btn btn-outline btn-sm" (click)="reset()">
-              {{ 'pages.search.bluesky.clear' | transloco }}
-            </button>
+          <button class="btn btn-outline btn-sm" (click)="reset()">
+            {{ 'pages.search.bluesky.clear' | transloco }}
+          </button>
         }
       </div>
     </div>
@@ -248,7 +249,9 @@
               [placeholder]="'pages.search.bluesky.min' | transloco"
               [ngModel]="accountBound('posts', 'min')"
               (ngModelChange)="setAccountBound('posts', 'min', $event)"
-              [attr.aria-label]="'pages.search.bluesky.minimumPosts' | transloco: { postType: words().posts }"
+              [attr.aria-label]="
+                'pages.search.bluesky.minimumPosts' | transloco: { postType: words().posts }
+              "
             />
             <input
               type="number"
@@ -256,7 +259,9 @@
               [placeholder]="'pages.search.bluesky.max' | transloco"
               [ngModel]="accountBound('posts', 'max')"
               (ngModelChange)="setAccountBound('posts', 'max', $event)"
-              [attr.aria-label]="'pages.search.bluesky.maximumPosts' | transloco: { postType: words().posts }"
+              [attr.aria-label]="
+                'pages.search.bluesky.maximumPosts' | transloco: { postType: words().posts }
+              "
             />
           </span>
         </label>
@@ -291,7 +296,8 @@
         [placeholder]="
           (target() === 'accounts'
             ? 'pages.search.bluesky.filterThesePeople'
-            : 'pages.search.bluesky.filterTheseResults') | transloco
+            : 'pages.search.bluesky.filterTheseResults'
+          ) | transloco
         "
         [attr.aria-label]="'pages.search.bluesky.filterLoadedResults' | transloco"
       />
@@ -336,7 +342,9 @@
           <select
             [ngModel]="statusSort()"
             (ngModelChange)="statusSort.set($event)"
-            [attr.aria-label]="'pages.search.bluesky.sortPosts' | transloco: { postType: words().posts }"
+            [attr.aria-label]="
+              'pages.search.bluesky.sortPosts' | transloco: { postType: words().posts }
+            "
           >
             @for (s of statusSorts; track s.value) {
               <option [value]="s.value">{{ s.label | transloco }}</option>
@@ -431,16 +439,11 @@
               (change)="collapseRepeats.set(!collapseRepeats())"
             />
             <span>
-              {{
-                'pages.search.bluesky.collapseRepeated'
-                  | transloco: { postType: words().posts }
-              }}
+              {{ 'pages.search.bluesky.collapseRepeated' | transloco: { postType: words().posts } }}
             </span>
           </label>
           <p class="muted small collapse-note">
-            {{
-              'pages.search.bluesky.collapseNote' | transloco: { postType: words().posts }
-            }}
+            {{ 'pages.search.bluesky.collapseNote' | transloco: { postType: words().posts } }}
           </p>
         </div>
 
@@ -488,8 +491,7 @@
           {{ 'pages.search.bluesky.refineLoadedResults' | transloco }}
           <span class="muted small">
             {{
-              'pages.search.bluesky.basedOnLoadedAccounts'
-                | transloco: { count: accounts().length }
+              'pages.search.bluesky.basedOnLoadedAccounts' | transloco: { count: accounts().length }
             }}
           </span>
         </summary>
@@ -509,7 +511,7 @@
               </label>
             }
             @if (facet.hint) {
-                <p class="muted small collapse-note">{{ facet.hint | transloco }}</p>
+              <p class="muted small collapse-note">{{ facet.hint | transloco }}</p>
             }
           </div>
         }
@@ -534,13 +536,14 @@
             <button class="btn btn-outline btn-sm" (click)="scanActivity()">
               {{
                 'pages.search.bluesky.checkActivity'
-                  | transloco: {
-                      count: activityScanSize(),
-                      accountWord:
-                        activityScanSize() === 1
-                          ? ('pages.search.bluesky.account' | transloco)
-                          : ('pages.search.bluesky.accounts' | transloco)
-                    }
+                  | transloco
+                    : {
+                        count: activityScanSize(),
+                        accountWord:
+                          activityScanSize() === 1
+                            ? ('pages.search.bluesky.account' | transloco)
+                            : ('pages.search.bluesky.accounts' | transloco),
+                      }
               }}
             </button>
           </div>
@@ -571,23 +574,25 @@
       } @else {
         {{
           'pages.search.bluesky.showingPosts'
-            | transloco: {
-                visible: visible().length,
-                loaded: statuses().length,
-                postType: words().posts
-              }
+            | transloco
+              : {
+                  visible: visible().length,
+                  loaded: statuses().length,
+                  postType: words().posts,
+                }
         }}<br />
         @if (excludedCount()) {
           {{
             'pages.search.bluesky.hiddenExcludedAccounts'
-              | transloco: {
-                  hidden: excludedCount(),
-                  excluded: excludedAuthors().size,
-                  accountWord:
-                    excludedAuthors().size === 1
-                      ? ('pages.search.bluesky.account' | transloco)
-                      : ('pages.search.bluesky.accounts' | transloco)
-                }
+              | transloco
+                : {
+                    hidden: excludedCount(),
+                    excluded: excludedAuthors().size,
+                    accountWord:
+                      excludedAuthors().size === 1
+                        ? ('pages.search.bluesky.account' | transloco)
+                        : ('pages.search.bluesky.accounts' | transloco),
+                  }
           }}<br />
         }
         @if (repeatsHidden()) {
@@ -603,8 +608,7 @@
         }
       }
       {{
-        'pages.search.bluesky.apiCallsUsed'
-          | transloco: { used: callsUsed(), maximum: apiBudget() }
+        'pages.search.bluesky.apiCallsUsed' | transloco: { used: callsUsed(), maximum: apiBudget() }
       }}
       <!-- The scan is not paging, so it is reported as its own spend rather than
            counted against a budget measured in pages. -->
@@ -633,10 +637,7 @@
           [innerHTML]="'pages.search.bluesky.accountSearchIntro' | transloco"
         ></p>
       } @else {
-        <p
-          class="muted small"
-          [innerHTML]="'pages.search.bluesky.postSearchIntro' | transloco"
-        ></p>
+        <p class="muted small" [innerHTML]="'pages.search.bluesky.postSearchIntro' | transloco"></p>
       }
     </div>
   } @else if (empty()) {
@@ -644,8 +645,8 @@
       {{
         (target() === 'accounts'
           ? 'pages.search.bluesky.noAccountsMatched'
-          : 'pages.search.bluesky.noPostsMatched')
-          | transloco: { postType: words().posts }
+          : 'pages.search.bluesky.noPostsMatched'
+        ) | transloco: { postType: words().posts }
       }}
     </p>
   } @else if (target() === 'accounts') {
@@ -724,7 +725,8 @@
                 {{
                   (isRepeatExpanded(s.id)
                     ? 'pages.search.bluesky.hide'
-                    : 'pages.search.bluesky.show') | transloco
+                    : 'pages.search.bluesky.show'
+                  ) | transloco
                 }}
               </button>
             </div>
@@ -741,9 +743,7 @@
     }
     @if (!visible().length) {
       <p class="muted center">
-        {{
-          'pages.search.bluesky.noLoadedPosts' | transloco: { postType: words().posts }
-        }}
+        {{ 'pages.search.bluesky.noLoadedPosts' | transloco: { postType: words().posts } }}
       </p>
     }
 
@@ -759,11 +759,12 @@
         <p class="muted small center">
           {{
             'pages.search.bluesky.loadedPosts'
-              | transloco: {
-                  count: statuses().length,
-                  postType: words().posts,
-                  calls: callsUsed()
-                }
+              | transloco
+                : {
+                    count: statuses().length,
+                    postType: words().posts,
+                    calls: callsUsed(),
+                  }
           }}
         </p>
       } @else {

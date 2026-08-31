@@ -25,20 +25,14 @@ import {
   CLONE_PAGE_SIZE,
   CLONE_TARGET,
   CloneSelection,
-  describeSelection,
   followsAreHidden,
   homeServerFor,
   selectCloneCandidates,
 } from '../clone-friends';
 import { DEFAULT_THRESHOLDS, thresholdSignals } from '../../../follow-quality';
-import {
-  CollectionPlan,
-  describeCollectionPlan,
-  planCollectionCopy,
-  selectCollections,
-} from '../copy-collections';
+import { CollectionPlan, planCollectionCopy, selectCollections } from '../copy-collections';
 import { AnonymousLists } from '../../../providers/anonymous/anonymous-lists';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
 type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error' | 'hidden';
 
@@ -108,6 +102,27 @@ type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error' | 'hidden';
 // i18n pages.profile.copyAccount.followedAccounts.other: Followed {{count}} accounts.
 // i18n pages.profile.copyAccount.homeWillRebuild: Your home feed will rebuild the next time you open it.
 // i18n pages.profile.copyAccount.goToHome: Go to Home
+// i18n pages.profile.copyAccount.summary.noSlots: You have no follow slots left, so nothing can be added.
+// i18n pages.profile.copyAccount.summary.noneActive: None of the accounts {{handle}} follows look active enough to be worth a slot.
+// i18n pages.profile.copyAccount.summary.alreadyFollowing: You already follow everyone {{handle}} does.
+// i18n pages.profile.copyAccount.summary.noneNew: Nothing new to follow from {{handle}}'s list.
+// i18n pages.profile.copyAccount.summary.follow: Follow {{count}} account {{handle}} follows?
+// i18n pages.profile.copyAccount.summary.followPlural: Follow {{count}} accounts {{handle}} follows?
+// i18n pages.profile.copyAccount.summary.withSkipped.one: Follow {{count}} account {{handle}} follows — {{skipped}} skipped as dormant or too quiet.
+// i18n pages.profile.copyAccount.summary.withSkipped.other: Follow {{count}} accounts {{handle}} follows — {{skipped}} skipped as dormant or too quiet.
+// i18n pages.profile.copyAccount.summary.withAlready.one: Follow {{count}} account {{handle}} follows — {{already}} already followed.
+// i18n pages.profile.copyAccount.summary.withAlready.other: Follow {{count}} accounts {{handle}} follows — {{already}} already followed.
+// i18n pages.profile.copyAccount.summary.withBoth.one: Follow {{count}} account {{handle}} follows — {{skipped}} skipped as dormant or too quiet, {{already}} already followed.
+// i18n pages.profile.copyAccount.summary.withBoth.other: Follow {{count}} accounts {{handle}} follows — {{skipped}} skipped as dormant or too quiet, {{already}} already followed.
+// i18n pages.profile.copyAccount.collectionSummary.complete: {{adopted}} of {{total}}
+// i18n pages.profile.copyAccount.collectionSummary.withSkipped: {{adopted}} of {{total}} · {{skipped}} too quiet
+// i18n pages.profile.copyAccount.reason.neverPosted: has never posted
+// i18n pages.profile.copyAccount.reason.noDate: has no readable last-post date
+// i18n pages.profile.copyAccount.reason.dormant: hasn't posted in {{age}}
+// i18n pages.profile.copyAccount.reason.posts.one: has only {{count}} post
+// i18n pages.profile.copyAccount.reason.posts.other: has only {{count}} posts
+// i18n pages.profile.copyAccount.errors.load: Couldn't load the accounts {{handle}} follows.
+// i18n pages.profile.copyAccount.errors.noSource: No readable source for this account.
 @Component({
   selector: 'app-copy-account-dialog',
   imports: [RouterLink, FormsModule, TranslocoPipe],
@@ -115,6 +130,7 @@ type Phase = 'loading' | 'confirm' | 'following' | 'done' | 'error' | 'hidden';
   styleUrl: './copy-account-dialog.css',
 })
 export class CopyAccountDialog implements OnInit {
+  private transloco = inject(TranslocoService);
   private auth = inject(Auth);
   private anonymous = inject(AnonymousAccount);
   private anonymousPublic = inject(AnonymousPublicApi);
@@ -163,7 +179,22 @@ export class CopyAccountDialog implements OnInit {
   protected loadingCollections = signal(false);
   /** Lists actually created, reported after the copy. */
   protected listsCreated = signal(0);
-  protected readonly describeCollection = describeCollectionPlan;
+  protected describeCollection = (plan: CollectionPlan): string => {
+    const total = plan.adopt.length + plan.skipped.length;
+    return plan.skipped.length
+      ? this.transloco.translate<string>(
+          'pages.profile.copyAccount.collectionSummary.withSkipped',
+          {
+            adopted: plan.adopt.length,
+            total,
+            skipped: plan.skipped.length,
+          },
+        )
+      : this.transloco.translate<string>('pages.profile.copyAccount.collectionSummary.complete', {
+          adopted: plan.adopt.length,
+          total,
+        });
+  };
 
   /** Members to be added across every planned list, for the confirm button's count. */
   protected collectionMemberCount = computed(() =>
@@ -296,8 +327,87 @@ export class CopyAccountDialog implements OnInit {
 
   protected summary = computed(() => {
     const selection = this.selection();
-    return selection ? describeSelection(selection, this.handle()) : '';
+    if (!selection) {
+      return '';
+    }
+    const handle = this.handle();
+    if (!selection.adopt.length) {
+      if (selection.limitedBySlots) {
+        return this.transloco.translate<string>('pages.profile.copyAccount.summary.noSlots');
+      }
+      if (selection.skipped.length && !selection.alreadyFollowing) {
+        return this.transloco.translate<string>('pages.profile.copyAccount.summary.noneActive', {
+          handle,
+        });
+      }
+      if (selection.alreadyFollowing && !selection.skipped.length) {
+        return this.transloco.translate<string>(
+          'pages.profile.copyAccount.summary.alreadyFollowing',
+          { handle },
+        );
+      }
+      return this.transloco.translate<string>('pages.profile.copyAccount.summary.noneNew', {
+        handle,
+      });
+    }
+    const count = selection.adopt.length;
+    const hasSkipped = selection.skipped.length > 0;
+    const hasAlready = selection.alreadyFollowing > 0;
+    if (hasSkipped && hasAlready) {
+      return this.transloco.translate<string>(
+        `pages.profile.copyAccount.summary.withBoth.${count === 1 ? 'one' : 'other'}`,
+        {
+          count,
+          handle,
+          skipped: selection.skipped.length,
+          already: selection.alreadyFollowing,
+        },
+      );
+    }
+    if (hasSkipped) {
+      return this.transloco.translate<string>(
+        `pages.profile.copyAccount.summary.withSkipped.${count === 1 ? 'one' : 'other'}`,
+        { count, handle, skipped: selection.skipped.length },
+      );
+    }
+    if (hasAlready) {
+      return this.transloco.translate<string>(
+        `pages.profile.copyAccount.summary.withAlready.${count === 1 ? 'one' : 'other'}`,
+        { count, handle, already: selection.alreadyFollowing },
+      );
+    }
+    return this.transloco.translate<string>(
+      count === 1
+        ? 'pages.profile.copyAccount.summary.follow'
+        : 'pages.profile.copyAccount.summary.followPlural',
+      { count, handle },
+    );
   });
+
+  protected reasonText(reason: string): string {
+    if (reason === 'has never posted') {
+      return this.transloco.translate<string>('pages.profile.copyAccount.reason.neverPosted');
+    }
+    if (reason === 'has no readable last-post date') {
+      return this.transloco.translate<string>('pages.profile.copyAccount.reason.noDate');
+    }
+    const dormant = /^hasn't posted in (.+)$/.exec(reason);
+    if (dormant) {
+      return this.transloco.translate<string>('pages.profile.copyAccount.reason.dormant', {
+        age: dormant[1],
+      });
+    }
+    const posts = /^has only (\d+) posts?$/.exec(reason);
+    if (posts) {
+      return this.transloco.translate<string>(
+        Number(posts[1]) === 1
+          ? 'pages.profile.copyAccount.reason.posts.one'
+          : 'pages.profile.copyAccount.reason.posts.other',
+        { count: Number(posts[1]) },
+      );
+    }
+    return reason;
+  }
 
   /**
    * Load on init, not in the constructor: a required `input()` is not populated
@@ -364,7 +474,11 @@ export class CopyAccountDialog implements OnInit {
       this.phase.set('confirm');
       void this.loadCollections(source.ref);
     } catch {
-      this.error.set(`Couldn't load the accounts ${this.handle()} follows.`);
+      this.error.set(
+        this.transloco.translate<string>('pages.profile.copyAccount.errors.load', {
+          handle: this.handle(),
+        }),
+      );
       this.phase.set('error');
     } finally {
       // Unlocks the parameter controls; never leave them disabled after a
@@ -467,7 +581,9 @@ export class CopyAccountDialog implements OnInit {
       };
     } catch {
       if (!current) {
-        throw new Error('No readable source for this account.');
+        throw new Error(
+          this.transloco.translate<string>('pages.profile.copyAccount.errors.noSource'),
+        );
       }
       return { ref: current, host: bare(currentServer), partial: true };
     }

@@ -25,9 +25,9 @@
         <span class="muted acct-handle">&#64;{{ a.acct }}</span>
 
         @if (a.bot) {
-          <span class="badge-pill" [title]="'pages.search.card.automatedAccount' | transloco"
-            >BOT</span
-          >
+          <span class="badge-pill" [title]="'pages.search.card.automatedAccount' | transloco">{{
+            'pages.search.card.bot' | transloco
+          }}</span>
         }
         @if (a.locked) {
           <span class="badge-pill" [title]="'pages.search.card.requiresFollowApproval' | transloco"

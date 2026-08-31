@@ -1,4 +1,5 @@
 import { Component, computed, DestroyRef, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Location, NgOptimizedImage } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -73,9 +74,128 @@ import { BloggerSession } from '../../providers/blogger/blogger-session';
 /** Profile body tabs: the account's posts, who they follow, who follows them. */
 type ProfileTab = 'posts' | 'media' | 'following' | 'followers' | 'collections' | 'analytics';
 
+// i18n pages.profile.loading.lookingUp: Looking them up on {{server}}…
+// i18n pages.profile.loading.loading: Loading…
+// i18n pages.profile.actions.back: ← Back
+// i18n pages.profile.actions.visitSite: ↗ Visit site
+// i18n pages.profile.actions.openOnTwitter: ↗ Open on Twitter
+// i18n pages.profile.actions.openOnBluesky: ↗ Open on Bluesky
+// i18n pages.profile.actions.openOnBskyApp: Open on bsky.app
+// i18n pages.profile.actions.openOn: Open on {{host}}
+// i18n pages.profile.actions.message: 💬 Message
+// i18n pages.profile.actions.settings: Settings
+// i18n pages.profile.actions.editLocalProfile: Edit local profile
+// i18n pages.profile.actions.copyAccount: Copy account…
+// i18n pages.profile.actions.show: Show
+// i18n pages.profile.actions.hide: Hide
+// i18n pages.profile.actions.removeFollower: Remove follower
+// i18n pages.profile.actions.reportAccount: Report account
+// i18n pages.profile.actions.reportSubmitted: Report submitted. A moderator will review it; reports cannot be undone.
+// i18n pages.profile.actions.moreAccountActions: More account actions
+// i18n pages.profile.actions.cancel: Cancel
+// i18n pages.profile.actions.homeFeed: Home feed
+// i18n pages.profile.rss.subscribed: 📡 Subscribed
+// i18n pages.profile.rss.subscribe: 📡 Subscribe
+// i18n pages.profile.twitter.stopShowing: Stop showing this account on your Feeds page
+// i18n pages.profile.twitter.showOnFeeds: Show this account on your Feeds page. Not a follow on Twitter — nobody is notified.
+// i18n pages.profile.twitter.followingLocally: 𝕏 Following locally
+// i18n pages.profile.twitter.followLocally: 𝕏 Follow locally
+// i18n pages.profile.twitter.savedPosts: Saved posts from an earlier visit.
+// i18n pages.profile.twitter.refreshing: Refreshing…
+// i18n pages.profile.twitter.refresh: Refresh (1 request)
+// i18n pages.profile.bluesky.following: 🦋 Following
+// i18n pages.profile.bluesky.follow: 🦋 Follow
+// i18n pages.profile.moderation.stopTrusting: Stop trusting account
+// i18n pages.profile.moderation.trust: Trust this account
+// i18n pages.profile.moderation.cwsOpen: CWs open and show sensitive media.
+// i18n pages.profile.moderation.showCws: Show their CWs and sensitive media.
+// i18n pages.profile.moderation.unmute: Unmute account
+// i18n pages.profile.moderation.muteFor: Mute for…
+// i18n pages.profile.moderation.unblock: Unblock account
+// i18n pages.profile.moderation.block: Block account
+// i18n pages.profile.lists.local: Local lists
+// i18n pages.profile.lists.lists: Lists
+// i18n pages.profile.relationship.thisAccountFollowsYou: This account follows you
+// i18n pages.profile.relationship.followsYou: Follows you
+// i18n pages.profile.relationship.mutualUnfollowTitle: You follow each other. Click to unfollow.
+// i18n pages.profile.relationship.unfollowTitle: Click to unfollow.
+// i18n pages.profile.relationship.mutuals: Mutuals
+// i18n pages.profile.relationship.following: Following
+// i18n pages.profile.relationship.requested: Requested
+// i18n pages.profile.relationship.follow: Follow
+// i18n pages.profile.fields.linkOwnershipVerified: Link ownership verified
+// i18n pages.profile.stats.items: items
+// i18n pages.profile.stats.following: following
+// i18n pages.profile.stats.followers: followers
+// i18n pages.profile.stats.collections: Collections ({{count}})
+// i18n pages.profile.featured.title: ⭐ Featured by {{name}}
+// i18n pages.profile.featured.followAll: Follow all ({{count}})
+// i18n pages.profile.featured.hint: A hand-picked collection of accounts this profile vouches for.
+// i18n pages.profile.featured.viewFeed: View as feed →
+// i18n pages.profile.navigation.profileSections: Profile sections
+// i18n pages.profile.navigation.media: Media
+// i18n pages.profile.navigation.collections: Collections
+// i18n pages.profile.navigation.analytics: Analytics
+// i18n pages.profile.navigation.timelineFilters: Timeline filters
+// i18n pages.profile.collections.title: Collections by {{name}}
+// i18n pages.profile.collections.member.one: {{count}} member
+// i18n pages.profile.collections.member.other: {{count}} members
+// i18n pages.profile.posts.pinned: Pinned
+// i18n pages.profile.posts.loginPrompt: Login or create an account to post content, reply and more
+// i18n pages.profile.posts.replies: Replies
+// i18n pages.profile.posts.loading: Loading posts…
+// i18n pages.profile.posts.noMatchesFilters: No posts match these filters.
+// i18n pages.profile.posts.noOlder: No older posts.
+// i18n pages.profile.posts.loadMore: Load more
+// i18n pages.profile.search.search: Search
+// i18n pages.profile.search.searching: Searching…
+// i18n pages.profile.search.clear: clear
+// i18n pages.profile.search.after: After
+// i18n pages.profile.search.before: Before
+// i18n pages.profile.search.hasMedia: Has media
+// i18n pages.profile.search.hasLink: Has link
+// i18n pages.profile.search.noReplies: No replies
+// i18n pages.profile.search.loadingMore: Loading more of their history to search…
+// i18n pages.profile.search.placeholder: Search @{{acct}}’s posts…
+// i18n pages.profile.search.ariaLabel: Search this account's posts
+// i18n pages.profile.search.noMatches: No posts matched.
+// i18n pages.profile.search.serverIndex: and this server’s index
+// i18n pages.profile.search.resultSummary.oneOne: {{results}} post · searched {{scanned}} loaded post{{server}}
+// i18n pages.profile.search.resultSummary.oneOther: {{results}} post · searched {{scanned}} loaded posts{{server}}
+// i18n pages.profile.search.resultSummary.otherOne: {{results}} posts · searched {{scanned}} loaded post{{server}}
+// i18n pages.profile.search.resultSummary.otherOther: {{results}} posts · searched {{scanned}} loaded posts{{server}}
+// i18n pages.profile.confirm.blockTitle: Block @{{acct}}?
+// i18n pages.profile.confirm.blockExplain: They will no longer be able to follow or interact with you. You can undo this later from this same menu.
+// i18n pages.profile.confirm.block: Confirm block
+// i18n pages.profile.confirm.unfollowTitle: Unfollow @{{acct}}?
+// i18n pages.profile.confirm.unfollowExplain: Their posts will no longer appear in your home timeline.
+// i18n pages.profile.confirm.unfollow: Confirm unfollow
+// i18n pages.profile.confirm.removeFollowerTitle: Remove @{{acct}} as a follower?
+// i18n pages.profile.confirm.removeFollowerExplain: They will stop following you, but they will not be blocked.
+// i18n pages.profile.errors.notFederated: They may simply not have federated here yet. Searching can pull them in.
+// i18n pages.profile.errors.searchFor: Search for @{{handle}}
+// i18n pages.profile.errors.idOnlyLink: This link carries only an account id, and ids belong to the server that issued them — there is no name in it to look up. Links made from here on include the handle, so they survive switching servers.
+// i18n pages.profile.errors.accountNotFound: Account not found.
+// i18n pages.profile.errors.followUpdateFailed: Could not update the follow on Bluesky.
+// i18n pages.profile.errors.mediaLoadFailed: Could not load pictures for this account.
+// i18n pages.profile.errors.serverDoesNotKnow: {{server}} doesn’t know @{{handle}}.
+// i18n pages.profile.errors.profileLoadFailed: Could not load this profile.
+// i18n pages.profile.errors.thisServer: This server
+// i18n pages.profile.twitter.postsLoadFailed: Could not load posts for @{{handle}}.
+// i18n pages.profile.twitter.refreshFailed: Could not refresh @{{handle}}.
+// i18n pages.profile.bluesky.linkRequired: Link a Bluesky account in Settings → Connections to view this profile.
+// i18n pages.profile.bluesky.profileLoadFailed: Could not load this Bluesky profile.
+// i18n pages.profile.bluesky.postsLoadFailed: Could not load posts for this account.
+// i18n pages.profile.search.noResultsDetail: Nothing matched. Mastodon only indexes some posts, so try fewer words or load more history.
+// i18n pages.profile.mute.oneHour: 1 hour
+// i18n pages.profile.mute.oneDay: 1 day
+// i18n pages.profile.mute.sevenDays: 7 days
+// i18n pages.profile.mute.forever: forever
+
 @Component({
   selector: 'app-profile',
   imports: [
+    TranslocoPipe,
     FormsModule,
     RouterLink,
     StatusCard,
@@ -95,6 +215,7 @@ type ProfileTab = 'posts' | 'media' | 'following' | 'followers' | 'collections' 
   styleUrl: './profile.css',
 })
 export class Profile implements OnInit, OnDestroy {
+  private transloco = inject(TranslocoService);
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   private diagnostics = inject(PageDiagnostics);
@@ -211,7 +332,9 @@ export class Profile implements OnInit, OnDestroy {
         this.bskyFollowBusy.set(false);
         this.diagnostics.error('Profile', 'bsky:follow-failed', error, { did });
         this.bskyError.set(
-          error instanceof Error ? error.message : 'Could not update the follow on Bluesky.',
+          error instanceof Error
+            ? error.message
+            : this.transloco.translate<string>('pages.profile.errors.followUpdateFailed'),
         );
       },
     });
@@ -423,7 +546,9 @@ export class Profile implements OnInit, OnDestroy {
           this.diagnostics.error('Profile', 'media:load-failed', error, { id });
           this.mediaLoading.set(false);
           this.mediaExhausted.set(true);
-          this.mediaError.set('Could not load pictures for this account.');
+          this.mediaError.set(
+            this.transloco.translate<string>('pages.profile.errors.mediaLoadFailed'),
+          );
         },
       }),
     );
@@ -764,7 +889,12 @@ export class Profile implements OnInit, OnDestroy {
           this.recovering.set(false);
           this.recoveryFailed.set(true);
           this.loading.set(false);
-          this.loadError.set(`${this.currentServerLabel()} doesn’t know @${handle}.`);
+          this.loadError.set(
+            this.transloco.translate<string>('pages.profile.errors.serverDoesNotKnow', {
+              server: this.currentServerLabel(),
+              handle,
+            }),
+          );
         },
       }),
     );
@@ -901,7 +1031,7 @@ export class Profile implements OnInit, OnDestroy {
           this.loadError.set(
             status === 404
               ? 'This profile is not on the server you are browsing.'
-              : 'Could not load this profile.',
+              : this.transloco.translate<string>('pages.profile.errors.profileLoadFailed'),
           );
         },
       }),
@@ -921,7 +1051,10 @@ export class Profile implements OnInit, OnDestroy {
   /** Host of the server being browsed, for messages that name it. */
   protected currentServerLabel(): string {
     const base = this.auth.isAnonymous ? this.anonymous.server() : this.server.baseUrl();
-    return base.replace(/^https?:\/\//, '') || 'This server';
+    return (
+      base.replace(/^https?:\/\//, '') ||
+      this.transloco.translate<string>('pages.profile.errors.thisServer')
+    );
   }
 
   private loadAnonymousPublicProfile(ref: AnonymousPublicRef): void {
@@ -1043,7 +1176,11 @@ export class Profile implements OnInit, OnDestroy {
             this.account() ?? twitterPlaceholderAccount(follow ?? fallbackFollow(handle)),
           );
           this.twitterError.set(
-            error instanceof Error ? error.message : `Could not load posts for @${handle}.`,
+            error instanceof Error
+              ? error.message
+              : this.transloco.translate<string>('pages.profile.twitter.postsLoadFailed', {
+                  handle,
+                }),
           );
           this.loading.set(false);
           this.statusesLoading.set(false);
@@ -1083,7 +1220,9 @@ export class Profile implements OnInit, OnDestroy {
         // The saved posts stay on screen. A failed refresh should cost the
         // reader the update, not the copy they were already reading.
         this.twitterError.set(
-          error instanceof Error ? error.message : `Could not refresh @${handle}.`,
+          error instanceof Error
+            ? error.message
+            : this.transloco.translate<string>('pages.profile.twitter.refreshFailed', { handle }),
         );
         this.statusesLoading.set(false);
       },
@@ -1137,7 +1276,7 @@ export class Profile implements OnInit, OnDestroy {
       this.loading.set(false);
       this.statusesLoading.set(false);
       this.exhausted.set(true);
-      this.bskyError.set('Link a Bluesky account in Settings → Connections to view this profile.');
+      this.bskyError.set(this.transloco.translate<string>('pages.profile.bluesky.linkRequired'));
       return;
     }
 
@@ -1161,7 +1300,9 @@ export class Profile implements OnInit, OnDestroy {
           this.diagnostics.error('Profile', 'bsky:load-failed', error, { did });
           this.loading.set(false);
           this.bskyError.set(
-            error instanceof Error ? error.message : 'Could not load this Bluesky profile.',
+            error instanceof Error
+              ? error.message
+              : this.transloco.translate<string>('pages.profile.bluesky.profileLoadFailed'),
           );
         },
       }),
@@ -1200,7 +1341,9 @@ export class Profile implements OnInit, OnDestroy {
           this.loadingMore.set(false);
           this.exhausted.set(true);
           this.bskyError.set(
-            error instanceof Error ? error.message : 'Could not load posts for this account.',
+            error instanceof Error
+              ? error.message
+              : this.transloco.translate<string>('pages.profile.bluesky.postsLoadFailed'),
           );
         },
       });
@@ -1499,7 +1642,7 @@ export class Profile implements OnInit, OnDestroy {
       this.searchResults.set(mergeResults(fromServer, local));
       if (!fromServer.length && !local.length) {
         this.searchError.set(
-          'Nothing matched. Mastodon only indexes some posts, so try fewer words or load more history.',
+          this.transloco.translate<string>('pages.profile.search.noResultsDetail'),
         );
       }
     } finally {
@@ -1832,10 +1975,10 @@ export class Profile implements OnInit, OnDestroy {
 
   /** Mute duration presets (seconds; null = until unmuted). */
   protected readonly muteDurations: { label: string; seconds: number | null }[] = [
-    { label: '1 hour', seconds: 3600 },
-    { label: '1 day', seconds: 86400 },
-    { label: '7 days', seconds: 604800 },
-    { label: 'forever', seconds: null },
+    { label: 'pages.profile.mute.oneHour', seconds: 3600 },
+    { label: 'pages.profile.mute.oneDay', seconds: 86400 },
+    { label: 'pages.profile.mute.sevenDays', seconds: 604800 },
+    { label: 'pages.profile.mute.forever', seconds: null },
   ];
 
   /**

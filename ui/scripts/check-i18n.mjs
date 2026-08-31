@@ -120,6 +120,9 @@ const MIGRATED = [
   'pages/pastes',
   'pages/links',
   'share-dialog',
+  'pages/search',
+  'pages/observability',
+  'pages/profile',
 ];
 
 /**
@@ -174,6 +177,16 @@ const ALLOWED = [
     file: 'pages/home/home.html',
     contains: '&#64;mawkingbird',
     why: 'A literal handle on the pinned sample post, not prose.',
+  },
+  {
+    file: 'pages/profile/profile.html',
+    contains: '<strong>Mawkingbird</strong>',
+    why: "The app's brand name is the author of the pinned anonymous login prompt.",
+  },
+  {
+    file: 'pages/profile/profile.html',
+    contains: '&#64;mawkingbird',
+    why: 'A literal product handle on the pinned anonymous login prompt, not prose.',
   },
   {
     file: 'pages/settings/connections/blogger/connection-blogger.html',

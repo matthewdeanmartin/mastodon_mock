@@ -2,16 +2,20 @@
   <!-- Recovery is a second round trip after a 404, so name it rather than
        leaving the same "Loading…" up for twice as long with no explanation. -->
   @if (recovering()) {
-    <p class="muted center">Looking them up on {{ currentServerLabel() }}…</p>
+    <p class="muted center">
+      {{ 'pages.profile.loading.lookingUp' | transloco: { server: currentServerLabel() } }}
+    </p>
   } @else {
-    <p class="muted center">Loading…</p>
+    <p class="muted center">{{ 'pages.profile.loading.loading' | transloco }}</p>
   }
 } @else if (account(); as a) {
   <!-- Back rides in the tab row (below) where there is one. RSS and Twitter
        profiles have no tabs, so they keep a standalone button rather than no
        way back. -->
   @if (isRss() || isTwitter()) {
-    <button class="back-button" type="button" (click)="goBack()">← Back</button>
+    <button class="back-button" type="button" (click)="goBack()">
+      {{ 'pages.profile.actions.back' | transloco }}
+    </button>
   }
   <header class="profile-header">
     <div
@@ -31,7 +35,7 @@
         <div class="profile-buttons">
           @if (a.url) {
             <a class="btn btn-outline" [href]="a.url" target="_blank" rel="noopener noreferrer">
-              ↗ Visit site
+              {{ 'pages.profile.actions.visitSite' | transloco }}
             </a>
           }
           <button
@@ -39,7 +43,10 @@
             [class.btn-outline]="rssSubscribed()"
             (click)="toggleRssSubscription()"
           >
-            {{ rssSubscribed() ? '📡 Subscribed' : '📡 Subscribe' }}
+            {{
+              (rssSubscribed() ? 'pages.profile.rss.subscribed' : 'pages.profile.rss.subscribe')
+                | transloco
+            }}
           </button>
         </div>
       } @else if (isTwitter()) {
@@ -49,7 +56,7 @@
         <div class="profile-buttons">
           @if (a.url) {
             <a class="btn btn-outline" [href]="a.url" target="_blank" rel="noopener noreferrer">
-              ↗ Open on Twitter
+              {{ 'pages.profile.actions.openOnTwitter' | transloco }}
             </a>
           }
           <button
@@ -58,11 +65,16 @@
             (click)="toggleTwitterFollow()"
             [title]="
               twitterFollowed()
-                ? 'Stop showing this account on your Feeds page'
-                : 'Show this account on your Feeds page. Not a follow on Twitter — nobody is notified.'
+                ? ('pages.profile.twitter.stopShowing' | transloco)
+                : ('pages.profile.twitter.showOnFeeds' | transloco)
             "
           >
-            {{ twitterFollowed() ? '𝕏 Following locally' : '𝕏 Follow locally' }}
+            {{
+              (twitterFollowed()
+                ? 'pages.profile.twitter.followingLocally'
+                : 'pages.profile.twitter.followLocally'
+              ) | transloco
+            }}
           </button>
         </div>
       } @else if (isBluesky()) {
@@ -72,7 +84,7 @@
         <div class="profile-buttons">
           @if (a.url) {
             <a class="btn btn-outline" [href]="a.url" target="_blank" rel="noopener noreferrer">
-              ↗ Open on Bluesky
+              {{ 'pages.profile.actions.openOnBluesky' | transloco }}
             </a>
           }
           @if (bskySession.linked() && !isSelf()) {
@@ -85,7 +97,12 @@
               @if (bskyFollowBusy()) {
                 …
               } @else {
-                {{ relationship()?.following ? '🦋 Following' : '🦋 Follow' }}
+                {{
+                  (relationship()?.following
+                    ? 'pages.profile.bluesky.following'
+                    : 'pages.profile.bluesky.follow'
+                  ) | transloco
+                }}
               }
             </button>
             <!-- Real Bluesky mutes and blocks, written on their network. A timed
@@ -93,37 +110,58 @@
                  Profile.mute. Reporting is not offered: it needs a labeler
                  service this app has no UI for. -->
             <details class="account-danger-menu">
-              <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
+              <summary
+                class="btn btn-outline"
+                [attr.aria-label]="'pages.profile.actions.moreAccountActions' | transloco"
+              >
+                •••
+              </summary>
               <div class="account-danger-panel">
                 @if (a.url) {
-                  <a [href]="a.url" target="_blank" rel="noopener noreferrer">Open on bsky.app</a>
+                  <a [href]="a.url" target="_blank" rel="noopener noreferrer">{{
+                    'pages.profile.actions.openOnBskyApp' | transloco
+                  }}</a>
                   <hr class="menu-rule" />
                 }
                 <button class="menu-trust" type="button" (click)="toggleTrust()">
-                  {{ isTrusted() ? 'Stop trusting account' : 'Trust this account' }}
+                  {{
+                    (isTrusted()
+                      ? 'pages.profile.moderation.stopTrusting'
+                      : 'pages.profile.moderation.trust'
+                    ) | transloco
+                  }}
                 </button>
                 <div class="menu-note muted small">
                   {{
                     isTrusted()
-                      ? 'CWs open and show sensitive media.'
-                      : 'Show their CWs and sensitive media.'
+                      ? ('pages.profile.moderation.cwsOpen' | transloco)
+                      : ('pages.profile.moderation.showCws' | transloco)
                   }}
                 </div>
                 <hr class="menu-rule" />
                 @if (relationship()?.muting || localMuted()) {
                   <button class="menu-danger" type="button" (click)="unmute()">
-                    Unmute account
+                    {{ 'pages.profile.moderation.unmute' | transloco }}
                   </button>
                 } @else {
-                  <div class="menu-note muted small">Mute for…</div>
+                  <div class="menu-note muted small">
+                    {{ 'pages.profile.moderation.muteFor' | transloco }}
+                  </div>
                   <div class="mute-durations">
                     @for (d of muteDurations; track d.label) {
-                      <button type="button" (click)="mute(d.seconds)">{{ d.label }}</button>
+                      <button type="button" (click)="mute(d.seconds)">
+                        {{ d.label | transloco }}
+                      </button>
                     }
                   </div>
                 }
                 <button class="menu-danger" type="button" (click)="requestBlock()">
-                  {{ relationship()?.blocking ? 'Unblock account' : 'Block account' }}
+                  {{
+                    (relationship()?.blocking
+                      ? 'pages.profile.moderation.unblock'
+                      : 'pages.profile.moderation.block'
+                    ) | transloco
+                  }}
                 </button>
               </div>
             </details>
@@ -138,13 +176,17 @@
             [routerLink]="['/conversations']"
             [queryParams]="{ open: 'bot:openrouter' }"
           >
-            💬 Message
+            {{ 'pages.profile.actions.message' | transloco }}
           </a>
-          <a class="btn btn-outline" routerLink="/settings/connections/openrouter">Settings</a>
+          <a class="btn btn-outline" routerLink="/settings/connections/openrouter">{{
+            'pages.profile.actions.settings' | transloco
+          }}</a>
         </div>
       } @else if (isSelf() && auth.isAnonymous) {
         <div class="profile-buttons">
-          <a class="btn btn-outline" routerLink="/settings/profile">Edit local profile</a>
+          <a class="btn btn-outline" routerLink="/settings/profile">{{
+            'pages.profile.actions.editLocalProfile' | transloco
+          }}</a>
         </div>
       } @else if (!isSelf()) {
         <div class="profile-buttons">
@@ -154,11 +196,19 @@
                  Follow, and the longer label was the one pushing that row into a
                  second line on a phone. The dialog itself still covers both. -->
             <button class="btn btn-outline" (click)="showLists.set(true)">
-              {{ auth.isAnonymous ? 'Local lists' : 'Lists' }}
+              {{
+                (auth.isAnonymous ? 'pages.profile.lists.local' : 'pages.profile.lists.lists')
+                  | transloco
+              }}
             </button>
           }
           <details class="account-danger-menu">
-            <summary class="btn btn-outline" aria-label="More account actions">•••</summary>
+            <summary
+              class="btn btn-outline"
+              [attr.aria-label]="'pages.profile.actions.moreAccountActions' | transloco"
+            >
+              •••
+            </summary>
             <div class="account-danger-panel">
               <!-- Two groups, split by a rule: things that make something appear in
                    your app, then things that make someone disappear. The split is
@@ -174,7 +224,7 @@
                    because an "open" that goes nowhere is worse than no link. -->
               @if (homeServerLink(); as link) {
                 <a [href]="link.url" target="_blank" rel="noopener noreferrer">
-                  Open on {{ link.host }}
+                  {{ 'pages.profile.actions.openOn' | transloco: { host: link.host } }}
                 </a>
               }
               <!-- Anonymous only, and that is a safety property rather than an
@@ -185,12 +235,19 @@
                    this by adding a delay and enabling it for authenticated users —
                    see sprint/anonymous-great-2-clone-friends.md. -->
               @if (canCopyAccount()) {
-                <button type="button" (click)="openCopyAccount()">Copy account…</button>
+                <button type="button" (click)="openCopyAccount()">
+                  {{ 'pages.profile.actions.copyAccount' | transloco }}
+                </button>
               }
               @if (capabilities.canManageRelationships || (isBluesky() && bskySession.linked())) {
                 @if (relationship()?.following) {
                   <button type="button" (click)="toggleAccountBoosts()">
-                    {{ relationship()?.showing_reblogs === false ? 'Show' : 'Hide' }}
+                    {{
+                      (relationship()?.showing_reblogs === false
+                        ? 'pages.profile.actions.show'
+                        : 'pages.profile.actions.hide'
+                      ) | transloco
+                    }}
                     {{ words().boosts }}
                   </button>
                 }
@@ -199,31 +256,43 @@
               <!-- The flipside of the two below: block and mute hide someone,
                    trust stops their own warnings from hiding them from you. -->
               <button class="menu-trust" type="button" (click)="toggleTrust()">
-                {{ isTrusted() ? 'Stop trusting account' : 'Trust this account' }}
+                {{
+                  (isTrusted()
+                    ? 'pages.profile.moderation.stopTrusting'
+                    : 'pages.profile.moderation.trust'
+                  ) | transloco
+                }}
               </button>
               <div class="menu-note muted small">
                 {{
                   isTrusted()
-                    ? 'CWs open and show sensitive media.'
-                    : 'Show their CWs and sensitive media.'
+                    ? ('pages.profile.moderation.cwsOpen' | transloco)
+                    : ('pages.profile.moderation.showCws' | transloco)
                 }}
               </div>
               <hr class="menu-rule" />
               @if (useLocalModeration ? localMuted() : relationship()?.muting) {
-                <button class="menu-danger" type="button" (click)="unmute()">Unmute account</button>
+                <button class="menu-danger" type="button" (click)="unmute()">
+                  {{ 'pages.profile.moderation.unmute' | transloco }}
+                </button>
               } @else {
-                <div class="menu-note muted small">Mute for…</div>
+                <div class="menu-note muted small">
+                  {{ 'pages.profile.moderation.muteFor' | transloco }}
+                </div>
                 <div class="mute-durations">
                   @for (d of muteDurations; track d.label) {
-                    <button type="button" (click)="mute(d.seconds)">{{ d.label }}</button>
+                    <button type="button" (click)="mute(d.seconds)">
+                      {{ d.label | transloco }}
+                    </button>
                   }
                 </div>
               }
               <button class="menu-danger" type="button" (click)="requestBlock()">
                 {{
-                  (useLocalModeration ? localBlocked() : relationship()?.blocking)
-                    ? 'Unblock account'
-                    : 'Block account'
+                  ((useLocalModeration ? localBlocked() : relationship()?.blocking)
+                    ? 'pages.profile.moderation.unblock'
+                    : 'pages.profile.moderation.block'
+                  ) | transloco
                 }}
               </button>
               <!-- Reporting and removing a follower keep their canManageRelationships
@@ -232,11 +301,11 @@
               @if (capabilities.canManageRelationships) {
                 @if (relationship()?.followed_by && !isBluesky()) {
                   <button class="menu-danger" type="button" (click)="requestRemoveFollower()">
-                    Remove follower
+                    {{ 'pages.profile.actions.removeFollower' | transloco }}
                   </button>
                 }
                 <button class="menu-danger" type="button" (click)="showReport.set(true)">
-                  Report account
+                  {{ 'pages.profile.actions.reportAccount' | transloco }}
                 </button>
               }
             </div>
@@ -252,7 +321,11 @@
                beside it saying "Following", so the button says "Mutuals" instead
                and the badge stands down. See mutualsLabel below. -->
           @if (!isSelf() && relationship()?.followed_by && !isMutual()) {
-            <span class="badge follows-you" title="This account follows you">Follows you</span>
+            <span
+              class="badge follows-you"
+              [title]="'pages.profile.relationship.thisAccountFollowsYou' | transloco"
+              >{{ 'pages.profile.relationship.followsYou' | transloco }}</span
+            >
           }
           @if (capabilities.canFollow) {
             <button
@@ -261,27 +334,28 @@
               [disabled]="relationship()?.requested"
               [title]="
                 isMutual()
-                  ? 'You follow each other. Click to unfollow.'
+                  ? ('pages.profile.relationship.mutualUnfollowTitle' | transloco)
                   : relationship()?.following
-                    ? 'Click to unfollow.'
+                    ? ('pages.profile.relationship.unfollowTitle' | transloco)
                     : ''
               "
               (click)="relationship()?.following ? requestUnfollow() : toggleFollow()"
             >
               {{
-                isMutual()
-                  ? 'Mutuals'
+                (isMutual()
+                  ? 'pages.profile.relationship.mutuals'
                   : relationship()?.following
-                    ? 'Following'
+                    ? 'pages.profile.relationship.following'
                     : relationship()?.requested
-                      ? 'Requested'
-                      : 'Follow'
+                      ? 'pages.profile.relationship.requested'
+                      : 'pages.profile.relationship.follow'
+                ) | transloco
               }}
             </button>
           }
           @if (isEliza() && relationship()?.following) {
             <a class="btn" [routerLink]="['/conversations']" [queryParams]="{ open: 'bot:eliza' }">
-              💬 Message
+              {{ 'pages.profile.actions.message' | transloco }}
             </a>
           }
         </div>
@@ -306,15 +380,20 @@
            a fetch costs a billable request, and arriving on a page is not a
            request for one. Say the copy is saved, and let the reader choose. -->
       <div class="stale-notice">
-        <span>Saved posts from an earlier visit.</span>
+        <span>{{ 'pages.profile.twitter.savedPosts' | transloco }}</span>
         <button type="button" (click)="refreshTwitter()" [disabled]="statusesLoading()">
-          {{ statusesLoading() ? 'Refreshing…' : 'Refresh (1 request)' }}
+          {{
+            (statusesLoading()
+              ? 'pages.profile.twitter.refreshing'
+              : 'pages.profile.twitter.refresh'
+            ) | transloco
+          }}
         </button>
       </div>
     }
     @if (reportDone()) {
       <div class="report-done">
-        Report submitted. A moderator will review it; reports cannot be undone.
+        {{ 'pages.profile.actions.reportSubmitted' | transloco }}
       </div>
     }
     @if (a.note) {
@@ -333,7 +412,11 @@
             <span class="field-value">
               <span [innerHTML]="f.value"></span>
               @if (f.verified_at) {
-                <span class="field-check" title="Link ownership verified">✓</span>
+                <span
+                  class="field-check"
+                  [title]="'pages.profile.fields.linkOwnershipVerified' | transloco"
+                  >✓</span
+                >
               }
             </span>
           </div>
@@ -343,7 +426,7 @@
     <div class="stats muted">
       <span
         ><strong>{{ a.statuses_count | humanCount }}</strong>
-        {{ isRss() ? 'items' : words().posts }}</span
+        {{ isRss() ? ('pages.profile.stats.items' | transloco) : words().posts }}</span
       >
       @if (!isRss() && !isTwitter()) {
         <button type="button" class="count-btn" (click)="setTab('following')">
@@ -352,11 +435,12 @@
               ? anonymousFollows.count()
               : (a.following_count | humanCount)
           }}</strong>
-          following
+          {{ 'pages.profile.stats.following' | transloco }}
         </button>
         @if (!auth.isAnonymous || !isSelf()) {
           <button type="button" class="count-btn" (click)="setTab('followers')">
-            <strong>{{ a.followers_count | humanCount }}</strong> followers
+            <strong>{{ a.followers_count | humanCount }}</strong>
+            {{ 'pages.profile.stats.followers' | transloco }}
           </button>
         }
         @if (collections().length > 0) {
@@ -365,7 +449,9 @@
             class="count-btn collection-count-btn"
             (click)="setTab('collections')"
           >
-            <strong>Collections ({{ collections().length }})</strong>
+            <strong>{{
+              'pages.profile.stats.collections' | transloco: { count: collections().length }
+            }}</strong>
           </button>
         }
       }
@@ -375,16 +461,25 @@
   @if (featured().length) {
     <section class="featured-card">
       <div class="featured-head">
-        <h3>⭐ Featured by {{ a.display_name || a.username }}</h3>
+        <h3>
+          {{ 'pages.profile.featured.title' | transloco: { name: a.display_name || a.username } }}
+        </h3>
         @if (!isSelf() && capabilities.canFollow && featuredToFollow().length) {
           <button class="btn" [disabled]="featuredBusy()" (click)="followAllFeatured()">
-            {{ featuredBusy() ? 'Following…' : 'Follow all (' + featuredToFollow().length + ')' }}
+            {{
+              (featuredBusy()
+                ? 'pages.profile.relationship.following'
+                : 'pages.profile.featured.followAll'
+              ) | transloco: { count: featuredToFollow().length }
+            }}
           </button>
         }
       </div>
       <p class="featured-hint muted">
-        A hand-picked collection of accounts this profile vouches for.
-        <a class="featured-feed-link" [routerLink]="['/endorsed', a.id]">View as feed →</a>
+        {{ 'pages.profile.featured.hint' | transloco }}
+        <a class="featured-feed-link" [routerLink]="['/endorsed', a.id]">{{
+          'pages.profile.featured.viewFeed' | transloco
+        }}</a>
       </p>
       @for (f of featured(); track f.id) {
         <div class="featured-row">
@@ -401,7 +496,9 @@
             <span class="muted">&#64;{{ f.acct }}</span>
           </a>
           @if (featuredFollowing().has(f.id)) {
-            <button type="button" class="btn featured-follow" disabled>Following</button>
+            <button type="button" class="btn featured-follow" disabled>
+              {{ 'pages.profile.relationship.following' | transloco }}
+            </button>
           } @else if (!isSelf() && capabilities.canFollow) {
             <button
               type="button"
@@ -409,7 +506,7 @@
               [disabled]="featuredBusy()"
               (click)="followFeatured(f)"
             >
-              Follow
+              {{ 'pages.profile.relationship.follow' | transloco }}
             </button>
           }
         </div>
@@ -425,7 +522,11 @@
        get a two-entry row rather than the full one: their pictures are still
        worth a wall, and scraping is how they get there. -->
   @if ((isRss() || isTwitter()) && canShowMedia()) {
-    <div class="profile-tabs" role="group" aria-label="Profile sections">
+    <div
+      class="profile-tabs"
+      role="group"
+      [attr.aria-label]="'pages.profile.navigation.profileSections' | transloco"
+    >
       <button
         type="button"
         class="ptab ptab-labelled"
@@ -433,7 +534,9 @@
         (click)="setTab('posts')"
       >
         <span class="ptab-glyph" aria-hidden="true">📜</span>
-        <span class="ptab-word">{{ isRss() ? 'Items' : words().Posts }}</span>
+        <span class="ptab-word">{{
+          isRss() ? ('pages.profile.stats.items' | transloco) : words().Posts
+        }}</span>
       </button>
       <button
         type="button"
@@ -442,13 +545,17 @@
         (click)="setTab('media')"
       >
         <span class="ptab-glyph" aria-hidden="true">🖼️</span>
-        <span class="ptab-word">Media</span>
+        <span class="ptab-word">{{ 'pages.profile.navigation.media' | transloco }}</span>
       </button>
     </div>
   }
 
   @if (!isRss() && !isTwitter()) {
-    <div class="profile-tabs" role="group" aria-label="Profile sections">
+    <div
+      class="profile-tabs"
+      role="group"
+      [attr.aria-label]="'pages.profile.navigation.profileSections' | transloco"
+    >
       <!-- aria-label rather than relying on the visible text: the word is
            display:none on a phone, and a button whose only remaining content is
            an arrow glyph would otherwise announce as "left arrow". -->
@@ -456,11 +563,11 @@
         class="ptab ptab-back"
         type="button"
         (click)="goBack()"
-        title="Back"
-        aria-label="Back"
+        [title]="'pages.profile.actions.back' | transloco"
+        [attr.aria-label]="'pages.profile.actions.back' | transloco"
       >
         <span aria-hidden="true">←</span>
-        <span class="ptab-word">Back</span>
+        <span class="ptab-word">{{ 'pages.profile.actions.back' | transloco }}</span>
       </button>
       <button
         type="button"
@@ -479,7 +586,7 @@
           (click)="setTab('media')"
         >
           <span class="ptab-glyph" aria-hidden="true">🖼️</span>
-          <span class="ptab-word">Media</span>
+          <span class="ptab-word">{{ 'pages.profile.navigation.media' | transloco }}</span>
         </button>
       }
       <button
@@ -488,7 +595,7 @@
         [class.active]="tab() === 'following'"
         (click)="setTab('following')"
       >
-        Following
+        {{ 'pages.profile.stats.following' | transloco }}
       </button>
       @if (!auth.isAnonymous || !isSelf()) {
         <button
@@ -497,7 +604,7 @@
           [class.active]="tab() === 'followers'"
           (click)="setTab('followers')"
         >
-          Followers
+          {{ 'pages.profile.stats.followers' | transloco }}
         </button>
       }
       @if (collections().length > 0) {
@@ -507,7 +614,7 @@
           [class.active]="tab() === 'collections'"
           (click)="setTab('collections')"
         >
-          Collections
+          {{ 'pages.profile.navigation.collections' | transloco }}
         </button>
       }
       <!-- Analytics reads Mastodon status metadata this account has none of. -->
@@ -518,7 +625,7 @@
           [class.active]="tab() === 'analytics'"
           (click)="setTab('analytics')"
         >
-          Analytics
+          {{ 'pages.profile.navigation.analytics' | transloco }}
         </button>
       }
     </div>
@@ -534,8 +641,13 @@
   }
 
   @if (tab() === 'collections' && collections().length) {
-    <section class="profile-collections" aria-label="Collections">
-      <h3>Collections by {{ a.display_name || a.username }}</h3>
+    <section
+      class="profile-collections"
+      [attr.aria-label]="'pages.profile.navigation.collections' | transloco"
+    >
+      <h3>
+        {{ 'pages.profile.collections.title' | transloco: { name: a.display_name || a.username } }}
+      </h3>
       <div class="collection-list">
         @for (collection of collections(); track collection.id) {
           @if (auth.isAnonymous) {
@@ -552,7 +664,13 @@
                 }
               </span>
               <span class="collection-count muted">
-                {{ collection.item_count }} member{{ collection.item_count === 1 ? '' : 's' }} ↗
+                {{
+                  (collection.item_count === 1
+                    ? 'pages.profile.collections.member.one'
+                    : 'pages.profile.collections.member.other'
+                  ) | transloco: { count: collection.item_count }
+                }}
+                ↗
               </span>
             </a>
           } @else {
@@ -564,7 +682,12 @@
                 }
               </span>
               <span class="collection-count muted">
-                {{ collection.item_count }} member{{ collection.item_count === 1 ? '' : 's' }}
+                {{
+                  (collection.item_count === 1
+                    ? 'pages.profile.collections.member.one'
+                    : 'pages.profile.collections.member.other'
+                  ) | transloco: { count: collection.item_count }
+                }}
               </span>
             </a>
           }
@@ -606,7 +729,9 @@
   @if (tab() === 'posts') {
     @if (!isRss() && !isTwitter() && !isBluesky() && auth.shouldOfferLogin && isSelf()) {
       <a class="profile-login-post" routerLink="/login" (click)="auth.exitAnonymous()">
-        <div class="profile-login-post-label muted">📌 Pinned</div>
+        <div class="profile-login-post-label muted">
+          📌 {{ 'pages.profile.posts.pinned' | transloco }}
+        </div>
         <div class="profile-login-post-body">
           <div class="profile-login-post-avatar" aria-hidden="true">M</div>
           <div>
@@ -614,7 +739,7 @@
               <strong>Mawkingbird</strong>
               <span class="muted">&#64;mawkingbird</span>
             </div>
-            <p>Login or create an account to post content, reply and more</p>
+            <p>{{ 'pages.profile.posts.loginPrompt' | transloco }}</p>
           </div>
         </div>
       </a>
@@ -624,7 +749,11 @@
          replies or pins on browser-local posts) but searching what you wrote
          still works. -->
     @if (!isRss() && !isTwitter()) {
-      <div class="profile-filters" role="group" aria-label="Timeline filters">
+      <div
+        class="profile-filters"
+        role="group"
+        [attr.aria-label]="'pages.profile.navigation.timelineFilters' | transloco"
+      >
         @if (!auth.isAnonymous || !isSelf()) {
           <button
             type="button"
@@ -642,7 +771,7 @@
             [attr.aria-pressed]="showReplies()"
             (click)="toggleReplies()"
           >
-            💬 Replies
+            💬 {{ 'pages.profile.posts.replies' | transloco }}
           </button>
           <button
             type="button"
@@ -651,7 +780,7 @@
             [attr.aria-pressed]="showPinned()"
             (click)="togglePinned()"
           >
-            📌 Pinned
+            📌 {{ 'pages.profile.posts.pinned' | transloco }}
           </button>
         }
         <!-- Fourth and last button this row takes. Search belongs here with the
@@ -664,7 +793,7 @@
           [attr.aria-pressed]="searchOpen()"
           (click)="toggleSearch()"
         >
-          🔍 Search
+          🔍 {{ 'pages.profile.search.search' | transloco }}
         </button>
       </div>
     }
@@ -686,20 +815,25 @@
             [ngModel]="searchCriteria().words"
             (ngModelChange)="patchSearch({ words: $event })"
             name="profile-search-words"
-            [placeholder]="'Search @' + a.acct + '&#8217;s posts…'"
-            aria-label="Search this account's posts"
+            [placeholder]="'pages.profile.search.placeholder' | transloco: { acct: a.acct }"
+            [attr.aria-label]="'pages.profile.search.ariaLabel' | transloco"
           />
           <button class="btn" type="submit" [disabled]="searching()">
-            {{ searching() ? 'Searching…' : 'Search' }}
+            {{
+              (searching() ? 'pages.profile.search.searching' : 'pages.profile.search.search')
+                | transloco
+            }}
           </button>
           @if (searchResults()) {
-            <button class="link" type="button" (click)="clearSearch()">clear</button>
+            <button class="link" type="button" (click)="clearSearch()">
+              {{ 'pages.profile.search.clear' | transloco }}
+            </button>
           }
         </form>
 
         <div class="profile-search-filters">
           <label>
-            <span class="muted small">After</span>
+            <span class="muted small">{{ 'pages.profile.search.after' | transloco }}</span>
             <input
               type="date"
               [ngModel]="searchCriteria().after ?? ''"
@@ -708,7 +842,7 @@
             />
           </label>
           <label>
-            <span class="muted small">Before</span>
+            <span class="muted small">{{ 'pages.profile.search.before' | transloco }}</span>
             <input
               type="date"
               [ngModel]="searchCriteria().before ?? ''"
@@ -723,7 +857,7 @@
             [attr.aria-pressed]="!!searchCriteria().hasMedia"
             (click)="patchSearch({ hasMedia: !searchCriteria().hasMedia })"
           >
-            🖼 Has media
+            🖼 {{ 'pages.profile.search.hasMedia' | transloco }}
           </button>
           <button
             type="button"
@@ -732,7 +866,7 @@
             [attr.aria-pressed]="!!searchCriteria().hasLink"
             (click)="patchSearch({ hasLink: !searchCriteria().hasLink })"
           >
-            🔗 Has link
+            🔗 {{ 'pages.profile.search.hasLink' | transloco }}
           </button>
           <button
             type="button"
@@ -741,27 +875,40 @@
             [attr.aria-pressed]="!!searchCriteria().excludeReplies"
             (click)="patchSearch({ excludeReplies: !searchCriteria().excludeReplies })"
           >
-            🚫 No replies
+            🚫 {{ 'pages.profile.search.noReplies' | transloco }}
           </button>
         </div>
 
         @if (searchLoadingMore()) {
-          <p class="muted small" role="status">Loading more of their history to search…</p>
+          <p class="muted small" role="status">
+            {{ 'pages.profile.search.loadingMore' | transloco }}
+          </p>
         }
         @if (searchError(); as error) {
           <p class="muted small profile-search-note">{{ error }}</p>
         }
         @if (searchResults(); as results) {
           <p class="muted small profile-search-note" role="status">
-            {{ results.length }} {{ results.length === 1 ? 'post' : 'posts' }} ·
-            <!-- Said plainly, because "12 results" from a patchy index reads as
-                 "they only posted about this 12 times", which is not what it
-                 means. -->
-            searched {{ searchScanned() }} loaded
-            {{ searchScanned() === 1 ? 'post' : 'posts' }}
-            @if (searchUsedServer()) {
-              and this server&#8217;s index
-            }
+            <span
+              [innerHTML]="
+                (results.length === 1
+                  ? searchScanned() === 1
+                    ? 'pages.profile.search.resultSummary.oneOne'
+                    : 'pages.profile.search.resultSummary.oneOther'
+                  : searchScanned() === 1
+                    ? 'pages.profile.search.resultSummary.otherOne'
+                    : 'pages.profile.search.resultSummary.otherOther'
+                )
+                  | transloco
+                    : {
+                        results: results.length,
+                        scanned: searchScanned(),
+                        server: searchUsedServer()
+                          ? ('pages.profile.search.serverIndex' | transloco)
+                          : '',
+                      }
+              "
+            ></span>
           </p>
         }
       </div>
@@ -776,12 +923,12 @@
           (deleted)="onDeleted($event)"
         />
       } @empty {
-        <p class="muted center">No posts matched.</p>
+        <p class="muted center">{{ 'pages.profile.search.noMatches' | transloco }}</p>
       }
     } @else {
       @if (showPinned()) {
         @for (s of pinnedStatuses(); track s.id) {
-          <div class="pinned-label muted">📌 Pinned</div>
+          <div class="pinned-label muted">📌 {{ 'pages.profile.posts.pinned' | transloco }}</div>
           <app-status-card
             [status]="s"
             filterContext="account"
@@ -792,7 +939,7 @@
       }
 
       @if (statusesLoading()) {
-        <p class="muted center">Loading posts…</p>
+        <p class="muted center">{{ 'pages.profile.posts.loading' | transloco }}</p>
       } @else {
         @for (s of visibleStatuses(); track s.id) {
           <app-status-card
@@ -803,16 +950,19 @@
           />
         } @empty {
           @if (!showPinned() || !pinnedStatuses().length) {
-            <p class="muted center">No posts match these filters.</p>
+            <p class="muted center">{{ 'pages.profile.posts.noMatchesFilters' | transloco }}</p>
           }
         }
         @if (statuses().length) {
           <div class="load-more-row">
             @if (exhausted()) {
-              <span class="muted small">No older posts.</span>
+              <span class="muted small">{{ 'pages.profile.posts.noOlder' | transloco }}</span>
             } @else {
               <button class="btn btn-outline" [disabled]="loadingMore()" (click)="loadMore()">
-                {{ loadingMore() ? 'Loading…' : 'Load more' }}
+                {{
+                  (loadingMore() ? 'pages.profile.loading.loading' : 'pages.profile.posts.loadMore')
+                    | transloco
+                }}
               </button>
             }
           </div>
@@ -861,17 +1011,18 @@
         (click)="$event.stopPropagation()"
         (keyup)="$event.stopPropagation()"
       >
-        <h3 id="block-title">Block &#64;{{ a.acct }}?</h3>
+        <h3 id="block-title">
+          {{ 'pages.profile.confirm.blockTitle' | transloco: { acct: a.acct } }}
+        </h3>
         <p>
-          They will no longer be able to follow or interact with you. You can undo this later from
-          this same menu.
+          {{ 'pages.profile.confirm.blockExplain' | transloco }}
         </p>
         <div class="confirm-actions">
           <button class="btn btn-outline" type="button" (click)="showBlockConfirm.set(false)">
-            Cancel
+            {{ 'pages.profile.actions.cancel' | transloco }}
           </button>
           <button class="btn btn-danger" type="button" (click)="confirmBlock()">
-            Confirm block
+            {{ 'pages.profile.confirm.block' | transloco }}
           </button>
         </div>
       </div>
@@ -892,14 +1043,16 @@
         (click)="$event.stopPropagation()"
         (keyup)="$event.stopPropagation()"
       >
-        <h3 id="unfollow-title">Unfollow &#64;{{ a.acct }}?</h3>
-        <p>Their posts will no longer appear in your home timeline.</p>
+        <h3 id="unfollow-title">
+          {{ 'pages.profile.confirm.unfollowTitle' | transloco: { acct: a.acct } }}
+        </h3>
+        <p>{{ 'pages.profile.confirm.unfollowExplain' | transloco }}</p>
         <div class="confirm-actions">
           <button class="btn btn-outline" type="button" (click)="showUnfollowConfirm.set(false)">
-            Cancel
+            {{ 'pages.profile.actions.cancel' | transloco }}
           </button>
           <button class="btn btn-danger" type="button" (click)="confirmUnfollow()">
-            Confirm unfollow
+            {{ 'pages.profile.confirm.unfollow' | transloco }}
           </button>
         </div>
       </div>
@@ -920,18 +1073,20 @@
         (click)="$event.stopPropagation()"
         (keyup)="$event.stopPropagation()"
       >
-        <h3 id="remove-follower-title">Remove &#64;{{ a.acct }} as a follower?</h3>
-        <p>They will stop following you, but they will not be blocked.</p>
+        <h3 id="remove-follower-title">
+          {{ 'pages.profile.confirm.removeFollowerTitle' | transloco: { acct: a.acct } }}
+        </h3>
+        <p>{{ 'pages.profile.confirm.removeFollowerExplain' | transloco }}</p>
         <div class="confirm-actions">
           <button
             class="btn btn-outline"
             type="button"
             (click)="showRemoveFollowerConfirm.set(false)"
           >
-            Cancel
+            {{ 'pages.profile.actions.cancel' | transloco }}
           </button>
           <button class="btn btn-danger" type="button" (click)="confirmRemoveFollower()">
-            Remove follower
+            {{ 'pages.profile.actions.removeFollower' | transloco }}
           </button>
         </div>
       </div>
@@ -953,13 +1108,15 @@
     @if (routeHandle(); as handle) {
       @if (recoveryFailed()) {
         <p class="muted small">
-          They may simply not have federated here yet. Searching can pull them in.
+          {{ 'pages.profile.errors.notFederated' | transloco }}
         </p>
         <div class="profile-error-actions">
           <a class="btn" [routerLink]="['/search']" [queryParams]="{ q: handle, type: 'accounts' }">
-            Search for &#64;{{ handle }}
+            {{ 'pages.profile.errors.searchFor' | transloco: { handle: handle } }}
           </a>
-          <button class="btn btn-outline" type="button" (click)="goBack()">← Back</button>
+          <button class="btn btn-outline" type="button" (click)="goBack()">
+            {{ 'pages.profile.actions.back' | transloco }}
+          </button>
         </div>
       }
     } @else {
@@ -968,16 +1125,18 @@
            be offering to search for a number. Say what went wrong and point at
            the surfaces that can actually find a person. -->
       <p class="muted small">
-        This link carries only an account id, and ids belong to the server that issued them — there
-        is no name in it to look up. Links made from here on include the handle, so they survive
-        switching servers.
+        {{ 'pages.profile.errors.idOnlyLink' | transloco }}
       </p>
       <div class="profile-error-actions">
-        <button class="btn" type="button" (click)="goBack()">← Back</button>
-        <a class="btn btn-outline" routerLink="/home">Home feed</a>
+        <button class="btn" type="button" (click)="goBack()">
+          {{ 'pages.profile.actions.back' | transloco }}
+        </button>
+        <a class="btn btn-outline" routerLink="/home">{{
+          'pages.profile.actions.homeFeed' | transloco
+        }}</a>
       </div>
     }
   </div>
 } @else {
-  <p class="muted center">Account not found.</p>
+  <p class="muted center">{{ 'pages.profile.errors.accountNotFound' | transloco }}</p>
 }

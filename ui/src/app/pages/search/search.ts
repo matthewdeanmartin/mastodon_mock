@@ -169,15 +169,18 @@ const SEARCH_TIMEOUT_MS = 20000;
 // i18n pages.search.explain.usedCalls: Used: {{count}} calls
 // i18n pages.search.explain.truncated: Truncated: {{count}} hashtag(s) dropped to stay within the API-call budget.
 // i18n pages.search.network.mastodon: Mastodon
-// i18n pages.search.network.bluesky: 🦋 Bluesky
+// i18n pages.search.network.bluesky: Bluesky
+// i18n pages.search.network.ariaLabel: Search network
 // i18n pages.search.type.accounts: Accounts
 // i18n pages.search.type.posts: Posts
 // i18n pages.search.type.hashtags: Hashtags
 // i18n pages.search.type.web: Search the web ↗
+// i18n pages.search.type.ariaLabel: Search for
 // i18n pages.search.action.search: Search
 // i18n pages.search.action.searchHelperTitle: Describe what you’re looking for and get a query
 // i18n pages.search.action.helpMeSearch: Help me search
 // i18n pages.search.action.syntaxHelp: Search syntax help
+// i18n pages.search.action.syntaxHelpTitle: What you can type in a {{post}} search
 // i18n pages.search.action.syntax: Syntax?
 // i18n pages.search.action.advanced: Advanced ▾
 // i18n pages.search.saved.summary: Saved ({{count}})
@@ -215,15 +218,19 @@ const SEARCH_TIMEOUT_MS = 20000;
 // i18n pages.search.server.noIndex: This server answered but returned nothing for a well-known account. Its search index is empty or restricted — not usable as a search server.
 // i18n pages.search.server.authRequired: This server requires a login for search, so it can’t be used anonymously.
 // i18n pages.search.server.unreachable: Couldn’t reach that server’s search API.
+// i18n pages.search.server.hostLabel: Search server host
 // i18n pages.search.savedNamePlaceholder: Name this search
 // i18n pages.search.savedNameLabel: Saved search name
 // i18n pages.search.action.cancel: Cancel
+// i18n pages.search.action.applyAndSearch: Apply &amp; search
 // i18n pages.search.budget.maximumApiCalls: Maximum API calls
 // i18n pages.search.budget.onePage: 1 page (~40 posts)
 // i18n pages.search.budget.twoPages: 2 pages (~80 posts)
 // i18n pages.search.budget.threePages: 3 pages (~120 posts)
 // i18n pages.search.budget.fivePages: 5 pages (~200 posts)
 // i18n pages.search.budget.tenPages: 10 pages (~400 posts)
+// i18n pages.search.placeholder.exactPhrase: change detection
+// i18n pages.search.placeholder.excludeWords: react vue
 // i18n pages.search.anonymousPostSearch: Anonymous post search uses hashtags — Mastodon doesn’t offer anonymous full-text search. Fields below are applied to loaded results.
 // i18n pages.search.fullTextSignIn: Sign in
 // i18n pages.search.fullTextPostSearch: for full-text post search.
@@ -262,6 +269,13 @@ const SEARCH_TIMEOUT_MS = 20000;
 // i18n pages.search.accountRangesDescription: Ranges filter the loaded results — e.g. cap followers to skip celebrities, or require a minimum post count to skip dead accounts.
 // i18n pages.search.refine.filterPeople: Filter these people
 // i18n pages.search.refine.filterLoadedPeople: Filter loaded people
+// i18n pages.search.refine.filterResults: Filter these results
+// i18n pages.search.refine.filterLoadedResults: Filter loaded results
+// i18n pages.search.refine.groupBy: Group by
+// i18n pages.search.refine.none: None
+// i18n pages.search.refine.author: Author
+// i18n pages.search.refine.date: Date
+// i18n pages.search.refine.sortPosts: Sort {{posts}}
 // i18n pages.search.refine.sort: Sort
 // i18n pages.search.refine.sortPeople: Sort people
 // i18n pages.search.refine.filterFollowState: Filter by follow state
@@ -287,15 +301,17 @@ const SEARCH_TIMEOUT_MS = 20000;
 // i18n pages.search.refine.muteEverywhere: Mute everywhere
 // i18n pages.search.refine.showExcluded: Show excluded authors again
 // i18n pages.search.refine.collapseRepeated: Collapse repeated
-// i18n pages.search.refine.collapseHint: Folds near-identical
-// i18n pages.search.refine.collapseHintSuffix: from the same author into one row.
+// i18n pages.search.refine.collapseRepeatedSentence: Collapse repeated {{posts}}
+// i18n pages.search.refine.collapseHint: Folds near-identical {{posts}} from the same author into one row.
 // i18n pages.search.refine.clearFiltersPosts: Clear filters
 // i18n pages.search.refine.showingPosts: Showing {{shown}} of {{loaded}} loaded posts
-// i18n pages.search.refine.hiddenFrom: {{count}} hidden from
+// i18n pages.search.refine.hiddenFrom: {{hidden}} hidden from {{excluded}} excluded {{accountWord}}
 // i18n pages.search.refine.excluded: excluded
-// i18n pages.search.refine.collapsed: near-identical collapsed
-// i18n pages.search.refine.apiCalls: of up to {{budget}} API calls used
-// i18n pages.search.refine.onlyLeft: Only {{count}} left after excluding. The excluded {{accountWord}} made up most of what was loaded — fetching more will find posts from other people.
+// i18n pages.search.refine.account: account
+// i18n pages.search.refine.accounts: accounts
+// i18n pages.search.refine.collapsed: {{count}} near-identical {{posts}} collapsed
+// i18n pages.search.refine.apiCalls: {{used}} of up to {{budget}} API calls used
+// i18n pages.search.refine.onlyLeft: Only {{count}} {{postWord}} left after excluding. The excluded {{accountWord}} made up most of what was loaded — fetching more will find posts from other people.
 // i18n pages.search.results.loading: Loading…
 // i18n pages.search.results.loadMorePosts: Load more posts
 // i18n pages.search.results.people: People
@@ -355,7 +371,7 @@ const SEARCH_TIMEOUT_MS = 20000;
 // i18n pages.search.empty.refused: {{host}} refused this search. The server may restrict search, or your login may not have search permission.
 // i18n pages.search.empty.unreachable: Couldn’t reach {{host}} to check whether search is working. Your connection or the server may be having trouble.
 // i18n pages.search.empty.tagsOnly: {{host}} recognises the hashtag but won’t serve the posts behind it. A different search server would fix this.
-// i18n pages.search.empty.postsUnavailable: Post search isn’t available on {{host}}. It can find accounts, but returns no posts even for a common hashtag — anonymous full-text search is off on almost every server. A different search server would fix this.
+// i18n pages.search.empty.postsUnavailable: Post search isn't available on {{host}}. It can find accounts, but returns no posts even for a common hashtag — anonymous full-text search is off on almost every server. A different search server would fix this.
 // i18n pages.search.empty.notWorking: Search doesn’t appear to be working on {{host}}. A different search server would fix this.
 
 @Component({
@@ -1032,6 +1048,8 @@ export class Search implements OnInit, OnDestroy {
   protected exactPhrase = signal('');
   protected excludeWords = signal('');
   protected author = signal('');
+  /** Example account syntax, deliberately kept literal rather than translated. */
+  protected readonly authorPlaceholder = '@account@server.example';
   protected before = signal('');
   protected after = signal('');
   protected language = signal('');
@@ -1877,6 +1895,8 @@ export class Search implements OnInit, OnDestroy {
   }
 
   /** Text in the search-server box; seeded from the stored choice. */
+  /** Example hostname, deliberately kept literal rather than translated. */
+  protected readonly serverHostPlaceholder = 'mastodon.social';
   protected searchServerInput = signal(this.searchServer.host() ?? '');
   protected searchServerStatus = signal<SearchServerStatus>('idle');
   /** Result count from the canary probe, shown as evidence the index is live. */

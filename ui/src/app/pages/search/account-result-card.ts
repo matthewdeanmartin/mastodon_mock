@@ -25,6 +25,7 @@ import { Terminology } from '../../terminology';
 // i18n pages.search.card.request: Request
 // i18n pages.search.card.follow: Follow
 // i18n pages.search.card.automatedAccount: Automated account
+// i18n pages.search.card.bot: BOT
 // i18n pages.search.card.requiresFollowApproval: Requires follow approval
 // i18n pages.search.card.followsYou: Follows you
 // i18n pages.search.card.whySeeingThis: Why you’re seeing this:
