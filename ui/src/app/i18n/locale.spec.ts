@@ -15,9 +15,10 @@ describe('supportedLocales', () => {
   });
 
   it('offers in-progress locales on test and canary deployments', () => {
-    expect(supportedLocales('https://mawkingbird.com/test/')).toEqual(['en', 'de']);
-    expect(supportedLocales('https://mawkingbird.com/canary/')).toEqual(['en', 'de']);
-    expect(supportedLocales('https://example.github.io/mawkingbird/canary/')).toEqual(['en', 'de']);
+    const expected = ['en', 'de', 'fr', 'id', 'ja'];
+    expect(supportedLocales('https://mawkingbird.com/test/')).toEqual(expected);
+    expect(supportedLocales('https://mawkingbird.com/canary/')).toEqual(expected);
+    expect(supportedLocales('https://example.github.io/mawkingbird/canary/')).toEqual(expected);
   });
 });
 

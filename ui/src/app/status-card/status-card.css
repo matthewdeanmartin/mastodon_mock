@@ -8,6 +8,18 @@
   padding: 8px 16px 0 56px;
 }
 
+/* Inherits the label's muted colour so the attribution line stays quiet — it is
+   a link for the reader who wants it, not a second thing competing with the
+   post. Underlines on hover so it is discoverable without shouting. */
+.boost-by {
+  color: inherit;
+  text-decoration: none;
+}
+
+.boost-by:hover {
+  text-decoration: underline;
+}
+
 .status {
   display: flex;
   gap: 12px;
@@ -384,6 +396,21 @@
 
 .action:hover {
   color: var(--accent);
+}
+
+/* A count with no action behind it.
+   Anonymous readers see counts for things they cannot do (boosts on a post with
+   no URL to share, for one). Those render as spans, and `.action` alone gave
+   them a pointer cursor and a hover highlight — so they looked exactly like the
+   working buttons beside them and did nothing when tapped. On a phone, with no
+   hover and no cursor, that is indistinguishable from a missed tap. Anything
+   that is only a number wears this. */
+.action-static {
+  cursor: default;
+}
+
+.action-static:hover {
+  color: var(--muted);
 }
 
 /* Active state gets a rounded accent box so it's visible without hovering. */

@@ -1,6 +1,17 @@
 @let a = account();
 
-<div class="acct-card" [class.expanded]="expanded()">
+<!--
+  The whole card opens the profile; see onCardClick for why it is a decline-list
+  rather than a wrapper link. No role or tabindex: the display-name link inside
+  is the same destination with the same name, already in the tab order, so
+  announcing the card as one more control would add noise, not access.
+-->
+<div
+  class="acct-card"
+  [class.expanded]="expanded()"
+  (mousedown)="onCardMouseDown()"
+  (click)="onCardClick($event)"
+>
   <div class="acct-main">
     <a
       class="acct-avatar-link"

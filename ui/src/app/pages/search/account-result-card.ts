@@ -1,5 +1,5 @@
 import { Component, computed, input, output, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Account, Relationship, Status } from '../../models';
 import { HumanCountPipe } from '../../human-count.pipe';
@@ -8,6 +8,32 @@ import { StatusCard } from '../../status-card/status-card';
 import { AccountWithMatches } from './account-refine';
 import { RenderedHtmlLinks } from '../../rendered-html-links';
 import { Terminology } from '../../terminology';
+
+/**
+ * Clicks that belong to something on the card rather than to the card itself.
+ *
+ * Same approach as `StatusCard`'s `INTERACTIVE_SELECTOR`, and kept as one
+ * reviewable list for the same reason: anything added to this card that responds
+ * to a click has to be reachable from here.
+ *
+ * `.acct-matches` is the entry that is specific to this card. The posts that made
+ * an account surface render as nested `app-status-card`s, and each of those has
+ * its own navigation — a click there means "open that post", never "open this
+ * profile", so the inner card must win.
+ */
+const INTERACTIVE_SELECTOR = [
+  'a',
+  'button',
+  'input',
+  'select',
+  'textarea',
+  'label',
+  'summary',
+  'details',
+  '[role="button"]',
+  '[role="link"]',
+  '.acct-matches',
+].join(',');
 
 // i18n pages.search.card.muteFor1Hour: 1 hour
 // i18n pages.search.card.muteFor1Day: 1 day
@@ -195,6 +221,46 @@ export class AccountResultCard {
 
   /** True when clicking the button unfollows (it currently shows a followed state). */
   protected isFollowingState = computed(() => this.following() || this.requested());
+
+  private router = inject(Router);
+
+  /** See {@link onCardClick} — snapshotted before the browser collapses it. */
+  private selectionAtMouseDown = false;
+
+  onCardMouseDown(): void {
+    this.selectionAtMouseDown = (getSelection()?.toString() ?? '').length > 0;
+  }
+
+  /**
+   * Open the profile when the click landed on the card rather than on a control.
+   *
+   * The bio was a plain `<div>` while the avatar and the display name above it
+   * were links, so on a phone a ~40px face and a short name were the only ways
+   * through, sitting under several lines of text that look exactly like a
+   * tappable card body. Readers concluded the profile was unavailable; the truth
+   * was that the target was small.
+   *
+   * A decline list rather than a target list, for the reason `StatusCard`
+   * documents: there is no "whitespace" element to bind to, so the card listens
+   * to everything and refuses what belongs to someone else — the Follow button,
+   * the moderation menu, the real links inside the rendered bio, and the nested
+   * post cards.
+   */
+  onCardClick(event: MouseEvent): void {
+    const hadSelection = this.selectionAtMouseDown;
+    this.selectionAtMouseDown = false;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    if (hadSelection) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (!target || target.closest(INTERACTIVE_SELECTOR)) {
+      return;
+    }
+    void this.router.navigate(this.profileLink());
+  }
 
   onFollowClick(): void {
     if (this.followBusy()) {

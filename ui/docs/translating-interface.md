@@ -19,6 +19,11 @@ stable key set, exact placeholders, and trustworthy English source text.
 Use one bot per locale. Do not have multiple bots edit the same locale file: consistency of
 vocabulary and formality matters more than raw throughput.
 
+Dispatch in large batches, not one subagent per small area. Every dispatch (subagent or fresh
+session) re-pays the cost of reading the skill and glossary before translating a single key,
+so a language done as ~5 large dispatches is far cheaper than the same language done as ~50
+small ones. See "Batch size" in `.claude/skills/translate-ui/SKILL.md` step 3.
+
 ## Bot work order
 
 Replace `de` below with the target locale and give this prompt to the bot:

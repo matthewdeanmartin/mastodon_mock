@@ -10,8 +10,19 @@
   </div>
 } @else if (!hiddenByFilter()) {
   @if (boostedBy) {
+    <!-- The booster's name is a link: without one, "turn off this person's
+         boosts" or even "who is this" meant leaving the feed and searching them
+         by hand. Falls back to plain text where there is no profile to open. -->
     <div class="boost-label muted">
-      <span aria-hidden="true">🔁</span> {{ boostedBy }} {{ words().boosted }}
+      <span aria-hidden="true">🔁</span>
+      @if (boosterLink; as link) {
+        <a class="boost-by" [routerLink]="link" (click)="$event.stopPropagation()">{{
+          boostedBy
+        }}</a>
+      } @else {
+        {{ boostedBy }}
+      }
+      {{ words().boosted }}
     </div>
   }
   <!-- The click handler makes the card's whitespace open the thread; see
@@ -148,12 +159,22 @@
           <!-- In append (learner) mode the original stays put and the translation is
                added below it. Every other case swaps the translation in, which is what
                renderedContent() already does. -->
-          <a class="content-link" [routerLink]="threadLink" (click)="onContentClick($event)">
+          <!-- Deliberately not a link. The post text used to be wrapped in its own
+               routerLink, which made selecting it a fight: a click navigated
+               immediately, and the first click of a double-click navigated before
+               the second was known about. The card's own `onCardClick` already
+               opens the thread from anywhere that is not interactive, already
+               declines modified clicks, and already snapshots the selection on
+               mousedown — so the anchor was a second, worse navigation path over
+               the top of a working one. `onContentClick` stays: it routes
+               hashtags, mentions and profile links inside the rendered HTML, and
+               that job was never the anchor's. -->
+          <div class="content-link" (click)="onContentClick($event)">
             <div
               class="content"
               [innerHTML]="appendMode() ? originalContent() : renderedContent()"
             ></div>
-          </a>
+          </div>
 
           @if (appendMode() && translation(); as t) {
             <div class="learner-translation">
@@ -363,8 +384,27 @@
                   : { count: display.replies_count, label: ('statusCard.replies' | transloco) }
             }}</span>
           </button>
+        } @else if (auth.isAnonymous && threadLink) {
+          <!-- 💬 is what everyone taps to reach the comments, and for an
+               anonymous reader it used to be an inert span: the tap did nothing,
+               and the post looked like it had no thread. Reading replies never
+               needed an account — only writing one does — so this goes to the
+               thread. The sign-in prompt belongs on the reply composer there,
+               not on the way in. -->
+          <a
+            class="action"
+            [routerLink]="threadLink"
+            (click)="$event.stopPropagation()"
+            [title]="'statusCard.repliesTitle' | transloco"
+            ><span aria-hidden="true">💬</span>
+            <span>{{
+              'statusCard.countLabel'
+                | transloco
+                  : { count: display.replies_count, label: ('statusCard.replies' | transloco) }
+            }}</span></a
+          >
         } @else if (auth.isAnonymous || readOnlyStats) {
-          <span class="action" [title]="'statusCard.repliesTitle' | transloco"
+          <span class="action action-static" [title]="'statusCard.repliesTitle' | transloco"
             ><span aria-hidden="true">💬</span>
             <span>{{
               'statusCard.countLabel'
@@ -513,7 +553,10 @@
               }}</span>
             </button>
           } @else {
-            <span class="action" [title]="words().Boosts"
+            <!-- No URL to share and no network to boost on: a number, not a
+                 control. `.action-static` keeps the row's spacing without the
+                 pointer cursor that made this look tappable. -->
+            <span class="action action-static" [title]="words().Boosts"
               ><span aria-hidden="true">🔁</span>
               <span>{{
                 'statusCard.countLabel'
@@ -547,7 +590,7 @@
               }}
             </button>
           } @else {
-            <span class="action">{{
+            <span class="action action-static">{{
               'statusCard.countLabel'
                 | transloco: { count: display.reblogs_count, label: words().boosts }
             }}</span>
@@ -557,7 +600,7 @@
                attach them to. When `caps.reblog` already rendered a button above,
                this fallback would be a second 🔁 on the same row — the case a
                signed-in viewer hits on every Bluesky post. -->
-          <span class="action" [title]="words().Boosts"
+          <span class="action action-static" [title]="words().Boosts"
             ><span aria-hidden="true">🔁</span>
             {{
               'statusCard.countLabel'
@@ -630,7 +673,17 @@
           </button>
         }
         @if (auth.isAnonymous) {
-          <span class="action" [title]="'statusCard.favouritesTitle' | transloco">
+          <!-- Liking needs an identity on the post's own server, so this cannot
+               act. It used to be an inert span wearing `.action`, which gave it a
+               pointer cursor and a hover highlight — a control in every visible
+               respect that ignored the tap. Now it answers: it says what liking
+               costs and offers the way there. -->
+          <button
+            class="action"
+            type="button"
+            (click)="promptSignIn('like', $event)"
+            [title]="'statusCard.favouritesTitle' | transloco"
+          >
             <span aria-hidden="true">{{ favIcon() }}</span>
             <span>{{
               'statusCard.countLabel'
@@ -640,7 +693,7 @@
                       label: ('statusCard.favourites' | transloco),
                     }
             }}</span>
-          </span>
+          </button>
         } @else if (!foreign) {
           @if (capabilities.canUseServerActions && display.provider !== 'bluesky') {
             <button
@@ -661,7 +714,7 @@
               }}
             </button>
           } @else {
-            <span class="action">{{
+            <span class="action action-static">{{
               'statusCard.countLabel'
                 | transloco
                   : {
@@ -673,7 +726,7 @@
         } @else if (!caps.favourite && readOnlyStats) {
           <!-- Same pairing as the boost fallback above: only stand in for the
                button when there is no button. -->
-          <span class="action" [title]="'statusCard.likesTitle' | transloco"
+          <span class="action action-static" [title]="'statusCard.likesTitle' | transloco"
             ><span aria-hidden="true">⭐</span>
             {{
               'statusCard.countLabel'
@@ -1172,6 +1225,10 @@
       [startIndex]="lightboxIndex()!"
       (closed)="lightboxIndex.set(null)"
     />
+  }
+
+  @if (signInFor()) {
+    <app-sign-in-prompt [action]="signInAction()" (dismissed)="signInFor.set(null)" />
   }
 
   @if (showShare()) {

@@ -60,6 +60,7 @@ import { BskyReply } from '../providers/bluesky/bluesky-reply';
 import { BlueskyApi } from '../providers/bluesky/bluesky-api';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { BskyRef } from '../providers/bluesky/bluesky-types';
+import { SignInPrompt } from '../sign-in-prompt/sign-in-prompt';
 import { AnonymousCapabilities } from '../providers/anonymous/anonymous-capabilities';
 import { AnonymousBookmarks } from '../providers/anonymous/anonymous-bookmarks';
 import { nitterHost, toNitterUrl } from '../providers/twitter/nitter';
@@ -324,6 +325,7 @@ function compactContentLinks(content: string, embeddedPostUrl: string | null): s
     ShareDialog,
     BookmarkProviderDialog,
     PreviewCardComponent,
+    SignInPrompt,
     TranslocoPipe,
   ],
   templateUrl: './status-card.html',
@@ -1403,6 +1405,30 @@ export class StatusCard {
     return s.reblog ? s.account.display_name : null;
   }
 
+  /**
+   * The booster's profile, or null when there is nowhere to send the reader.
+   *
+   * "John Doe boosted this" was bare text, so the only way to find out who John
+   * Doe is — or to go and turn off their boosts — was to search their name by
+   * hand. The account was in reach the whole time: {@link booster} already
+   * returns it for the follow-trust check.
+   *
+   * The booster is the *outer* status's account, which is the reader's own
+   * server's view of them, so this takes the same handle-plus-id route as
+   * {@link accountLink}'s native case rather than the provider-specific
+   * branches — a boost only exists on a provider that has profiles.
+   */
+  protected get boosterLink(): (string | number)[] | null {
+    const booster = this.booster;
+    if (!booster || this.foreign) {
+      return null;
+    }
+    return accountRoutePath({
+      id: booster.id,
+      handle: qualifiedHandle(booster) ?? undefined,
+    });
+  }
+
   /** The quoted status to embed, if this status quotes a visible one. */
   protected quotedStatus = computed<Status | null>(
     () => this.display.quote?.quoted_status ?? this.linkQuote(),
@@ -1474,6 +1500,31 @@ export class StatusCard {
   protected externalBookmarkUrl = computed(() =>
     firstExternalLink(this.display.content, this.server.baseUrl()),
   );
+
+  /**
+   * Which action an anonymous reader just asked for, or null when no prompt is up.
+   *
+   * Holds the i18n *key suffix* rather than a rendered phrase so the heading
+   * translates with the rest of the page — resolved in {@link signInAction}.
+   */
+  protected signInFor = signal<'like' | 'reply' | 'boost' | null>(null);
+
+  /** The translated phrase the prompt puts in its heading. */
+  protected signInAction = computed(() => {
+    const action = this.signInFor();
+    return action ? this.transloco.translate(`signInPrompt.action.${action}`) : '';
+  });
+
+  /**
+   * Answer a tap on an action an anonymous reader cannot perform.
+   *
+   * `stopPropagation` because the card itself navigates to the thread on click,
+   * and opening a dialog and leaving the page at the same time is neither.
+   */
+  protected promptSignIn(action: 'like' | 'reply' | 'boost', event: Event): void {
+    event.stopPropagation();
+    this.signInFor.set(action);
+  }
 
   toggleFavourite(event: Event): void {
     event.stopPropagation();

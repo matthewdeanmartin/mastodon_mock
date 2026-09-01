@@ -168,6 +168,43 @@ describe('StatusCard', () => {
       expect(navigate).toHaveBeenCalledWith(['/statuses', '43']);
     });
 
+    /**
+     * Post text used to be wrapped in its own routerLink, so a click navigated
+     * before a selection could be made and a double-click navigated on the
+     * first of the pair. The card handler does the job now.
+     */
+    it('opens the thread from post text without making the text a link', () => {
+      const fixture = setUp(makeStatus({ id: '45' }));
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('a.content-link')).toBeNull();
+
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      clickOn(fixture, '.content');
+
+      expect(navigate).toHaveBeenCalledWith(['/statuses', '45']);
+    });
+
+    it('leaves a selection alone rather than navigating away from it', () => {
+      const fixture = setUp(makeStatus({ id: '46' }));
+      const el = fixture.nativeElement as HTMLElement;
+      const article = el.querySelector('article.status')!;
+
+      // The gesture that ends a selection: the browser collapses it on
+      // mousedown, so the card snapshots it there rather than reading it late.
+      const selection = getSelection()!;
+      const range = document.createRange();
+      range.selectNodeContents(el.querySelector('.content')!);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      article.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      selection.removeAllRanges();
+      clickOn(fixture, '.content');
+
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
     it('does not navigate when an action button was clicked', () => {
       const fixture = setUp(makeStatus({ id: '44' }));
       const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
@@ -312,6 +349,64 @@ describe('StatusCard', () => {
     // the hardcoded "Reposts" it used to carry.
     expect(el.querySelector('[title="Boosts"]')?.textContent).toContain('2');
     expect(el.querySelector('[title="Favourites"]')?.textContent).toContain('3');
+  });
+
+  /**
+   * Anonymous readers used to get counts rendered as `<span class="action">`.
+   * `.action` carries `cursor: pointer` and a hover highlight, so those spans
+   * looked exactly like the working buttons beside them and did nothing at all
+   * when tapped — on a phone, indistinguishable from a tap that missed.
+   */
+  describe('Anonymous actions answer the tap', () => {
+    it('offers a way in when an anonymous reader taps like', () => {
+      TestBed.inject(Auth).enterAnonymous();
+      const f = setUp(makeStatus({ favourites_count: 3 }));
+      const el = f.nativeElement as HTMLElement;
+
+      const like = el.querySelector<HTMLButtonElement>('button[title="Favourites"]');
+      expect(like).not.toBeNull();
+
+      like!.click();
+      f.detectChanges();
+
+      expect(el.querySelector('app-sign-in-prompt')).not.toBeNull();
+    });
+
+    it('sends an anonymous reader from the comment count to the thread', () => {
+      TestBed.inject(Auth).enterAnonymous();
+      const f = setUp(makeStatus({ replies_count: 2 }));
+      const el = f.nativeElement as HTMLElement;
+
+      // A real link, not an inert span: reading replies never needed an account.
+      const comments = el.querySelector<HTMLAnchorElement>('a[title="Replies"]');
+      expect(comments).not.toBeNull();
+      expect(comments!.getAttribute('href')).toBe('/statuses/1');
+    });
+
+    it('never dresses a bare count as something tappable', () => {
+      TestBed.inject(Auth).enterAnonymous();
+      // No url, so there is nothing to share and the boost count is only a number.
+      const f = setUp(makeStatus({ reblogs_count: 2, url: null }));
+      const el = f.nativeElement as HTMLElement;
+
+      const boosts = el.querySelector('[title="Boosts"]');
+      expect(boosts?.tagName).toBe('SPAN');
+      expect(boosts?.classList.contains('action-static')).toBe(true);
+    });
+  });
+
+  it('links the booster to their profile', () => {
+    // "John Doe boosted this" was bare text, so muting their boosts — or just
+    // finding out who they are — meant searching the name by hand.
+    const booster = makeAccount('99');
+    booster.display_name = 'John Doe';
+    booster.acct = 'john@social.example';
+    const f = setUp(makeStatus({ account: booster, reblog: makeStatus({ id: '5' }) }));
+    const el = f.nativeElement as HTMLElement;
+
+    const link = el.querySelector<HTMLAnchorElement>('.boost-by');
+    expect(link?.textContent?.trim()).toBe('John Doe');
+    expect(link?.getAttribute('href')).toContain('99');
   });
 
   it('opens the share-elsewhere dialog from the Anonymous boost button', () => {

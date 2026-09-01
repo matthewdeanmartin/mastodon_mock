@@ -1,6 +1,15 @@
 .acct-card {
   border-bottom: 1px solid var(--border);
   padding: 12px 16px;
+  /* The whole card opens the profile, so it says so. The bio used to be inert
+     text under a ~40px avatar, which read as "this profile is unavailable". */
+  cursor: pointer;
+}
+
+/* The nested "matched on" posts are their own cards with their own destination,
+   so the profile cursor must not follow the reader into them. */
+.acct-card .acct-matches {
+  cursor: auto;
 }
 
 .acct-main {

@@ -37,7 +37,7 @@ import { isCanaryBuild, isTestBuild } from '../build-flavor';
  * the settings control all read from this list.
  */
 export const PRODUCTION_LOCALES = ['en'] as const;
-export const IN_PROGRESS_LOCALES = ['de', 'fr'] as const;
+export const IN_PROGRESS_LOCALES = ['de', 'fr', 'id', 'ja'] as const;
 
 export type SupportedLocale =
   | (typeof PRODUCTION_LOCALES)[number]
@@ -76,12 +76,13 @@ export const LOCALE_ENDONYMS: Record<string, string> = {
   en: 'English',
   de: 'Deutsch (in Arbeit)',
   fr: 'Français (en cours)',
+  id: 'Bahasa Indonesia (sedang dikerjakan)',
   es: 'Español',
   sv: 'Svenska',
   fi: 'Suomi',
   is: 'Íslenska',
   ru: 'Русский',
-  ja: '日本語',
+  ja: '日本語（作業中）',
 };
 
 /** Normalize a possibly-regioned tag ("en-US", "pt_BR") to a bare code. */

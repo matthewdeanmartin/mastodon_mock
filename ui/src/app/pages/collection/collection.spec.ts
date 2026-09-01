@@ -300,6 +300,52 @@ describe('CollectionPage', () => {
     expect(internals(fixture).sampled()).toBe(true);
   });
 
+  /**
+   * A sampled post must be able to open its thread. The failure mode this locks
+   * out is silent: `threadLink` goes null when `providerRef` is missing any of
+   * server/statusId/accountId, and a null link makes the card inert — no error,
+   * no navigation, nothing to see. Reported as "clicking the post does nothing".
+   */
+  it('gives sampled posts everything the thread route needs', () => {
+    const kit = SHIPPED_STARTER_KITS[0];
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { paramMap: of(convertToParamMap({ id: kit.id })) },
+    });
+
+    const fixture = setUp();
+    internals(fixture).loadSample();
+
+    const requests = httpMock.match((r) => r.url.includes('/statuses'));
+    requests.forEach((r, i) =>
+      r.flush(
+        i === 0
+          ? [
+              {
+                id: '110',
+                created_at: '2026-06-01T00:00:00Z',
+                content: 'hi',
+                account: { id: 'acc-1', username: 'a', acct: 'a', display_name: 'A' },
+                media_attachments: [],
+                replies_count: 0,
+                reblogs_count: 0,
+                favourites_count: 0,
+              },
+            ]
+          : [],
+      ),
+    );
+
+    const [post] = internals(fixture).feed();
+    expect(post.provider).toBe('anonymous-mastodon');
+    // All three, because anonymousRef refuses a partial ref and threadLink
+    // refuses a missing anonymousRef.
+    expect(post.providerRef).toMatchObject({
+      server: expect.stringMatching(/^https:\/\//),
+      statusId: '110',
+      accountId: 'acc-1',
+    });
+  });
+
   it('honours a larger chosen sample size', () => {
     const kit = SHIPPED_STARTER_KITS[0];
     TestBed.overrideProvider(ActivatedRoute, {

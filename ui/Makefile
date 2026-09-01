@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 MAKEFLAGS += --no-print-directory
 
-.PHONY: help install format format-check lint storage subpaths i18n i18n-extract i18n-todo test test-ci build build-admin build-mockingbird security check check-ci
+.PHONY: help install format format-check lint storage subpaths i18n i18n-extract i18n-todo i18n-batch i18n-merge i18n-traps test test-ci build build-admin build-mockingbird security check check-ci
 
 help:
 	@echo "Angular quality gates (admin UI + Mockingbird):"
@@ -13,6 +13,9 @@ help:
 	@echo "  make i18n               Verify UI strings are translatable + report coverage"
 	@echo "  make i18n-extract       Regenerate public/i18n/en.json from source comments"
 	@echo "  make i18n-todo L=de     Write a translation work order for one language"
+	@echo "  make i18n-batch L=de    Print the next slice of untranslated keys (N=250, P=prefix)"
+	@echo "  make i18n-merge L=de F=b.json  Validate a translation batch, then merge it"
+	@echo "  make i18n-traps L=de    Grep a locale for wrong-sense translations"
 	@echo "  make test               Run tests with coverage"
 	@echo "  make build              Production-build admin UI and Mockingbird"
 	@echo "  make build-admin        Build the packaged admin UI"
@@ -63,6 +66,31 @@ i18n-extract:
 i18n-todo:
 	@test -n "$(L)" || (echo "Usage: make i18n-todo L=de" && exit 2)
 	node scripts/i18n-todo.mjs $(L)
+
+# The work order is the specification; it does not fit in one agent's context at
+# 5,700 keys. This prints the next slice of *missing* keys as TSV, largest area
+# first, so a batch can be translated and merged. The locale file is the ledger:
+# re-run after a merge and the next slice appears with no bookkeeping.
+#   N=250 caps the slice, P=settings.rss restricts to a prefix, --areas counts only.
+i18n-batch:
+	@test -n "$(L)" || (echo "Usage: make i18n-batch L=de [N=250] [P=settings]" && exit 2)
+	@node scripts/i18n-batch.mjs $(L) $(ARGS)
+
+# The gate translations must pass to land. Rejects the batch WHOLE on placeholder
+# or markup drift, an unknown key, a `max` overflow, or any rule the locale
+# declares in scripts/i18n-locale-rules.mjs. German shipped a split du/Sie
+# register and a button reading "block the amnesty" because this check ran after
+# the fact instead of at the door; French, gated this way, shipped neither.
+i18n-merge:
+	@test -n "$(L)" || (echo "Usage: make i18n-merge L=de F=batch.json" && exit 2)
+	@test -n "$(F)" || (echo "Usage: make i18n-merge L=de F=batch.json" && exit 2)
+	node scripts/i18n-merge.mjs $(L) $(F) $(ARGS)
+
+# Advisory sweep for the *wrong sense* of this app's vocabulary — the defect
+# class coverage cannot see. Never fatal: a hit is evidence, not a verdict.
+i18n-traps:
+	@test -n "$(L)" || (echo "Usage: make i18n-traps L=de" && exit 2)
+	@node scripts/i18n-traps.mjs $(L) $(P)
 
 test:
 	npm run test:source-integrity
