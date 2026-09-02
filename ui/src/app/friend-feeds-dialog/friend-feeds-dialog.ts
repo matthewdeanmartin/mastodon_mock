@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { FocusTrap } from '../a11y/focus-trap';
 import { Auth } from '../auth';
+import { PageDiagnostics } from '../page-diagnostics';
 import { ProfileAccountKey } from '../providers/account/profile-account-key';
 import { SupporterStatus } from '../providers/account/supporter-status';
 import { FoundFeed } from '../providers/rss/friend-feed-cache';
@@ -49,7 +50,10 @@ import { RssSubscriptions } from '../providers/rss/rss-subscriptions';
 // i18n friendFeeds.close: Close
 // i18n friendFeeds.stop: Stop and keep what was found
 // i18n friendFeeds.walking: Reading the list of people you follow…
-// i18n friendFeeds.walkingCount: {{count}} accounts read
+// i18n friendFeeds.walkingCount: {{count}} of about {{total}} accounts read · {{links}} websites to check
+// i18n friendFeeds.walkingCountUnknown: {{count}} accounts read · {{links}} websites to check
+// i18n friendFeeds.walkingSlow: Big following lists take a while — this reads them 80 at a time.
+// i18n friendFeeds.runningHint: You can leave this open; closing it needs the Stop button.
 // i18n friendFeeds.probing: Checking {{done}} of {{total}} sites · {{found}} feeds found
 // i18n friendFeeds.reusedOne: {{count}} site was already checked in an earlier run
 // i18n friendFeeds.reusedOther: {{count}} sites were already checked in earlier runs
@@ -80,6 +84,7 @@ export class FriendFeedsDialog {
   private subs = inject(RssSubscriptions);
   private accountKey = inject(ProfileAccountKey);
   private auth = inject(Auth);
+  private diagnostics = inject(PageDiagnostics);
   protected supporter = inject(SupporterStatus);
 
   readonly closed = output<void>();
@@ -155,10 +160,16 @@ export class FriendFeedsDialog {
     }
     this.capOverflow.set(null);
     this.addError.set(null);
-    await this.scan.scan(me.id, key, this.cap());
+    // `following_count` is the progress bar's denominator. Without it the walk
+    // has no total and the bar cannot move.
+    await this.scan.scan(me.id, key, this.cap(), me.following_count ?? 0);
   }
 
   protected stop(): void {
+    this.diagnostics.info('FriendFeedsDialog', 'user:stop', {
+      probed: this.progress()?.probed ?? 0,
+      found: this.progress()?.found ?? 0,
+    });
     this.scan.stop();
   }
 
@@ -168,6 +179,9 @@ export class FriendFeedsDialog {
     if (!key) {
       return;
     }
+    // Notable because it throws away the probe cache: the next scan pays full
+    // price again, which is the one action here that costs real money.
+    this.diagnostics.info('FriendFeedsDialog', 'user:forget-cache', {});
     await this.scan.forget(key);
   }
 
@@ -213,6 +227,10 @@ export class FriendFeedsDialog {
       count++;
     }
 
+    this.diagnostics.info('FriendFeedsDialog', 'user:follow-all', {
+      added: count,
+      blockedByLimit: blocked,
+    });
     this.justAdded.set(added);
     this.capOverflow.set(
       blocked > 0 ? { added: count, left: blocked, limit: this.subs.limit() } : null,
@@ -234,7 +252,32 @@ export class FriendFeedsDialog {
     URL.revokeObjectURL(url);
   }
 
+  /**
+   * Close, unless a scan is running.
+   *
+   * A stray click on the backdrop must not abandon a job the user is minutes
+   * into and has paid proxy requests for. The scan itself survives — it is
+   * root-provided and reopening shows it again — but a dialog that vanishes
+   * mid-run reads as a crash, and the Stop button is right there for someone
+   * who actually means it.
+   *
+   * The explicit Stop and Close buttons call {@link forceClose}, so this only
+   * ever guards the accidental dismissals: backdrop click and Escape.
+   */
   protected close(): void {
+    if (this.running()) {
+      return;
+    }
+    this.closed.emit();
+  }
+
+  /** Close on purpose, running or not. */
+  protected forceClose(): void {
+    // Worth a line when it happens mid-run: the scan keeps going in the
+    // background, so a later "why is the proxy busy" question has an answer.
+    if (this.running()) {
+      this.diagnostics.info('FriendFeedsDialog', 'close:while-running', {});
+    }
     this.closed.emit();
   }
 }

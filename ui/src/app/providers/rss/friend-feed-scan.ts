@@ -131,6 +131,16 @@ const RATE_LIMIT_BACKOFF_MS = 5_000;
  */
 const CONSECUTIVE_FAILURE_LIMIT = 20;
 
+/**
+ * Milliseconds between following-list pages.
+ *
+ * Lighter than {@link PROBE_INTERVAL_MS} because these go to the user's own
+ * instance rather than through the proxy, and because the walk is the part the
+ * user is waiting on before anything visible happens. Still non-zero: a few
+ * hundred back-to-back requests is impolite to a small server.
+ */
+const WALK_INTERVAL_MS = 120;
+
 /** Probe budgets offered in the dialog. */
 export const PROBE_CAPS = [100, 250, 500, 1000] as const;
 
@@ -150,6 +160,8 @@ export interface FriendScanProgress {
   probeTarget: number;
   /** Feeds found so far, across cache hits and fresh probes. */
   found: number;
+  /** Distinct profile URLs seen while walking — the reason the walk matters. */
+  linksFound: number;
   /** Probes skipped because an earlier scan had already answered them. */
   fromCache: number;
   /**
@@ -265,7 +277,21 @@ export class FriendFeedScan {
    * skip-listed hosts cost nothing and do not count against it. That is the
    * honest unit, because it is the one that maps to requests.
    */
-  async scan(accountId: string, accountKey: string, cap: number): Promise<FriendScanResult | null> {
+  async scan(
+    accountId: string,
+    accountKey: string,
+    cap: number,
+    /**
+     * The server's own `following_count`.
+     *
+     * Without it the progress bar has no denominator: an earlier version used
+     * "accounts read so far" as the total, which is the numerator, so the walk
+     * was permanently 100% complete and the bar never moved. A stated total can
+     * drift from what the list actually returns, which is why the walk still
+     * takes whichever is larger as it goes.
+     */
+    followingTotal = 0,
+  ): Promise<FriendScanResult | null> {
     if (this.running()) {
       return this.result();
     }
@@ -273,15 +299,30 @@ export class FriendFeedScan {
     this.progress.set({
       phase: 'walking',
       accountsWalked: 0,
-      accountsTotal: 0,
+      accountsTotal: followingTotal,
       probed: 0,
       probeTarget: 0,
       found: 0,
+      linksFound: 0,
       fromCache: 0,
     });
 
+    this.diagnostics.info('FriendFeedScan', 'scan:start', {
+      cap,
+      followingTotal,
+    });
+
     try {
-      const accounts = await this.walkFollowing(accountId);
+      const walkStartedAt = Date.now();
+      const accounts = await this.walkFollowing(accountId, followingTotal);
+      this.diagnostics.info('FriendFeedScan', 'walk:finished', {
+        accounts: accounts.length,
+        pages: Math.ceil(accounts.length / PAGE_SIZE),
+        ms: Date.now() - walkStartedAt,
+        // True when the walk stopped on the page ceiling rather than on the
+        // end of the list, which means the following list was not fully read.
+        hitPageCeiling: accounts.length >= MAX_PAGES * PAGE_SIZE,
+      });
       if (this.cancelRequested) {
         return this.finish(accountKey, [], 0, true);
       }
@@ -322,6 +363,14 @@ export class FriendFeedScan {
       }
 
       const budget = pending.slice(0, cap);
+      this.diagnostics.info('FriendFeedScan', 'probe:planned', {
+        candidates: targets.size,
+        fromCache,
+        toProbe: budget.length,
+        // Above zero means the cap left work undone, so the result is partial
+        // and a second run has something to do.
+        deferredForCap: pending.length - budget.length,
+      });
       this.progress.update((p) =>
         p
           ? {
@@ -363,13 +412,25 @@ export class FriendFeedScan {
         // refused — each one would write an `unreachable` record for a site
         // that was never actually asked.
         if (outcome.rateLimited) {
-          this.diagnostics.info('FriendFeedScan', 'probe:rate-limited', { spent });
+          // Logged on both edges. A pause that only announces its start leaves
+          // the reader of a log unable to tell "waiting" from "died while
+          // waiting", which is exactly the ambiguity a pause creates on screen.
+          this.diagnostics.warn('FriendFeedScan', 'probe:rate-limited:pausing', {
+            spent,
+            waitMs: RATE_LIMIT_BACKOFF_MS,
+            consecutiveFailures,
+          });
           this.progress.update((p) => (p ? { ...p, waitingOnRateLimit: true } : p));
           await delay(RATE_LIMIT_BACKOFF_MS);
           this.progress.update((p) => (p ? { ...p, waitingOnRateLimit: false } : p));
+          this.diagnostics.info('FriendFeedScan', 'probe:rate-limited:resumed', { spent });
         }
         if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
-          this.diagnostics.warn('FriendFeedScan', 'scan:giving-up', { spent });
+          this.diagnostics.warn('FriendFeedScan', 'scan:giving-up', {
+            spent,
+            consecutiveFailures,
+            limit: CONSECUTIVE_FAILURE_LIMIT,
+          });
           gaveUp = true;
           break;
         }
@@ -392,13 +453,19 @@ export class FriendFeedScan {
   }
 
   /** Read the whole following list, one page at a time. */
-  private async walkFollowing(accountId: string): Promise<Account[]> {
+  private async walkFollowing(accountId: string, statedTotal: number): Promise<Account[]> {
     const accounts: Account[] = [];
     let maxId: string | undefined;
 
     for (let page = 0; page < MAX_PAGES; page++) {
       if (this.cancelRequested) {
         break;
+      }
+      // Paced like the probes. These go to the user's own instance rather than
+      // the proxy, but a few hundred back-to-back requests is impolite to a
+      // small server and is the shape of thing an instance rate-limits.
+      if (page > 0) {
+        await delay(WALK_INTERVAL_MS);
       }
       const result = await firstValueFrom(
         this.api.accountFollowingPage(accountId, maxId, PAGE_SIZE),
@@ -409,12 +476,34 @@ export class FriendFeedScan {
           ? {
               ...p,
               accountsWalked: accounts.length,
-              accountsTotal: Math.max(p.accountsTotal, accounts.length),
+              // The stated count can be stale or wrong, so never let the
+              // denominator fall below what has actually been read: a bar that
+              // reads 140% is worse than one that finishes early.
+              accountsTotal: Math.max(statedTotal, accounts.length),
+              // Counted as we go so the user sees the number that matters —
+              // "2,938 accounts read" says nothing about whether any of them
+              // had a website on their profile.
+              linksFound: countProfileUrls(accounts),
             }
           : p,
       );
+      // Logged per page: this is the stretch that looked like a hang, and a
+      // line per page is what makes "still going" distinguishable from "stuck"
+      // in a report. Cheap — one line per 80 accounts.
+      this.diagnostics.info('FriendFeedScan', 'walk:page', {
+        page: page + 1,
+        read: accounts.length,
+        statedTotal,
+        hasMore: Boolean(result.nextMaxId),
+      });
       if (!result.nextMaxId || result.accounts.length === 0) {
         break;
+      }
+      if (page === MAX_PAGES - 1) {
+        this.diagnostics.warn('FriendFeedScan', 'walk:page-ceiling', {
+          read: accounts.length,
+          maxPages: MAX_PAGES,
+        });
       }
       maxId = result.nextMaxId;
     }
@@ -514,9 +603,34 @@ export class FriendFeedScan {
       feeds: feeds.length,
       checked: checkedCount,
       partial,
+      // Which of the three reasons a run can be partial, so a short result is
+      // explainable after the fact rather than just disappointing.
+      stoppedByUser: this.cancelRequested,
     });
     return result;
   }
+}
+
+/**
+ * Distinct probe-worthy profile URLs across `accounts`.
+ *
+ * Deliberately applies the same filters the scan itself will — normalize, drop
+ * non-URLs, drop the skip list — so the number shown during the walk is the
+ * number of sites that will actually be checked, not a larger one the user
+ * then watches shrink.
+ */
+function countProfileUrls(accounts: readonly Account[]): number {
+  const seen = new Set<string>();
+  for (const account of accounts) {
+    for (const field of account.fields ?? []) {
+      const raw = urlIn(field.value);
+      const key = raw ? normalizeProfileUrl(raw) : null;
+      if (key && !isSkippedHost(key)) {
+        seen.add(key);
+      }
+    }
+  }
+  return seen.size;
 }
 
 /** Sleep, for the pacing between probes. */

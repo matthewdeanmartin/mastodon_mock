@@ -19,12 +19,12 @@
       <div class="plus-gate">
         <strong>{{ 'friendFeeds.plusTitle' | transloco }}</strong>
         <p class="muted small">{{ 'friendFeeds.plusWhy' | transloco }}</p>
-        <a class="btn" routerLink="/plans" (click)="close()">
+        <a class="btn" routerLink="/plans" (click)="forceClose()">
           {{ 'friendFeeds.plusSeePlans' | transloco }}
         </a>
       </div>
       <div class="dialog-actions">
-        <button class="btn btn-outline" type="button" (click)="close()">
+        <button class="btn btn-outline" type="button" (click)="forceClose()">
           {{ 'friendFeeds.close' | transloco }}
         </button>
       </div>
@@ -51,7 +51,7 @@
       }
 
       <div class="dialog-actions">
-        <button class="btn btn-outline" type="button" (click)="close()">
+        <button class="btn btn-outline" type="button" (click)="forceClose()">
           {{ 'friendFeeds.cancel' | transloco }}
         </button>
         <button
@@ -87,9 +87,27 @@
         </div>
 
         @if (p.phase === 'walking') {
+          <!-- The count alone was the whole problem: "2,938 accounts read" with
+               no total and no found-count looks identical to a hang. -->
           <p class="muted small">
-            {{ 'friendFeeds.walkingCount' | transloco: { count: p.accountsWalked } }}
+            @if (p.accountsTotal > 0) {
+              {{
+                'friendFeeds.walkingCount'
+                  | transloco
+                    : {
+                        count: p.accountsWalked,
+                        total: p.accountsTotal,
+                        links: p.linksFound,
+                      }
+              }}
+            } @else {
+              {{
+                'friendFeeds.walkingCountUnknown'
+                  | transloco: { count: p.accountsWalked, links: p.linksFound }
+              }}
+            }
           </p>
+          <p class="muted small">{{ 'friendFeeds.walkingSlow' | transloco }}</p>
         }
         <!-- Five seconds of a still progress bar reads as a hang unless the
              pause is named. -->
@@ -107,6 +125,8 @@
           </p>
         }
 
+        <p class="muted small">{{ 'friendFeeds.runningHint' | transloco }}</p>
+
         <div class="dialog-actions">
           <button class="btn btn-outline" type="button" (click)="stop()">
             {{ 'friendFeeds.stop' | transloco }}
@@ -116,7 +136,7 @@
     } @else if (failed()) {
       <p class="error-text">{{ 'friendFeeds.failed' | transloco }}</p>
       <div class="dialog-actions">
-        <button class="btn btn-outline" type="button" (click)="close()">
+        <button class="btn btn-outline" type="button" (click)="forceClose()">
           {{ 'friendFeeds.close' | transloco }}
         </button>
         <button class="btn" type="button" (click)="rescan()">
@@ -187,7 +207,7 @@
       </p>
 
       <div class="dialog-actions">
-        <button class="btn btn-outline" type="button" (click)="close()">
+        <button class="btn btn-outline" type="button" (click)="forceClose()">
           {{ 'friendFeeds.close' | transloco }}
         </button>
         <button class="btn btn-outline" type="button" (click)="rescan()">

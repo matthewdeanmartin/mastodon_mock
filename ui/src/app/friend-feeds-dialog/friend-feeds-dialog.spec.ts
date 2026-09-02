@@ -194,4 +194,42 @@ describe('FriendFeedsDialog', () => {
 
     expect(scan.loadStored).toHaveBeenCalledWith('account-1');
   });
+  /**
+   * Regression: a stray backdrop click abandoned a running scan.
+   *
+   * The scan itself survives — it is root-provided, so reopening shows it
+   * again — but a dialog that vanishes minutes into a job the user has paid
+   * proxy requests for reads as a crash. Stop is right there for anyone who
+   * means it.
+   */
+  it('ignores a backdrop click while a scan is running', () => {
+    scan.running.mockReturnValue(true);
+    scan.progress.set({
+      phase: 'probing',
+      accountsWalked: 10,
+      accountsTotal: 10,
+      probed: 1,
+      probeTarget: 5,
+      found: 0,
+      linksFound: 3,
+      fromCache: 0,
+    });
+    const fixture = render();
+    const closed = vi.fn();
+    fixture.componentInstance.closed.subscribe(closed);
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.overlay')?.click();
+
+    expect(closed).not.toHaveBeenCalled();
+  });
+
+  it('still closes on a backdrop click when nothing is running', () => {
+    const fixture = render();
+    const closed = vi.fn();
+    fixture.componentInstance.closed.subscribe(closed);
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.overlay')?.click();
+
+    expect(closed).toHaveBeenCalled();
+  });
 });
