@@ -538,6 +538,33 @@ describe('AutoTranslateEligibility.isAlreadyTargetLanguage', () => {
     expect(eligibility.isAlreadyTargetLanguage(post(FRENCH, 'fr'), 'en')).toBe(false);
   });
 
+  /**
+   * Reported: a plainly German post answered "this post already looks like
+   * English, so translating it would return the same text" and offered a
+   * settings page. The post declared `en`, and the declaration was trusted
+   * unconditionally — clients default that field to the composer's UI locale, so
+   * anyone posting in a second language ships the wrong tag.
+   *
+   * The costs are not symmetric. Wrongly spending one request is a rounding
+   * error; wrongly refusing tells a reader something visibly false about the
+   * text in front of them.
+   */
+  it('translates anyway when the text plainly is not what the post claims', () => {
+    const GERMAN =
+      'Die Nutzung der Musik war ihm doch verboten worden? Vermutlich genau deshalb gewählt';
+
+    expect(eligibility.isAlreadyTargetLanguage(post(GERMAN, 'en'), 'en')).toBe(false);
+  });
+
+  it('still trusts a declaration the detector cannot second-guess', () => {
+    // Too short to detect: the declaration stands, exactly as before.
+    expect(eligibility.isAlreadyTargetLanguage(post('ok', 'en'), 'en')).toBe(true);
+  });
+
+  it('keeps refusing when the text agrees with the declaration', () => {
+    expect(eligibility.isAlreadyTargetLanguage(post(ENGLISH, 'en'), 'en')).toBe(true);
+  });
+
   it('allows when the language cannot be determined', () => {
     // Uncertainty resolves toward translating: withholding a translation someone needed
     // is a worse failure than spending one request.

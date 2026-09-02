@@ -315,6 +315,20 @@ export class FeedLanguageFilter {
     // what language a post is in, and now they cannot even disagree by accident.
     return declared ?? this.detectedLanguageFor(target);
   }
+
+  /**
+   * What the *text* looks like, ignoring what the post claims — or null when the
+   * detector will not commit.
+   *
+   * Deliberately separate from {@link effectiveLanguage}, which prefers the
+   * declaration. A caller that needs to know whether a declaration is credible
+   * has to be able to ask the two questions apart; see
+   * `AutoTranslateEligibility.isAlreadyTargetLanguage`, where a wrong `en` tag on
+   * a German post was refusing the translation outright.
+   */
+  detectedLanguage(status: Status): string | null {
+    return this.detectedLanguageFor(status.reblog ?? status);
+  }
 }
 
 /** Why a post is not eligible for automatic translation, for diagnostics and tests. */
@@ -400,7 +414,28 @@ export class AutoTranslateEligibility {
     // the same derivation hiding uses, so the two can never disagree about what
     // language a post is in.
     const effective = this.filter.effectiveLanguage(status);
-    return !!effective && bare(effective) === wanted;
+    if (!effective || bare(effective) !== wanted) {
+      return false;
+    }
+    // ...but a declaration this app can *see* is wrong does not get to refuse the
+    // translation.
+    //
+    // `effectiveLanguage` trusts `status.language` unconditionally and only detects
+    // when nothing was declared. That is right for hiding — a reader who hides a
+    // language is acting on what the post claims — and wrong here, because the cost
+    // is asymmetric: wrongly spending one request is a rounding error, and wrongly
+    // refusing tells someone their plainly German post "already looks like English"
+    // and offers them a settings page. Which is exactly what a post declaring `en`
+    // over "Die Nutzung der Musik war ihm doch verboten worden?" did.
+    //
+    // Mis-declared language is common and usually nobody's fault: clients default
+    // the field to the composer's UI locale, so anyone posting in a second language
+    // ships the wrong tag. So when the detector is *confident* and disagrees with the
+    // declaration, the declaration loses and the translation goes ahead. When the
+    // detector is unsure it says nothing and the declaration stands, unchanged from
+    // before.
+    const detected = this.filter.detectedLanguage(status);
+    return !detected || bare(detected) === wanted;
   }
 
   /**

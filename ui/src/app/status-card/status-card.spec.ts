@@ -450,6 +450,33 @@ describe('StatusCard', () => {
     });
   });
 
+  /**
+   * Reported as "clicking replies just pops me to the top of the page".
+   *
+   * `[href]` bound to a null `display.url` renders `href=""`, and an empty href
+   * is not an inert link — it points at the current page, so clicking it
+   * reloads the route and dumps the reader back at the top of the feed. A
+   * foreign post without a url (a Bluesky post whose adapter had none) put one
+   * of these in the action row right beside the reply count.
+   */
+  it('never renders a link that navigates to the current page', () => {
+    const f = setUp(makeStatus({ id: 'bsky:1', provider: 'bluesky', url: null }));
+    const el = f.nativeElement as HTMLElement;
+
+    for (const anchor of el.querySelectorAll('a')) {
+      expect(anchor.getAttribute('href')).not.toBe('');
+    }
+  });
+
+  it('still offers the original when the post has one', () => {
+    const f = setUp(
+      makeStatus({ id: 'bsky:2', provider: 'bluesky', url: 'https://bsky.app/p/2' }),
+    );
+
+    const link = (f.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>('.open-original');
+    expect(link?.getAttribute('href')).toBe('https://bsky.app/p/2');
+  });
+
   it('links the booster to their profile', () => {
     // "John Doe boosted this" was bare text, so muting their boosts — or just
     // finding out who they are — meant searching the name by hand.
