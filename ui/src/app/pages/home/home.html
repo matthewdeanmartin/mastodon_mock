@@ -52,7 +52,7 @@
      open. The box is one click away and stays gone until asked for, because the
      distance between "landed on Home" and "posted" is the thing worth lengthening.
      Arriving with a draft skips all of it — that IS the deliberate publish step. -->
-@if (!fromDraft() && !openedDraft() && !miniComposerOpen()) {
+@if (offersWriting() && !fromDraft() && !openedDraft() && !miniComposerOpen()) {
   <div class="write-cta">
     <button class="btn write-btn" type="button" (click)="startWriting()">
       ✍ {{ 'pages.home.write.button' | transloco }}
@@ -68,7 +68,7 @@
       </button>
     }
   </div>
-} @else {
+} @else if (offersWriting()) {
   <!-- Un-gated when finishing a draft: that IS the deliberate publish step. -->
   <app-compose
     [gateable]="!fromDraft() && !openedDraft()"

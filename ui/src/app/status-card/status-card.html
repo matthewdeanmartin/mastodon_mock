@@ -451,6 +451,7 @@
               [class.on]="
                 display.reblogged || (soleShareAction() === 'posse' && posseQueued(repostKind))
               "
+              [class.working]="busyWith('reblog')"
               [disabled]="actionBusy()"
               [attr.aria-expanded]="shareMenuIsUseful() ? shareMenuOpen() : null"
               [attr.aria-haspopup]="shareMenuIsUseful() ? 'menu' : 'dialog'"
@@ -522,7 +523,8 @@
           <button
             class="action"
             [class.on]="display.reblogged"
-            [disabled]="actionBusy()"
+            [class.working]="busyWith('reblog')"
+            [disabled]="busyWith('reblog')"
             (click)="toggleReblog($event)"
             [title]="display.reblogged ? words().UndoBoost : words().Boost"
             [attr.aria-pressed]="display.reblogged"
@@ -612,7 +614,8 @@
           <button
             class="action"
             [class.on]="display.favourited"
-            [disabled]="actionBusy()"
+            [class.working]="busyWith('favourite')"
+            [disabled]="busyWith('favourite')"
             (click)="toggleFavourite($event)"
             [title]="
               (display.favourited ? 'statusCard.undoFavourite' : 'statusCard.favourite') | transloco
@@ -774,8 +777,9 @@
             <button
               class="action"
               [class.on]="bookmarkActive()"
+              [class.working]="busyWith('bookmark')"
               (click)="toggleBookmark($event)"
-              [disabled]="actionBusy()"
+              [disabled]="busyWith('bookmark')"
               [title]="
                 (bookmarkActive() ? 'statusCard.removeBookmark' : 'statusCard.bookmark') | transloco
               "

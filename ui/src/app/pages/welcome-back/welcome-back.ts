@@ -7,8 +7,9 @@ import { AppFooter } from '../../shell/app-footer/app-footer';
 // i18n pagesWelcomeBack.eyebrow: Almost there
 // i18n pagesWelcomeBack.heading: Create your account on <strong>{{server}}</strong>
 // i18n pagesWelcomeBack.lead: Your account is created on the server itself — a client like this should never handle your email or password. That means <strong>{{server}}</strong> won't send you back here automatically. Here's the two-step plan:
-// i18n pagesWelcomeBack.step1.title: Bookmark this page
+// i18n pagesWelcomeBack.step1.title: Keep this page
 // i18n pagesWelcomeBack.step1.body: Press <kbd>{{hint}}</kbd> now so you can find your way back after signing up. This is the page you'll return to.
+// i18n pagesWelcomeBack.step1.bodyTouch: Keep this tab open — the next step opens in a new one, so you can come back to this. Bookmarking it from your browser's menu works too.
 // i18n pagesWelcomeBack.step2.title: Sign up on {{server}}
 // i18n pagesWelcomeBack.step2.body: We'll open its sign-up page in a new tab. Finish creating and confirming your account there, then come back to this tab.
 // i18n pagesWelcomeBack.step2.open: Open {{server}} sign-up ↗
@@ -51,8 +52,30 @@ export class WelcomeBack {
     return base ? `${base}/auth/sign_up` : null;
   });
 
-  /** Whether this browser can add bookmarks with a keystroke hint (Ctrl/⌘+D everywhere). */
-  protected bookmarkHint = /Mac/i.test(navigator.platform) ? '⌘ + D' : 'Ctrl + D';
+  /**
+   * Whether this device is driven by touch rather than a keyboard and mouse.
+   *
+   * Read once: it is a property of the browser and cannot change while the page
+   * is open. `(pointer: coarse)` is the question actually being asked — "is
+   * there a keyboard to press Ctrl + D on" — and it answers correctly for a
+   * tablet with a stylus and for a desktop touchscreen with a real keyboard,
+   * both of which a user-agent sniff gets wrong.
+   */
+  protected readonly touchOnly =
+    typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+
+  /**
+   * The keystroke that bookmarks a page, on devices that have one.
+   *
+   * `navigator.platform` is deprecated and, on iOS, reports `iPhone` — which
+   * this used to fall through to the non-Mac branch, telling phone users to
+   * press Ctrl + D. That was step one of a two-step plan, so it stalled the
+   * whole sign-up flow on the device most likely to be running it. Touch
+   * devices get {@link touchOnly} copy instead and never read this.
+   */
+  protected readonly bookmarkHint = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
+    ? '⌘ + D'
+    : 'Ctrl + D';
 
   /**
    * Head to the Mastodon login page, which will start OAuth against the

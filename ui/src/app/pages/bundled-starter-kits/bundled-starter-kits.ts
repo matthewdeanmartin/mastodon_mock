@@ -1,25 +1,63 @@
-import { Component } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { STARTER_KITS } from '../../starter-collection';
+import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 
-// i18n bundledStarterKits.title: Bundled starter kits
-// i18n bundledStarterKits.intro: Curated lists assembled by the developer of Mawkingbird — not collections anyone published on a server, just a hand-picked set of accounts to get a new timeline off the ground. Follow the whole set or pick through it.
+// i18n bundledStarterKits.title: People to follow
+// i18n bundledStarterKits.intro: Each of these is a ready-made set of accounts. Open one to see who is in it, sample what they post, and follow the whole set in one go — or pick through it.
 // i18n bundledStarterKits.account.one: {{count}} account
 // i18n bundledStarterKits.account.other: {{count}} accounts
-// i18n bundledStarterKits.open: · open the kit →
+// i18n bundledStarterKits.open: · open →
+// i18n bundledStarterKits.filter.label: Filter these
+// i18n bundledStarterKits.filter.placeholder: photography, science, news…
+// i18n bundledStarterKits.filter.none: Nothing here matches “{{query}}”. Clear the filter to see every set.
+// i18n bundledStarterKits.byUs: Ours
+// i18n bundledStarterKits.byThem: Curated by {{curator}}
+// i18n bundledStarterKits.moreWays: Looking for something more specific?
+// i18n bundledStarterKits.moreWaysLink: Every way to find people
+
+/** One curated set, whichever corpus it came from. */
+interface DiscoverySet {
+  key: string;
+  title: string;
+  blurb: string;
+  accountCount: number;
+  link: string;
+  /** Who assembled it: us, or the person whose collection this snapshots. */
+  curator: string | null;
+}
 
 /**
- * Bundled starter kits: sets of accounts assembled by this app's developer.
+ * The one page that answers "who should I follow?".
  *
- * Deliberately a list rather than a single hard-coded card, because the
- * universal kit is meant to become several themed ones as special-interest
- * sets get generated. Adding one should be an entry in {@link KITS}, not a
- * layout change.
+ * ## Why two kinds of thing share a page
  *
- * Distinct from {@link BundledCollections}: those are snapshots of other
- * people's real Mastodon collections, curated by their own authors. These are
- * ours, and carry no claim to be anything else.
+ * The app ships two corpora, and they really are different: **starter kits**
+ * are assembled by this app's developer, **bundled collections** are snapshots
+ * of real collections other people published on their own instances. That
+ * distinction is true, and it used to be the *first* thing a newcomer was asked
+ * to understand — two routes, reached through two rows on the Find Friends hub,
+ * each explaining its own provenance before showing a single face.
+ *
+ * It is our distinction, not theirs. Someone who has just been told their
+ * timeline is empty wants people; "was this list assembled by the developer or
+ * snapshotted from someone else's instance" is a question they have no basis to
+ * answer and no reason to care about. So both kinds are listed together, and
+ * provenance survives as a quiet label on each card rather than as a fork in
+ * the road.
+ *
+ * The routes are untouched — `/bundled-collections` still exists and still
+ * works, so every link that ever pointed at it keeps working.
+ *
+ * ## Who this page is for
+ *
+ * Newcomers. First-run sends an anonymous visitor straight here (see
+ * `Shell.answerFirstRun`), because this is the shortest path in the app from
+ * nothing to a working timeline: one press follows a whole set. The Find
+ * Friends hub is the other audience — someone who already has a timeline and
+ * wants *more* people, tags, imports and directories — and it stays exactly as
+ * it is, linked from the foot of this page for anyone who needs it.
  */
 @Component({
   selector: 'app-bundled-starter-kits',
@@ -28,9 +66,44 @@ import { STARTER_KITS } from '../../starter-collection';
   styleUrl: './bundled-starter-kits.css',
 })
 export class BundledStarterKits {
-  protected readonly kits = STARTER_KITS;
+  /** Free-text narrowing, because the merged list is longer than either was. */
+  protected readonly filter = signal('');
 
-  protected linkFor(slug: string): string {
-    return slug === 'starter' ? '/collections/starter' : `/collections/starter/${slug}`;
-  }
+  private readonly all: readonly DiscoverySet[] = [
+    ...STARTER_KITS.map((kit) => ({
+      key: `kit:${kit.slug}`,
+      title: kit.title,
+      blurb: kit.blurb,
+      accountCount: kit.accounts.length,
+      link: kit.slug === 'starter' ? '/collections/starter' : `/collections/starter/${kit.slug}`,
+      curator: null,
+    })),
+    ...SHIPPED_STARTER_KITS.map((collection) => ({
+      key: `collection:${collection.id}`,
+      title: collection.title,
+      blurb: collection.description,
+      accountCount: collection.accounts.length,
+      link: `/collections/${collection.id}`,
+      curator: collection.curatorName || collection.curatorHandle,
+    })),
+  ];
+
+  /**
+   * The sets to show, narrowed by the filter box.
+   *
+   * Matches title and blurb, the same fields and the same plain substring rule
+   * as the search page's `kitMatchesFor` — a reader who found a set by typing
+   * "birds" into search should find it by typing "birds" here.
+   */
+  protected readonly visible = computed<readonly DiscoverySet[]>(() => {
+    const needle = this.filter().trim().toLowerCase();
+    if (!needle) {
+      return this.all;
+    }
+    return this.all.filter(
+      (set) =>
+        set.title.toLowerCase().includes(needle) ||
+        (set.blurb ?? '').toLowerCase().includes(needle),
+    );
+  });
 }

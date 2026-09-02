@@ -147,7 +147,7 @@ function saveCsv(csv: string, filename: string): void {
 // i18n settings.importExport.github.follows.title: People you follow on GitHub
 // i18n settings.importExport.github.friends.one: {{count}} GitHub friend
 // i18n settings.importExport.github.friends.other: {{count}} GitHub friends
-// i18n settings.importExport.github.intro: Use either or both GitHub sources. Exact handles are resolved through your Mastodon server so results open inside Mockingbird and show your follow status.
+// i18n settings.importExport.github.intro: Use either or both GitHub sources. Exact handles are resolved through your Mastodon server so results open inside Mawkingbird and show your follow status.
 // i18n settings.importExport.github.linkedSummary: {{count}} matched directly from GitHub profile links. Loaded in
 // i18n settings.importExport.github.loadingFollows: Loading GitHub follows…
 // i18n settings.importExport.github.mastodonMatches.one: {{count}} Mastodon match

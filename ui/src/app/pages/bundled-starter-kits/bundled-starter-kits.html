@@ -4,21 +4,56 @@
   {{ 'bundledStarterKits.intro' | transloco }}
 </p>
 
-@for (kit of kits; track kit.slug) {
-  <a class="kit-row" [routerLink]="linkFor(kit.slug)">
+<!-- The merged list is longer than either of the two it replaced, and this is
+     the page a newcomer is sent to with no idea what is on it. One box, no
+     modes: it narrows what is already visible rather than searching anything. -->
+<label class="kit-filter">
+  <span class="muted small">{{ 'bundledStarterKits.filter.label' | transloco }}</span>
+  <input
+    type="text"
+    [value]="filter()"
+    (input)="filter.set($any($event.target).value)"
+    [placeholder]="'bundledStarterKits.filter.placeholder' | transloco"
+    autocomplete="off"
+  />
+</label>
+
+@for (set of visible(); track set.key) {
+  <a class="kit-row" [routerLink]="set.link">
     <div class="kit-icon" aria-hidden="true">M</div>
     <div class="kit-body">
-      <strong>{{ kit.title }}</strong>
-      <p class="muted small">{{ kit.blurb }}</p>
+      <strong>{{ set.title }}</strong>
+      <p class="muted small">{{ set.blurb }}</p>
       <span class="muted small">
         {{
-          (kit.accounts.length === 1
+          (set.accountCount === 1
             ? 'bundledStarterKits.account.one'
             : 'bundledStarterKits.account.other'
-          ) | transloco: { count: kit.accounts.length }
+          ) | transloco: { count: set.accountCount }
         }}
+        <!-- Provenance, kept quiet. It is a real difference and worth stating,
+             but it is our distinction rather than the reader's, so it reads as
+             a credit on the card instead of a choice before the cards. -->
+        ·
+        @if (set.curator; as curator) {
+          {{ 'bundledStarterKits.byThem' | transloco: { curator } }}
+        } @else {
+          {{ 'bundledStarterKits.byUs' | transloco }}
+        }
         {{ 'bundledStarterKits.open' | transloco }}
       </span>
     </div>
   </a>
+} @empty {
+  <p class="muted small kit-none">
+    {{ 'bundledStarterKits.filter.none' | transloco: { query: filter() } }}
+  </p>
 }
+
+<!-- The power-user door, at the foot rather than the front. Someone who already
+     has a timeline and wants more people, tags, imports or directories wants the
+     hub; someone arriving here for the first time wants faces. -->
+<p class="kit-more muted small">
+  {{ 'bundledStarterKits.moreWays' | transloco }}
+  <a routerLink="/find-friends">{{ 'bundledStarterKits.moreWaysLink' | transloco }}</a>
+</p>

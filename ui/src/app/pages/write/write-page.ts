@@ -230,7 +230,7 @@ export interface Notice {
 // i18n pages.write.wizardStep: Step {{position}} of {{total}}
 // i18n pages.write.aria.publishTo: Publish to
 // i18n pages.write.scheduleAvailable: Mastodon can hold this post server-side. You can choose a publishing time next.
-// i18n pages.write.scheduleUnavailable: This publishes now. Scheduling is offered only for a single Mastodon post; Mockingbird does not rely on a browser or phone staying open.
+// i18n pages.write.scheduleUnavailable: This publishes now. Scheduling is offered only for a single Mastodon post; Mawkingbird does not rely on a browser or phone staying open.
 // i18n pages.write.noTargets.before: Nothing is connected that this could be published to. Link a service under
 // i18n pages.write.noTargets.after: , or sign in.
 // i18n pages.write.connections: Connections

@@ -76,7 +76,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 // i18n settings.config.publishing: Publishing…
 // i18n settings.config.publishNow: Publish this preview
 // i18n settings.config.importFile: Import file
-// i18n settings.config.pastePlaceholder: …or paste Mockingbird config JSON here
+// i18n settings.config.pastePlaceholder: …or paste Mawkingbird config JSON here
 // i18n settings.config.previewPasted: Preview pasted config
 // i18n settings.config.remoteUrl: Remote URL
 // i18n settings.config.remoteUrlPlaceholder: https://example.com/mockingbird-config.json

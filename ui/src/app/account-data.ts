@@ -19,7 +19,23 @@ import {
  * on whole accounts, including ones that are not currently signed in.
  */
 
-/** Anonymous keys predate scoping and use a prefix instead of a suffix. */
+/**
+ * Anonymous keys predate scoping and use a prefix instead of a suffix.
+ *
+ * ## Do not rename `mockingbird_`
+ *
+ * The app's user-facing name is **Mawkingbird**, and every visible surface says
+ * so. This prefix does not, and that mismatch is deliberate: `mockingbird_` is
+ * the key namespace already written into every existing user's `localStorage` —
+ * their follows, feeds, bookmarks, saved searches and linked sessions. Renaming
+ * it does not migrate that data, it *orphans* it: the app would come up looking
+ * like a fresh install to everyone who already uses it, with no error and no way
+ * back short of a support conversation.
+ *
+ * It is a storage identifier that happens to be spelled like an old brand, not
+ * a brand. If a future change genuinely needs the new spelling, it needs a
+ * migration that reads both prefixes for a release, not a find-and-replace.
+ */
 const ANONYMOUS_PREFIX = 'mockingbird_anonymous_';
 
 /**

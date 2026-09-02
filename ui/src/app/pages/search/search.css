@@ -42,14 +42,82 @@
   overflow-y: auto;
 }
 
+/* The column is a `<details>` so a phone can collapse it. At this width it is
+   never collapsed: forcing `display` past the closed state is what lets the same
+   element be open here and shut on a phone with no JS and no resize listener. */
+.search-form-box > summary {
+  display: none;
+}
+
+.search-form-box > *:not(summary) {
+  display: revert;
+}
+
+.refine-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Says what is still narrowing the results while the panel is shut. A collapsed
+   panel that is silently filtering is worse than the wall it replaced. */
+.refine-active-count {
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* Announces that the search finished, above the results themselves. Quiet by
+   design — it is a confirmation, not a headline — but it must not be missable
+   on a phone, which is the whole reason it exists. */
+.result-announcement {
+  margin: 0;
+  padding: 12px 16px 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.result-announcement:empty {
+  display: none;
+}
+
 @media (max-width: 800px) {
   .search-page.two-box {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* Results first once the column collapses.
+     The grid puts the form box first, which is right at desktop width — the
+     controls sit beside the results and scroll with them. Stacked, that same
+     order buries the results under the whole refinement column: the query box,
+     the type select, the numeric facets, the refine bar and the facet list.
+     Submitting a search then appears to do nothing, because everything that
+     changed above the fold is a control. Ordering rather than scrolling on
+     completion, which would fight a reader who is mid-gesture. */
+  .two-box .search-results-box {
+    order: 1;
+  }
+
   .two-box .search-form-box {
     position: static;
     max-height: none;
+    order: 2;
+  }
+
+  /* Here the `<details>` behaves like one: the summary is the control, and the
+     body follows the open state instead of being forced visible. */
+  .search-form-box > summary {
+    display: flex;
+  }
+
+  .search-form-box:not([open]) > *:not(summary) {
+    display: none;
   }
 }
 
@@ -591,4 +659,35 @@
 
 .thin-results p {
   margin: 0;
+}
+
+/* --- Curated sets matching the query -----------------------------------------
+   Above the account results because following a whole hand-picked set is a
+   better answer to "who should I follow about X" than the first individual
+   match — and because it is the answer a newcomer cannot otherwise find. */
+.kit-matches {
+  padding: 12px 16px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kit-matches-head {
+  margin: 0;
+  font-size: 14px;
+}
+
+.kit-match {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.kit-match:hover {
+  background: var(--col-hover, rgba(127, 127, 127, 0.08));
 }

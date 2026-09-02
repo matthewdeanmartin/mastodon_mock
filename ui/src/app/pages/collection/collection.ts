@@ -416,6 +416,9 @@ export class CollectionPage implements OnInit {
     if (tab === 'feed' && !this.shipped()) {
       this.loadFeed();
     }
+    if (tab === 'feed') {
+      this.autoSample();
+    }
   }
 
   /** Merge each member's recent statuses into one reverse-chronological feed. */
@@ -469,6 +472,42 @@ export class CollectionPage implements OnInit {
    * Members are shuffled before sampling, so pressing it again on a large
    * collection surfaces different people rather than the same first five.
    */
+  /**
+   * How many members to sample without being asked.
+   *
+   * Three, not the control's default of five: this is spent on the reader's
+   * behalf, so it buys the smallest thing that reads as a preview.
+   */
+  private static readonly AUTO_SAMPLE_SIZE = 3;
+
+  /**
+   * Show a few posts on arrival, rather than a control panel.
+   *
+   * The explicit button was the right instinct — each member costs a request,
+   * so the size is the reader's choice — but it left a first-time visitor
+   * looking at a size dropdown and a "Show me posts" button where they expected
+   * a preview. The page's own reasoning says a list of names says little about
+   * whether you want these people in your timeline; that is an argument for
+   * loading a *small* sample by default, not for loading none.
+   *
+   * Three requests on a page someone deliberately opened is proportionate, and
+   * the size control and "Sample again" still gate anything larger.
+   *
+   * Guarded so it fires once: `sampled` is set by `loadSample` itself, so a tab
+   * switch back to Posts will not re-spend the requests, and it cannot run
+   * before members exist because there would be nobody to sample.
+   */
+  private autoSample(): void {
+    if (this.sampled() || this.feedLoading() || !this.shipped()) {
+      return;
+    }
+    if (!this.members().some((m) => m.state === 'accepted')) {
+      return;
+    }
+    this.sampleSize.set(CollectionPage.AUTO_SAMPLE_SIZE);
+    this.loadSample();
+  }
+
   protected loadSample(): void {
     const accepted = this.members().filter((m) => m.state === 'accepted');
     if (!accepted.length || this.feedLoading()) {

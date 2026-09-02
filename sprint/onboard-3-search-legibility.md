@@ -1,6 +1,18 @@
 # Onboarding sprint 3 — Making search legible
 
-Status: PLANNED. Independent of sprints 1-2; sequenced third because none of it is a bug.
+Status: **COMPLETE** (2026-09-01). 15 tests added; `make test` green (5614 tests, 0 missing).
+
+One planning assumption was corrected during implementation: 3.1's preferred option — "default to
+Posts" — was rejected against `search-capability.ts`, which documents that Mastodon full-text post
+search needs both an Elasticsearch index and a token, and is off *as the rule rather than the
+exception* anonymously. Defaulting a first-time anonymous visitor into the one search that usually
+returns nothing would be a worse first impression than the wrong-but-populated list they get now.
+Shipped option 2 alone: infer from the query's shape where it is unambiguous, leave the default
+otherwise.
+
+Also found while testing: gating the new result announcement on `searching` made it appear and then
+blank, because `maybeAutoFill` pages again to build the facet corpus and re-sets that flag. It is
+gated on having something true to say instead.
 
 Search is the app's strongest surface and its worst first impression. Four separate problems, all
 in `pages/search/`.

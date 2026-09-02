@@ -14,7 +14,7 @@ import { RssAddFeed } from '../../../providers/rss/rss-add-feed';
 import { PageDiagnostics } from '../../../page-diagnostics';
 
 // i18n pages.rss.addFeed.pasteLink: Paste a link
-// i18n pages.rss.addFeed.intro: A site, a feed, or a fediverse handle — paste whatever you have and Mockingbird works out the rest.
+// i18n pages.rss.addFeed.intro: A site, a feed, or a fediverse handle — paste whatever you have and Mawkingbird works out the rest.
 // i18n pages.rss.addFeed.tryAgainVia: Try again via {{proxy}}
 // i18n pages.rss.addFeed.didYouMean: Did you mean
 // i18n pages.rss.addFeed.question: ?

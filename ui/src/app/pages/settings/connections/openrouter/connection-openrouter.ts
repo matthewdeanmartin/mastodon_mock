@@ -49,8 +49,8 @@ import { PageDiagnostics } from '../../../../page-diagnostics';
 // i18n settings.connections.openrouter.expiry.cleared.b: , and fetched back from your vault the next time it is needed. The retention policy of the account you are signed in as is the one that applies.
 // i18n settings.connections.openrouter.expiry.deleted.a: This key is deleted from this browser on
 // i18n settings.connections.openrouter.expiry.deleted.b: . The retention policy of the account you are signed in as is the one that applies.
-// i18n settings.connections.openrouter.intro: One key, hundreds of AI models, billed by usage. Authorization happens directly between this browser and OpenRouter — Mockingbird never sees a client secret, and the key it issues is yours.
-// i18n settings.connections.openrouter.keyWarning.a: The key OpenRouter issues can spend your OpenRouter credits. It is stored in this browser's localStorage, never sent to Mockingbird, and sent only to
+// i18n settings.connections.openrouter.intro: One key, hundreds of AI models, billed by usage. Authorization happens directly between this browser and OpenRouter — Mawkingbird never sees a client secret, and the key it issues is yours.
+// i18n settings.connections.openrouter.keyWarning.a: The key OpenRouter issues can spend your OpenRouter credits. It is stored in this browser's localStorage, never sent to Mawkingbird, and sent only to
 // i18n settings.connections.openrouter.keyWarning.b: . Use a browser profile and device you trust; revoke the key at OpenRouter to invalidate it.
 // i18n settings.connections.openrouter.model.default.a: The model the search and tag helpers use. The default is
 // i18n settings.connections.openrouter.model.default.b: — cheap, fast, and able to return structured JSON, which is all these features ask of it.

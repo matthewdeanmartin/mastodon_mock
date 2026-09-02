@@ -69,11 +69,11 @@ type TestState =
  * one that actually keeps working.
  */
 // i18n settings.connections.corsProxy.title: 🔀 CORS proxy
-// i18n settings.connections.corsProxy.intro: Some sites refuse to answer requests that come from another site's JavaScript. Mockingbird has no server of its own, so those feeds simply cannot be read — unless you route them through a relay that fetches on your behalf. That relay is a CORS proxy.
-// i18n settings.connections.corsProxy.credentialWarning: A proxy can read every address you ask it for and every byte it sends back, and it can change the response. Only ever use one for public things — Mockingbird refuses to send your Mastodon instance, any connected account, or anything carrying a login through a proxy, but a private feed URL with a key baked into it would still be exposed. Never point a proxy at one of those.
+// i18n settings.connections.corsProxy.intro: Some sites refuse to answer requests that come from another site's JavaScript. Mawkingbird has no server of its own, so those feeds simply cannot be read — unless you route them through a relay that fetches on your behalf. That relay is a CORS proxy.
+// i18n settings.connections.corsProxy.credentialWarning: A proxy can read every address you ask it for and every byte it sends back, and it can change the response. Only ever use one for public things — Mawkingbird refuses to send your Mastodon instance, any connected account, or anything carrying a login through a proxy, but a private feed URL with a key baked into it would still be exposed. Never point a proxy at one of those.
 // i18n settings.connections.corsProxy.droppedSelection: Your previous proxy only works on localhost, so it has been cleared for this site. Choose one that works here.
 // i18n settings.connections.corsProxy.chooseHeading: Choose a proxy
-// i18n settings.connections.corsProxy.devOnlyHidden: Proxies whose free tier only answers <code>localhost</code> are hidden here, because they cannot work on this site. Run Mockingbird locally to see them.
+// i18n settings.connections.corsProxy.devOnlyHidden: Proxies whose free tier only answers <code>localhost</code> are hidden here, because they cannot work on this site. Run Mawkingbird locally to see them.
 // i18n settings.connections.corsProxy.devOnlyTag: localhost only
 // i18n settings.connections.corsProxy.keyRequiredTag: key required
 // i18n settings.connections.corsProxy.supporterTag: Mawkingbird Plus active — supporter rate limit

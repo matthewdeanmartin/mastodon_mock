@@ -44,11 +44,16 @@ describe('FindFriends', () => {
     anonymous = true;
   });
 
-  it('leads with starter kits, not with search', () => {
-    // Starter kits are the only option that works with no name in mind and no
-    // leaving the site. "Search for people" led before, which asks a brand-new
-    // visitor to already know who they are looking for.
-    expect(rowTitles(setUp())[0]).toBe('Starter kits');
+  it('leads with ready-made sets, not with search', () => {
+    // Ready-made sets are the only option that works with no name in mind and
+    // no leaving the site. "Search for people" led before, which asks a
+    // brand-new visitor to already know who they are looking for.
+    //
+    // One row, not two: our starter kits and snapshots of other people's
+    // collections list together on the page this links to. The distinction is
+    // real but it is ours, and it was being put to a newcomer before they had
+    // seen a single face.
+    expect(rowTitles(setUp())[0]).toBe('Ready-made sets of people');
   });
 
   it('puts everything needing prior knowledge under Advanced', () => {

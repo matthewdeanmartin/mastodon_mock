@@ -42,6 +42,14 @@ interface StoredApp {
 
 type Tab = 'signin' | 'mock' | 'init';
 
+/**
+ * Why the visitor came to the sign-in page.
+ *
+ * Not the same question as `LoginChooser`'s, which is "which network" and has
+ * already been answered before this page loads. See {@link Login.intent}.
+ */
+type LoginIntent = 'have' | 'need' | 'look';
+
 /** How much authority to request from the instance during OAuth. */
 export type OAuthAccess = 'full' | 'read';
 
@@ -102,6 +110,14 @@ type ServerStatus = 'idle' | 'checking' | 'ok' | 'degraded' | 'unreachable';
 // i18n pages.login.server.talkingTo: Talking to
 // i18n pages.login.server.thisServer: this server
 // i18n pages.login.server.pickAServer: — pick a server —
+// i18n pages.login.intent.question: What brings you here?
+// i18n pages.login.intent.have: I have a Mastodon account
+// i18n pages.login.intent.haveHint: Sign in on the server where your account lives.
+// i18n pages.login.intent.need: I need an account
+// i18n pages.login.intent.needHint: Pick a server and sign up there. It takes a couple of minutes.
+// i18n pages.login.intent.look: I'm just looking
+// i18n pages.login.intent.lookHint: Read without an account. You can sign in whenever you like.
+// i18n pages.login.intent.change: ← Something else
 // i18n pages.login.path.haveAccount: I have an account
 // i18n pages.login.path.pickServerFirst: Pick your server above, then sign in.
 // i18n pages.login.oauth.accessLegend: How much access to grant this app
@@ -167,6 +183,56 @@ export class Login implements OnInit, OnDestroy {
   private mastodonServers = inject(MastodonServers);
 
   protected tab = signal<Tab>('signin');
+
+  /**
+   * Which of the three doors the visitor picked, or null while being asked.
+   *
+   * ## Why this page asks a second question
+   *
+   * `/login` (`LoginChooser`) already asked "Mastodon or Bluesky", so by the
+   * time this component loads the *network* is settled. What arrived here
+   * unsettled was everything else: the page used to render the server picker,
+   * "I have an account", "I'm new here" and "Continue anonymously" all at once,
+   * in three bordered panels that stack into one column on a phone.
+   *
+   * Two of those three are mutually exclusive by construction — nobody needs
+   * both the sign-in form and the registration path — so showing both is pure
+   * noise for whichever visitor is reading. Worse is the order: the server
+   * combobox is the *first* control on the page, and picking a Mastodon server
+   * is a question only someone who already has an account can answer. A
+   * stranger met a configuration field before they were offered a way in.
+   *
+   * So the parts are gated behind the one question that tells them apart. It is
+   * null until answered, which is what keeps the machinery off the first screen.
+   */
+  protected intent = signal<LoginIntent | null>(null);
+
+  /** The three doors, in the order they are offered. */
+  protected readonly intentChoices: readonly {
+    value: LoginIntent;
+    labelKey: string;
+    hintKey: string;
+    emoji: string;
+  }[] = [
+    {
+      value: 'have',
+      labelKey: 'pages.login.intent.have',
+      hintKey: 'pages.login.intent.haveHint',
+      emoji: '🔑',
+    },
+    {
+      value: 'need',
+      labelKey: 'pages.login.intent.need',
+      hintKey: 'pages.login.intent.needHint',
+      emoji: '✨',
+    },
+    {
+      value: 'look',
+      labelKey: 'pages.login.intent.look',
+      hintKey: 'pages.login.intent.lookHint',
+      emoji: '👀',
+    },
+  ];
 
   /** Build flavor: brand text and whether mock-only login tabs are shown. */
   protected brand = environment.brand;

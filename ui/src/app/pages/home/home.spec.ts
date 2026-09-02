@@ -602,6 +602,26 @@ describe('Home', () => {
     expect(buttons[1].textContent).toContain('Quick post');
   });
 
+  /**
+   * "Quick post" names an action an anonymous reader has no destination for —
+   * no account, nowhere for a post to go — and the target actually waiting
+   * behind the composer for them is a pastebin, which is a surprising answer to
+   * a button that read as "post to my followers".
+   */
+  it('offers no way to publish from an anonymous Home', () => {
+    // Not the shared setUp: an anonymous Home reads through the anonymous
+    // provider rather than /api/v1/timelines/home, so it makes different calls.
+    TestBed.inject(Auth).enterAnonymous('https://mastodon.social');
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.match(() => true).forEach((r) => r.flush([]));
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelectorAll('.write-btn').length).toBe(0);
+    expect(el.querySelector('app-compose')).toBeNull();
+  });
+
   it('opens the mini composer on demand, without persisting the choice', () => {
     const prefs = TestBed.inject(ClientPrefs);
     const fixture = setUp();

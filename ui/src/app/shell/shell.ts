@@ -352,6 +352,26 @@ export class Shell implements OnInit {
    * does: services cache storage-backed state in signals at construction, so a
    * soft navigation would leave `AnonymousFollows` serving follows that are no
    * longer in storage.
+   *
+   * ## Why "continue" navigates instead of staying put
+   *
+   * It used to just return, leaving the visitor on `/home` — whose three seeded
+   * follows had been removed a line earlier. So the timeline they had been
+   * reading while they decided disappeared on the click that dismissed the
+   * modal, and they landed on the empty state. Watching a first-time user hit
+   * this, the empty state's single button was not read as the next step: it
+   * looks like a message about a problem, not an instruction.
+   *
+   * Even followed, that button starts a four-screen walk — the Find Friends hub
+   * (ten rows), then the kit list, then a kit, then "Follow everyone". Every one
+   * of those screens asks the visitor to choose a *method* when what they need
+   * is people. Twitter and Mastodon both force a follow step, and neither routes
+   * through a hub to reach it.
+   *
+   * So this goes straight to the kits, the one screen where a stranger with no
+   * account gets a working timeline in one press. The hub still exists and is
+   * still the right answer for someone browsing deliberately; it is the wrong
+   * thing to put in front of someone who has just been shown an empty feed.
    */
   protected answerFirstRun(choice: FirstRunChoice): void {
     this.preview.clear();
@@ -359,6 +379,7 @@ export class Shell implements OnInit {
     if (choice === 'anonymous') {
       // Safe now: the app is theirs to navigate. `start()` is idempotent.
       this.hotkeys.start();
+      void this.router.navigateByUrl('/bundled-starter-kits');
       return;
     }
     // Leave Anonymous so the login page opens signed-out, exactly as the

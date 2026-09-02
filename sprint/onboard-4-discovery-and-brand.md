@@ -1,7 +1,25 @@
 # Onboarding sprint 4 — Discovery, feedback and the name of the app
 
-Status: PLANNED. Coordinate 4.1 with [[onboard-2-first-run-path]] 2.1 and
-[[onboard-3-search-legibility]] 3.4 — all three touch the same surface.
+Status: **COMPLETE** (2026-09-01). 19 tests added; `make test` green (5623 tests, 0 missing).
+
+Decisions and corrections made during implementation:
+
+- **4.1 merged onto `/bundled-starter-kits`**, which is where first-run already lands.
+  `/bundled-collections` and `/starter-kits` are redirects to it, so every existing link works.
+  The `BundledCollections` component became dead code and was deleted; its two tests and three of
+  the old kits-page tests are gone from the manifest **deliberately**, and the baseline was updated
+  with `check-test-manifest.mjs --update`. Coverage was re-checked first: the member-count and
+  provenance assertions were carried into the merged page's spec rather than dropped.
+- **The brand sweep renamed one i18n *key*** (`storageDiagnostics.keyNoteMockingbird`) as well as
+  its value, and missed the matching `transloco.translate(...)` call — which would have shipped a
+  visibly missing translation. Caught by `check:i18n`, and the key restored. Keys are storage-like
+  identifiers: only values were meant to change.
+- **Deleting English keys leaves orphans in every translated locale.** `de/fr/id/ja.json` each
+  carried the removed `bundledCollections.*` and `pages.findFriends.bundledCollections.*` keys, and
+  `check:i18n` treats an orphan as fatal. Pruned by hand — there is no tooling for it, which is
+  worth knowing before the next feature deletion.
+- **4.2's auto-sample fires on the Posts tab, not on arrival.** A shipped collection opens on
+  *members* (`collection.ts:382`), so hooking page load would have done nothing.
 
 The leftovers, which have less in common with each other than the first three sprints did. What
 unites them is that each one costs a new user confidence rather than functionality.

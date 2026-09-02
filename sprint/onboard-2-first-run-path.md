@@ -1,7 +1,10 @@
 # Onboarding sprint 2 — The first-run path and the login wizard
 
-Status: PLANNED. Follows [[onboard-1-honest-actions]]; 2.1 in particular reads better once the
-anonymous actions are honest.
+Status: **COMPLETE** (2026-09-01). 7 tests added; `make test` green (5597 tests, 0 missing).
+
+All three items were verified in code before implementing. 2.1 and 2.2 both had details wrong in
+planning — 2.1 blamed the wrong empty-state element, 2.2 blamed the wrong route — and both were
+corrected in place before any code was written.
 
 Two flow changes, one of them marked TOP PRIO by the boss. Both are about the same mistake:
 **offering every option at once to someone who does not yet have the context to choose.**
@@ -10,90 +13,125 @@ Two flow changes, one of them marked TOP PRIO by the boss. Both are about the sa
 
 ## 2.1 — Follow-first: never show a new user an empty feed (TOP PRIO)
 
+**Verified in code 2026-09-01. Two details of the first draft were wrong; the finding stands.**
+
 **Now:** `pages/entry/entry.ts` seeds three follows, enters Anonymous, and lands on `/home` with
-the first-run modal over a real timeline. That part works and is well-reasoned — the modal exists
-so a stranger sees the app rather than a page about the app. The failure is what happens *after*
-the answer.
+the first-run modal over a real timeline. That part works and is well-reasoned. The failure is
+what happens *after* the answer.
 
-Picking "Continue without logging in" clears the seed. The visitor is then on `/home` with nothing
-followed, looking at `showFollowNudge()` (`pages/home/home.html:5`) — a blue banner reading "you
-aren't following anyone" with a `/find-friends` CTA beside it. **A first-time tester read that
-banner and did not know what to do next.** It is the correct information in a form people have
-been trained to ignore: it looks like an ad, it sits above the fold on a page with no other
-content, and it asks rather than leads.
+`Shell.answerFirstRun` (`shell/shell.ts:356`) handles it: it calls `preview.clear()`, sets
+`firstRunActive` false, and for `'anonymous'` **starts the hotkeys and returns.** No navigation.
+The visitor stays exactly where they are — on `/home`, whose three seeded follows have just been
+removed underneath them. The timeline they were looking at while deciding vanishes on the click
+that dismissed the modal.
 
-Twitter and Mastodon both solve this the same way, and neither uses a banner: onboarding *forces*
-a follow step, and the first feed you ever see already has posts in it.
+Corrections to the first draft:
 
-**Change:** after the first-run modal is answered with `anonymous`, route to the follow-picking
-screen instead of `/home`. Same for a fresh sign-in that lands on zero follows.
+- **The blue "you aren't following anyone" banner is not what they see.** `showFollowNudge`
+  (`home.ts:563`) requires `!auth.isAnonymous`, so an anonymous first-timer never gets it.
+- What they get is the `nothingFollowed` empty state (`home.html:228`): one line — "Your timeline
+  is empty — you're not following anyone yet" — and one button, "Find people to follow". Its own
+  source comment calls it "the first-run destination", so this screen is doing the job on purpose.
 
-Design questions this sprint must settle, in order:
+The screen is not badly built. The problem is that it is a **fourth** screen that asks for a
+choice, and the three after it ask for three more:
 
-1. **Which screen.** `/find-friends` today is a two-row menu (`pages/find-friends/find-friends.html`)
-   pointing at `/bundled-starter-kits` and `/bundled-collections` — it is a *directory of
-   directories*, one more choice rather than an answer. A forced onboarding step needs actual
-   people with actual Follow buttons on the first screen. Either `/find-friends` grows an inline
-   picker above its two rows, or onboarding routes past it straight to starter kits. Sprint 4
-   merges these surfaces anyway, so prefer whichever choice sprint 4 will not have to undo.
-2. **How they leave.** There must be a way out that is not a follow — "skip for now" — or this
-   becomes a wall. But it should be the quiet option, not a peer of the primary action.
-3. **What Home shows on arrival.** Once they have followed someone, `showFollowNudge()` should not
-   fire, and the seeded preview should be gone. Check the interaction with `PreviewSeed.markEmpty`
-   and the seed-clearing on modal exit — there is a real risk of the seed being cleared, the user
-   following three people, and the anonymous feed cache serving the *old* seeded posts.
-   `anonymousSourceKey()` / `AnonymousHomeFeedCache` (`home.ts:735`) is the code to check.
+| Step | Screen | What the visitor must decide |
+|---|---|---|
+| 1 | first-run modal | log in, or not |
+| 2 | `/home` empty state | press the one button |
+| 3 | `/find-friends` | which of **10 rows** — kits, collections, 12 interest links, search, directory, offsite, contacts, import, invite |
+| 4 | `/bundled-starter-kits` | which kit |
+| 5 | `/collections/starter/:slug` | finally, "Follow everyone" |
 
-**Keep:** the modal itself, the preview behind it, and the sample note. Those are working.
+`/find-friends` is a genuinely good hub for someone browsing — rows are ordered by how well each
+serves a five-minute-old visitor, with prior-knowledge tools under **Advanced**. It is the wrong
+thing to put in front of someone who has just been told their timeline is empty, because it
+answers "what are all the ways to find people" when the question is "give me people."
 
-**Files:** `pages/entry/entry.ts`, `first-run/first-run-modal.ts` consumer, `pages/home/home.ts`
-(nudge conditions), `pages/find-friends/*`, routes.
+Twitter and Mastodon both force a follow step and neither routes through a hub.
 
-## 2.2 — The mobile login page is a wall (TOP PRIO)
+**Change:** on `answerFirstRun('anonymous')`, navigate to the starter kits rather than staying put.
+Skip `/find-friends` — it is the hub for *choosing a method*, and onboarding has already chosen one.
 
-**Now:** `pages/login/login.html` renders, in one 860px column, all at once:
+Design points settled by the code:
 
-- a hero with logo, brand and tagline;
-- a tab row (plus two more tabs against a mock server);
-- a "not sure which server?" prompt with a server combo box and a live suggestion dropdown
-  carrying category, size and description per entry;
-- `<section class="path path-primary">` — "I have an account";
-- `<section class="path">` — "New here", with its own registration form;
-- `<section class="path anonymous-option">` — "Continue anonymously", which itself embeds
-  `<app-server-discovery>`, a whole server-hunting widget.
+1. **The destination is the kits.** `canFollowKit()` (`collection.ts:275`) is explicitly available
+   to anonymous visitors, and "Follow everyone" runs through the importer against the compiled-in
+   snapshot, so it works with no account and no network identity. That is the one screen in the
+   app where a stranger goes from nothing to a working timeline in one press.
+2. **Leaving must stay possible.** The kits page is a normal route with the shell around it, so
+   the visitor can navigate away; no extra escape hatch is needed, and no "skip" button should
+   compete with the primary action.
+3. **The seed cache.** `preview.clear()` removes the follows, and `AnonymousHomeFeedCache` keys on
+   `anonymousSourceKey()` (`home.ts:1187`) — the follow/tag set. Following a kit changes that key,
+   so the cache cannot serve the old seeded posts. Confirm with a test rather than by reading.
 
-One `@media (max-width: 860px)` rule (`login.css:174`) reflows it. It does not reduce it. On a
-phone this is several screens of scroll in which every block competes, and the visitor must
-understand what a "server" is before the page will let them past the first control.
+**Files:** `shell/shell.ts` (`answerFirstRun`), `shell/shell.spec.ts`.
 
-**Change:** make it a wizard. Step one asks the question the boss named — *do you have an account,
-or do you need one?* — and nothing else is on screen. Only after that answer does the page show
-the machinery that answer requires:
+## 2.2 — The Mastodon sign-in page is a wall (TOP PRIO)
 
-| Answer | Then show |
+**Verified 2026-09-01. The first draft named the wrong route; the finding stands and narrows.**
+
+**Correction:** `/login` is **not** this page. It is `LoginChooser`
+(`pages/login-chooser/login-chooser.html`), and it is already the wizard step the boss asked for:
+one title, two doors (🐘 Mastodon / 🦋 Bluesky) with a plain-language hint each, a quiet
+"not sure? browse anonymously instead" way out, and the analytics opt-out. It is 66 lines and it
+is good. **Do not rebuild it.**
+
+The wall is `/login/mastodon` (`pages/login/login.html`, 444 lines), reached *after* the visitor
+has already answered "which network". So the shape of the fix is not "add a first question" —
+that question is asked and answered. It is "stop showing everything at once on the screen that
+comes next."
+
+That page renders, in one column, all at the same time:
+
+- hero with logo, brand and tagline;
+- a tab row (plus two mock-only tabs against a mock server);
+- "not sure which server?" plus a server combobox with a live suggestion list carrying category,
+  size and description per row;
+- `section.path.path-primary` — "I have an account": an OAuth access-scope radio fieldset, the
+  sign-in button, and a `<details>` holding a paste-a-token path;
+- `section.path` — "New here", which against a real instance is a link to `/welcome-back` and
+  against the mock is a full inline registration form (username, email, password, agree);
+- `section.path.anonymous-option` — "Continue anonymously", which embeds
+  `<app-server-discovery>`, an entire server-hunting widget.
+
+`.paths` is `grid-template-columns: repeat(3, 1fr)` and collapses to one column at
+`max-width: 860px` (`login.css:174`), where `.login-card` also drops to `width: 480px`. It does not
+overflow — `max-width: 94vw` catches it — so this is a **density** problem, not a layout bug: three
+bordered panels plus a server picker plus a discovery widget, stacked, on a phone.
+
+The deeper problem is order. The server combobox is the first control on the page, and it asks a
+question only an existing Mastodon user can answer. A visitor who has just told us "I have a
+Mastodon account" is made to configure a host before being offered the sign-in button.
+
+**Change:** keep the page, gate its parts behind the question the boss named — *do you have an
+account, or do you need one?*
+
+| Answer | Show |
 |---|---|
-| I have an account | Network choice (Mastodon / Bluesky), then the server field, then sign in |
-| I need an account | Server suggestions → `/welcome-back` (see 2.3) |
-| Just looking | Continue anonymously; server discovery stays behind a "pick a different server" link |
+| I have an account | server field (prefilled), then the OAuth button; token path stays in its `<details>` |
+| I need an account | the sign-up route to `/welcome-back`; server suggestions framed as "pick one" |
+| Just looking | continue anonymously; `app-server-discovery` behind a disclosure |
 
 Notes:
 
-- **The server picker moves.** It is currently the first thing on the page and it is the single
-  biggest source of confusion, because it asks a question only an existing Mastodon user can
-  answer. It belongs *inside* the two branches that need it, with a sensible default already
-  filled in.
-- **`app-server-discovery` goes behind a disclosure.** It is a good tool and a terrible default.
-- **The mock tabs (`mockTooling && server.isMock`) stay as they are.** They are dev tooling; do not
-  spend wizard design on them, just make sure they do not appear in the wizard's step model.
-- **The first-run modal already asks a near-identical question** ("Which account do you have?",
-  `first-run-modal.html`). Reuse its wording and its two-step shape so the two do not contradict
-  each other. If a visitor arrives at `/login` *from* the modal having already picked a network,
-  the wizard should honour that and skip step one.
-- Wide screens can keep more on screen at once, but the wizard should be the single
-  implementation — do not build a phone layout and a desktop layout separately.
+- **Two of the three sections are already mutually exclusive in practice.** Someone with an account
+  never needs the sign-up panel, and vice versa. Nothing is lost by asking first.
+- **The server picker moves into the branches that need it**, with the current value prefilled.
+- **`app-server-discovery` goes behind a disclosure.** Good tool, terrible default.
+- **The mock tabs stay exactly as they are.** They are dev tooling; keep them out of the step model.
+- **Reuse the chooser's visual language** (`.door` rows) for the new first question, so the two
+  consecutive questions look like one flow rather than two designs.
+- **Do not** duplicate `LoginChooser`'s network question here. It has been answered by the time
+  this page loads.
 
-**Files:** `pages/login/login.{html,ts,css}`, `login.spec.ts` (348 lines today — expect substantial
-rework), possibly a shared step component with `first-run-modal`.
+**Also found, out of scope:** `login.html:317` carries a hardcoded, untranslated English string
+naming **"Mocking Bird"** — both a missed i18n key and an instance of the brand split that
+[[onboard-4-discovery-and-brand]] 4.4 covers.
+
+**Files:** `pages/login/login.{html,ts,css}`, `login.spec.ts`.
 
 ## 2.3 — "Press Ctrl + D" on a phone
 

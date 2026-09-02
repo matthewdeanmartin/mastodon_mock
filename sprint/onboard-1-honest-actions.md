@@ -1,6 +1,10 @@
 # Onboarding sprint 1 — Honest actions and dead links
 
-Status: PLANNED. Depends on nothing. Every item is confirmed in source.
+Status: **COMPLETE** (2026-09-01). 11 tests added; `make test` green.
+
+Two of the six items were misdiagnosed in planning and were corrected during implementation by
+probe spec rather than by reading — see 1.1 and 1.3. The corrections are kept in place of the
+original claims, because the wrong diagnosis for 1.1 would have caused a regression.
 
 The theme: **stop the app making promises it cannot keep, and stop it hiding destinations it
 already has.** Nothing here is a redesign. Each item is a small correction whose absence a new

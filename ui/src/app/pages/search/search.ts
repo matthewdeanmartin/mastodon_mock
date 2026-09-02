@@ -91,6 +91,7 @@ import { serializeMastodonQuery } from './mastodon-query-serializer';
 import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-explain';
 import { isBlueskySaved, isMastodonSaved, SavedSearches } from './saved-searches';
 import { RecentSearches, RecentSearch } from './recent-searches';
+import { kitMatchesFor } from './kit-matches';
 import { BlueskyPostSearch } from '../../providers/bluesky/bluesky-post-search';
 import { decodeSearchFromParams, encodeSearchToParams } from './search-url';
 import { PageDiagnostics } from '../../page-diagnostics';
@@ -171,6 +172,16 @@ const SEARCH_TIMEOUT_MS = 20000;
 // i18n pages.search.network.mastodon: Mastodon
 // i18n pages.search.network.bluesky: Bluesky
 // i18n pages.search.network.ariaLabel: Search network
+// i18n pages.search.kits.heading: Ready-made sets of people
+// i18n pages.search.kits.accounts.one: {{count}} account · follow the whole set
+// i18n pages.search.kits.accounts.other: {{count}} accounts · follow the whole set
+// i18n pages.search.refine.summary: Search options and filters
+// i18n pages.search.refine.activeCount.one: {{count}} filter on
+// i18n pages.search.refine.activeCount.other: {{count}} filters on
+// i18n pages.search.found.posts.one: Found 1 {{post}}.
+// i18n pages.search.found.posts.other: Found {{count}} {{posts}}.
+// i18n pages.search.found.accounts.one: Found 1 account.
+// i18n pages.search.found.accounts.other: Found {{count}} accounts.
 // i18n pages.search.type.accounts: Accounts
 // i18n pages.search.type.posts: Posts
 // i18n pages.search.type.hashtags: Hashtags
@@ -652,6 +663,58 @@ export class Search implements OnInit, OnDestroy {
   protected type = signal<SearchType>('accounts');
 
   /**
+   * True once the reader has picked a type themselves, or arrived with one.
+   *
+   * Inference must never override a choice. This is the flag that keeps
+   * {@link inferTypeFor} to its actual job — guessing when nobody has said —
+   * rather than second-guessing the select on every keystroke.
+   */
+  private typeChosen = false;
+
+  /**
+   * The search type a query's *shape* asks for, or null when it does not say.
+   *
+   * ## Why the old default was wrong
+   *
+   * The type was hard-coded to `accounts` because it is first in the union, not
+   * because it is the right answer. Someone typing a topic — "gardening",
+   * "climate" — got a list of *people whose profile text matches*, which is a
+   * plausible answer to a question nobody asked, and reads as though the app
+   * misunderstood them.
+   *
+   * ## Why this is inference and not a new default
+   *
+   * "Default to Posts" is the obvious fix and it is a trap here. Mastodon
+   * full-text post search needs both an Elasticsearch index and a token, so on
+   * many servers — and anonymously as the *rule* rather than the exception, as
+   * `search-capability.ts` documents — a post search returns `[]` for every
+   * query, forever, with no error. Defaulting a first-time anonymous visitor
+   * into the one search that is usually switched off would be a worse first
+   * impression than the wrong-but-populated list they get today.
+   *
+   * So this only claims the cases the query itself settles:
+   *
+   * - `@name`, `name@host` — unambiguously a person.
+   * - `#tag` — unambiguously a hashtag.
+   *
+   * Everything else returns null and the existing default stands. A topic
+   * search is a *guess* about intent; a leading `@` is a statement of it.
+   */
+  private inferTypeFor(query: string): SearchType | null {
+    const raw = query.trim();
+    if (!raw || /\s/.test(raw)) {
+      return null;
+    }
+    if (raw.startsWith('#') && raw.length > 1) {
+      return 'hashtags';
+    }
+    if (raw.startsWith('@') || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(raw)) {
+      return 'accounts';
+    }
+    return null;
+  }
+
+  /**
    * Progressive feedback for a search that is taking too long.
    *
    * ## Why this exists
@@ -938,6 +1001,8 @@ export class Search implements OnInit, OnDestroy {
     // On Bluesky the type select drives the panel's target rather than the
     // Mastodon search's type, but it is the *same* signal either way — that is
     // the point of having one widget instead of two.
+    // An explicit pick from the dropdown outranks anything the query looks like.
+    this.typeChosen = true;
     this.type.set(value as SearchType);
     if (this.blueskyMode()) {
       void this.router.navigate([], {
@@ -1229,6 +1294,33 @@ export class Search implements OnInit, OnDestroy {
   // Facets open by default — collapsed, the "Refine loaded results" section is
   // easy to miss entirely.
   protected refineOpen = signal(true);
+  /**
+   * How many refinements are currently narrowing the results.
+   *
+   * Exists so a collapsed refinement panel can never hide something that is
+   * doing work: on a phone the panel closes once results exist, and a closed
+   * panel that is silently filtering is worse than the wall it replaced. The
+   * summary carries this count, so "3 filters" is visible without opening it.
+   *
+   * Counts only what the reader chose. Defaults — no text filter, `both` for
+   * account matching, `any` content type, `all` scope — are not refinements and
+   * must not inflate the badge, or it reads "2 filters" on an untouched page.
+   */
+  protected activeRefinementCount = computed(() => {
+    let count = this.selectedFacets().length + this.excludedAuthors().size;
+    if (this.type() === 'accounts') {
+      if (this.accountFilter().trim()) count++;
+      if (this.accountSource() !== 'both') count++;
+      if (this.followersMin().trim()) count++;
+      if (this.followersMax().trim()) count++;
+    } else {
+      if (this.loadedFilter().trim()) count++;
+      if (this.contentType() !== 'any') count++;
+      if (this.scope() !== 'all') count++;
+    }
+    return count;
+  });
+
   protected selectedFacets = signal<FacetSelection[]>([]);
 
   // --- flood control ---
@@ -1429,6 +1521,83 @@ export class Search implements OnInit, OnDestroy {
   /** Loaded statuses reshaped by the current grouping selection. */
   protected groups = computed(() => groupResults(this.visibleStatuses(), this.grouping()));
 
+  /**
+   * One line saying the search finished and what it found.
+   *
+   * ## Why a phone needs this and a desktop does not
+   *
+   * The page is a two-column grid — refinement controls left, results right —
+   * that collapses to one column at 800px with the *form* column first in DOM
+   * order. So on a phone, submitting a search changes only the part of the
+   * screen the reader is looking at by adding facets; the results themselves are
+   * a full screen further down. The reported symptom was "facets alone look like
+   * nothing happened", and that is exactly what it looks like.
+   *
+   * There was already a count — "Loaded 12 posts in 3 API calls" — but it lives
+   * inside the refine block in that same left column, it is a note about what
+   * the facet counts are computed over, and it is phrased for someone auditing
+   * an API budget. It is not an answer to "did my search work".
+   *
+   * Null while idle or in flight: the searching and timed-out states have their
+   * own copy, and two overlapping claims about the same request is worse than
+   * one. Rendered into an `aria-live` region so it is also the answer for a
+   * reader who cannot see the results appear.
+   */
+  protected resultAnnouncement = computed<string | null>(() => {
+    // Deliberately *not* gated on `searching`. The first page clears that flag
+    // and then `maybeAutoFill` pages again to fill the facet corpus, setting it
+    // right back — so a "hide while searching" rule would show the count and
+    // then blank it, which is the flicker this line exists to prevent. What
+    // gates it instead is having something true to say: the results signal for
+    // posts, `accountSearchRan` for accounts. The count then only ever grows.
+    if (this.searchTimedOut()) {
+      return null;
+    }
+    if (this.type() === 'accounts') {
+      if (!this.accountSearchRan()) {
+        return null;
+      }
+      const count = this.loadedAccountCount();
+      return this.transloco.translate(
+        count === 1 ? 'pages.search.found.accounts.one' : 'pages.search.found.accounts.other',
+        { count },
+      );
+    }
+    if (!this.results()) {
+      return null;
+    }
+    const count = this.loadedCount();
+    return this.transloco.translate(
+      count === 1 ? 'pages.search.found.posts.one' : 'pages.search.found.posts.other',
+      { count, posts: this.words().posts, post: this.words().post },
+    );
+  });
+
+  /**
+   * Curated sets matching the query, shown above the account results.
+   *
+   * Free — both corpora are compiled in — so this runs alongside a normal
+   * account search rather than hiding behind a fourth type in the dropdown.
+   * Reads the *submitted* query rather than the box, so the block does not
+   * flicker in and out while someone is typing.
+   *
+   * Only on the accounts tab: that is the "who should I follow" search, which
+   * is the question a kit answers. On a post search it would be an interruption.
+   */
+  protected kitMatches = computed(() =>
+    this.type() === 'accounts' ? kitMatchesFor(this.ranQuery()) : [],
+  );
+
+  /**
+   * The query the last search actually ran with.
+   *
+   * A signal rather than reading `urlQuery`, which is a plain field and would
+   * not drive a computed. Set where a search starts, so the kit block reflects
+   * what was searched rather than what is currently in the box — otherwise it
+   * appears and disappears under the reader as they type.
+   */
+  private ranQuery = signal('');
+
   protected loadedCount = computed(() => this.results()?.statuses.length ?? 0);
   protected shownCount = computed(() => this.visibleStatuses().length);
 
@@ -1527,6 +1696,12 @@ export class Search implements OnInit, OnDestroy {
       }
 
       const t = (rawType as SearchType) ?? 'accounts';
+      // A `type` in the URL is a decision too — a shared link, a saved search, or
+      // the reader's own earlier pick coming back through the history. Inference
+      // must not overrule it on the next Search press.
+      if (rawType) {
+        this.typeChosen = true;
+      }
       this.blueskyMode.set(false);
       this.urlQuery = q;
       this.urlType = t;
@@ -1680,6 +1855,16 @@ export class Search implements OnInit, OnDestroy {
       });
       this.blueskyPanel()?.runQuery();
       return;
+    }
+    // Let the query's shape pick the type, but only while nobody has chosen one.
+    // Applied here rather than as the box changes so the select does not twitch
+    // under the reader mid-word; by the time Search is pressed the query is
+    // whatever they meant it to be.
+    if (!this.typeChosen) {
+      const inferred = this.inferTypeFor(q);
+      if (inferred && inferred !== this.type()) {
+        this.type.set(inferred);
+      }
     }
     const type = this.type();
     this.diagnostics.info('Search', 'user:run', {
@@ -2159,6 +2344,8 @@ export class Search implements OnInit, OnDestroy {
   }
 
   private fetch(q: string, type: SearchType): void {
+    // What the kit block matches against: the query that ran, not the box.
+    this.ranQuery.set(q);
     this.diagnostics.info('Search', 'load:start', {
       type,
       queryLength: q.length,

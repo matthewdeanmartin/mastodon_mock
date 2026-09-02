@@ -73,7 +73,7 @@ import { RemoteStorageUsage } from '../../observability/remote-storage-usage';
 // i18n storageDiagnostics.scanning: Scanning…
 // i18n storageDiagnostics.keyNoteApiMetrics: API metrics
 // i18n storageDiagnostics.keyNoteRouteLog: route log
-// i18n storageDiagnostics.keyNoteMockingbird: Mockingbird
+// i18n storageDiagnostics.keyNoteMockingbird: Mawkingbird
 // i18n storageDiagnostics.keyNoteSession: session
 // i18n storageDiagnostics.deleteConfirm: Delete localStorage key "{{key}}"? This can’t be undone.
 // i18n storageDiagnostics.remoteWhenNever: never

@@ -15,6 +15,21 @@ describe('account-data', () => {
     expect(scopeForAccount(null)).toBe('_anonymous');
   });
 
+  /**
+   * The app is called Mawkingbird and every visible surface says so; this
+   * prefix deliberately does not. It is the namespace already written into
+   * every existing user's localStorage, so renaming it to match the brand would
+   * orphan their follows, feeds and sessions — the app would look like a fresh
+   * install to everyone who already uses it, silently. This test is here so
+   * that a well-meaning brand sweep fails loudly instead.
+   */
+  it('keeps the legacy storage prefix whatever the app is called', () => {
+    localStorage.setItem('mockingbird_anonymous_follows', '["x"]');
+
+    expect(keyBelongsToScope('mockingbird_anonymous_follows', '_anonymous')).toBe(true);
+    expect(keyBelongsToScope('mawkingbird_anonymous_follows', '_anonymous')).toBe(false);
+  });
+
   it('derives a distinct, token-free scope per saved login', () => {
     const one = scopeForAccount('token-one');
     const two = scopeForAccount('token-two');

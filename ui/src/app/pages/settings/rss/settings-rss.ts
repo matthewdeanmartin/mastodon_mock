@@ -52,7 +52,7 @@ interface ImportReport {
 /** English source strings; see scripts/extract-i18n.mjs. */
 // i18n settings.rss.title: 📡 RSS feeds
 // i18n settings.rss.intro: Any RSS or Atom feed becomes posts in your home feed, read-only, with an "Open original" link. No account, no credential — a feed URL is all it takes.
-// i18n settings.rss.cors: Mockingbird has no server, so a feed only works if its site allows browser (CORS) access. Plenty don't. You'll know right away when you add one, because adding it fetches it.
+// i18n settings.rss.cors: Mawkingbird has no server, so a feed only works if its site allows browser (CORS) access. Plenty don't. You'll know right away when you add one, because adding it fetches it.
 // i18n settings.rss.saved: {{count}} of {{limit}} feeds saved in this browser.
 // i18n settings.rss.proxy.before: Feeds that block browser access can be routed through
 // i18n settings.rss.proxy.after: , per feed, below.

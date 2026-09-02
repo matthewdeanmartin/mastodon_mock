@@ -6,7 +6,7 @@ import { CONNECTION_SCOPE_COPY } from '../connection-catalog';
 import { PageDiagnostics } from '../../../../page-diagnostics';
 
 // i18n settings.connections.dropbox.title: 📦 Dropbox
-// i18n settings.connections.dropbox.intro: Connect an app-specific Dropbox folder with OAuth. Authorization and file access happen directly between this browser and Dropbox; Mockingbird never receives a client secret or your files.
+// i18n settings.connections.dropbox.intro: Connect an app-specific Dropbox folder with OAuth. Authorization and file access happen directly between this browser and Dropbox; Mawkingbird never receives a client secret or your files.
 // i18n settings.connections.dropbox.notConfigured: Dropbox is not configured for this build. Add the public Dropbox app key to the Angular environment first.
 // i18n settings.connections.dropbox.listing: Listing…
 // i18n settings.connections.dropbox.list: List files and folders

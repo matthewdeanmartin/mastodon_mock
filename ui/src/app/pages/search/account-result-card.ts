@@ -262,6 +262,27 @@ export class AccountResultCard {
     void this.router.navigate(this.profileLink());
   }
 
+  /**
+   * Keyboard equivalent of {@link onCardClick}.
+   *
+   * Present because the card takes a click, and a pointer-only affordance is
+   * one keyboard users cannot reach. It is deliberately narrow: Enter, and only
+   * when the focus is on the card itself rather than on one of the controls
+   * inside it — the display-name link already offers the same destination to
+   * anyone tabbing through, so this must not steal Enter from the Follow button.
+   */
+  onCardKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Enter' || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (!target || target.closest(INTERACTIVE_SELECTOR)) {
+      return;
+    }
+    event.preventDefault();
+    void this.router.navigate(this.profileLink());
+  }
+
   onFollowClick(): void {
     if (this.followBusy()) {
       return;

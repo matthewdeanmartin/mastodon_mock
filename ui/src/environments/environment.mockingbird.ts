@@ -9,7 +9,13 @@
  * fault injection. There is no "this server" default — an instance must be chosen.
  */
 export const environment = {
-  brand: 'Mocking Bird',
+  // The one user-facing name. It was 'Mocking Bird' here while index.html's
+  // <title>, the first-run modal and the shell all said "Mawkingbird" — so the
+  // login card and the browser tab disagreed on what this app is called, on the
+  // two screens a stranger sees while deciding whether to trust it with an
+  // account. Note this is *not* the `mockingbird_` localStorage prefix, which is
+  // a separate thing and must not be renamed; see account-data.ts.
+  brand: 'Mawkingbird',
   mockTooling: false,
   allowThisServer: false,
   /** Public OAuth client id. This is safe to include in the static browser bundle. */

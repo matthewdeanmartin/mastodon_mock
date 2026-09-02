@@ -8,12 +8,19 @@
  * the `mockingbird` configuration's `fileReplacements` in angular.json.
  */
 export const environment = {
-  /** Brand shown in the header / login card / page title. */
-  brand: 'mastodon_mock',
+  /**
+   * Brand shown in the header / login card / page title.
+   *
+   * Deliberately different from the shipped build's "Mawkingbird": this
+   * configuration only ever runs against the mock server, and a visibly
+   * different name is how you tell at a glance that the thing on screen is not
+   * the real app. It is a dev marker, not a second product name.
+   */
+  brand: 'mastodon_mock (dev)',
   /**
    * When true, the UI exposes mock-server-only surface: the "Mock Login" and
    * "Mock Init" login tabs, the fault-injection page, and the `_mock/*` API calls.
-   * The standalone Mocking Bird client builds with this off.
+   * The standalone Mawkingbird client builds with this off.
    */
   mockTooling: true,
   /**

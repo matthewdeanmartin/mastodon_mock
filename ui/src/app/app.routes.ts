@@ -573,26 +573,23 @@ export const routes: Routes = [
         title: 'Directory',
         loadComponent: () => import('./pages/directory/directory').then((m) => m.Directory),
       },
-      {
-        path: 'bundled-collections',
-        title: 'Bundled collections',
-        loadComponent: () =>
-          import('./pages/bundled-collections/bundled-collections').then(
-            (m) => m.BundledCollections,
-          ),
-      },
+      // Both corpora — our starter kits and snapshots of other people's real
+      // collections — now list together on one page. The distinction is real but
+      // it is *ours*, and it was being asked of a newcomer before they had seen
+      // a single face. The route is kept rather than removed so every link that
+      // ever pointed here still works.
+      { path: 'bundled-collections', redirectTo: 'bundled-starter-kits', pathMatch: 'full' },
       {
         path: 'bundled-starter-kits',
-        title: 'Starter kits',
+        title: 'People to follow',
         loadComponent: () =>
           import('./pages/bundled-starter-kits/bundled-starter-kits').then(
             (m) => m.BundledStarterKits,
           ),
       },
-      // `/starter-kits` used to hold both kinds at once. They are two different
-      // things — other people's real collections, and ours — so they are two
-      // pages now, and the old path lands on the hub that offers both.
-      { path: 'starter-kits', redirectTo: 'find-friends', pathMatch: 'full' },
+      // `/starter-kits` held both kinds at once, then briefly meant one of two
+      // pages. It means the merged page again — which is what it originally was.
+      { path: 'starter-kits', redirectTo: 'bundled-starter-kits', pathMatch: 'full' },
       // Feeds hub: lists, saved searches, server feeds, collections and tags in
       // one page. `/feeds/lists` and `/feeds/tags` are filtered views of the same
       // component (see Feeds.only). These literal segments MUST precede the

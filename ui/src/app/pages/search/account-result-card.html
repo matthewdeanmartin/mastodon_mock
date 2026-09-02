@@ -9,8 +9,10 @@
 <div
   class="acct-card"
   [class.expanded]="expanded()"
+  tabindex="-1"
   (mousedown)="onCardMouseDown()"
   (click)="onCardClick($event)"
+  (keydown)="onCardKeydown($event)"
 >
   <div class="acct-main">
     <a

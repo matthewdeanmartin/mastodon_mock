@@ -191,7 +191,7 @@ export const FEED_SECTIONS: readonly { id: FeedSection; key: string }[] = [
 // i18n pages.lists.bsky.listsHeading: 🦋 Bluesky lists
 // i18n pages.lists.bsky.popularHeading: 🦋 Popular on Bluesky
 // i18n pages.lists.bsky.popularHint: Feeds other people built and published. Anyone can read them — no Bluesky account needed.
-// i18n pages.lists.bsky.savedHint: Saved on Bluesky. Pin and unpin them in the Bluesky app — Mockingbird reads this list but never rewrites it.
+// i18n pages.lists.bsky.savedHint: Saved on Bluesky. Pin and unpin them in the Bluesky app — Mawkingbird reads this list but never rewrites it.
 // i18n pages.lists.bsky.byList: · list by &#64;{{handle}}
 // i18n pages.lists.bsky.byFeed: · feed by &#64;{{handle}}
 // i18n pages.lists.bsky.byHandle: · by &#64;{{handle}}

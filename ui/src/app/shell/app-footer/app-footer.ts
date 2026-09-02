@@ -22,7 +22,7 @@ import { LocalePicker } from '../../locale-picker/locale-picker';
  */
 // i18n footer.rules: {{host}} rules & terms
 // i18n footer.server: Server
-// i18n footer.source: Mockingbird source
+// i18n footer.source: Mawkingbird source
 // i18n footer.reportBug: Report a bug
 // i18n footer.privacy: Privacy
 // i18n footer.failWhale: Fail whale

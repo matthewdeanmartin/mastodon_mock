@@ -38,3 +38,26 @@
   margin: 4px 0 6px;
   line-height: 1.5;
 }
+
+/* Narrows the merged list. Full width so it is obviously about everything below
+   it rather than about the first card. */
+.kit-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 16px 4px;
+}
+
+.kit-filter input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  font-size: 15px;
+  min-width: 0;
+}
+
+.kit-none,
+.kit-more {
+  margin: 16px;
+  line-height: 1.5;
+}

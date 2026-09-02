@@ -395,6 +395,61 @@ describe('StatusCard', () => {
     });
   });
 
+  /**
+   * `[disabled]` was the whole of the feedback, and a disabled icon button looks
+   * exactly like an idle one — so a tap that landed and a tap that missed the
+   * target produced the same picture. Worse, one flag disabled all five controls
+   * at once, so pressing Like made the card look like it was doing five things.
+   */
+  describe('feedback while an action is in flight', () => {
+    function likeButton(f: ComponentFixture<StatusCard>): HTMLButtonElement {
+      return (f.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        '[aria-label="Favourite"]',
+      )!;
+    }
+
+    it('shows the like as done before the server answers', () => {
+      const f = setUp(makeStatus({ id: '7', favourites_count: 4 }));
+
+      likeButton(f).click();
+      f.detectChanges();
+
+      const el = f.nativeElement as HTMLElement;
+      // The icon flips and the count moves with it: "Liked" beside an unchanged
+      // number is its own kind of broken.
+      expect(el.querySelector('[aria-label="Undo favourite"]')).not.toBeNull();
+      expect(el.textContent).toContain('5');
+      httpMock.expectOne((r) => r.url.includes('/favourite'));
+    });
+
+    it('marks only the pressed control as working', () => {
+      const f = setUp(makeStatus({ id: '8' }));
+
+      likeButton(f).click();
+      f.detectChanges();
+
+      const el = f.nativeElement as HTMLElement;
+      const working = [...el.querySelectorAll('.action.working')];
+      expect(working.length).toBe(1);
+      httpMock.expectOne((r) => r.url.includes('/favourite'));
+    });
+
+    it('puts the like back when the request fails', () => {
+      const f = setUp(makeStatus({ id: '9', favourites_count: 4 }));
+
+      likeButton(f).click();
+      httpMock
+        .expectOne((r) => r.url.includes('/favourite'))
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      f.detectChanges();
+
+      const el = f.nativeElement as HTMLElement;
+      expect(el.querySelector('[aria-label="Favourite"]')).not.toBeNull();
+      expect(el.querySelector('.action.working')).toBeNull();
+      expect(el.textContent).toContain('4');
+    });
+  });
+
   it('links the booster to their profile', () => {
     // "John Doe boosted this" was bare text, so muting their boosts — or just
     // finding out who they are — meant searching the name by hand.

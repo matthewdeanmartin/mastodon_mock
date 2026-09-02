@@ -17,6 +17,7 @@ import { Auth } from '../../auth';
 import { SearchServer } from '../../search-server';
 import { RecentSearches } from './recent-searches';
 import { WebDroppedItem } from './web-query-serializer';
+import { STARTER_KITS } from '../../starter-collection';
 
 /** Exposes Search's protected signals for white-box testing. */
 interface SearchInternals {
@@ -36,6 +37,8 @@ interface SearchInternals {
   searchServerPostHits: WritableSignal<number | null>;
   searchServerTagsOnly: WritableSignal<boolean>;
   emptyExplanation(): string | null;
+  activeRefinementCount(): number;
+  resultAnnouncement(): string | null;
   searchSlow: WritableSignal<boolean>;
   searchTimedOut: WritableSignal<boolean>;
   retrySearch(): void;
@@ -170,6 +173,135 @@ describe('Search', () => {
     internals(fixture).run();
     fixture.detectChanges();
   }
+
+  /**
+   * The type was hard-coded to `accounts` because it is first in the union, so
+   * someone typing a topic got a list of people whose *profile text* matched —
+   * a plausible answer to a question nobody asked.
+   */
+  describe('picking a search type from the query', () => {
+    it('reads a leading @ as a person', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('statuses');
+      internals(fixture).query.set('@alice');
+      internals(fixture).run();
+
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('reads a full handle as a person', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('statuses');
+      internals(fixture).query.set('alice@social.example');
+      internals(fixture).run();
+
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('reads a leading # as a hashtag', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('#gardening');
+      internals(fixture).run();
+
+      expect(internals(fixture).type()).toBe('hashtags');
+    });
+
+    /**
+     * Post search needs an Elasticsearch index and a token, and anonymously it
+     * is off more often than on — so guessing "posts" from a bare word would
+     * send a first-time visitor into the one search that usually returns
+     * nothing. A topic is a guess about intent; a leading @ is a statement.
+     */
+    it('leaves a bare topic on the existing default', () => {
+      const fixture = setUp();
+      internals(fixture).query.set('gardening');
+      internals(fixture).run();
+
+      expect(internals(fixture).type()).toBe('accounts');
+    });
+
+    it('never overrules a type the reader picked', () => {
+      const fixture = setUp();
+      internals(fixture).onTypeSelect('statuses');
+      internals(fixture).query.set('@alice');
+      internals(fixture).run();
+
+      expect(internals(fixture).type()).toBe('statuses');
+    });
+  });
+
+  /**
+   * The page is a two-column grid that collapses with the *form* column first,
+   * so on a phone a finished search changed only the facets — a screen above
+   * the results. "Facets alone look like nothing happened."
+   */
+  describe('saying that the search finished', () => {
+    it('announces how many posts were found', () => {
+      const fixture = setUp();
+      search(fixture, 'gardening');
+      httpMock
+        .expectOne((r) => r.url.includes('/api/v2/search'))
+        .flush(makeResults([makeStatus('1')]));
+      fixture.detectChanges();
+
+      const live = (fixture.nativeElement as HTMLElement).querySelector('.result-announcement');
+      expect(live?.getAttribute('aria-live')).toBe('polite');
+      expect(live?.textContent).toContain('Found 1');
+    });
+
+    it('says nothing while the search is still running', () => {
+      const fixture = setUp();
+      internals(fixture).searching.set(true);
+      fixture.detectChanges();
+
+      const live = (fixture.nativeElement as HTMLElement).querySelector('.result-announcement');
+      expect((live?.textContent ?? '').trim()).toBe('');
+    });
+  });
+
+  /**
+   * A collapsed refinement panel must never hide a filter that is doing work,
+   * so the summary carries a count of what is still narrowing the results.
+   */
+  describe('refinement summary', () => {
+    it('counts nothing on an untouched page', () => {
+      const fixture = setUp();
+
+      expect(internals(fixture).activeRefinementCount()).toBe(0);
+    });
+
+    it('counts a filter the reader actually set', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('accounts');
+      internals(fixture).accountSource.set('bio');
+      internals(fixture).followersMax.set('500');
+
+      expect(internals(fixture).activeRefinementCount()).toBe(2);
+    });
+  });
+
+  it('offers matching starter kits above the account results', () => {
+    const fixture = setUp();
+    const universal = STARTER_KITS.find((k) => k.slug === 'starter')!;
+    search(fixture, universal.title.split(' ')[0], 'accounts');
+    httpMock.match(() => true).forEach((r) => r.flush(makeResults()));
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const kit = el.querySelector('.kit-match');
+    expect(kit).not.toBeNull();
+    expect(kit?.getAttribute('href')).toContain('/collections');
+  });
+
+  it('keeps kits out of a post search, where they would interrupt', () => {
+    const fixture = setUp();
+    const universal = STARTER_KITS.find((k) => k.slug === 'starter')!;
+    search(fixture, universal.title.split(' ')[0], 'statuses');
+    httpMock.match(() => true).forEach((r) => r.flush(makeResults()));
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.kit-match')).toBeNull();
+  });
 
   /**
    * A search that never answers.

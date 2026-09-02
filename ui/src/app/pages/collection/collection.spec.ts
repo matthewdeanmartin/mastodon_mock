@@ -271,7 +271,14 @@ describe('CollectionPage', () => {
 
   // Names alone say little about whether you want these people. Sampling costs
   // one request per member, so nothing loads until it is asked for.
-  it('fetches nothing for a preview until a sample is requested', () => {
+  /**
+   * The Posts tab used to open on a size dropdown and a "Show me posts" button
+   * where a reader expected a preview. The page's own argument — that a list of
+   * names says little about whether you want these people — is a reason to load
+   * a *small* sample by default, not none. Three, spent on their behalf; the
+   * controls still gate anything larger.
+   */
+  it('shows a few posts on the Posts tab without being asked', () => {
     const kit = SHIPPED_STARTER_KITS[0];
     TestBed.overrideProvider(ActivatedRoute, {
       useValue: { paramMap: of(convertToParamMap({ id: kit.id })) },
@@ -279,18 +286,15 @@ describe('CollectionPage', () => {
 
     const fixture = setUp();
 
+    // Nothing is spent until the reader actually opens Posts.
     expect(internals(fixture).sampled()).toBe(false);
     httpMock.expectNone((r) => r.url.includes('/statuses'));
 
     internals(fixture).setTab('feed');
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.sample-box')).not.toBeNull();
-    internals(fixture).loadSample();
 
-    // Default size is 5, so at most five member timelines get asked for.
     const requests = httpMock.match((r) => r.url.includes('/statuses'));
-    expect(requests.length).toBeGreaterThan(0);
-    expect(requests.length).toBeLessThanOrEqual(5);
+    expect(requests.length).toBe(3);
     // Each goes to the member's *own* instance. Asking the home server for an
     // id it has never seen is a guaranteed 404 and an empty sample.
     for (const request of requests) {
@@ -298,6 +302,24 @@ describe('CollectionPage', () => {
     }
     requests.forEach((r) => r.flush([]));
     expect(internals(fixture).sampled()).toBe(true);
+    // The controls survive, for a reader who wants more than the preview.
+    expect((fixture.nativeElement as HTMLElement).querySelector('.sample-box')).not.toBeNull();
+  });
+
+  it('does not spend the requests twice when the reader flips tabs', () => {
+    const kit = SHIPPED_STARTER_KITS[0];
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { paramMap: of(convertToParamMap({ id: kit.id })) },
+    });
+
+    const fixture = setUp();
+    internals(fixture).setTab('feed');
+    httpMock.match((r) => r.url.includes('/statuses')).forEach((r) => r.flush([]));
+
+    internals(fixture).setTab('members');
+    internals(fixture).setTab('feed');
+
+    httpMock.expectNone((r) => r.url.includes('/statuses'));
   });
 
   /**

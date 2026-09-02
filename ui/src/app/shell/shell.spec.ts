@@ -2,7 +2,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../auth';
 import { Hotkeys } from '../hotkeys';
@@ -461,7 +461,10 @@ describe('Shell first-run modal', () => {
       providers: [
         provideHttpClient(withInterceptors([serverInterceptor])),
         provideHttpClientTesting(),
-        provideRouter([]),
+        // The anonymous answer navigates to the kits now, so the route has to
+        // exist here or every test that answers the modal logs a rejected
+        // navigation. Blank component: this suite is about the shell.
+        provideRouter([{ path: 'bundled-starter-kits', children: [] }]),
         { provide: PlusBadgeEntitlement, useValue: new FakePlusBadgeEntitlement() },
       ],
     });
@@ -539,6 +542,24 @@ describe('Shell first-run modal', () => {
     const host = fixture.nativeElement as HTMLElement;
     expect(host.querySelector('.login-nav')).not.toBeNull();
     expect(host.querySelector('app-first-run-modal')).toBeNull();
+  });
+
+  /**
+   * Watching a first-time user: they answered "continue", the seeded timeline
+   * vanished with the seed, and the empty state's single button did not read as
+   * the next step. Staying on Home left them with nothing to do — so the answer
+   * navigates to the one screen that turns a stranger into a working timeline in
+   * one press, rather than to the hub that asks which method they would like.
+   */
+  it('takes an anonymous visitor to people they can follow', async () => {
+    TestBed.inject(PreviewSeed).markEmpty('https://mastodon.social');
+    const fixture = render();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    fixture.componentInstance['answerFirstRun']('anonymous');
+
+    expect(navigate).toHaveBeenCalledWith('/bundled-starter-kits');
   });
 
   it('clears the seed and dismisses when the visitor continues anonymously', () => {

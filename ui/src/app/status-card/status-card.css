@@ -392,6 +392,20 @@
   gap: 6px;
   padding: 2px;
   cursor: pointer;
+  /* 2px of padding around 13px text is a ~20px target, against the ~44px a
+     fingertip actually needs — the other half of "no clues if you failed to
+     touch the tiny button". The row's own `gap` already reserves the space, so
+     claiming it costs no layout: the hit area grows, the ink does not. */
+  min-height: 40px;
+  min-width: 32px;
+  justify-content: center;
+}
+
+/* A count with no button behind it should not reserve a fingertip's worth of
+   space; it is text sitting in the row, not something to press. */
+.action-static {
+  min-height: 0;
+  min-width: 0;
 }
 
 .action:hover {
@@ -411,6 +425,31 @@
 
 .action-static:hover {
   color: var(--muted);
+}
+
+/* An action waiting on the network.
+   `[disabled]` alone was the entire feedback, and a disabled icon button is
+   pixel-identical to an idle one — so on a phone, with no hover and no cursor,
+   a tap that landed looked exactly like a tap that missed. The pulse is the
+   part a reader can actually see; it rides alongside the optimistic flip of the
+   icon itself, so a fast network shows the new state and a slow one shows this. */
+.action.working {
+  animation: action-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes action-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Respect a reader who has asked the OS for less motion: the state still has to
+   be visible, so it holds the dimmed value instead of animating to it. */
+@media (prefers-reduced-motion: reduce) {
+  .action.working {
+    animation: none;
+    opacity: 0.45;
+  }
 }
 
 /* Active state gets a rounded accent box so it's visible without hovering. */

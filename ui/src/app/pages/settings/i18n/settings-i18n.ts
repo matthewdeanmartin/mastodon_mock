@@ -53,7 +53,7 @@ const PICKER_ORDER: LangCode[] = [
  */
 /** English source strings; see scripts/extract-i18n.mjs. */
 // i18n settings.i18n.title: Internationalization
-// i18n settings.i18n.intro: Tell Mockingbird which languages you read, and keep trending content relevant.
+// i18n settings.i18n.intro: Tell Mawkingbird which languages you read, and keep trending content relevant.
 // i18n settings.i18n.postingLang: Posting language
 // i18n settings.i18n.notSpecified: Not specified
 // i18n settings.i18n.postingLang.hint: The default language Mastodon attaches to new posts.

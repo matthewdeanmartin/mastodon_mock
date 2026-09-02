@@ -32,10 +32,8 @@ import { contactPickerAvailable } from '../settings/import-export/contact-picker
  */
 // i18n pages.findFriends.heading: Find Friends
 // i18n pages.findFriends.intro: Every way this app can help you find people to follow, in one place.
-// i18n pages.findFriends.starterKits.title: Starter kits
-// i18n pages.findFriends.starterKits.desc: Follow a whole set of accounts at once — the fastest way to get a timeline worth reading.
-// i18n pages.findFriends.bundledCollections.title: Bundled collections
-// i18n pages.findFriends.bundledCollections.desc: Real collections curated by other people, shipped with the app because Mastodon can't search for collections yet.
+// i18n pages.findFriends.starterKits.title: Ready-made sets of people
+// i18n pages.findFriends.starterKits.desc: Follow a whole set of accounts at once — the fastest way to get a timeline worth reading. Sets we assembled, and real collections curated by other people.
 // i18n pages.findFriends.interestsHeading: Search for something you're interested in
 // i18n pages.findFriends.interestsSub: Posts mentioning a topic, so you can follow whoever is actually talking about it.
 // i18n pages.findFriends.searchAnything.title: Search posts for anything else

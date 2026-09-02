@@ -291,7 +291,11 @@ describe('Login', () => {
       applyServerNow(): void;
       useDegradedServer(): void;
       serverStatus(): string;
+      intent: { set(value: string | null): void };
     };
+    // The server picker lives behind the opening question now, so a test about
+    // the picker has to answer it first — exactly as a visitor does.
+    component.intent.set('have');
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
         new Response(
@@ -313,6 +317,83 @@ describe('Login', () => {
     expect(fixture.nativeElement.textContent).toContain('Use anyway');
     component.useDegradedServer();
     expect(TestBed.inject(Server).baseUrl()).toBe('https://degraded.example');
+  });
+
+  /**
+   * The page used to show the server picker, "I have an account", "I'm new here"
+   * and "Continue anonymously" all at once — three bordered panels stacked into
+   * one column on a phone, behind a server field that only an existing Mastodon
+   * user can fill in. Which network they wanted was already settled by
+   * LoginChooser, so the remaining question is what they came to do.
+   */
+  describe('opening question', () => {
+    function textOf(fixture: ReturnType<typeof setUp>): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function answer(fixture: ReturnType<typeof setUp>, value: string): void {
+      (fixture.componentInstance as unknown as { intent: { set(v: string): void } }).intent.set(
+        value,
+      );
+      fixture.detectChanges();
+    }
+
+    it('asks one question and shows nothing else', () => {
+      const fixture = setUp();
+      fixture.detectChanges();
+      httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
+
+      const text = textOf(fixture);
+      expect(text).toContain('What brings you here?');
+      // None of the machinery is on the first screen.
+      expect(text).not.toContain('I have an account');
+      expect(text).not.toContain("I'm new here");
+      expect((fixture.nativeElement as HTMLElement).querySelector('#server-combo')).toBeNull();
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('app-server-discovery'),
+      ).toBeNull();
+    });
+
+    it('shows only the panel the answer calls for', () => {
+      const fixture = setUp();
+      fixture.detectChanges();
+      httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
+
+      answer(fixture, 'have');
+      expect(textOf(fixture)).toContain('I have an account');
+      expect(textOf(fixture)).not.toContain("I'm new here");
+
+      answer(fixture, 'need');
+      expect(textOf(fixture)).toContain("I'm new here");
+      expect(textOf(fixture)).not.toContain('I have an account');
+    });
+
+    it('brings the server picker back once an answer needs it', () => {
+      const fixture = setUp();
+      fixture.detectChanges();
+      httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
+
+      answer(fixture, 'have');
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('#server-combo')).not.toBeNull();
+    });
+
+    it('lets the visitor go back and choose again', () => {
+      const fixture = setUp();
+      fixture.detectChanges();
+      httpMock.expectOne('/api/v1/_mock/dev_users').flush([]);
+
+      answer(fixture, 'have');
+      const back = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        '.intent-back',
+      );
+      expect(back).not.toBeNull();
+
+      back!.click();
+      fixture.detectChanges();
+
+      expect(textOf(fixture)).toContain('What brings you here?');
+    });
   });
 
   it('loginAs() mints a fresh token via _mock/login and signs in', () => {

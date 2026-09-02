@@ -405,7 +405,33 @@
     />
   } @else {
     <div class="search-page" [class.two-box]="twoBox">
-      <div class="search-form-box">
+      <!--
+        A `<details>` rather than a signal-driven block, and open by default.
+
+        The refinement column is long — query controls, the type select, numeric
+        facets, the refine bar, the facet list and the budget note. Beside the
+        results at desktop width that is fine. Stacked on a phone it is a wall
+        the reader must scroll past every time, so once a search has run it
+        collapses there and names what is active, which is the only honest way
+        to hide a control that is doing something.
+
+        Native `<details>` because it needs to be *open on desktop and closed on
+        a phone at the same time*, with no JS and no resize listener: the CSS
+        opens it unconditionally above 800px, so the `open` attribute below only
+        ever governs the narrow case. A signal would have to pick one.
+      -->
+      <details class="search-form-box" [open]="!twoBox">
+        <summary class="refine-summary">
+          <span>{{ 'pages.search.refine.summary' | transloco }}</span>
+          @if (activeRefinementCount(); as active) {
+            <span class="refine-active-count">{{
+              (active === 1
+                ? 'pages.search.refine.activeCount.one'
+                : 'pages.search.refine.activeCount.other'
+              ) | transloco: { count: active }
+            }}</span>
+          }
+        </summary>
         @if (type() === 'statuses') {
           <div class="budget-row">
             <label class="muted small" for="api-budget">{{
@@ -1108,9 +1134,44 @@
             }}
           </div>
         }
-      </div>
+      </details>
 
       <div class="search-results-box">
+        <!-- Says the search finished, at the top of the results and inside them.
+             On a phone the grid collapses with the form column first, so a
+             completed search otherwise changes only the facets far above this
+             point — "facets alone look like nothing happened". `aria-live` so
+             the same news reaches a reader who is not watching the page. -->
+        <p class="result-announcement" role="status" aria-live="polite">
+          @if (resultAnnouncement(); as found) {
+            {{ found }}
+          }
+        </p>
+
+        <!-- Curated sets whose name or description matches. Both corpora are
+             compiled in, so this costs no request and cannot fail — which is why
+             it can sit above every account search instead of behind a fourth
+             entry in the type dropdown. Until now a kit was reachable only from
+             the Find Friends hub, so a reader who saw one once could not ask for
+             it again by name. -->
+        @if (kitMatches().length) {
+          <div class="kit-matches">
+            <h2 class="kit-matches-head">{{ 'pages.search.kits.heading' | transloco }}</h2>
+            @for (kit of kitMatches(); track kit.link) {
+              <a class="kit-match" [routerLink]="kit.link">
+                <strong>{{ kit.title }}</strong>
+                <span class="muted small">{{ kit.blurb }}</span>
+                <span class="muted small">{{
+                  (kit.accountCount === 1
+                    ? 'pages.search.kits.accounts.one'
+                    : 'pages.search.kits.accounts.other'
+                  ) | transloco: { count: kit.accountCount }
+                }}</span>
+              </a>
+            }
+          </div>
+        }
+
         @if (type() === 'accounts' && !accountResultsRan && !accountSearchRan() && !searching()) {
           <!-- Nothing searched yet and looking for people: answer "what can I type
            here?", the same question the posts tab answers with its operator

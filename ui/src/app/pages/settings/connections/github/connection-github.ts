@@ -31,8 +31,8 @@ import { PageDiagnostics } from '../../../../page-diagnostics';
 // i18n settings.connections.github.directlyFrom: directly from <code>api.github.com</code>.
 // i18n settings.connections.github.createTokenLink: Create a classic personal access token
 // i18n settings.connections.github.tokenScopes: with <code>notifications</code> and <code>read:user</code>.
-// i18n settings.connections.github.validatesWith: Paste it below. Mockingbird validates it with <code>GET /user</code>.
-// i18n settings.connections.github.credentialWarning: This token can read your GitHub notifications. It is stored in this browser's localStorage, never sent to Mockingbird, and sent only to <code>api.github.com</code>. Use a browser profile and device you trust; revoke the token in GitHub to invalidate it.
+// i18n settings.connections.github.validatesWith: Paste it below. Mawkingbird validates it with <code>GET /user</code>.
+// i18n settings.connections.github.credentialWarning: This token can read your GitHub notifications. It is stored in this browser's localStorage, never sent to Mawkingbird, and sent only to <code>api.github.com</code>. Use a browser profile and device you trust; revoke the token in GitHub to invalidate it.
 // i18n settings.connections.github.checking: Checking…
 // i18n settings.connections.github.connect: Connect GitHub
 // i18n settings.connections.github.connectedAs: GitHub connected as @{{login}}.

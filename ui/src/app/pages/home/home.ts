@@ -258,6 +258,23 @@ export class Home implements OnInit, OnDestroy {
    */
   protected readonly offersMiniComposer = computed(() => !this.prefs.thoughtfulPosting());
 
+  /**
+   * Whether to offer writing at the top of Home at all.
+   *
+   * Not for an anonymous reader. "Quick post" names an action with no
+   * destination — there is no account and nowhere for a post to go — and the
+   * target actually waiting behind the composer for them is a pastebin
+   * (`compose.ts`, `isAnonymous && featureFlags.enabled('pastebin')`), which is
+   * a surprising answer to a button that looked like "post to my followers".
+   *
+   * Writing while anonymous is real and stays: it means notes to yourself and
+   * drafts, and it belongs on the Write screen where the framing can say so.
+   * What it does not belong at is the top of a feed, wearing the words used for
+   * publishing. The sign-in invitation on the cards below is the honest offer
+   * here; a second composer would just be the same over-promise again.
+   */
+  protected readonly offersWriting = computed(() => !this.auth.isAnonymous);
+
   /** The full writing workspace is behind a flag; without it, Write goes to /drafts. */
   protected readonly hasWritePage = computed(() => this.flags.enabled('write'));
 

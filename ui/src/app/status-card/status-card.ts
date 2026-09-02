@@ -1169,9 +1169,44 @@ export class StatusCard {
   }
 
   /** The status to render: unwrap a boost to the original. */
+  /**
+   * An unconfirmed local flip of `favourited` / `reblogged`, or null.
+   *
+   * Set the instant the reader presses, cleared when the server answers either
+   * way — so it is never the source of truth for longer than one request. Held
+   * apart from the status rather than written into it because the status is an
+   * `input` owned by the feed: mutating it would make a parent re-render undo
+   * the feedback, and a failed request would need the original back.
+   */
+  private optimistic = signal<Partial<Pick<Status, 'favourited' | 'reblogged'>> | null>(null);
+
   get display(): Status {
     const s = this.status();
-    return s.reblog ?? s;
+    const base = s.reblog ?? s;
+    const pending = this.optimistic();
+    if (!pending) {
+      return base;
+    }
+    // Counts move with the flag, or the card shows "Liked" beside an unchanged
+    // number and looks broken in a different way than before.
+    const favouritesDelta =
+      pending.favourited === undefined || pending.favourited === base.favourited
+        ? 0
+        : pending.favourited
+          ? 1
+          : -1;
+    const reblogsDelta =
+      pending.reblogged === undefined || pending.reblogged === base.reblogged
+        ? 0
+        : pending.reblogged
+          ? 1
+          : -1;
+    return {
+      ...base,
+      ...pending,
+      favourites_count: Math.max(0, base.favourites_count + favouritesDelta),
+      reblogs_count: Math.max(0, base.reblogs_count + reblogsDelta),
+    };
   }
 
   /**
@@ -1490,8 +1525,39 @@ export class StatusCard {
     this.replied.emit(quote);
   }
 
-  /** An action (fav/boost) is in flight; the button is disabled meanwhile. */
-  protected actionBusy = signal(false);
+  /**
+   * Which action is in flight, or null. One at a time, by construction.
+   *
+   * ## Why this replaced a single boolean
+   *
+   * `actionBusy` was one flag for the whole card, bound to `[disabled]` on five
+   * separate controls. Two things followed, both bad:
+   *
+   * - A disabled icon button looks exactly like an idle one. On a phone, where
+   *   there is no hover and no cursor to read, a tap that landed and a tap that
+   *   missed the target produced the identical picture — which is the reported
+   *   "no clues if you failed to touch the tiny button or if it is still in
+   *   progress".
+   * - Any one action greyed out all five. Pressing Like made Boost, Share and
+   *   Bookmark go dead too, so the card looked like it was doing five things.
+   *
+   * Naming the action fixes the second and lets {@link busyWith} drive a visible
+   * state for the first.
+   */
+  protected inFlight = signal<'favourite' | 'reblog' | 'bookmark' | null>(null);
+
+  /** Whether *this* action is the one waiting on the network. */
+  protected busyWith(action: 'favourite' | 'reblog' | 'bookmark'): boolean {
+    return this.inFlight() === action;
+  }
+
+  /**
+   * True while any action is in flight.
+   *
+   * Kept for the share *menu*, whose items must not be pressable mid-boost —
+   * that is a genuine correctness guard rather than a feedback signal.
+   */
+  protected actionBusy = computed(() => this.inFlight() !== null);
   /** Last fav/boost failure, shown under the actions row until the next attempt. */
   protected actionError = signal<string | null>(null);
   /** Successful external actions are announced without styling them as failures. */
@@ -1534,17 +1600,26 @@ export class StatusCard {
     // Routed by provider (Mastodon API vs Bluesky like records). Foreign calls
     // cross the network to another service, so show pending + surface failures
     // (a silently dead Bluesky session used to make this button "do nothing").
-    this.actionBusy.set(true);
+    this.inFlight.set('favourite');
     this.actionError.set(null);
     const target = this.display;
+    // Flip the heart now and correct it from the response. The action is
+    // idempotent and the success path already replaces this state with the
+    // server's own, so an optimistic answer is never a lie that outlives the
+    // request — and it is the only feedback that arrives within one frame,
+    // which is what a tap on a phone needs.
+    this.optimistic.set({ favourited: !target.favourited });
     this.actions.toggleFavourite(target).subscribe({
       next: (updated) => {
-        this.actionBusy.set(false);
+        this.inFlight.set(null);
+        this.optimistic.set(null);
         this.recordPosse('like', target, updated.favourited);
         this.changed.emit(updated);
       },
       error: () => {
-        this.actionBusy.set(false);
+        this.inFlight.set(null);
+        // Put the heart back. The failure message says why.
+        this.optimistic.set(null);
         this.actionError.set(this.actionFailureMessage('like'));
       },
     });
@@ -1601,18 +1676,23 @@ export class StatusCard {
     if (!this.caps.reblog) {
       return;
     }
-    this.actionBusy.set(true);
+    this.inFlight.set('reblog');
     this.actionError.set(null);
     const target = this.display;
+    // Same reasoning as the heart above: show the boost immediately, let the
+    // response overwrite it, put it back if the request fails.
+    this.optimistic.set({ reblogged: !target.reblogged });
     this.actions.toggleReblog(target).subscribe({
       next: (updated) => {
-        this.actionBusy.set(false);
+        this.inFlight.set(null);
+        this.optimistic.set(null);
         const result = updated.reblog ?? updated;
         this.recordPosse('repost', target, result.reblogged || !!updated.reblog);
         this.changed.emit(result);
       },
       error: () => {
-        this.actionBusy.set(false);
+        this.inFlight.set(null);
+        this.optimistic.set(null);
         this.actionError.set(this.actionFailureMessage('boost'));
       },
     });
@@ -1702,14 +1782,16 @@ export class StatusCard {
       this.toggleNativeBookmark();
       return;
     }
-    this.actionBusy.set(true);
+    // A real round trip to Raindrop, so it gets the bookmark button's busy state
+    // rather than the whole card's.
+    this.inFlight.set('bookmark');
     this.actionError.set(null);
     this.actionNotice.set(null);
     const target = choice === 'raindrop-link' ? 'external-link' : 'post';
     void this.raindrop
       .addBookmark(this.display, target, this.externalBookmarkUrl() ?? undefined)
       .then(() => {
-        this.actionBusy.set(false);
+        this.inFlight.set(null);
         this.actionNotice.set(
           choice === 'raindrop-link'
             ? this.transloco.translate('statusCard.externalLinkSaved')
@@ -1717,7 +1799,7 @@ export class StatusCard {
         );
       })
       .catch((error: unknown) => {
-        this.actionBusy.set(false);
+        this.inFlight.set(null);
         this.actionError.set(
           error instanceof Error
             ? error.message
