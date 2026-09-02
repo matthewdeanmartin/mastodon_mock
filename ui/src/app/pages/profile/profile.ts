@@ -77,6 +77,7 @@ type ProfileTab = 'posts' | 'media' | 'following' | 'followers' | 'collections' 
 // i18n pages.profile.loading.lookingUp: Looking them up on {{server}}…
 // i18n pages.profile.loading.loading: Loading…
 // i18n pages.profile.actions.back: ← Back
+// i18n pages.profile.actions.backWord: Back
 // i18n pages.profile.actions.visitSite: ↗ Visit site
 // i18n pages.profile.actions.openOnTwitter: ↗ Open on Twitter
 // i18n pages.profile.actions.openOnBluesky: ↗ Open on Bluesky

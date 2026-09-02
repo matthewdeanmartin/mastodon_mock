@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
 import { beforeEach, describe, expect, it } from 'vitest';
+import en from '../../../public/i18n/en.json';
 import { ClientPrefs } from '../client-prefs';
 import { FeedLanguagePicker } from './feed-language-picker';
 
@@ -121,5 +123,37 @@ describe('FeedLanguagePicker', () => {
 
     expect(prefs.feedLanguages()).toEqual([]);
     expect(prefs.hideForeignLangPosts()).toBe(false);
+  });
+  /**
+   * Regression: the button read `feedLanguagePicker.myLanguages` in production.
+   *
+   * {@link FeedLanguagePicker.label} is a `computed()` that calls the
+   * *imperative* `translate()`. In production the dictionary arrives over HTTP
+   * after first paint, so that first evaluation returned the key — and because
+   * a `computed()` caches until a dependency changes, and none of `label`'s
+   * other dependencies change on their own, the key stayed on screen forever.
+   *
+   * Every other spec here is blind to this: `translocoTesting()` preloads
+   * `en.json` synchronously, so `translate()` never has a chance to miss. This
+   * one reproduces the real ordering by rendering against an *empty* dictionary
+   * and only then loading English, the way the HTTP loader does.
+   */
+  it('picks up its label when the dictionary lands after first paint', () => {
+    const transloco = TestBed.inject(TranslocoService);
+    // First paint with nothing loaded: this is where the key used to stick.
+    transloco.setTranslation({}, 'en', { merge: false });
+    prefs.setFeedLanguages([]);
+    prefs.setHideForeignLangPosts(true);
+
+    const fixture = render();
+    const button = () =>
+      (fixture.nativeElement as HTMLElement).querySelector('.lang-button')!.textContent ?? '';
+    expect(button()).toContain('feedLanguagePicker.myLanguages');
+
+    // The dictionary arrives; the label must follow it.
+    transloco.setTranslation(en, 'en', { merge: false });
+    fixture.detectChanges();
+    expect(button()).toContain('My languages');
+    expect(button()).not.toContain('feedLanguagePicker');
   });
 });

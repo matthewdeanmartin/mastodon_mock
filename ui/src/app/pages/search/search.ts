@@ -105,6 +105,7 @@ import { isTagsOnly, probeSearchServer, SearchServerStatus } from '../../search-
 import { normalizeHostUrl } from '../../host-url';
 import { Terminology } from '../../terminology';
 import { LocalModeration } from '../../local-moderation';
+import { TranslatedText } from '../../i18n/translated';
 
 type SearchType = 'accounts' | 'statuses' | 'hashtags';
 
@@ -824,6 +825,7 @@ export class Search implements OnInit, OnDestroy {
 
   /** What the shared box is searching right now, spelled out for the reader. */
   protected queryPlaceholder = computed(() => {
+    this.i18n.version();
     const network = this.blueskyMode()
       ? this.transloco.translate('pages.search.network.bluesky')
       : this.transloco.translate('pages.search.network.mastodon');
@@ -946,6 +948,12 @@ export class Search implements OnInit, OnDestroy {
   protected webEngineLabel = signal('');
 
   private transloco = inject(TranslocoService);
+  /**
+   * Gives the `translate()` calls in the computeds here a dependency on the
+   * loaded dictionary. Without it, a label built before the fetch lands keeps
+   * the raw key forever. See {@link TranslatedText}.
+   */
+  private i18n = inject(TranslatedText);
 
   /**
    * `webDropped()`, rendered into the reader's language.

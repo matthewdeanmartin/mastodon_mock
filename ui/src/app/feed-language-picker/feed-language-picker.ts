@@ -3,6 +3,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ClientPrefs, MAX_FEED_LANGUAGES } from '../client-prefs';
 import { LANG_NAMES, LangCode } from '../language-detect';
 import { KnownLanguages } from '../trend-language-filter';
+import { TranslatedText } from '../i18n/translated';
 import { Terminology } from '../terminology';
 
 // i18n feedLanguagePicker.description: Choose which languages the feed shows. {{posts}} whose language cannot be determined are never hidden. Languages come from Settings → Internationalization.
@@ -49,6 +50,13 @@ export class FeedLanguagePicker {
   private host = inject(ElementRef<HTMLElement>);
   private transloco = inject(TranslocoService);
 
+  /**
+   * The dependency `translate()` does not provide on its own — see
+   * {@link TranslatedText}. Without it, {@link label} caches the raw key it got
+   * before the dictionary finished loading.
+   */
+  private i18n = inject(TranslatedText);
+
   protected readonly max = MAX_FEED_LANGUAGES;
   protected readonly open = signal(false);
 
@@ -73,6 +81,7 @@ export class FeedLanguagePicker {
    * Three names would crowd the filter bar, so that one degrades to a count.
    */
   protected readonly label = computed(() => {
+    this.i18n.version();
     if (this.showingAll()) {
       return this.transloco.translate('feedLanguagePicker.all');
     }

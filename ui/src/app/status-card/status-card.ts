@@ -80,6 +80,7 @@ import {
   BookmarkProviderDialog,
 } from '../bookmark-provider-dialog/bookmark-provider-dialog';
 import { firstExternalLink, RaindropSession } from '../providers/raindrop/raindrop-session';
+import { TranslatedText } from '../i18n/translated';
 import { Server } from '../server';
 import {
   anonymousAccountRouteRef,
@@ -356,6 +357,12 @@ export class StatusCard {
   private raindrop = inject(RaindropSession);
   private server = inject(Server);
   private transloco = inject(TranslocoService);
+  /**
+   * Gives the `translate()` calls in the computeds here a dependency on the
+   * loaded dictionary. Without it, a label built before the fetch lands keeps
+   * the raw key forever. See {@link TranslatedText}.
+   */
+  private i18n = inject(TranslatedText);
 
   /** Pictures render only when images are on and feed reader mode is off. */
   protected imagesVisible = computed(() => this.prefs.showImages() && !this.prefs.feedReader());
@@ -533,6 +540,7 @@ export class StatusCard {
 
   /** Label and tooltip for the 🔁 control, which changes with what it will do. */
   protected readonly shareButtonLabel = computed(() => {
+    this.i18n.version();
     if (this.shareMenuIsUseful()) {
       return this.transloco.translate('statusCard.boostQuoteOrShare');
     }
