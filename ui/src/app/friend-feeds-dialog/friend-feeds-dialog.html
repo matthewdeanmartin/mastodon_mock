@@ -181,8 +181,16 @@
                   {{ 'friendFeeds.following' | transloco }}
                 </span>
               } @else {
-                <button class="btn btn-small" type="button" (click)="follow(feed)">
-                  {{ 'friendFeeds.follow' | transloco }}
+                <button
+                  class="btn btn-small"
+                  type="button"
+                  [disabled]="busy() === feed.url || followingAll()"
+                  (click)="follow(feed)"
+                >
+                  {{
+                    (busy() === feed.url ? 'friendFeeds.checking' : 'friendFeeds.follow')
+                      | transloco
+                  }}
                 </button>
               }
             </li>
@@ -193,11 +201,32 @@
           <p class="error-text small">{{ message }}</p>
         }
         @if (capOverflow(); as over) {
+          <!-- Raising the cap belongs here, not on another page: this is the
+               moment the number is proven wrong, and sending the reader away
+               would lose this screen and its results. -->
           <p class="error-text small">
             {{
               'friendFeeds.capReached'
                 | transloco: { added: over.added, left: over.left, limit: over.limit }
             }}
+          </p>
+          <button
+            class="btn btn-small"
+            type="button"
+            [disabled]="followingAll()"
+            (click)="raiseLimitAndContinue()"
+          >
+            {{ 'friendFeeds.raiseLimit' | transloco: { limit: limitNeeded() } }}
+          </button>
+        }
+        @if (limitRaisedTo(); as raised) {
+          <p class="muted small">
+            {{ 'friendFeeds.limitRaised' | transloco: { limit: raised } }}
+          </p>
+        }
+        @if (followFailures() > 0) {
+          <p class="muted small">
+            {{ 'friendFeeds.followFailed' | transloco: { count: followFailures() } }}
           </p>
         }
       }
@@ -217,8 +246,15 @@
           <button class="btn btn-outline" type="button" (click)="download()">
             {{ 'friendFeeds.download' | transloco }}
           </button>
-          <button class="btn" type="button" (click)="followAll()">
-            {{ 'friendFeeds.followAll' | transloco }}
+          <button class="btn" type="button" [disabled]="followingAll()" (click)="followAll()">
+            @if (followingAll()) {
+              {{
+                'friendFeeds.followingAll'
+                  | transloco: { done: followProgress().done, total: followProgress().total }
+              }}
+            } @else {
+              {{ 'friendFeeds.followAll' | transloco }}
+            }
           </button>
         }
       </div>

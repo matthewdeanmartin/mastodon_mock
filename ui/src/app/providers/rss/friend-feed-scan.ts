@@ -546,10 +546,15 @@ export class FriendFeedScan {
       };
     }
 
+    // `resolution.needsProxy` describes how the *page* was fetched, not the
+    // feed, and the two routinely differ — a blog behind Cloudflare may serve
+    // its Atom file with permissive CORS, or the reverse. Recording it here
+    // would be asserting something never tested, so the route is left unset and
+    // decided where it can actually be proven: the follow path fetches the feed
+    // directly, then through the proxy, and records whichever worked.
     const feeds: FoundFeed[] = resolution.feeds.map((feed) => ({
       url: feed.url,
       title: feed.title || hostOf(feed.url),
-      ...(resolution.needsProxy ? { useProxy: true } : {}),
       siteUrl: resolution.siteUrl,
       via,
     }));

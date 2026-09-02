@@ -10,7 +10,11 @@ import { SupporterStatus } from '../providers/account/supporter-status';
 import { FoundFeed } from '../providers/rss/friend-feed-cache';
 import { DEFAULT_PROBE_CAP, FriendFeedScan, PROBE_CAPS } from '../providers/rss/friend-feed-scan';
 import { opmlFilename } from '../providers/rss/opml';
-import { RssSubscriptions } from '../providers/rss/rss-subscriptions';
+import { RssAddFeed } from '../providers/rss/rss-add-feed';
+import { RSS_SUBSCRIPTION_LIMIT_MAX, RssSubscriptions } from '../providers/rss/rss-subscriptions';
+import { CorsProxy } from '../providers/cors-proxy/cors-proxy';
+import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * "Find my friends' blogs": consent, progress, then the feeds.
@@ -67,11 +71,17 @@ import { RssSubscriptions } from '../providers/rss/rss-subscriptions';
 // i18n friendFeeds.generatedAt: Generated {{when}}
 // i18n friendFeeds.via: from {{handle}}
 // i18n friendFeeds.follow: Follow
+// i18n friendFeeds.checking: Checking…
 // i18n friendFeeds.following: Following
 // i18n friendFeeds.followAll: Follow all
 // i18n friendFeeds.download: Download OPML
 // i18n friendFeeds.rescan: Check again
-// i18n friendFeeds.capReached: Added {{added}}. The other {{left}} would go over your {{limit}}-feed limit — raise it on the RSS feeds settings page.
+// i18n friendFeeds.capReached: Added {{added}}. The other {{left}} would go over your {{limit}}-feed limit.
+// i18n friendFeeds.raiseLimit: Raise the limit to {{limit}} and follow the rest
+// i18n friendFeeds.raising: Following the rest…
+// i18n friendFeeds.limitRaised: Limit raised to {{limit}}.
+// i18n friendFeeds.followingAll: Following {{done}} of {{total}}…
+// i18n friendFeeds.followFailed: {{count}} could not be read, even through the proxy. They are left unfollowed.
 // i18n friendFeeds.signedOut: Sign in to check the people you follow.
 @Component({
   selector: 'app-friend-feeds-dialog',
@@ -82,6 +92,9 @@ import { RssSubscriptions } from '../providers/rss/rss-subscriptions';
 export class FriendFeedsDialog {
   private scan = inject(FriendFeedScan);
   private subs = inject(RssSubscriptions);
+  private addFeed = inject(RssAddFeed);
+  private proxy = inject(CorsProxy);
+  private proxySettings = inject(CorsProxySettings);
   private accountKey = inject(ProfileAccountKey);
   private auth = inject(Auth);
   private diagnostics = inject(PageDiagnostics);
@@ -112,8 +125,34 @@ export class FriendFeedsDialog {
     limit: number;
   } | null>(null);
 
-  /** A refusal from a single `add`, already worded by RssSubscriptions. */
+  /** A refusal from a single `add`, already worded by the service that made it. */
   protected readonly addError = signal<string | null>(null);
+
+  /** The most recent failure text from {@link addWithProxyFallback}. */
+  private lastAddError: string | null = null;
+
+  /** The feed currently being fetched by a single Follow, if any. */
+  protected readonly busy = signal<string | null>(null);
+
+  /** True while Follow all is working through the list. */
+  protected readonly followingAll = signal(false);
+
+  /** How far Follow all has got — it fetches each feed, so it is not instant. */
+  protected readonly followProgress = signal({ done: 0, total: 0 });
+
+  /** Feeds Follow all could not read even through the proxy. */
+  protected readonly followFailures = signal(0);
+
+  /** Set once the limit has been raised from here, so the UI can confirm it. */
+  protected readonly limitRaisedTo = signal<number | null>(null);
+
+  /** The ceiling {@link raiseLimitAndContinue} would move to. */
+  protected readonly limitNeeded = computed(() =>
+    Math.min(
+      this.subs.feeds().length + (this.capOverflow()?.left ?? 0),
+      RSS_SUBSCRIPTION_LIMIT_MAX,
+    ),
+  );
 
   /** True before anything has been asked for — the consent screen. */
   protected readonly asking = computed(() => !this.progress() && !this.result());
@@ -189,13 +228,76 @@ export class FriendFeedsDialog {
     return this.justAdded().has(feed.url) || this.subs.has(feed.url);
   }
 
-  protected follow(feed: FoundFeed): void {
-    const error = this.subs.add(feed.url, feed.title, feed.useProxy ?? false);
-    if (error) {
-      this.addError.set(error);
-      return;
+  /**
+   * Subscribe to one feed, proving it can actually be read first.
+   *
+   * ## Why this fetches rather than just writing a subscription
+   *
+   * A `<link rel=alternate>` is a *claim*. The scan found these on other
+   * people's pages and never fetched the feeds themselves, so writing them
+   * straight into the subscription list produces entries that look fine and
+   * then fail on first read — which is exactly what happened: hundreds of
+   * feeds, most of them unreadable, each needing to be found and fixed by hand.
+   *
+   * ## Why the proxy is not opt-in here
+   *
+   * Most personal blogs do not send CORS headers, so the direct fetch fails for
+   * the majority of what this feature finds. Making the user opt in per feed
+   * means answering the same question hundreds of times, and the question is a
+   * strange one to ask: these are public feed URLs discovered on public web
+   * pages, carrying no credential of any kind. There is nothing to leak.
+   *
+   * So: direct first — free, private, and works for the minority who send the
+   * header — then the proxy. Same order as the starter-kit installer, and the
+   * subscription records which route actually worked, so the reader does not
+   * have to rediscover it.
+   */
+  protected async follow(feed: FoundFeed): Promise<void> {
+    this.addError.set(null);
+    this.busy.set(feed.url);
+    try {
+      const added = await this.addWithProxyFallback(feed);
+      if (added) {
+        this.justAdded.update((set) => new Set(set).add(feed.url));
+      } else {
+        this.addError.set(this.lastAddError ?? 'That feed could not be read.');
+      }
+    } finally {
+      this.busy.set(null);
     }
-    this.justAdded.update((set) => new Set(set).add(feed.url));
+  }
+
+  /**
+   * Try direct, then through the proxy. True when a subscription was made.
+   *
+   * Adopts the supporter proxy on the way if the account is entitled to one and
+   * has never set it up — a paying user should not have to go and configure
+   * something before a feature they paid for can work.
+   */
+  private async addWithProxyFallback(feed: FoundFeed): Promise<boolean> {
+    this.lastAddError = null;
+    for (const useProxy of [false, true]) {
+      if (useProxy) {
+        if (this.proxySettings.missingEntitledProxy()) {
+          this.proxySettings.adoptSupporterProxy();
+        }
+        if (!this.proxy.available()) {
+          break;
+        }
+      }
+      try {
+        await firstValueFrom(this.addFeed.add(feed.url, useProxy));
+        return true;
+      } catch (error) {
+        this.lastAddError = error instanceof Error ? error.message : String(error);
+        // At the subscription limit there is no point trying the proxy: the
+        // refusal is about the list's size, not about reaching the feed.
+        if (this.subs.remaining() <= 0) {
+          break;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -205,36 +307,74 @@ export class FriendFeedsDialog {
    * rather than stopping at the first refusal or silently dropping the tail.
    * Someone who asked for all of them should get as many as they can have.
    */
-  protected followAll(): void {
-    const feeds = this.result()?.feeds ?? [];
+  protected async followAll(): Promise<void> {
+    if (this.followingAll()) {
+      return;
+    }
+    const feeds = (this.result()?.feeds ?? []).filter((feed) => !this.isFollowing(feed));
     const added = new Set(this.justAdded());
     let count = 0;
-    let blocked = 0;
+    let blockedByLimit = 0;
+    let unreadable = 0;
 
-    for (const feed of feeds) {
-      if (this.isFollowing(feed)) {
-        continue;
+    this.addError.set(null);
+    this.capOverflow.set(null);
+    this.followFailures.set(0);
+    this.followingAll.set(true);
+    this.followProgress.set({ done: 0, total: feeds.length });
+
+    try {
+      for (const feed of feeds) {
+        if (this.subs.remaining() <= 0) {
+          blockedByLimit++;
+          continue;
+        }
+        if (await this.addWithProxyFallback(feed)) {
+          added.add(feed.url);
+          count++;
+        } else if (this.subs.remaining() <= 0) {
+          blockedByLimit++;
+        } else {
+          unreadable++;
+        }
+        this.justAdded.set(new Set(added));
+        this.followProgress.update((p) => ({ ...p, done: p.done + 1 }));
       }
-      if (this.subs.remaining() <= 0) {
-        blocked++;
-        continue;
-      }
-      if (this.subs.add(feed.url, feed.title, feed.useProxy ?? false)) {
-        blocked++;
-        continue;
-      }
-      added.add(feed.url);
-      count++;
+    } finally {
+      this.followingAll.set(false);
     }
 
     this.diagnostics.info('FriendFeedsDialog', 'user:follow-all', {
       added: count,
-      blockedByLimit: blocked,
+      blockedByLimit,
+      unreadable,
     });
     this.justAdded.set(added);
+    this.followFailures.set(unreadable);
     this.capOverflow.set(
-      blocked > 0 ? { added: count, left: blocked, limit: this.subs.limit() } : null,
+      blockedByLimit > 0 ? { added: count, left: blockedByLimit, limit: this.subs.limit() } : null,
     );
+  }
+
+  /**
+   * Raise the subscription limit far enough for what is left, then carry on.
+   *
+   * Hitting a ten-feed default after a scan that found hundreds is the exact
+   * moment the number is wrong, and sending someone to another page to change
+   * it — losing this screen and its results on the way — is a poor answer to a
+   * question they have already implicitly answered by pressing Follow all.
+   *
+   * Raises to what this result actually needs rather than to the maximum: the
+   * cap exists because long lists are slow to read, so the honest move is to
+   * fit the list in hand, not to remove the ceiling.
+   */
+  protected async raiseLimitAndContinue(): Promise<void> {
+    const needed = this.subs.feeds().length + (this.capOverflow()?.left ?? 0);
+    const next = Math.min(needed, RSS_SUBSCRIPTION_LIMIT_MAX);
+    this.subs.setLimit(next);
+    this.diagnostics.info('FriendFeedsDialog', 'user:raise-limit', { limit: next });
+    this.limitRaisedTo.set(next);
+    await this.followAll();
   }
 
   /** Hand the OPML to the browser as a file. */

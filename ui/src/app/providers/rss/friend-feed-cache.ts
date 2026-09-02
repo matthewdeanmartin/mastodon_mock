@@ -82,7 +82,13 @@ export interface FoundFeed {
   url: string;
   /** The feed's own title, or the site host when it gave none. */
   title: string;
-  /** Whether the feed needed the CORS proxy, so a subscription can record it. */
+  /**
+   * Whether the feed needed the CORS proxy.
+   *
+   * Unset by the scan on purpose: discovery reads the *page*, and how that was
+   * fetched says nothing about the feed. The follow path settles it by trying
+   * both and recording what worked.
+   */
   useProxy?: boolean;
   /** The profile URL this was found behind, for attribution in the dialog. */
   siteUrl: string;
