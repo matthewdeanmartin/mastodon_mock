@@ -291,6 +291,29 @@ export class MawkingbirdSession {
   }
 
   /**
+   * Whether this session is strong enough to own stored data.
+   *
+   * Mirrors `canOwnStorage()` in the profile service's `authorize.ts`, and is
+   * an exclusion of `anon` for the same reason: an anonymous identity is
+   * *designed* to be forgotten when its token expires, so anything stored under
+   * it is garbage the day after it is written. That is a property of the
+   * identity, not an entitlement — which is why this is not a tier check. A
+   * free-but-signed-in account can own storage; an anonymous one never can, at
+   * any tier.
+   *
+   * Duplicating the rule on the client is deliberate. The service stays the
+   * authority and still refuses (`403 code: anonymous`); this only spares the
+   * app a request whose answer is knowable locally and cannot change without a
+   * sign-in — which is itself a re-mint, so the answer is never stale.
+   *
+   * Null when no token is held yet: unknown is not the same as anonymous, and
+   * callers should wait rather than assume.
+   */
+  canOwnStorage(): boolean | null {
+    return this.held ? this.held.auth !== 'anon' : null;
+  }
+
+  /**
    * Re-mint if the held token's tier is behind what the account is entitled to.
    *
    * ## Why this is needed

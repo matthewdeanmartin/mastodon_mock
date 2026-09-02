@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Api } from '../api';
 import { Announcement } from '../models';
+import { networkSources } from '../shell/network-sources';
 
 /**
  * localStorage key holding the ids the viewer has dismissed.
@@ -61,8 +62,36 @@ export class AnnouncementStore {
 
   private loading = false;
 
+  /**
+   * Whether this account has a Mastodon server to ask at all.
+   *
+   * Announcements are a Mastodon-instance concept: there is no Bluesky
+   * equivalent, and no endpoint to call for one. A Bluesky-primary account that
+   * never opted into a Mastodon connector has no instance — so the relative
+   * `/api/v1/announcements` is not prefixed by `serverInterceptor` (there is no
+   * base URL to prefix it with) and resolves against the page's own origin
+   * instead. On mawkingbird.com that is a static GitHub Pages site, which
+   * answers the SPA 404 shim rather than JSON, and the client reports
+   * `request:failed … 422`.
+   *
+   * Guarding here rather than at each caller because `load()` is the choke
+   * point all three surfaces share — the banner over the timeline, the rail's
+   * server card, and the server's announcements page. The rail already checks
+   * `usableMastodon` before calling; the banner did not, and `home.html` gates
+   * it on `!auth.isAnonymous`, which was the same question only while every
+   * signed-in account was Mastodon-primary.
+   */
+  private usableMastodon = networkSources().usableMastodon;
+
   load(force = false): void {
     if (this.loading || (this.loaded() && !force)) {
+      return;
+    }
+    // No Mastodon source, no announcements to have. Settle as an empty,
+    // *loaded* store so the surfaces render their empty state instead of
+    // waiting forever on a request that is never coming.
+    if (!this.usableMastodon()) {
+      this.loaded.set(true);
       return;
     }
     this.loading = true;

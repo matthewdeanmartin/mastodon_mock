@@ -1,7 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Auth } from '../auth';
 import { Announcement } from '../models';
 import { AnnouncementStore } from './announcement-store';
 
@@ -124,5 +125,35 @@ describe('AnnouncementStore', () => {
 
     expect(store.loaded()).toBe(true);
     expect(store.total()).toBe(0);
+  });
+  /**
+   * Regression: a Bluesky-primary account requested Mastodon announcements.
+   *
+   * Announcements are an instance concept with no Bluesky counterpart. Such an
+   * account has no Mastodon server, so `serverInterceptor` has no base URL to
+   * prefix the relative `/api/v1/announcements` with, and it resolves against
+   * the page's own origin — on mawkingbird.com a static GitHub Pages site,
+   * which answers the SPA 404 shim instead of JSON and surfaces to the user as
+   * `request:failed … 422`.
+   *
+   * `home.html` renders the banner for anyone who is not anonymous, which was
+   * the same question as "has a Mastodon server" only while every signed-in
+   * account was Mastodon-primary. The guard lives in `load()` because all three
+   * surfaces funnel through it.
+   *
+   * The spy goes in before the first `TestBed.inject`, since the store reads
+   * `networkSources()` when it is constructed.
+   */
+  it('asks for nothing when the account has no Mastodon server', () => {
+    vi.spyOn(TestBed.inject(Auth), 'isBlueskyPrimary', 'get').mockReturnValue(true);
+
+    const store = TestBed.inject(AnnouncementStore);
+    store.load();
+
+    httpMock.expectNone('/api/v1/announcements');
+    expect(store.all()).toEqual([]);
+    // Settled, not pending: the surfaces must render their empty state rather
+    // than a spinner waiting on a call that is never made.
+    expect(store.loaded()).toBe(true);
   });
 });

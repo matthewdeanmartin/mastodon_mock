@@ -34,6 +34,7 @@ describe('ProfileClient wire contract', () => {
   let session: {
     token: ReturnType<typeof vi.fn>;
     heldTier: ReturnType<typeof vi.fn>;
+    canOwnStorage: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -43,6 +44,7 @@ describe('ProfileClient wire contract', () => {
     session = {
       token: vi.fn().mockResolvedValue('signed-token'),
       heldTier: vi.fn().mockReturnValue('plus'),
+      canOwnStorage: vi.fn().mockReturnValue(true),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -136,5 +138,42 @@ describe('ProfileClient wire contract', () => {
       message: expect.stringContaining('account service'),
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  /**
+   * Regression: production fired `GET /manifest` for anonymous visitors.
+   *
+   * The profile service refuses any anonymous session with
+   * `403 code: anonymous` — storage requires an identity that outlives its
+   * token, which is a property of the session and not an entitlement. Sync's
+   * `start()` runs on every cold load, so every signed-out visitor spent one
+   * guaranteed-403 round trip on an answer already knowable locally.
+   *
+   * Reported as `forbidden`, matching what the service's own 403 would have
+   * produced: a signed-out visitor must not be told the service is unreachable
+   * when it is reachable and simply says no.
+   */
+  it('does not call the service at all for an anonymous session', async () => {
+    session.canOwnStorage.mockReturnValue(false);
+
+    const result = await client.manifest();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.kind).toBe('forbidden');
+  });
+
+  /**
+   * The guard keys on `canOwnStorage() === false`, so the "no token yet"
+   * answer (null) must not be mistaken for "anonymous". `send()` awaits the
+   * mint before asking, so in practice a null here means the mint produced
+   * nothing — but the distinction is worth pinning: unknown is not anonymous.
+   */
+  it('still calls when the session cannot yet say whether it owns storage', async () => {
+    session.canOwnStorage.mockReturnValue(null);
+    fetchMock.mockResolvedValueOnce(manifestResponse());
+
+    const result = await client.manifest();
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(result.kind).toBe('ok');
   });
 });

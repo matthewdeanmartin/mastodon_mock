@@ -7,11 +7,16 @@ const AUTH = 'https://auth.example.test';
 const ACCOUNT = 'https://account.example.test';
 const NOW = 1_800_000_000_000;
 
-function minted(token: string, tier: Tier, expiresInSeconds = 3_600): Response {
+function minted(
+  token: string,
+  tier: Tier,
+  expiresInSeconds = 3_600,
+  auth: 'anon' | 'email' | 'idp' = 'email',
+): Response {
   return Response.json({
     token,
     expiresAt: NOW / 1_000 + expiresInSeconds,
-    auth: 'email',
+    auth,
     tier,
   });
 }
@@ -104,5 +109,31 @@ describe('MawkingbirdSession token lifecycle', () => {
     await expect(session.token()).resolves.toBe('replacement');
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * `canOwnStorage()` mirrors the profile service's own `canOwnStorage()` in
+   * `authorize.ts`: an anonymous identity is designed to be forgotten when its
+   * token expires, so it may never own stored data. Duplicating the rule here
+   * is what lets `ProfileClient` skip a call the service would answer
+   * `403 code: anonymous` — which is what production was doing on every cold
+   * load for signed-out visitors.
+   *
+   * It is emphatically not a tier check: the free tier below is signed in, and
+   * signed in is what matters.
+   */
+  it('reports whether the held session may own stored data', async () => {
+    // Nothing minted yet: unknown, which callers must not read as anonymous.
+    expect(session.canOwnStorage()).toBeNull();
+
+    fetchMock.mockResolvedValueOnce(minted('anon-token', 'free', 3_600, 'anon'));
+    await session.token();
+    expect(session.canOwnStorage()).toBe(false);
+
+    // Signed in on the free tier still owns storage: the rule is about identity
+    // strength, not entitlement.
+    fetchMock.mockResolvedValueOnce(minted('free-token', 'free', 3_600, 'email'));
+    await session.refresh();
+    expect(session.canOwnStorage()).toBe(true);
   });
 });

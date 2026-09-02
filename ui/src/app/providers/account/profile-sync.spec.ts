@@ -26,6 +26,13 @@ class FakeMawkingbirdSession {
    */
   upgradeIfStale = vi.fn().mockResolvedValue(false);
   heldTier = vi.fn().mockReturnValue('plus');
+  /**
+   * Signed in, so every test here exercises the real request path. The
+   * anonymous short-circuit `ProfileClient.send()` applies to this answer is
+   * covered in `profile-client.spec.ts`; these tests are about what sync does
+   * with the service's replies, which presupposes reaching it.
+   */
+  canOwnStorage = vi.fn().mockReturnValue(true);
 }
 
 /** The last request `fetch` was called with. */

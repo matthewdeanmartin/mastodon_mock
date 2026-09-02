@@ -118,12 +118,23 @@ export type ProfileResult<T> =
   | { kind: 'conflict'; current: SettingsDocument; etag: string }
   /** Not entitled: free tier, or a lapsed subscription. Reads still work. */
   | { kind: 'payment-required'; message: string }
-  /** Signed out, anonymous, or not on the tester list. */
   /** 401: the credential was not accepted. Says nothing about entitlement. */
   | { kind: 'unauthenticated'; message: string }
+  /** Signed out, anonymous, or not on the tester list. */
   | { kind: 'forbidden'; message: string }
   /** Anything else: offline, CORS, 5xx, a malformed body. */
   | { kind: 'failed'; message: string };
+
+/**
+ * The message `send()` reports when it declines to call for an anonymous
+ * session. Matched by {@link ProfileClient.refusalForSend} so the caller gets
+ * `forbidden` — the same kind the service's own 403 would have produced.
+ */
+const ANONYMOUS_REFUSAL = 'anonymous-session';
+
+/** Wording for the local refusal; mirrors the service's own message. */
+const ANONYMOUS_MESSAGE =
+  'An anonymous session cannot store a profile. Confirm an email address to keep settings across browsers.';
 
 @Injectable({ providedIn: 'root' })
 export class ProfileClient {
@@ -173,7 +184,7 @@ export class ProfileClient {
     }
     const response = await this.send('/settings', { method: 'GET', headers });
     if (typeof response === 'string') {
-      return { kind: 'failed', message: response };
+      return this.refusalForSend(response);
     }
     if (response.status === 304) {
       return { kind: 'unchanged' };
@@ -221,7 +232,7 @@ export class ProfileClient {
       body: JSON.stringify(document),
     });
     if (typeof response === 'string') {
-      return { kind: 'failed', message: response };
+      return this.refusalForSend(response);
     }
 
     // 412 carries the winning document, which is what lets a conflict resolve in
@@ -269,7 +280,7 @@ export class ProfileClient {
       headers: { 'If-Match': etag },
     });
     if (typeof response === 'string') {
-      return { kind: 'failed', message: response };
+      return this.refusalForSend(response);
     }
     if (response.status === 404) {
       return { kind: 'absent' };
@@ -329,8 +340,14 @@ export class ProfileClient {
     const method = init.method ?? 'GET';
     const response = await this.send(path, init);
     if (typeof response === 'string') {
-      this.log.warn('ProfileClient', 'request:unreachable', { method, path, message: response });
-      return { kind: 'failed', message: response };
+      if (response === ANONYMOUS_REFUSAL) {
+        // Not a warning: declining to call for an anonymous session is the
+        // designed path, not a fault worth flagging in the diagnostics log.
+        this.log.info('ProfileClient', 'request:skipped-anonymous', { method, path });
+      } else {
+        this.log.warn('ProfileClient', 'request:unreachable', { method, path, message: response });
+      }
+      return this.refusalForSend(response);
     }
     if (response.status === 404) {
       // Expected whenever nothing is stored yet, so `info` rather than `warn`.
@@ -354,6 +371,22 @@ export class ProfileClient {
     } catch {
       return { kind: 'failed', message: 'The profile service returned an unreadable answer.' };
     }
+  }
+
+  /**
+   * Turn `send()`'s string failure into the result its callers should report.
+   *
+   * Everything `send()` declines to do arrives here as a string. Almost all of
+   * it is genuinely a failure — offline, CORS, a dead service — but the
+   * anonymous refusal is not: it is this client answering on the service's
+   * behalf, so it must produce the same `forbidden` the 403 would have, or a
+   * signed-out visitor would see "could not reach the service" for a service
+   * that is perfectly reachable and simply says no.
+   */
+  private refusalForSend(message: string): ProfileResult<never> {
+    return message === ANONYMOUS_REFUSAL
+      ? { kind: 'forbidden', message: ANONYMOUS_MESSAGE }
+      : { kind: 'failed', message };
   }
 
   /**
@@ -424,6 +457,18 @@ export class ProfileClient {
     const token = await this.session.token();
     if (!token) {
       return 'Could not reach the Mawkingbird account service.';
+    }
+    // An anonymous session cannot own stored data, so every profile call it
+    // makes is answered `403 code: anonymous` — see `canOwnStorage()` on the
+    // session, which mirrors the service's own rule. Stopping here rather than
+    // at one call site because the answer is a property of the session and so
+    // holds for every path: on production this fired on cold load for every
+    // signed-out visitor, one guaranteed-403 request each.
+    //
+    // Checked after the mint, never before: `canOwnStorage()` reads the held
+    // token, and until `token()` has resolved there is nothing to read.
+    if (this.session.canOwnStorage() === false) {
+      return ANONYMOUS_REFUSAL;
     }
     // The tier of the token actually being sent, captured before the request
     // rather than after it: this is what the service will bill against, and a
