@@ -83,6 +83,54 @@ const PAGE_SIZE = 80;
  */
 const MAX_PAGES = 200;
 
+/**
+ * Milliseconds between probes.
+ *
+ * The Mawkingbird proxy allows supporters 300 requests a minute — generous, and
+ * still a ceiling a bulk scan can walk straight into: probing is sequential but
+ * not *slow*, and `PasteResolve` may spend two requests on one site (direct
+ * first, then the proxy). Back-to-back local failures alone can exceed five a
+ * second.
+ *
+ * 250ms caps this at four a second, comfortably inside the allowance while
+ * leaving room for the rest of the app — a scan must not rate-limit the feed
+ * reading happening in the same browser. It makes a 500-site run take about two
+ * minutes, which is the right trade for a job that already shows a progress bar
+ * and can be stopped.
+ *
+ * The limit being paced against is real and per-person: the proxy keys a
+ * supporter's bucket on `plus:<userId>` rather than on their address, so this
+ * is one allowance the user carries between networks and does not share with
+ * the rest of their household. Pacing therefore does something — it is not a
+ * gesture at a limit nobody enforces.
+ *
+ * It is still not a guarantee. Cloudflare's counter lives per datacenter, so a
+ * session split across locations (a VPN changing exits, genuine roaming) sees
+ * more headroom than one number suggests, and a slow site can leave the pacing
+ * moot anyway. Staying under the ceiling is this constant's job; being correct
+ * when it is hit regardless is {@link RATE_LIMIT_BACKOFF_MS}'s.
+ */
+const PROBE_INTERVAL_MS = 250;
+
+/**
+ * How long to wait after the proxy says no.
+ *
+ * A 429 means the window is exhausted, and the windows here are per minute, so
+ * pausing for a few seconds and continuing is the honest response — far better
+ * than abandoning a scan the user is watching, and far better than hammering.
+ */
+const RATE_LIMIT_BACKOFF_MS = 5_000;
+
+/**
+ * Consecutive unreachable probes that end a run.
+ *
+ * A handful of dead sites is ordinary; twenty in a row is the proxy refusing
+ * everything, and continuing would spend the user's whole budget writing
+ * `unreachable` records. Stopping keeps what was found and marks the result
+ * partial, so a later run picks up exactly where this one gave up.
+ */
+const CONSECUTIVE_FAILURE_LIMIT = 20;
+
 /** Probe budgets offered in the dialog. */
 export const PROBE_CAPS = [100, 250, 500, 1000] as const;
 
@@ -104,7 +152,24 @@ export interface FriendScanProgress {
   found: number;
   /** Probes skipped because an earlier scan had already answered them. */
   fromCache: number;
+  /**
+   * True while waiting out a 429.
+   *
+   * Surfaced so the dialog can say why it has gone quiet: five seconds of a
+   * frozen progress bar reads as a hang, and "the proxy asked us to slow down"
+   * is both true and reassuring.
+   */
+  waitingOnRateLimit?: boolean;
   error?: string;
+}
+
+/** One probe's result, including why it failed when it did. */
+interface ProbeOutcomeDetail {
+  feeds: FoundFeed[];
+  /** False when the site was never actually answered. */
+  reached: boolean;
+  /** True when the proxy refused with 429, so waiting is the right response. */
+  rateLimited: boolean;
 }
 
 /** What a finished scan produced. */
@@ -269,17 +334,51 @@ export class FriendFeedScan {
           : p,
       );
 
+      let consecutiveFailures = 0;
+      let spent = 0;
+      let gaveUp = false;
+
       for (const target of budget) {
         if (this.cancelRequested) {
           break;
         }
-        const feeds = await this.probe(target.key, target.raw, target.via);
-        found.push(...feeds);
+        // Paced rather than fired back-to-back: see PROBE_INTERVAL_MS. Before
+        // the probe, not after, so the delay is skipped on the way out.
+        if (spent > 0) {
+          await delay(PROBE_INTERVAL_MS);
+        }
+        spent++;
+
+        const outcome = await this.probe(target.key, target.raw, target.via);
+        found.push(...outcome.feeds);
         this.progress.update((p) => (p ? { ...p, probed: p.probed + 1, found: found.length } : p));
+
+        if (outcome.reached) {
+          consecutiveFailures = 0;
+          continue;
+        }
+        consecutiveFailures++;
+        // The proxy said the window is exhausted. Wait for it to refill rather
+        // than burning the remaining budget on requests that will also be
+        // refused — each one would write an `unreachable` record for a site
+        // that was never actually asked.
+        if (outcome.rateLimited) {
+          this.diagnostics.info('FriendFeedScan', 'probe:rate-limited', { spent });
+          this.progress.update((p) => (p ? { ...p, waitingOnRateLimit: true } : p));
+          await delay(RATE_LIMIT_BACKOFF_MS);
+          this.progress.update((p) => (p ? { ...p, waitingOnRateLimit: false } : p));
+        }
+        if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
+          this.diagnostics.warn('FriendFeedScan', 'scan:giving-up', { spent });
+          gaveUp = true;
+          break;
+        }
       }
 
-      // Partial when the user stopped it, or when the cap left probes unspent.
-      const partial = this.cancelRequested || budget.length < pending.length;
+      // Partial when the user stopped it, when the cap left probes unspent, or
+      // when the run gave up — all three mean "there may be more to find", and
+      // the dialog says so rather than implying a complete answer.
+      const partial = this.cancelRequested || gaveUp || budget.length < pending.length;
       return this.finish(accountKey, found, targets.size, partial);
     } catch (error) {
       this.diagnostics.warn('FriendFeedScan', 'scan:failed', {
@@ -331,22 +430,31 @@ export class FriendFeedScan {
    * about what a site publishes, which they would eventually stop doing if this
    * grew its own copy.
    */
-  private async probe(key: string, raw: string, via: string): Promise<FoundFeed[]> {
+  private async probe(key: string, raw: string, via: string): Promise<ProbeOutcomeDetail> {
     let resolution;
     try {
       resolution = await this.resolver.resolve(raw);
     } catch {
       await this.cache.recordProbe(key, 'unreachable');
-      return [];
+      return { feeds: [], reached: false, rateLimited: false };
     }
 
     if (resolution.kind !== 'feeds' || resolution.feeds.length === 0) {
-      // `account`, `suggestion` and `none` all mean the same thing here: the
-      // page was reached and there was no feed on it to subscribe to. Recorded
-      // as `none` so it is believed and never probed again — unlike the
-      // `unreachable` written above, which is retried.
-      await this.cache.recordProbe(key, 'none');
-      return [];
+      // Only a site that actually *answered* may be remembered as feedless.
+      //
+      // A `none` carrying `reached: false` is a fetch that never landed — most
+      // importantly a 429 from the CORS proxy, which `probePage` swallows into
+      // an empty body. Recording that as `none` would be the worst bug this
+      // feature could have: one rate-limited run would permanently mark
+      // hundreds of friends as having no blog, with nothing anywhere saying
+      // why, and no re-scan would ever look at them again.
+      const reached = resolution.kind === 'none' ? resolution.reached !== false : true;
+      await this.cache.recordProbe(key, reached ? 'none' : 'unreachable');
+      return {
+        feeds: [],
+        reached,
+        rateLimited: resolution.kind === 'none' && resolution.rateLimited === true,
+      };
     }
 
     const feeds: FoundFeed[] = resolution.feeds.map((feed) => ({
@@ -357,7 +465,7 @@ export class FriendFeedScan {
       via,
     }));
     await this.cache.recordProbe(key, 'feeds', feeds);
-    return feeds;
+    return { feeds, reached: true, rateLimited: false };
   }
 
   /** Every feed the probe cache holds, for reopening a stored result. */
@@ -409,6 +517,11 @@ export class FriendFeedScan {
     });
     return result;
   }
+}
+
+/** Sleep, for the pacing between probes. */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**

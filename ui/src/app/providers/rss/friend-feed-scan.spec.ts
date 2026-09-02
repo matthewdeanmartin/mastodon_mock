@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from '../../api';
 import { Account } from '../../models';
 import { PageDiagnostics } from '../../page-diagnostics';
@@ -89,7 +89,32 @@ describe('FriendFeedScan', () => {
       ],
     });
     scan = TestBed.inject(FriendFeedScan);
+    // The scanner paces itself (250ms between probes) and backs off for five
+    // seconds on a 429. Both are correct in production and pure waiting here,
+    // so time is faked and driven by `run` below.
+    vi.useFakeTimers();
   });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /**
+   * Run a scan to completion under fake timers.
+   *
+   * The scanner alternates between awaiting a promise and awaiting a timer, so
+   * neither `runAllTimersAsync` alone nor plain awaiting is enough: this races
+   * the scan against a loop that keeps advancing the clock until it settles.
+   */
+  async function run(cap = 500): Promise<Awaited<ReturnType<typeof scan.scan>>> {
+    const promise = scan.scan('me', 'account-1', cap);
+    let done = false;
+    void promise.then(() => (done = true));
+    while (!done) {
+      await vi.advanceTimersByTimeAsync(1_000);
+    }
+    return promise;
+  }
 
   it('probes each site once however many friends link it', async () => {
     // The group-blog case. Three friends, one site, one probe — and the
@@ -103,7 +128,7 @@ describe('FriendFeedScan', () => {
     );
     resolver.resolve.mockResolvedValue(feedFound('https://shared.example'));
 
-    const result = await scan.scan('me', 'account-1', 500);
+    const result = await run();
 
     expect(resolver.resolve).toHaveBeenCalledOnce();
     expect(result?.feeds).toHaveLength(1);
@@ -124,7 +149,7 @@ describe('FriendFeedScan', () => {
     );
     resolver.resolve.mockResolvedValue(feedFound('https://fresh.example'));
 
-    await scan.scan('me', 'account-1', 500);
+    await run();
 
     expect(resolver.resolve).toHaveBeenCalledOnce();
     expect(resolver.resolve).toHaveBeenCalledWith('https://fresh.example');
@@ -142,7 +167,7 @@ describe('FriendFeedScan', () => {
     api.accountFollowingPage.mockReturnValue(onePage([account('ana', 'https://flaky.example')]));
     resolver.resolve.mockResolvedValue(feedFound('https://flaky.example'));
 
-    await scan.scan('me', 'account-1', 500);
+    await run();
 
     expect(resolver.resolve).toHaveBeenCalledOnce();
   });
@@ -151,7 +176,7 @@ describe('FriendFeedScan', () => {
     api.accountFollowingPage.mockReturnValue(onePage([account('ana', 'https://down.example')]));
     resolver.resolve.mockRejectedValue(new Error('network'));
 
-    await scan.scan('me', 'account-1', 500);
+    await run();
 
     expect(cache.recordProbe).toHaveBeenCalledWith('https://down.example', 'unreachable');
   });
@@ -161,7 +186,7 @@ describe('FriendFeedScan', () => {
       onePage([account('ana', 'https://twitter.com/ana', 'https://linktr.ee/ana')]),
     );
 
-    await scan.scan('me', 'account-1', 500);
+    await run();
 
     expect(resolver.resolve).not.toHaveBeenCalled();
   });
@@ -176,7 +201,7 @@ describe('FriendFeedScan', () => {
     );
     resolver.resolve.mockImplementation((url: string) => Promise.resolve(feedFound(url)));
 
-    const result = await scan.scan('me', 'account-1', 2);
+    const result = await run(2);
 
     expect(resolver.resolve).toHaveBeenCalledTimes(2);
     // Partial is the honest label: a third site was never looked at, and the
@@ -188,7 +213,7 @@ describe('FriendFeedScan', () => {
     api.accountFollowingPage.mockReturnValue(onePage([account('ana', 'https://one.example')]));
     resolver.resolve.mockResolvedValue(feedFound('https://one.example'));
 
-    const result = await scan.scan('me', 'account-1', 500);
+    const result = await run();
 
     expect(result?.partial).toBe(false);
   });
@@ -204,7 +229,7 @@ describe('FriendFeedScan', () => {
       return Promise.resolve(feedFound(url));
     });
 
-    const result = await scan.scan('me', 'account-1', 500);
+    const result = await run();
 
     expect(result?.feeds).toHaveLength(1);
     expect(result?.partial).toBe(true);
@@ -214,7 +239,7 @@ describe('FriendFeedScan', () => {
     api.accountFollowingPage.mockReturnValue(onePage([account('ana', 'https://one.example')]));
     resolver.resolve.mockResolvedValue(feedFound('https://one.example'));
 
-    const result = await scan.scan('me', 'account-1', 500);
+    const result = await run();
 
     expect(result?.opml).toContain('https://one.example/feed.xml');
     expect(cache.saveOpml).toHaveBeenCalledOnce();
@@ -228,7 +253,7 @@ describe('FriendFeedScan', () => {
       onePage([account('ana', 'she/her', 'mailto:ana@example.com', 'Berlin')]),
     );
 
-    await scan.scan('me', 'account-1', 500);
+    await run();
 
     expect(resolver.resolve).not.toHaveBeenCalled();
   });
@@ -240,7 +265,7 @@ describe('FriendFeedScan', () => {
     );
     resolver.resolve.mockResolvedValue(feedFound('https://one.example'));
 
-    await scan.scan('me', 'account-1', 500);
+    await run();
 
     expect(resolver.resolve).toHaveBeenCalledWith('https://one.example');
   });
@@ -250,8 +275,85 @@ describe('FriendFeedScan', () => {
       .mockReturnValueOnce(of({ accounts: [account('ana')], nextMaxId: 'p2', source: 'link' }))
       .mockReturnValueOnce(of({ accounts: [account('ben')], nextMaxId: null, source: 'link' }));
 
-    await scan.scan('me', 'account-1', 500);
+    await run();
 
     expect(api.accountFollowingPage).toHaveBeenCalledTimes(2);
+  });
+  /**
+   * The worst bug this feature could have.
+   *
+   * The Mawkingbird proxy allows supporters 300 requests a minute, and a bulk
+   * scan is exactly the thing that can reach it. `probePage` turns a 429 into
+   * an empty body, so without the `reached` flag every rate-limited site would
+   * be cached as `none` — permanently marking hundreds of friends as having no
+   * blog, with nothing saying why, and no future scan ever looking again.
+   */
+  it('never caches a rate-limited site as having no feed', async () => {
+    api.accountFollowingPage.mockReturnValue(onePage([account('ana', 'https://one.example')]));
+    resolver.resolve.mockResolvedValue({
+      kind: 'none',
+      reason: 'rate limited',
+      reached: false,
+      rateLimited: true,
+    });
+
+    await run();
+
+    expect(cache.recordProbe).toHaveBeenCalledWith('https://one.example', 'unreachable');
+  });
+
+  it('still caches a site that answered and had no feed', async () => {
+    // The other half of the same rule: this one *is* safe to remember, and
+    // remembering it is what makes a re-scan cheap.
+    api.accountFollowingPage.mockReturnValue(onePage([account('ana', 'https://one.example')]));
+    resolver.resolve.mockResolvedValue({
+      kind: 'none',
+      reason: 'no feed on that page',
+      reached: true,
+    });
+
+    await run();
+
+    expect(cache.recordProbe).toHaveBeenCalledWith('https://one.example', 'none');
+  });
+
+  it('gives up rather than spending the budget on a proxy refusing everything', async () => {
+    // Twenty failures in a row is the proxy saying no, not twenty dead sites.
+    // Continuing would write `unreachable` for sites never actually asked.
+    const many = Array.from({ length: 40 }, (_, i) => account(`f${i}`, `https://s${i}.example`));
+    api.accountFollowingPage.mockReturnValue(onePage(many));
+    resolver.resolve.mockResolvedValue({
+      kind: 'none',
+      reason: 'rate limited',
+      reached: false,
+      rateLimited: true,
+    });
+
+    const result = await run();
+
+    expect(resolver.resolve.mock.calls.length).toBeLessThan(40);
+    // Partial, so the dialog invites another run and the user is not told a
+    // truncated answer is the whole one.
+    expect(result?.partial).toBe(true);
+  });
+
+  it('keeps going when failures are scattered rather than consecutive', async () => {
+    // A handful of dead sites is ordinary and must not end a scan.
+    const many = Array.from({ length: 12 }, (_, i) => account(`f${i}`, `https://s${i}.example`));
+    api.accountFollowingPage.mockReturnValue(onePage(many));
+    let call = 0;
+    resolver.resolve.mockImplementation((url: string) => {
+      call++;
+      return Promise.resolve(
+        call % 2 === 0
+          ? { kind: 'none' as const, reason: 'unreachable', reached: false }
+          : feedFound(url),
+      );
+    });
+
+    const result = await run();
+
+    expect(resolver.resolve).toHaveBeenCalledTimes(12);
+    expect(result?.partial).toBe(false);
   });
 });

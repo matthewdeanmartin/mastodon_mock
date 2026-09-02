@@ -91,6 +91,11 @@
             {{ 'friendFeeds.walkingCount' | transloco: { count: p.accountsWalked } }}
           </p>
         }
+        <!-- Five seconds of a still progress bar reads as a hang unless the
+             pause is named. -->
+        @if (p.waitingOnRateLimit) {
+          <p class="muted small">{{ 'friendFeeds.rateLimited' | transloco }}</p>
+        }
         <!-- What the cache saved, stated while it is being saved: this is the
              number that makes a second run feel different from the first. -->
         @if (p.fromCache > 0) {

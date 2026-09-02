@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { Api } from '../../api';
@@ -23,7 +23,21 @@ export type PasteResolution =
   | { kind: 'feeds'; feeds: FeedCandidate[]; siteUrl: string; needsProxy: boolean }
   | { kind: 'account'; account: Account; rssUrl: string }
   | { kind: 'suggestion'; url: string }
-  | { kind: 'none'; reason: string };
+  /**
+   * Nothing to subscribe to.
+   *
+   * `reached` says whether the site actually answered. For the paste box the
+   * distinction is cosmetic — either way there is no feed to offer — but a bulk
+   * caller must not cache "we never got through" as "this site has no feed":
+   * see `friend-feed-scan.ts`, where a rate-limited run would otherwise mark
+   * hundreds of friends as blogless, permanently.
+   *
+   * `rateLimited` narrows that further: the proxy answered 429, so the right
+   * response is to wait rather than to keep asking. Surfaced here because this
+   * is the only layer that sees the status code — below it the failure is an
+   * empty body, and above it there is nothing left to distinguish.
+   */
+  | { kind: 'none'; reason: string; reached?: boolean; rateLimited?: boolean };
 
 /** URL shapes that are probably already a feed, so try fetching one first. */
 const FEEDISH = /(\.(xml|rss|atom)(\?|$))|(\/(feed|rss|atom|feeds)\/?(\?|$))/i;
@@ -222,10 +236,14 @@ export class PasteResolve {
       return {
         kind: 'none',
         reason: 'Checking a site for feeds needs a CORS proxy. Set one up in Settings → RSS.',
+        reached: false,
       };
     }
 
     let html: string;
+    // Kept out of the empty-body signal: a 429 and a site that served nothing
+    // are both "no HTML", and only the status tells them apart.
+    let rateLimited = false;
     try {
       const request = this.proxy.proxyRequest(pageUrl, 'article');
       html =
@@ -236,14 +254,26 @@ export class PasteResolve {
               context: externalFetch(),
               responseType: 'text',
             })
-            .pipe(catchError(() => of(''))),
+            .pipe(
+              catchError((error: unknown) => {
+                rateLimited = error instanceof HttpErrorResponse && error.status === 429;
+                return of('');
+              }),
+            ),
         )) ?? '';
     } catch {
       html = '';
     }
 
     if (!html) {
-      return { kind: 'none', reason: 'Couldn’t reach that site.' };
+      return {
+        kind: 'none',
+        reason: rateLimited
+          ? 'The CORS proxy is rate-limiting you. Wait a little and try again.'
+          : 'Couldn’t reach that site.',
+        reached: false,
+        ...(rateLimited ? { rateLimited: true } : {}),
+      };
     }
 
     // The response may itself be a feed — a URL with no feed-ish extension that
@@ -258,9 +288,12 @@ export class PasteResolve {
 
     const found = feedLinksIn(html, pageUrl);
     if (!found.length) {
+      // Reached, read, and it declares nothing — the one `none` a bulk caller
+      // may safely remember, because asking again would get the same answer.
       return {
         kind: 'none',
         reason: 'No feed found on that page. It may not publish one.',
+        reached: true,
       };
     }
     return {

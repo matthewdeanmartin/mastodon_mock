@@ -53,6 +53,7 @@ import { RssSubscriptions } from '../providers/rss/rss-subscriptions';
 // i18n friendFeeds.probing: Checking {{done}} of {{total}} sites · {{found}} feeds found
 // i18n friendFeeds.reusedOne: {{count}} site was already checked in an earlier run
 // i18n friendFeeds.reusedOther: {{count}} sites were already checked in earlier runs
+// i18n friendFeeds.rateLimited: The CORS proxy asked us to slow down — waiting a moment before carrying on.
 // i18n friendFeeds.failed: The scan could not finish.
 // i18n friendFeeds.resultNone: No feeds found. None of the websites your friends link to publish one that could be followed.
 // i18n friendFeeds.resultCount.one: <strong>{{count}}</strong> feed found
