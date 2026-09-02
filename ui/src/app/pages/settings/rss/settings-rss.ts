@@ -16,6 +16,7 @@ import {
   RssSubscriptions,
 } from '../../../providers/rss/rss-subscriptions';
 import { buildOpml, opmlFilename, parseOpml } from '../../../providers/rss/opml';
+import { FriendFeedsDialog } from '../../../friend-feeds-dialog/friend-feeds-dialog';
 import { PageDiagnostics } from '../../../page-diagnostics';
 import { RssReadState } from '../../../providers/rss/rss-read-state';
 
@@ -82,6 +83,7 @@ interface ImportReport {
 // i18n settings.rss.save: Save
 // i18n settings.rss.maxFeeds.hint: We suggest no more than {{recommended}}. Every feed is re-read by every view that shows them, so a long list opens slower and uses more of a free CORS proxy's quota — but it is your reading list, so set it where you want it. Lowering this never deletes a feed you already have.
 // i18n settings.rss.exportOpml: Export OPML
+// i18n settings.rss.friendFeeds: Find friends’ blogs
 // i18n settings.rss.importing: Importing…
 // i18n settings.rss.importOpml: Import OPML
 // i18n settings.rss.import.progress: Checking feed {{done}} of {{total}} — each one is fetched to prove this browser can actually read it.
@@ -106,11 +108,17 @@ interface ImportReport {
 // i18n settings.rss.noFeeds: No feeds yet.
 @Component({
   selector: 'app-settings-rss',
-  imports: [FormsModule, RouterLink, TranslocoPipe],
+  imports: [FormsModule, FriendFeedsDialog, RouterLink, TranslocoPipe],
   templateUrl: './settings-rss.html',
   styleUrl: './settings-rss.css',
 })
 export class SettingsRss implements OnInit {
+  /**
+   * The friends'-blogs dialog. Mounted only while open — it pulls in the scan
+   * machinery, which most visits to this page have no use for.
+   */
+  protected readonly showFriendFeeds = signal(false);
+
   private readonly diagnostics = inject(PageDiagnostics);
   private rssFetch = inject(RssFetch);
   private addFeedService = inject(RssAddFeed);
@@ -246,6 +254,10 @@ export class SettingsRss implements OnInit {
   }
 
   /** Download the current subscriptions as an OPML file. */
+  openFriendFeeds(): void {
+    this.showFriendFeeds.set(true);
+  }
+
   exportOpml(): void {
     const blob = new Blob([buildOpml(this.subs.feeds())], {
       type: 'text/x-opml+xml;charset=utf-8',

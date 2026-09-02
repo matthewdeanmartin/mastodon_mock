@@ -49,6 +49,7 @@ interface SettingsNavGroup {
 // i18n settings.groups.content: Content
 // i18n settings.groups.people: People
 // i18n settings.groups.advanced: Advanced
+// i18n settings.groups.rss: RSS
 // i18n settings.nav.publicProfile: Public profile
 // i18n settings.nav.server: Server
 // i18n settings.nav.mawkingbirdPlus: Mawkingbird Plus
@@ -73,6 +74,7 @@ interface SettingsNavGroup {
 // i18n settings.nav.inviteLinks: Invite links
 // i18n settings.nav.featureFlags: Feature flags
 // i18n settings.nav.development: Development
+// i18n settings.nav.rss: RSS feeds
 // i18n settings.sectionsAriaLabel: Settings sections
 const NAV_GROUPS: SettingsNavGroup[] = [
   {
@@ -99,6 +101,14 @@ const NAV_GROUPS: SettingsNavGroup[] = [
   {
     titleKey: 'settings.groups.people',
     paths: ['moderation', 'follows', 'bulk-actions', 'import-export', 'invites', 'privacy'],
+  },
+  {
+    // Its own heading rather than a line under Content: RSS is a reading list
+    // of many feeds carrying no credential, which is a different kind of thing
+    // from every filtering rule Content holds. Last because it is a side
+    // interest for most accounts, and the ones who want it go looking.
+    titleKey: 'settings.groups.rss',
+    paths: ['rss'],
   },
   {
     titleKey: 'settings.groups.advanced',
@@ -159,8 +169,12 @@ export class SettingsShell {
       // Client-side (localStorage) accounts on other services: Bluesky, GitHub,
       // Raindrop.io, Dropbox. Not exact — the catalog's child pages live under it.
       { labelKey: 'settings.nav.connections', path: 'connections', exact: false, anonymous: true },
-      // 'rss' is deliberately absent: RSS moved to the More menu, on its way to
-      // becoming a miniapp of its own like Write. The route still resolves.
+      // RSS is in the More menu too, on its way to becoming a miniapp of its
+      // own like Write. It is listed here as well because the feed list, the
+      // subscription cap and OPML import/export are settings by any reading,
+      // and a settings page reachable only from another menu is one nobody
+      // finds when they go looking for it.
+      { labelKey: 'settings.nav.rss', path: 'rss', exact: true, anonymous: true },
       { labelKey: 'settings.nav.privacy', path: 'privacy', exact: true },
       { labelKey: 'settings.nav.writing', path: 'writing', exact: true, anonymous: true },
       // Appearance is client-side (theme/accent/undo-send in localStorage) and works

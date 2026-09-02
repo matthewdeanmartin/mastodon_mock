@@ -15,6 +15,7 @@ import { ClientPrefs, RssDensity } from '../../client-prefs';
 import { HeadlineRow } from './headline-row/headline-row';
 import { SeenWhenScrolled } from './seen-when-scrolled';
 import { RssArticle } from './rss-article/rss-article';
+import { FriendFeedsDialog } from '../../friend-feeds-dialog/friend-feeds-dialog';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
 // i18n pages.rss.subscriptions: Subscriptions
@@ -22,6 +23,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 // i18n pages.rss.pasteLink: Paste a link
 // i18n pages.rss.done: Done
 // i18n pages.rss.starterKits: Starter kits
+// i18n pages.rss.friendFeeds: Friends’ blogs
 // i18n pages.rss.allItems: All items
 // i18n pages.rss.unsorted: Unsorted
 // i18n pages.rss.feedOff: · off
@@ -113,6 +115,7 @@ interface RailGroup {
   imports: [
     RouterLink,
     AddFeedDialog,
+    FriendFeedsDialog,
     StatusCard,
     RssStarterKitsPanel,
     HeadlineRow,
@@ -224,6 +227,10 @@ export class RssPage {
    * the feed count, so installing a kit does not yank the panel away mid-click.
    */
   protected readonly showKits = signal(false);
+
+  /** The friends'-blogs dialog. Mounted only while open: it is a lot of
+   * machinery for a button most sessions never press. */
+  protected readonly showFriendFeeds = signal(false);
 
   /** Which item is expanded in headline mode, by `Status.id`. */
   protected readonly expandedId = signal<string | null>(null);
@@ -393,6 +400,11 @@ export class RssPage {
     const next = !this.showKits();
     this.showKits.set(next);
     this.diagnostics.info('RssPage', 'user:toggle-kits', { open: next });
+  }
+
+  protected openFriendFeeds(): void {
+    this.showFriendFeeds.set(true);
+    this.diagnostics.info('RssPage', 'user:open-friend-feeds', {});
   }
 
   protected setFilter(filter: 'all' | 'starred'): void {

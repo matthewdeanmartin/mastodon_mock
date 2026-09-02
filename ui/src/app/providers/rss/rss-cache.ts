@@ -42,8 +42,24 @@ import { ParsedFeed } from './rss-parser';
  */
 
 const DB_NAME = 'mockingbird_rss';
-const DB_VERSION = 1;
+/**
+ * Version 2 added the two stores in `friend-feed-cache.ts`.
+ *
+ * Both files must name the same version: IndexedDB refuses an `open` at a lower
+ * version than the database already has, so leaving this at 1 would break every
+ * feed read the moment a friend-feed scan had run once.
+ *
+ * Each file's `onupgradeneeded` creates only the stores it finds missing, so
+ * whichever opens first performs the migration for both.
+ */
+const DB_VERSION = 2;
 const FEED_STORE = 'feeds';
+
+/** Stores owned by `friend-feed-cache.ts`, created here on upgrade. */
+const FRIEND_STORES = [
+  { name: 'profile_probes', keyPath: 'url' },
+  { name: 'friend_opml', keyPath: 'accountKey' },
+] as const;
 
 /**
  * How long a failing feed is left alone before we try the network again.
@@ -113,6 +129,11 @@ function openDatabase(): Promise<IDBDatabase | null> {
       const db = request.result;
       if (!db.objectStoreNames.contains(FEED_STORE)) {
         db.createObjectStore(FEED_STORE, { keyPath: 'url' });
+      }
+      for (const store of FRIEND_STORES) {
+        if (!db.objectStoreNames.contains(store.name)) {
+          db.createObjectStore(store.name, { keyPath: store.keyPath });
+        }
       }
     };
     request.onsuccess = () => resolve(request.result);

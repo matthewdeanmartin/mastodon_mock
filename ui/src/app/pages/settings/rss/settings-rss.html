@@ -149,6 +149,12 @@
           [disabled]="!!importProgress()"
         />
       </label>
+      <!-- Sits with import/export because it produces the same artefact: an
+           OPML file. The difference is where it comes from — your friends'
+           profiles rather than another reader. -->
+      <button class="btn btn-outline" type="button" (click)="openFriendFeeds()">
+        {{ 'settings.rss.friendFeeds' | transloco }}
+      </button>
     </div>
 
     @if (importProgress(); as progress) {
@@ -280,3 +286,7 @@
     <p class="muted">{{ 'settings.rss.noFeeds' | transloco }}</p>
   }
 </div>
+
+@if (showFriendFeeds()) {
+  <app-friend-feeds-dialog (closed)="showFriendFeeds.set(false)" />
+}

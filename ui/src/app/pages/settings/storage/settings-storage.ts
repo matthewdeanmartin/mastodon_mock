@@ -176,6 +176,8 @@ export class SettingsStorage {
   protected storeLabel(database: string, store: string): string {
     const known: Record<string, string> = {
       'mockingbird_rss/feeds': 'RSS feed cache',
+      'mockingbird_rss/profile_probes': 'Checked websites (friends’ blogs)',
+      'mockingbird_rss/friend_opml': 'Friends’ blogs, as OPML',
       'mockingbird_twitter/timelines': 'Twitter timeline cache',
     };
     return known[`${database}/${store}`] ?? `${database} / ${store}`;

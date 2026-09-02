@@ -15,6 +15,9 @@
         >
           {{ (showKits() ? 'pages.rss.done' : 'pages.rss.starterKits') | transloco }}
         </button>
+        <button class="btn btn-small btn-outline" type="button" (click)="openFriendFeeds()">
+          {{ 'pages.rss.friendFeeds' | transloco }}
+        </button>
       </span>
     </div>
 
@@ -240,4 +243,8 @@
 
 @if (showAddDialog()) {
   <app-add-feed-dialog (closed)="closeAddDialog()" />
+}
+
+@if (showFriendFeeds()) {
+  <app-friend-feeds-dialog (closed)="showFriendFeeds.set(false)" />
 }

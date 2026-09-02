@@ -26,9 +26,12 @@ describe('SettingsShell', () => {
     expect(labels).toContain('Filters');
     expect(labels).toContain('Muted & Blocked');
     expect(labels).toContain('Bulk moderation');
-    // Blue's controls all live on Appearance; RSS moved to the More menu.
+    // Blue's controls all live on Appearance, so it has no page of its own.
     expect(labels).not.toContain('Mockingbird Blue');
-    expect(labels).not.toContain('RSS feeds');
+    // RSS is listed here *and* in the More menu: the feed list, the cap and
+    // OPML import/export are settings by any reading, and a settings page
+    // reachable only from another menu is one nobody finds.
+    expect(labels).toContain('RSS feeds');
     expect(labels).toContain('Privacy');
     expect(labels).not.toContain('Posting defaults');
     expect(labels).not.toContain('Posting & Privacy');
@@ -67,6 +70,9 @@ describe('SettingsShell', () => {
         // Trusted accounts and the CW/sensitive switches are client-side, so they
         // work anonymously even though 'Muted & Blocked' beside them does not.
         'Trust: CW/Sensitive',
+        // A feed URL carries no credential, so a reading list works with no
+        // server identity at all — the most anonymous-capable page there is.
+        'RSS feeds',
         'Import/Export Config',
         'Feature flags',
       ]),
