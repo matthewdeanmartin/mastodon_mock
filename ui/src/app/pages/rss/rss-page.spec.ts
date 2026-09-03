@@ -1,10 +1,11 @@
 import { Component, input } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { EMPTY, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ParsedFeed } from '../../providers/rss/rss-parser';
 import { RssFetch } from '../../providers/rss/rss-fetch';
+import { RssProvider } from '../../providers/rss/rss-provider';
 import { RssSubscriptions } from '../../providers/rss/rss-subscriptions';
 import { RssReadState } from '../../providers/rss/rss-read-state';
 import { ClientPrefs } from '../../client-prefs';
@@ -213,6 +214,19 @@ describe('RssPage', () => {
     const text = textOf(fixture);
     expect(text).toContain('Survived');
     expect(text).toContain("Couldn't load Dead Feed");
+  });
+
+  it('stops loading when the pane source completes without a value', async () => {
+    TestBed.overrideProvider(RssProvider, { useValue: { getFeeds: () => EMPTY } });
+    TestBed.inject(RssSubscriptions).add('https://silent.example/feed.xml', 'Silent Feed');
+
+    const fixture = setUp();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = textOf(fixture);
+    expect(text).not.toContain('Loading items');
+    expect(text).toContain("Couldn't load Silent Feed");
   });
 
   it('opens the add-feed dialog on click, closes it on (closed)', () => {

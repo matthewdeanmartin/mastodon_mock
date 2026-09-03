@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, forkJoin, map, Observable, of, throwError, timeout } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, throwError, throwIfEmpty, timeout } from 'rxjs';
 import { Account, Status } from '../../models';
 import { FeedProvider } from '../provider';
 import { commentAccount, feedAccount, feedToStatuses, itemToStatus } from './rss-adapter';
@@ -188,6 +188,13 @@ export class RssProvider implements FeedProvider {
             each: FEED_JOIN_TIMEOUT_MS,
             with: () => throwError(() => new Error('This feed did not respond in time.')),
           }),
+          // Completion without a value is neither success nor an error, and a
+          // timeout cannot catch it because it has already completed. More
+          // importantly, one empty member makes forkJoin complete without
+          // emitting anything at all, which leaves the page waiting forever.
+          // Convert that third terminal state into the same per-feed failure as
+          // a timeout or network error.
+          throwIfEmpty(() => new Error('This feed completed without returning anything.')),
           catchError(() => {
             failed.push(url);
             return of([] as Status[]);

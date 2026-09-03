@@ -283,11 +283,13 @@ export class RssPage {
       return;
     }
     this.loading.set(true);
+    let received = false;
     this.rss.getFeeds(feedUrls).subscribe({
       next: ({ statuses, failed }) => {
         if (seq !== this.loadSeq) {
           return;
         }
+        received = true;
         this.statuses.set(statuses);
         this.failed.set(failed);
         this.loading.set(false);
@@ -297,6 +299,19 @@ export class RssPage {
           return;
         }
         this.diagnostics.error('RssPage', 'pane:load-failed', err, { feeds: feedUrls.length });
+        this.statuses.set([]);
+        this.failed.set(feedUrls);
+        this.loading.set(false);
+      },
+      complete: () => {
+        // An Observable may legally complete without calling next. Keep this
+        // boundary defensive even though RssProvider also converts empty feed
+        // completions into failures: loading indicators must have a terminal
+        // path for all three Observable outcomes.
+        if (seq !== this.loadSeq || received) {
+          return;
+        }
+        this.diagnostics.warn('RssPage', 'pane:load-empty', { feeds: feedUrls.length });
         this.statuses.set([]);
         this.failed.set(feedUrls);
         this.loading.set(false);

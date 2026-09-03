@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, NEVER, of, throwError } from 'rxjs';
+import { EMPTY, firstValueFrom, NEVER, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../../models';
 import { ParsedFeed } from './rss-parser';
@@ -313,5 +313,17 @@ describe('RssProvider', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('renders the feeds that answered when one completes without a value', async () => {
+    const provider = setUp((url: string) =>
+      url.includes('silent') ? EMPTY : of(feed('good', ['2026-01-01T00:00:00Z'])),
+    );
+    const urls = ['https://good.example/feed', 'https://silent.example/feed'];
+
+    const result = await firstValueFrom(provider.getFeeds(urls));
+
+    expect(result.statuses).toHaveLength(1);
+    expect(result.failed).toEqual(['https://silent.example/feed']);
   });
 });
