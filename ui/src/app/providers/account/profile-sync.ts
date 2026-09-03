@@ -7,7 +7,7 @@ import {
   type ConfigChange,
   type PortableConfig,
 } from '../../portable-config';
-import { ProfileClient, type SettingsDocument } from './profile-client';
+import { type FetchedSettings, ProfileClient, type SettingsDocument } from './profile-client';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { SupporterStatus } from './supporter-status';
 import { MawkingbirdSession } from './mawkingbird-session';
@@ -329,6 +329,47 @@ export class ProfileSync {
   }
 
   /**
+   * Apply a fetched settings document, or hand the conflict back to the UI.
+   *
+   * Extracted so the ordinary path and the retry-without-etag path above cannot
+   * drift: both have to make the same decision about a dirty browser, and a
+   * second copy of it is a second place for that rule to be got wrong.
+   */
+  private applyFetched(value: FetchedSettings, dirty: boolean): PullOutcome {
+    const { document, etag } = value;
+    const remote = this.toPortableConfig(document);
+    const changes = configChanges(remote, localStorage);
+
+    if (dirty) {
+      // The one case that must ask. Deliberately does not apply anything
+      // first: the user may choose to keep this browser's copy, and a partial
+      // application would have already destroyed it.
+      this.diagnostics.info('ProfileSync', 'pull:needs-decision', {
+        remoteRevision: document.revision,
+        differing: changes.length,
+      });
+      return { kind: 'needs-decision', remote, changes, etag, revision: document.revision };
+    }
+
+    importPortableConfig(remote, localStorage);
+    this.setRecord(
+      updateSyncRecord({
+        etag,
+        revision: document.revision,
+        dirty: false,
+        lastSyncedAt: Date.now(),
+        failures: 0,
+      }),
+    );
+    this.diagnostics.info('ProfileSync', 'pull:applied', {
+      revision: document.revision,
+      changed: changes.length,
+      keys: changes.map((change) => change.key),
+    });
+    return { kind: 'applied', changes };
+  }
+
+  /**
    * Adopt the settings already stored for this account.
    *
    * The `off-but-remote-exists` answer. Pulls, applies, and turns sync on.
@@ -514,40 +555,31 @@ export class ProfileSync {
       if (fetched.kind !== 'ok') {
         const message = 'message' in fetched ? fetched.message : 'Could not read your profile.';
         this.diagnostics.warn('ProfileSync', 'pull:failed', { kind: fetched.kind, message });
+        // A conditional read that fails is worth exactly one unconditional
+        // retry before giving up.
+        //
+        // `If-None-Match` is sent from a locally persisted etag, so a bad one
+        // makes every pull fail the same way — through reloads, and for as long
+        // as the value sits in localStorage. That is a sync stuck permanently
+        // on a value the user cannot see and has no way to clear. Dropping the
+        // etag and asking once more costs one request and turns a dead end into
+        // a self-repair; if the plain read fails too, the failure is real and
+        // reported as before.
+        if (current.etag) {
+          this.diagnostics.info('ProfileSync', 'pull:retry-without-etag', {});
+          const retried = await this.client.fetchSettings();
+          if (retried.kind === 'ok') {
+            return this.applyFetched(retried.value, current.dirty === true);
+          }
+          if (retried.kind === 'absent') {
+            this.setRecord(updateSyncRecord({ etag: undefined }));
+            return { kind: 'absent' };
+          }
+        }
         return { kind: 'failed', message };
       }
 
-      const { document, etag } = fetched.value;
-      const remote = this.toPortableConfig(document);
-      const changes = configChanges(remote, localStorage);
-
-      if (current.dirty) {
-        // The one case that must ask. Deliberately does not apply anything
-        // first: the user may choose to keep this browser's copy, and a partial
-        // application would have already destroyed it.
-        this.diagnostics.info('ProfileSync', 'pull:needs-decision', {
-          remoteRevision: document.revision,
-          differing: changes.length,
-        });
-        return { kind: 'needs-decision', remote, changes, etag, revision: document.revision };
-      }
-
-      importPortableConfig(remote, localStorage);
-      this.setRecord(
-        updateSyncRecord({
-          etag,
-          revision: document.revision,
-          dirty: false,
-          lastSyncedAt: Date.now(),
-          failures: 0,
-        }),
-      );
-      this.diagnostics.info('ProfileSync', 'pull:applied', {
-        revision: document.revision,
-        changed: changes.length,
-        keys: changes.map((change) => change.key),
-      });
-      return { kind: 'applied', changes };
+      return this.applyFetched(fetched.value, current.dirty === true);
     } finally {
       this.busy.set(false);
     }

@@ -11,6 +11,7 @@ import {
   switchMap,
   tap,
   throwError,
+  timeout,
 } from 'rxjs';
 import { ClientPrefs } from '../../client-prefs';
 import { PageDiagnostics } from '../../page-diagnostics';
@@ -305,6 +306,20 @@ export class RssFetch {
         ...(headers ? { headers } : {}),
       })
       .pipe(
+        // Without this a request that never settles hangs forever, and it does
+        // not hang alone: `RssProvider.getFeeds` joins every subscribed feed
+        // with `forkJoin`, which emits only once *all* of them complete. So one
+        // silent socket leaves the whole reading pane on "Loading items…"
+        // indefinitely — no error, no partial list, and the same feed stalls it
+        // again after a refresh.
+        //
+        // A timeout turns that into an ordinary per-feed failure: the feed is
+        // reported in `failed`, every other feed still renders, and the cooldown
+        // in `shouldSkipNetwork` stops it being retried on a loop.
+        timeout({
+          each: FEED_TIMEOUT_MS,
+          with: () => throwError(() => new Error(TIMEOUT_MESSAGE)),
+        }),
         tap({
           next: (response) => viaProxy && this.proxyUsage.record(true, toResponse(response)),
           error: () => viaProxy && this.proxyUsage.record(false),
@@ -314,6 +329,20 @@ export class RssFetch {
       );
   }
 }
+
+/**
+ * How long one feed fetch may take before it is called a failure.
+ *
+ * Generous: a slow blog on a cheap host behind a CORS proxy is doing two hops,
+ * and a feed that takes eight seconds is annoying rather than broken. What this
+ * exists to catch is the request that never settles at all — the case that
+ * otherwise hangs the entire pane, because `forkJoin` waits for every feed.
+ */
+const FEED_TIMEOUT_MS = 20_000;
+
+/** Shown for a feed that never answered. */
+const TIMEOUT_MESSAGE =
+  'This feed took too long to answer. It may be slow, or temporarily unreachable.';
 
 /**
  * Whether an error is the app's own configuration refusing, rather than the

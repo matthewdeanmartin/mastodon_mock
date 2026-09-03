@@ -176,4 +176,36 @@ describe('ProfileClient wire contract', () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(result.kind).toBe('ok');
   });
+  /**
+   * A 2xx that is not a settings document must not wedge sync.
+   *
+   * `GET /settings` answers 200, 304 or 404 and always sets an ETag on the 200,
+   * so a bodyless success did not come from that handler — a preflight answered
+   * as the request, or something in between rewrote it. Reported as `absent`
+   * because there is demonstrably no document, which the caller already handles
+   * by writing one; `failed` only produces a sync that never recovers.
+   */
+  it('treats a 204 as nothing stored rather than as a broken document', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const result = await client.fetchSettings();
+
+    expect(result.kind).toBe('absent');
+  });
+
+  it('refuses a 200 with no ETag, because it could never be written back', async () => {
+    // The header is the whole concurrency mechanism: without it a later PUT has
+    // no `If-Match` to send, so accepting this would produce a document that
+    // can be read forever and updated never.
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ revision: 1 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const result = await client.fetchSettings();
+
+    expect(result.kind).toBe('failed');
+  });
 });

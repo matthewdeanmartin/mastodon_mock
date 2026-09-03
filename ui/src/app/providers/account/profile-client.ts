@@ -196,11 +196,40 @@ export class ProfileClient {
     if (refusal) {
       return refusal;
     }
+    // A 2xx that is not a document. The service answers `GET /settings` with
+    // 200, 304 or 404 and always sets an ETag on the 200 — so a bodyless or
+    // ETag-less success did not come from the settings handler: a preflight
+    // answered as the request, a redirect followed to somewhere else, or an
+    // intermediary rewrote it. `absent` rather than `failed`, because there is
+    // demonstrably no document here and that is a state the caller already
+    // handles by writing one, where `failed` only produces a stuck sync.
+    if (response.status === 204) {
+      this.log.warn('ProfileClient', 'settings:no-content', { status: response.status });
+      return { kind: 'absent' };
+    }
+
     const etag = response.headers.get('ETag');
     if (!etag) {
       // Without an ETag there is nothing to write back against, so treating this
       // as success would produce a document that can never be updated.
-      return { kind: 'failed', message: 'The profile service returned no ETag.' };
+      //
+      // Logged with what is actually knowable, because the bare message was
+      // undiagnosable in the field: the header is set by the Worker on every
+      // 200 and exposed via `Access-Control-Expose-Headers`, so reaching here
+      // means either something between us rewrote the response, or the browser
+      // could not read the header — and `type` distinguishes those. An opaque
+      // response reads as status 0 with no headers at all.
+      this.log.warn('ProfileClient', 'settings:no-etag', {
+        status: response.status,
+        type: response.type,
+        // Present when the body arrived but the header did not, which points at
+        // header exposure rather than at a wrong response.
+        hasBody: response.headers.get('Content-Type') !== null,
+      });
+      return {
+        kind: 'failed',
+        message: 'The profile service returned no ETag, so this document cannot be updated safely.',
+      };
     }
     try {
       return { kind: 'ok', value: { document: (await response.json()) as SettingsDocument, etag } };

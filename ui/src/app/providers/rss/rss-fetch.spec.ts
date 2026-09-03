@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../../client-prefs';
 import { CorsProxySettings } from '../cors-proxy/cors-proxy-settings';
 import { CorsProxyUsageStore } from '../cors-proxy/cors-proxy-usage';
@@ -420,5 +420,34 @@ describe('RssFetch', () => {
     await settle();
     http.expectOne(() => true).flush('', { status: 403, statusText: 'Forbidden' });
     expect((await errorPromise).message).toMatch(/proxy rejected the request/i);
+  });
+  /**
+   * Regression: a request that never answered hung forever.
+   *
+   * There was no timeout anywhere on the feed path, and `RssProvider.getFeeds`
+   * joins feeds with `forkJoin` — which waits for all of them — so one silent
+   * socket left the whole reading pane on "Loading items…" with no error and no
+   * partial list. A timeout turns it into an ordinary per-feed failure, which
+   * the pane already knows how to report and the cooldown already knows not to
+   * retry immediately.
+   */
+  it('gives up on a feed that never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      let error: Error | null = null;
+      fetcher
+        .fetchFeed('https://slow.example/feed.xml')
+        .subscribe({ error: (err: Error) => (error = err) });
+      await vi.advanceTimersByTimeAsync(0);
+      // Opened and then never answered — no flush, no error, nothing.
+      http.expectOne('https://slow.example/feed.xml');
+
+      await vi.advanceTimersByTimeAsync(21_000);
+
+      expect(error).not.toBeNull();
+      expect(error!.message).toContain('took too long');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

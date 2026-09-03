@@ -356,6 +356,54 @@ describe('ProfileSync', () => {
       expect(sync.record().revision).toBe(5);
     });
 
+    /**
+     * Regression: a bad stored etag wedged sync permanently.
+     *
+     * `If-None-Match` is sent from an etag kept in localStorage, so a value the
+     * service will not accept makes every pull fail identically — through
+     * reloads, and for as long as it sits there. The user sees sync simply stop
+     * working, with no way to see or clear the value responsible. One
+     * unconditional retry costs a single request and turns that dead end into a
+     * self-repair.
+     */
+    it('retries without the stored etag when a conditional read fails', async () => {
+      localStorage.setItem(PREFS, '{"theme":"light"}');
+      sync.resetForTest({ state: 'on', revision: 1, dirty: false, etag: '"stale"' });
+      fetchStub
+        .mockResolvedValueOnce(respond(500, { error: 'no' }))
+        .mockResolvedValueOnce(respond(200, storedDocument(), { ETag: '"fresh"' }));
+
+      const outcome = await sync.pull();
+
+      expect(outcome.kind).toBe('applied');
+      expect(sync.record().etag).toBe('"fresh"');
+      // The second request must not carry the etag that just failed.
+      const retry = fetchStub.mock.calls[1]?.[1] as RequestInit | undefined;
+      expect(new Headers(retry?.headers).get('If-None-Match')).toBeNull();
+    });
+
+    it('reports the failure when the plain read fails too', async () => {
+      // The retry is one attempt, not a loop: if an unconditional read also
+      // fails, the problem is not the etag and saying so is the honest answer.
+      sync.resetForTest({ state: 'on', revision: 1, dirty: false, etag: '"stale"' });
+      fetchStub.mockResolvedValue(respond(500, { error: 'no' }));
+
+      const outcome = await sync.pull();
+
+      expect(outcome.kind).toBe('failed');
+      expect(fetchStub).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry when there was no etag to blame', async () => {
+      sync.resetForTest({ state: 'on', revision: 1, dirty: false });
+      fetchStub.mockResolvedValue(respond(500, { error: 'no' }));
+
+      const outcome = await sync.pull();
+
+      expect(outcome.kind).toBe('failed');
+      expect(fetchStub).toHaveBeenCalledOnce();
+    });
+
     it('asks when the remote is ahead and this browser has unsaved edits', async () => {
       // The one case that must ask: either answer loses something, so it is not
       // ours to choose.

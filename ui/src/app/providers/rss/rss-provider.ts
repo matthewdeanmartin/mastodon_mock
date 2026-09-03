@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, forkJoin, map, Observable, of } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, throwError, timeout } from 'rxjs';
 import { Account, Status } from '../../models';
 import { FeedProvider } from '../provider';
 import { commentAccount, feedAccount, feedToStatuses, itemToStatus } from './rss-adapter';
@@ -37,6 +37,16 @@ export interface RssItemView {
  * default page size is 40) while being a fixed, small ceiling.
  */
 export const PER_FEED_ITEM_CAP = 100;
+
+/**
+ * Backstop for one feed inside a joined pane load.
+ *
+ * See the note at its use in {@link RssProvider.getFeeds}: this exists so a
+ * single stalled feed cannot hold the whole reading pane, whatever stalled it.
+ * Longer than `RssFetch`'s own network timeout so that the inner, better-worded
+ * failure is the one users normally see.
+ */
+const FEED_JOIN_TIMEOUT_MS = 30_000;
 
 /**
  * RSS as a home-timeline source. Feeds have no pagination, so the first
@@ -160,6 +170,24 @@ export class RssProvider implements FeedProvider {
       feedUrls.map((url) =>
         this.getFeed(url).pipe(
           map(({ statuses }) => statuses.slice(0, PER_FEED_ITEM_CAP)),
+          // A second, deliberately longer backstop than the one inside
+          // `RssFetch`.
+          //
+          // `forkJoin` emits only when every inner observable *completes*, so a
+          // single feed that never settles leaves the whole pane on
+          // "Loading items…" forever — no error and no partial list, which is
+          // exactly the hang this guards. The network timeout covers the
+          // ordinary cause; this also covers the ones that are not the network
+          // at all, such as an IndexedDB read whose callback never fires
+          // because another tab is holding a database upgrade open.
+          //
+          // Longer than the fetch timeout on purpose: when the inner one is
+          // working it should be what reports, with its better message. This
+          // only fires when something upstream of the network stalled.
+          timeout({
+            each: FEED_JOIN_TIMEOUT_MS,
+            with: () => throwError(() => new Error('This feed did not respond in time.')),
+          }),
           catchError(() => {
             failed.push(url);
             return of([] as Status[]);

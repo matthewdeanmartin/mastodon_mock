@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, of, throwError } from 'rxjs';
+import { firstValueFrom, NEVER, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Status } from '../../models';
 import { ParsedFeed } from './rss-parser';
 import { RssFetch } from './rss-fetch';
 import { PER_FEED_ITEM_CAP, RssProvider } from './rss-provider';
@@ -272,5 +273,45 @@ describe('RssProvider', () => {
       provider.reset();
       expect(await firstValueFrom(provider.fetchPage())).toHaveLength(12);
     });
+  });
+  /**
+   * Regression: one silent feed hung the entire reading pane.
+   *
+   * `getFeeds` joins every subscribed feed with `forkJoin`, which emits only
+   * once *all* of them complete. A feed whose request never settles therefore
+   * left the pane on "Loading items…" forever — no error, no partial list, and
+   * the same feed stalled it again on the next refresh. That is what a user
+   * reported, and it is why there is a backstop timeout here as well as in
+   * `RssFetch`: the inner one covers the network, this one covers everything
+   * else that can fail to settle, such as an IndexedDB read whose callback
+   * never fires.
+   */
+  it('renders the feeds that answered when one never does', async () => {
+    vi.useFakeTimers();
+    try {
+      const provider = setUp((url: string) =>
+        // Never emits and never completes — a socket that was opened and then
+        // forgotten about.
+        url.includes('stalled') ? NEVER : of(feed('good', ['2026-01-01T00:00:00Z'])),
+      );
+      const subs = TestBed.inject(RssSubscriptions);
+      subs.add('https://good.example/feed', 'Good');
+      subs.add('https://stalled.example/feed', 'Stalled');
+
+      let result: { statuses: Status[]; failed: string[] } | null = null;
+      provider
+        .getFeeds(['https://good.example/feed', 'https://stalled.example/feed'])
+        .subscribe((value) => (result = value));
+
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      // The pane resolves rather than hanging, the working feed still renders,
+      // and the stalled one is named so the UI can say which failed.
+      expect(result).not.toBeNull();
+      expect(result!.statuses.length).toBeGreaterThan(0);
+      expect(result!.failed).toEqual(['https://stalled.example/feed']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
