@@ -150,6 +150,152 @@ describe('RssFetch', () => {
     req.flush(FEED_XML);
   });
 
+  it('coalesces concurrent Mawkingbird feed misses into one batch request', async () => {
+    vi.useFakeTimers();
+    try {
+      settings.select('mawkingbird');
+      const titles: string[] = [];
+      fetcher
+        .fetchFeed('https://one.example/feed.xml', { useProxy: true })
+        .subscribe((feed) => titles.push(feed.title));
+      fetcher
+        .fetchFeed('https://two.example/feed.xml', { useProxy: true })
+        .subscribe((feed) => titles.push(feed.title));
+
+      await vi.advanceTimersByTimeAsync(20);
+      const req = http.expectOne(
+        (candidate) => candidate.method === 'POST' && candidate.url.endsWith('/batch?route=feeds'),
+      );
+      expect(req.request.headers.get('Content-Type')).toBe('text/plain;charset=UTF-8');
+      const sent = JSON.parse(req.request.body as string) as {
+        requests: { id: string; url: string }[];
+      };
+      expect(sent.requests.map(({ url }) => url)).toEqual([
+        'https://one.example/feed.xml',
+        'https://two.example/feed.xml',
+      ]);
+
+      req.flush({
+        results: sent.requests.map(({ id }) => ({
+          id,
+          status: 200,
+          ok: true,
+          body: FEED_XML,
+          usage: null,
+        })),
+      });
+      await settle();
+
+      expect(titles).toEqual(['A Feed', 'A Feed']);
+      expect(cache.putCount).toBe(2);
+      expect(TestBed.inject(CorsProxyUsageStore).usage()).toMatchObject({
+        requests: 1,
+        failures: 0,
+      });
+      http.verify();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps Mawkingbird item failures separate inside a successful batch envelope', async () => {
+    vi.useFakeTimers();
+    try {
+      settings.select('mawkingbird');
+      let goodTitle = '';
+      let badError: Error | null = null;
+      fetcher
+        .fetchFeed('https://good.example/feed.xml', { useProxy: true })
+        .subscribe((feed) => (goodTitle = feed.title));
+      fetcher.fetchFeed('https://busy.example/feed.xml', { useProxy: true }).subscribe({
+        error: (error: Error) => (badError = error),
+      });
+
+      await vi.advanceTimersByTimeAsync(20);
+      const req = http.expectOne((candidate) => candidate.url.endsWith('/batch?route=feeds'));
+      const sent = JSON.parse(req.request.body as string) as {
+        requests: { id: string; url: string }[];
+      };
+      req.flush({
+        results: [
+          { ...sent.requests[0], status: 200, ok: true, body: FEED_XML, usage: 40 },
+          { ...sent.requests[1], status: 429, ok: false, body: 'rate limited', usage: 41 },
+        ],
+      });
+      await settle();
+
+      expect(goodTitle).toBe('A Feed');
+      expect(badError).not.toBeNull();
+      expect(badError!.message).toMatch(/rate-limiting/i);
+      expect(cache.putCount).toBe(1);
+      expect(TestBed.inject(CorsProxyUsageStore).usage()).toMatchObject({
+        requests: 1,
+        failures: 1,
+        accountTotal: 41,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses the ordinary Mawkingbird endpoint when only one feed misses', async () => {
+    vi.useFakeTimers();
+    try {
+      settings.select('mawkingbird');
+      fetcher.fetchFeed('https://one.example/feed.xml', { useProxy: true }).subscribe();
+      await vi.advanceTimersByTimeAsync(20);
+
+      const req = http.expectOne(
+        (candidate) => candidate.method === 'GET' && candidate.url.includes('?route=feeds&url='),
+      );
+      req.flush(FEED_XML);
+      http.verify();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('splits more than six misses across the fewest allowed batches', async () => {
+    vi.useFakeTimers();
+    try {
+      settings.select('mawkingbird');
+      for (let index = 0; index < 8; index++) {
+        fetcher.fetchFeed(`https://feed-${index}.example/rss`, { useProxy: true }).subscribe();
+      }
+      await vi.advanceTimersByTimeAsync(20);
+
+      const requests = http.match(
+        (candidate) => candidate.method === 'POST' && candidate.url.endsWith('/batch?route=feeds'),
+      );
+      expect(requests).toHaveLength(2);
+      expect(
+        requests.map(
+          (request) =>
+            (JSON.parse(request.request.body as string) as { requests: unknown[] }).requests.length,
+        ),
+      ).toEqual([6, 2]);
+      for (const request of requests) {
+        const sent = JSON.parse(request.request.body as string) as {
+          requests: { id: string }[];
+        };
+        request.flush({
+          results: sent.requests.map(({ id }) => ({
+            id,
+            status: 200,
+            ok: true,
+            body: FEED_XML,
+            usage: null,
+          })),
+        });
+      }
+      await settle();
+      expect(TestBed.inject(CorsProxyUsageStore).usage().requests).toBe(2);
+      http.verify();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   // ------------------------------------------------------------- caching
   // Every request here is one a rate-limited CORS proxy would otherwise have
   // to serve, so each of these is a bug that cost real quota.

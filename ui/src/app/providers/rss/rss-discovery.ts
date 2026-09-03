@@ -1,8 +1,7 @@
-import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { CorsProxy } from '../cors-proxy/cors-proxy';
-import { externalFetch } from '../external-fetch';
+import { CorsProxyBatchFetch } from '../cors-proxy/cors-proxy-batch-fetch';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { RssSubscriptions } from './rss-subscriptions';
 
@@ -134,8 +133,8 @@ export function feedLinksIn(
  */
 @Injectable({ providedIn: 'root' })
 export class RssDiscovery {
-  private http = inject(HttpClient);
   private proxy = inject(CorsProxy);
+  private batchFetch = inject(CorsProxyBatchFetch);
   private subs = inject(RssSubscriptions);
   private diagnostics = inject(PageDiagnostics);
 
@@ -186,10 +185,11 @@ export class RssDiscovery {
       this.checked.set(targets.length);
 
       const results: DiscoveredFeed[] = [];
-      // Sequential, like the OPML importer and kit installer: a burst of
-      // cross-origin fetches is what a free proxy rate-limits.
-      for (const [siteUrl, via] of targets) {
-        for (const feed of await this.probe(siteUrl)) {
+      const probed = await Promise.all(
+        targets.map(async ([siteUrl, via]) => ({ siteUrl, via, feeds: await this.probe(siteUrl) })),
+      );
+      for (const { siteUrl, via, feeds } of probed) {
+        for (const feed of feeds) {
           // Already subscribed is not a suggestion.
           if (this.subs.has(feed.url) || results.some((r) => r.url === feed.url)) {
             continue;
@@ -212,14 +212,7 @@ export class RssDiscovery {
   /** Fetch one site and read its feed declarations. Failures are not fatal. */
   private async probe(siteUrl: string): Promise<{ url: string; title: string; type: string }[]> {
     try {
-      const request = this.proxy.proxyRequest(siteUrl, 'article');
-      const html = await firstValueFrom(
-        this.http.get(request.url, {
-          headers: request.headers,
-          context: externalFetch(),
-          responseType: 'text',
-        }),
-      );
+      const html = await firstValueFrom(this.batchFetch.text(siteUrl, 'article'));
       return feedLinksIn(html ?? '', siteUrl);
     } catch (err) {
       // A site that will not load is the common case, not an exception: it is

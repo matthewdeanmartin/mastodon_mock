@@ -41,9 +41,8 @@
  *   3. **Deduplication by normalized URL**, so twenty friends who all link the
  *      same group blog cost one probe between them.
  *
- * Probes run sequentially. A burst of cross-origin fetches is exactly what a
- * free proxy rate-limits, which is the same reasoning as `rss-discovery.ts` and
- * the OPML importer.
+ * Mawkingbird probes run in groups of its advertised batch size, with the same
+ * per-item pacing between groups. Other proxies remain sequential.
  *
  * ## Stopping early is a real answer
  *
@@ -87,10 +86,9 @@ const MAX_PAGES = 200;
  * Milliseconds between probes.
  *
  * The Mawkingbird proxy allows supporters 300 requests a minute — generous, and
- * still a ceiling a bulk scan can walk straight into: probing is sequential but
- * not *slow*, and `PasteResolve` may spend two requests on one site (direct
- * first, then the proxy). Back-to-back local failures alone can exceed five a
- * second.
+ * still a ceiling a bulk scan can walk straight into. Batching saves Worker
+ * invocations, not per-target rate-limit charges, so starts remain paced at an
+ * average of four targets a second.
  *
  * 250ms caps this at four a second, comfortably inside the allowance while
  * leaving room for the rest of the app — a scan must not rate-limit the feed
@@ -387,31 +385,36 @@ export class FriendFeedScan {
       let spent = 0;
       let gaveUp = false;
 
-      for (const target of budget) {
+      const batchSize = Math.max(1, this.proxy.batchCapacity('article'));
+      for (let index = 0; index < budget.length; index += batchSize) {
         if (this.cancelRequested) {
           break;
         }
-        // Paced rather than fired back-to-back: see PROBE_INTERVAL_MS. Before
-        // the probe, not after, so the delay is skipped on the way out.
+        // Pace groups by their item count: batching changes Worker invocations,
+        // not the number of route-limit charges.
         if (spent > 0) {
-          await delay(PROBE_INTERVAL_MS);
+          await delay(PROBE_INTERVAL_MS * batchSize);
         }
-        spent++;
-
-        const outcome = await this.probe(target.key, target.raw, target.via);
-        found.push(...outcome.feeds);
-        this.progress.update((p) => (p ? { ...p, probed: p.probed + 1, found: found.length } : p));
-
-        if (outcome.reached) {
-          consecutiveFailures = 0;
-          continue;
+        const group = budget.slice(index, index + batchSize);
+        spent += group.length;
+        const outcomes = await Promise.all(
+          group.map((target) => this.probe(target.key, target.raw, target.via)),
+        );
+        let rateLimited = false;
+        for (const outcome of outcomes) {
+          found.push(...outcome.feeds);
+          this.progress.update((p) =>
+            p ? { ...p, probed: p.probed + 1, found: found.length } : p,
+          );
+          if (outcome.reached) consecutiveFailures = 0;
+          else consecutiveFailures++;
+          rateLimited ||= outcome.rateLimited;
         }
-        consecutiveFailures++;
         // The proxy said the window is exhausted. Wait for it to refill rather
         // than burning the remaining budget on requests that will also be
         // refused — each one would write an `unreachable` record for a site
         // that was never actually asked.
-        if (outcome.rateLimited) {
+        if (rateLimited) {
           // Logged on both edges. A pause that only announces its start leaves
           // the reader of a log unable to tell "waiting" from "died while
           // waiting", which is exactly the ambiguity a pause creates on screen.

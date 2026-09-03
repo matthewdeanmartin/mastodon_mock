@@ -22,13 +22,14 @@ const page = (statuses: Status[]) => ({ statuses, cursor: null, hasMore: false, 
 describe('TwitterProvider', () => {
   let getUserPosts: ReturnType<typeof vi.fn>;
   let stored: { handle: string; statuses: Status[]; fetchedAt: number }[];
+  let batchAvailable: boolean;
 
   /** Build the provider with `stored` already on "disk". */
   function build(): TwitterProvider {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
-        { provide: TwitterApi, useValue: { getUserPosts } },
+        { provide: TwitterApi, useValue: { getUserPosts, batchAvailable: () => batchAvailable } },
         {
           provide: TwitterCache,
           useValue: {
@@ -54,6 +55,7 @@ describe('TwitterProvider', () => {
   beforeEach(() => {
     localStorage.clear();
     stored = [];
+    batchAvailable = false;
     getUserPosts = vi.fn().mockReturnValue(of(page([status('1')])));
   });
 
@@ -130,6 +132,28 @@ describe('TwitterProvider', () => {
     follow(['a', 'b', 'c']);
     await firstValueFrom(provider.fetchPage());
     expect(peak).toBe(1);
+  });
+
+  it('starts cold reads together when Mawkingbird can batch them', async () => {
+    batchAvailable = true;
+    let inFlight = 0;
+    let peak = 0;
+    getUserPosts.mockImplementation(
+      () =>
+        new Observable<ReturnType<typeof page>>((subscriber) => {
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          setTimeout(() => {
+            inFlight--;
+            subscriber.next(page([status('1')]));
+            subscriber.complete();
+          }, 5);
+        }),
+    );
+    const provider = build();
+    follow(['a', 'b', 'c']);
+    await firstValueFrom(provider.fetchPage());
+    expect(peak).toBe(COLD_START_BUDGET);
   });
 
   it('keeps the feed when one followed account fails', async () => {

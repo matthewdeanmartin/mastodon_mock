@@ -57,12 +57,21 @@ export class CorsProxyUsageStore {
   readonly usage = signal<CorsProxyUsage>(read());
 
   record(ok: boolean, response?: Response | null): void {
+    this.recordTotal(ok, readAccountTotal(response));
+  }
+
+  /** Record one browser request whose account total arrived inside a batch body. */
+  recordBatch(ok: boolean, accountTotal: number | null): void {
+    this.recordTotal(ok, accountTotal);
+  }
+
+  private recordTotal(ok: boolean, accountTotal: number | null): void {
     const current = this.usage();
     this.write({
       requests: current.requests + 1,
       failures: current.failures + (ok ? 0 : 1),
       lastAt: Date.now(),
-      accountTotal: readAccountTotal(response) ?? current.accountTotal ?? null,
+      accountTotal: accountTotal ?? current.accountTotal ?? null,
     });
   }
 
@@ -98,6 +107,10 @@ function read(): CorsProxyUsage {
       requests: numberOr(parsed.requests),
       failures: numberOr(parsed.failures),
       lastAt: numberOr(parsed.lastAt),
+      accountTotal:
+        parsed.accountTotal === null || parsed.accountTotal === undefined
+          ? null
+          : numberOr(parsed.accountTotal),
     };
   } catch {
     return { ...EMPTY };

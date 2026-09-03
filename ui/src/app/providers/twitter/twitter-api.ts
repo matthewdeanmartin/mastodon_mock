@@ -47,6 +47,10 @@ export interface TwitterPage {
 export class TwitterApi {
   private transport = inject(TwitterTransport);
 
+  batchAvailable(): boolean {
+    return this.transport.batchAvailable();
+  }
+
   /**
    * What is left on the prepaid balance.
    *

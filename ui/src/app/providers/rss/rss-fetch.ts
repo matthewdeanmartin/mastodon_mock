@@ -7,6 +7,7 @@ import {
   map,
   Observable,
   of,
+  Subscriber,
   shareReplay,
   switchMap,
   tap,
@@ -75,6 +76,11 @@ export class RssFetch {
    * proxy configuration change mid-flight.
    */
   private inFlight = new Map<string, Observable<ParsedFeed>>();
+
+  /** Proxy-eligible misses waiting for the short coalescing window to close. */
+  private batchQueue: PendingBatchFeed[] = [];
+  private batchTimer: ReturnType<typeof setTimeout> | null = null;
+  private batchSequence = 0;
 
   /**
    * When each diagnostic key was last emitted, for rate-limiting the log.
@@ -281,6 +287,149 @@ export class RssFetch {
   private buildRequest(url: string, options: { useProxy?: boolean }): Observable<ParsedFeed> {
     const viaProxy = options.useProxy === true;
 
+    if (viaProxy && this.corsProxy.batchCapacity('feeds') > 1) {
+      return this.buildBatchedRequest(url);
+    }
+
+    return this.buildSingleRequest(url, viaProxy);
+  }
+
+  /**
+   * Hold a proxy request very briefly so sibling RSS cache misses can share one
+   * Worker invocation. A lone request falls back to the ordinary GET endpoint,
+   * avoiding a batch envelope when it would save nothing.
+   */
+  private buildBatchedRequest(url: string): Observable<ParsedFeed> {
+    return new Observable((subscriber) => {
+      const pending: PendingBatchFeed = {
+        id: `rss-${++this.batchSequence}`,
+        url,
+        subscriber,
+      };
+      this.batchQueue.push(pending);
+      if (this.batchTimer === null) {
+        this.batchTimer = setTimeout(() => this.flushBatchQueue(), PROXY_BATCH_WINDOW_MS);
+      }
+      return () => {
+        const index = this.batchQueue.indexOf(pending);
+        if (index >= 0) {
+          this.batchQueue.splice(index, 1);
+        }
+      };
+    });
+  }
+
+  private flushBatchQueue(): void {
+    this.batchTimer = null;
+    const pending = this.batchQueue.filter((item) => !item.subscriber.closed);
+    this.batchQueue = [];
+    const capacity = this.corsProxy.batchCapacity('feeds');
+
+    if (capacity < 2) {
+      pending.forEach((item) => this.sendSingle(item));
+      return;
+    }
+    for (let index = 0; index < pending.length; index += capacity) {
+      const group = pending.slice(index, index + capacity);
+      if (group.length === 1) {
+        this.sendSingle(group[0]);
+      } else {
+        this.sendBatch(group);
+      }
+    }
+  }
+
+  private sendSingle(item: PendingBatchFeed): void {
+    this.buildSingleRequest(item.url, true).subscribe(item.subscriber);
+  }
+
+  private sendBatch(items: readonly PendingBatchFeed[]): void {
+    let request;
+    try {
+      request = this.corsProxy.proxyBatchRequest(
+        items.map(({ id, url }) => ({ id, url })),
+        'feeds',
+      );
+    } catch (error: unknown) {
+      const failure = error instanceof Error ? error : new Error('These feeds cannot be proxied.');
+      items.forEach((item) => item.subscriber.error(failure));
+      return;
+    }
+
+    this.http
+      .post<unknown>(request.url, request.body, {
+        headers: request.headers,
+        observe: 'response',
+        context: externalFetch(),
+      })
+      .pipe(
+        // The Worker waits for all upstreams before returning the envelope. Give
+        // its own per-feed timeout a little room to become an item-level result.
+        timeout({
+          each: BATCH_TIMEOUT_MS,
+          with: () => throwError(() => new Error(TIMEOUT_MESSAGE)),
+        }),
+      )
+      .subscribe({
+        next: (response) => this.deliverBatch(items, response.body),
+        error: (error: unknown) => {
+          this.proxyUsage.record(false);
+          const failure = new Error(describe(error, true));
+          items.forEach((item) => item.subscriber.error(failure));
+        },
+      });
+  }
+
+  private deliverBatch(items: readonly PendingBatchFeed[], body: unknown): void {
+    const results = readBatchResults(body);
+    if (!results) {
+      this.proxyUsage.recordBatch(false, null);
+      const failure = new Error('The CORS proxy returned an invalid batch response.');
+      items.forEach((item) => item.subscriber.error(failure));
+      return;
+    }
+
+    const byId = new Map(results.map((result) => [result.id, result]));
+    const accountTotal = results.reduce<number | null>(
+      (highest, result) => (result.usage === null ? highest : Math.max(highest ?? 0, result.usage)),
+      null,
+    );
+    this.proxyUsage.recordBatch(
+      items.every((item) => byId.get(item.id)?.ok === true),
+      accountTotal,
+    );
+
+    for (const item of items) {
+      const result = byId.get(item.id);
+      if (!result) {
+        item.subscriber.error(new Error('The CORS proxy omitted a feed from its batch response.'));
+        continue;
+      }
+      if (!result.ok) {
+        item.subscriber.error(
+          new Error(
+            describe(
+              new HttpErrorResponse({
+                status: result.status,
+                error: result.body,
+                url: item.url,
+              }),
+              true,
+            ),
+          ),
+        );
+        continue;
+      }
+      try {
+        item.subscriber.next(parseFeed(result.body));
+        item.subscriber.complete();
+      } catch (error: unknown) {
+        item.subscriber.error(error);
+      }
+    }
+  }
+
+  private buildSingleRequest(url: string, viaProxy: boolean): Observable<ParsedFeed> {
     let requestUrl = url;
     let headers: HttpHeaders | undefined;
     if (viaProxy) {
@@ -340,9 +489,70 @@ export class RssFetch {
  */
 const FEED_TIMEOUT_MS = 20_000;
 
+/** Long enough to catch siblings created by the same `forkJoin`, imperceptible to a person. */
+const PROXY_BATCH_WINDOW_MS = 10;
+
+/** Worker-side fetches may consume the full single-feed timeout before the envelope returns. */
+const BATCH_TIMEOUT_MS = FEED_TIMEOUT_MS + 5_000;
+
 /** Shown for a feed that never answered. */
 const TIMEOUT_MESSAGE =
   'This feed took too long to answer. It may be slow, or temporarily unreachable.';
+
+interface PendingBatchFeed {
+  id: string;
+  url: string;
+  subscriber: Subscriber<ParsedFeed>;
+}
+
+interface BatchFeedResult {
+  id: string;
+  status: number;
+  ok: boolean;
+  body: string;
+  usage: number | null;
+}
+
+/** Narrow an untrusted proxy envelope before matching results back to callers. */
+function readBatchResults(value: unknown): BatchFeedResult[] | null {
+  if (!isRecord(value) || !Array.isArray(value['results'])) {
+    return null;
+  }
+  const results: BatchFeedResult[] = [];
+  const ids = new Set<string>();
+  for (const candidate of value['results']) {
+    if (
+      !isRecord(candidate) ||
+      typeof candidate['id'] !== 'string' ||
+      candidate['id'].length === 0 ||
+      ids.has(candidate['id']) ||
+      typeof candidate['status'] !== 'number' ||
+      !Number.isInteger(candidate['status']) ||
+      typeof candidate['ok'] !== 'boolean' ||
+      typeof candidate['body'] !== 'string' ||
+      !isUsage(candidate['usage'])
+    ) {
+      return null;
+    }
+    ids.add(candidate['id']);
+    results.push({
+      id: candidate['id'],
+      status: candidate['status'],
+      ok: candidate['ok'],
+      body: candidate['body'],
+      usage: candidate['usage'],
+    });
+  }
+  return results;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isUsage(value: unknown): value is number | null {
+  return value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0);
+}
 
 /**
  * Whether an error is the app's own configuration refusing, rather than the

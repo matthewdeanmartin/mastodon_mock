@@ -58,6 +58,7 @@ describe('FriendFeedScan', () => {
   let cache: FakeCache;
   let diagnostics: { info: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> };
   let scan: FriendFeedScan;
+  let batchCapacity: number;
 
   /** One page of `accounts`, with no cursor so the walk stops. */
   function onePage(accounts: Account[]) {
@@ -80,13 +81,17 @@ describe('FriendFeedScan', () => {
     resolver = { resolve: vi.fn() };
     cache = new FakeCache();
     diagnostics = { info: vi.fn(), warn: vi.fn() };
+    batchCapacity = 1;
     TestBed.configureTestingModule({
       providers: [
         FriendFeedScan,
         { provide: Api, useValue: api },
         { provide: PasteResolve, useValue: resolver },
         { provide: FriendFeedCache, useValue: cache },
-        { provide: CorsProxy, useValue: { available: () => true } },
+        {
+          provide: CorsProxy,
+          useValue: { available: () => true, batchCapacity: () => batchCapacity },
+        },
         { provide: PageDiagnostics, useValue: diagnostics },
       ],
     });
@@ -138,6 +143,30 @@ describe('FriendFeedScan', () => {
     expect(resolver.resolve).toHaveBeenCalledOnce();
     expect(result?.feeds).toHaveLength(1);
     expect(result?.feeds[0].via).toBe('ana');
+  });
+
+  it('starts one Mawkingbird article batch at a time', async () => {
+    batchCapacity = 6;
+    const many = Array.from({ length: 8 }, (_, i) => account(`f${i}`, `https://s${i}.example`));
+    api.accountFollowingPage.mockReturnValue(onePage(many));
+    let inFlight = 0;
+    let peak = 0;
+    resolver.resolve.mockImplementation(
+      (url: string) =>
+        new Promise((resolve) => {
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          setTimeout(() => {
+            inFlight--;
+            resolve(feedFound(url));
+          }, 10);
+        }),
+    );
+
+    await run();
+
+    expect(peak).toBe(6);
+    expect(resolver.resolve).toHaveBeenCalledTimes(8);
   });
 
   it('never re-probes a URL an earlier scan already answered', async () => {

@@ -15,7 +15,7 @@ import { Status } from '../../models';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { FeedProvider } from '../provider';
 import { TwitterFeed } from './twitter-feed';
-import { TwitterFollows } from './twitter-follows';
+import { TwitterFollow, TwitterFollows } from './twitter-follows';
 import { TwitterSettings } from './twitter-settings';
 
 /**
@@ -224,49 +224,45 @@ export class TwitterProvider implements FeedProvider {
       });
     }
 
-    // Cached reads are free and can all resolve together; the cold-start
-    // fetches go one at a time. Parallel requests through a free CORS proxy is
-    // the exact shape that trips its per-origin limit — observed during
-    // development — and a throttled request fails *having already been billed*.
+    // Cached reads are free and can all resolve together. Cold starts begin
+    // together only when Mawkingbird can enclose them in one invocation;
+    // third-party proxies keep the established one-at-a-time path.
     const cachedPages = warm.length
       ? forkJoin(warm.map((follow) => this.feed.cached(follow.username)))
       : of<Status[][]>([]);
 
-    const fetchedPages = toFetch.length
-      ? from(toFetch).pipe(
-          concatMap((follow) =>
-            // Once the breaker trips mid-batch, abandon the rest of the cold
-            // starts: they are queued behind the same dead proxy and would each
-            // pay the full failure latency before reporting the same thing.
-            this.paused()
-              ? of<Status[]>([])
-              : this.feed.timeline(follow).pipe(
-                  tap(() => {
-                    this.consecutiveFailures = 0;
-                  }),
-                  // One dead handle must not cost the reader the whole Home feed.
-                  // The aggregator reads a thrown error as "this provider is
-                  // finished", which would drop every other account too.
-                  catchError((error: unknown) => {
-                    const message =
-                      error instanceof Error ? error.message : 'Could not load an account.';
-                    this.errors.update((all) => [...all, `@${follow.username}: ${message}`]);
-                    this.consecutiveFailures += 1;
-                    this.diagnostics.error('Twitter', 'page:account-error', error, {
-                      handle: follow.username,
-                      consecutiveFailures: this.consecutiveFailures,
-                      threshold: FAILURE_THRESHOLD,
-                    });
-                    if (this.consecutiveFailures >= FAILURE_THRESHOLD) {
-                      this.trip();
-                    }
-                    return of<Status[]>([]);
-                  }),
-                ),
-          ),
-          toArray(),
-        )
-      : of<Status[][]>([]);
+    const fetchOne = (follow: TwitterFollow) =>
+      // Once the breaker trips mid-batch, abandon the rest of the cold
+      // starts: they are queued behind the same dead proxy and would each
+      // pay the full failure latency before reporting the same thing.
+      this.paused()
+        ? of<Status[]>([])
+        : this.feed.timeline(follow).pipe(
+            tap(() => {
+              this.consecutiveFailures = 0;
+            }),
+            catchError((error: unknown) => {
+              const message = error instanceof Error ? error.message : 'Could not load an account.';
+              this.errors.update((all) => [...all, `@${follow.username}: ${message}`]);
+              this.consecutiveFailures += 1;
+              this.diagnostics.error('Twitter', 'page:account-error', error, {
+                handle: follow.username,
+                consecutiveFailures: this.consecutiveFailures,
+                threshold: FAILURE_THRESHOLD,
+              });
+              if (this.consecutiveFailures >= FAILURE_THRESHOLD) this.trip();
+              return of<Status[]>([]);
+            }),
+          );
+
+    const fetchedPages = !toFetch.length
+      ? of<Status[][]>([])
+      : this.feed.batchAvailable()
+        ? forkJoin(toFetch.map(fetchOne))
+        : from(toFetch).pipe(
+            concatMap((follow) => fetchOne(follow)),
+            toArray(),
+          );
 
     return forkJoin([cachedPages, fetchedPages]).pipe(
       map(([cached, fetched]) =>

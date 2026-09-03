@@ -1,12 +1,12 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { Api } from '../../api';
 import { Account } from '../../models';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { CorsProxy } from '../cors-proxy/cors-proxy';
+import { CorsProxyBatchFetch } from '../cors-proxy/cors-proxy-batch-fetch';
 import { CorsProxySettings } from '../cors-proxy/cors-proxy-settings';
-import { externalFetch } from '../external-fetch';
 import { FeedCandidate, collapseFormats, rankFeeds } from './feed-ranking';
 import { feedLinksIn } from './rss-discovery';
 import { RssFetch } from './rss-fetch';
@@ -70,10 +70,11 @@ const BARE_DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
  * ## Cost discipline
  *
  * Each probe is a cross-origin fetch on the shared CORS-proxy budget — the same
- * one article expansion and friend-link discovery draw on. So: one resolve at a
- * time; never on keystroke (callers resolve on submit, not on input); and a
- * session cache keyed by input, because pasting the same URL twice while trying
- * to make something work is the common case, not the exception.
+ * one article expansion and friend-link discovery draw on. So: never on
+ * keystroke (callers resolve on submit, not on input), batch simultaneous bulk
+ * resolves, and keep a session cache keyed by input, because pasting the same
+ * URL twice while trying to make something work is the common case, not the
+ * exception.
  *
  * The cache is in-memory and per-session on purpose. "Which feeds does this site
  * declare" is exactly the kind of fact that goes stale invisibly, and a
@@ -81,8 +82,8 @@ const BARE_DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
  */
 @Injectable({ providedIn: 'root' })
 export class PasteResolve {
-  private http = inject(HttpClient);
   private proxy = inject(CorsProxy);
+  private batchFetch = inject(CorsProxyBatchFetch);
   private proxySettings = inject(CorsProxySettings);
   private api = inject(Api);
   private feeds = inject(RssFetch);
@@ -91,6 +92,7 @@ export class PasteResolve {
   readonly running = signal(false);
 
   private cache = new Map<string, PasteResolution>();
+  private active = 0;
 
   /**
    * Resolve `input`.
@@ -108,10 +110,7 @@ export class PasteResolve {
     if (cached) {
       return cached;
     }
-    if (this.running()) {
-      return { kind: 'none', reason: 'Still looking at the last one — one moment.' };
-    }
-
+    this.active++;
     this.running.set(true);
     try {
       const result = await this.classify(trimmed);
@@ -123,7 +122,8 @@ export class PasteResolve {
       this.diagnostics.info('RSS', 'paste:resolved', { kind: result.kind });
       return result;
     } finally {
-      this.running.set(false);
+      this.active--;
+      this.running.set(this.active > 0);
     }
   }
 
@@ -245,23 +245,9 @@ export class PasteResolve {
     // are both "no HTML", and only the status tells them apart.
     let rateLimited = false;
     try {
-      const request = this.proxy.proxyRequest(pageUrl, 'article');
-      html =
-        (await firstValueFrom(
-          this.http
-            .get(request.url, {
-              headers: request.headers,
-              context: externalFetch(),
-              responseType: 'text',
-            })
-            .pipe(
-              catchError((error: unknown) => {
-                rateLimited = error instanceof HttpErrorResponse && error.status === 429;
-                return of('');
-              }),
-            ),
-        )) ?? '';
-    } catch {
+      html = (await firstValueFrom(this.batchFetch.text(pageUrl, 'article'))) ?? '';
+    } catch (error: unknown) {
+      rateLimited = error instanceof HttpErrorResponse && error.status === 429;
       html = '';
     }
 

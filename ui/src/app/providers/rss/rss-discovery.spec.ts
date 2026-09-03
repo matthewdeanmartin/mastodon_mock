@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { HttpClient } from '@angular/common/http';
 import { CorsProxy } from '../cors-proxy/cors-proxy';
+import { CorsProxyBatchFetch } from '../cors-proxy/cors-proxy-batch-fetch';
 import { feedLinksIn, RssDiscovery } from './rss-discovery';
 import { RssSubscriptions } from './rss-subscriptions';
 
@@ -61,24 +61,20 @@ describe('RssDiscovery', () => {
   /** site URL → HTML, anything else fails the fetch. */
   let pages: Map<string, string>;
   let proxyAvailable: boolean;
+  let fetchText: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     localStorage.clear();
     pages = new Map();
     proxyAvailable = true;
+    fetchText = vi.fn((url: string) => {
+      const html = pages.get(url);
+      return html === undefined ? throwError(() => new Error('boom')) : of(html);
+    });
 
     TestBed.configureTestingModule({
       providers: [
-        {
-          provide: HttpClient,
-          useValue: {
-            get: vi.fn((url: string) => {
-              // The stub proxy passes the target through unchanged.
-              const html = pages.get(url);
-              return html === undefined ? throwError(() => new Error('boom')) : of(html);
-            }),
-          },
-        },
+        { provide: CorsProxyBatchFetch, useValue: { text: fetchText } },
         {
           provide: CorsProxy,
           useValue: {
@@ -112,15 +108,13 @@ describe('RssDiscovery', () => {
 
   it('probes each site once however many links point at it', async () => {
     pages.set('https://blog.test/', feedLink('/feed.xml'));
-    const http = TestBed.inject(HttpClient);
-
     await TestBed.inject(RssDiscovery).discover([
       { url: 'https://blog.test/a', via: 'alice' },
       { url: 'https://blog.test/b', via: 'bob' },
       { url: 'https://blog.test/c', via: 'carol' },
     ]);
 
-    expect(http.get).toHaveBeenCalledTimes(1);
+    expect(fetchText).toHaveBeenCalledTimes(1);
     // Attribution goes to whoever linked it first.
     expect(TestBed.inject(RssDiscovery).found()[0].via).toBe('alice');
   });
@@ -133,7 +127,7 @@ describe('RssDiscovery', () => {
     await TestBed.inject(RssDiscovery).discover(links);
 
     // Each probe is a third-party fetch on a shared budget.
-    expect(TestBed.inject(HttpClient).get).toHaveBeenCalledTimes(10);
+    expect(fetchText).toHaveBeenCalledTimes(10);
   });
 
   it('keeps going when a site will not load', async () => {
@@ -162,7 +156,7 @@ describe('RssDiscovery', () => {
 
     expect(await discovery.discover([{ url: 'https://blog.test/a', via: 'alice' }])).toEqual([]);
     expect(discovery.error()).toContain('CORS proxy');
-    expect(TestBed.inject(HttpClient).get).not.toHaveBeenCalled();
+    expect(fetchText).not.toHaveBeenCalled();
   });
 
   it('ignores links that are not http(s)', async () => {
@@ -170,7 +164,7 @@ describe('RssDiscovery', () => {
       { url: 'mailto:someone@example.com', via: 'alice' },
       { url: 'not a url', via: 'bob' },
     ]);
-    expect(TestBed.inject(HttpClient).get).not.toHaveBeenCalled();
+    expect(fetchText).not.toHaveBeenCalled();
   });
 
   it('clears running state when finished', async () => {

@@ -1,6 +1,6 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, map, Observable, throwError, timer } from 'rxjs';
+import { catchError, map, Observable, Subscriber, throwError, timeout, timer } from 'rxjs';
 import { retry } from 'rxjs/operators';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { CorsProxy, CorsProxyRefusal } from '../cors-proxy/cors-proxy';
@@ -82,6 +82,14 @@ export class TwitterTransport {
   private consent = inject(ProxyConsent);
   private usage = inject(TwitterUsage);
   private diagnostics = inject(PageDiagnostics);
+  private batchQueue: PendingTwitterRequest[] = [];
+  private batchTimer: ReturnType<typeof setTimeout> | null = null;
+  private batchSequence = 0;
+
+  /** Whether simultaneous reads can share one Mawkingbird invocation. */
+  batchAvailable(): boolean {
+    return this.proxy.batchCapacity(this.activeRoute()) > 1;
+  }
 
   /**
    * Send an authenticated read to the active source, through the proxy.
@@ -128,6 +136,7 @@ export class TwitterTransport {
       return throwError(() => new TwitterProxyRequired(config.entry.id, false));
     }
 
+    const route = config.entry.id === 'getxapi' ? 'getxapi' : 'twitterapi';
     let proxied: { url: string; headers: HttpHeaders };
     try {
       // Credentialed: the key rides through the proxy, which is exactly what the
@@ -135,11 +144,7 @@ export class TwitterTransport {
       // user's own instance) still applies.
       // The route name tracks the source, because the Mawkingbird proxy has a
       // separate allowlist entry per data service.
-      proxied = this.proxy.proxyCredentialedRequest(
-        targetUrl,
-        true,
-        config.entry.id === 'getxapi' ? 'getxapi' : 'twitterapi',
-      );
+      proxied = this.proxy.proxyCredentialedRequest(targetUrl, true, route);
     } catch (error: unknown) {
       const message =
         error instanceof CorsProxyRefusal ? error.message : 'This request cannot be proxied.';
@@ -169,7 +174,12 @@ export class TwitterTransport {
       proxy: proxyLabel,
     });
 
-    return this.send<T>(config, proxied.url, headers, proxyLabel).pipe(
+    const response =
+      this.proxy.batchCapacity(route) > 1
+        ? this.sendBatched<T>(config, targetUrl, route, headers, proxyLabel)
+        : this.send<T>(config, proxied.url, headers, proxyLabel);
+
+    return response.pipe(
       map((body) => {
         // HTTP 200 is not success here — see providerErrorInBody. A proxy can
         // relay a 403 body under its own 200, which is precisely what AllOrigins
@@ -199,6 +209,99 @@ export class TwitterTransport {
         return throwError(() => normalized);
       }),
     );
+  }
+
+  private activeRoute(): 'twitterapi' | 'getxapi' {
+    return this.settings.resolve()?.entry.id === 'getxapi' ? 'getxapi' : 'twitterapi';
+  }
+
+  private sendBatched<T>(
+    config: TwitterConfig,
+    targetUrl: string,
+    route: 'twitterapi' | 'getxapi',
+    headers: HttpHeaders,
+    proxyLabel: string,
+  ): Observable<T> {
+    return new Observable((subscriber) => {
+      const pending: PendingTwitterRequest = {
+        id: `twitter-${++this.batchSequence}`,
+        targetUrl,
+        route,
+        config,
+        headers,
+        proxyLabel,
+        subscriber,
+      };
+      this.batchQueue.push(pending);
+      if (this.batchTimer === null) {
+        this.batchTimer = setTimeout(() => this.flushBatch(), BATCH_WINDOW_MS);
+      }
+      return () => {
+        const index = this.batchQueue.indexOf(pending);
+        if (index >= 0) this.batchQueue.splice(index, 1);
+      };
+    });
+  }
+
+  private flushBatch(): void {
+    this.batchTimer = null;
+    const pending = this.batchQueue.filter((item) => !item.subscriber.closed);
+    this.batchQueue = [];
+    const groups = new Map<string, PendingTwitterRequest[]>();
+    for (const item of pending) {
+      const key = `${item.route}\n${headerFingerprint(item.headers)}`;
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+    }
+    for (const items of groups.values()) {
+      const capacity = this.proxy.batchCapacity(items[0].route);
+      for (let index = 0; index < items.length; index += Math.max(1, capacity)) {
+        const group = items.slice(index, index + Math.max(1, capacity));
+        if (capacity < 2 || group.length === 1) this.sendQueuedSingle(group[0]);
+        else this.sendQueuedBatch(group);
+      }
+    }
+  }
+
+  private sendQueuedSingle(item: PendingTwitterRequest): void {
+    let proxied;
+    try {
+      proxied = this.proxy.proxyCredentialedRequest(item.targetUrl, true, item.route);
+    } catch (error: unknown) {
+      item.subscriber.error(error);
+      return;
+    }
+    this.send<unknown>(item.config, proxied.url, item.headers, item.proxyLabel).subscribe(
+      item.subscriber,
+    );
+  }
+
+  private sendQueuedBatch(items: readonly PendingTwitterRequest[]): void {
+    let request;
+    try {
+      request = this.proxy.proxyCredentialedBatchRequest(
+        items.map(({ id, targetUrl }) => ({ id, url: targetUrl })),
+        true,
+        items[0].route,
+      );
+    } catch (error: unknown) {
+      items.forEach((item) => item.subscriber.error(error));
+      return;
+    }
+    let headers = request.headers;
+    for (const name of items[0].headers.keys()) {
+      const value = items[0].headers.get(name);
+      if (value) headers = headers.set(name, value);
+    }
+    this.http
+      .post<unknown>(request.url, request.body, {
+        headers,
+        context: externalFetch(),
+      })
+      .pipe(timeout(BATCH_TIMEOUT_MS))
+      .subscribe({
+        next: (body) => deliverTwitterBatch(items, body),
+        error: (error: unknown) => items.forEach((item) => item.subscriber.error(error)),
+      });
   }
 
   /**
@@ -321,6 +424,73 @@ export class TwitterTransport {
       }),
     );
   }
+}
+
+const BATCH_WINDOW_MS = 10;
+const BATCH_TIMEOUT_MS = 25_000;
+
+interface PendingTwitterRequest {
+  id: string;
+  targetUrl: string;
+  route: 'twitterapi' | 'getxapi';
+  config: TwitterConfig;
+  headers: HttpHeaders;
+  proxyLabel: string;
+  subscriber: Subscriber<unknown>;
+}
+
+function headerFingerprint(headers: HttpHeaders): string {
+  return headers
+    .keys()
+    .sort()
+    .map((name) => `${name}:${headers.get(name) ?? ''}`)
+    .join('\n');
+}
+
+function deliverTwitterBatch(items: readonly PendingTwitterRequest[], value: unknown): void {
+  if (!isRecord(value) || !Array.isArray(value['results'])) {
+    const error = new Error('The CORS proxy returned an invalid batch response.');
+    items.forEach((item) => item.subscriber.error(error));
+    return;
+  }
+  const results = new Map<string, { status: number; ok: boolean; body: string }>();
+  for (const candidate of value['results']) {
+    if (
+      !isRecord(candidate) ||
+      typeof candidate['id'] !== 'string' ||
+      typeof candidate['status'] !== 'number' ||
+      typeof candidate['ok'] !== 'boolean' ||
+      typeof candidate['body'] !== 'string'
+    ) {
+      const error = new Error('The CORS proxy returned an invalid batch response.');
+      items.forEach((item) => item.subscriber.error(error));
+      return;
+    }
+    results.set(candidate['id'], {
+      status: candidate['status'],
+      ok: candidate['ok'],
+      body: candidate['body'],
+    });
+  }
+  for (const item of items) {
+    const result = results.get(item.id);
+    if (!result) {
+      item.subscriber.error(new Error('The CORS proxy omitted a Twitter request.'));
+    } else if (!result.ok) {
+      item.subscriber.error(new HttpErrorResponse({ status: result.status, error: result.body }));
+    } else {
+      try {
+        item.subscriber.next(JSON.parse(result.body));
+        item.subscriber.complete();
+      } catch {
+        item.subscriber.error(new Error('The Twitter data service returned invalid JSON.'));
+      }
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 /**

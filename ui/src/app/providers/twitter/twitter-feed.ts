@@ -116,6 +116,10 @@ export class TwitterFeed {
    */
   readonly requestCount = computed(() => this.usage.total());
 
+  batchAvailable(): boolean {
+    return this.api.batchAvailable?.() ?? false;
+  }
+
   /**
    * Whether a held entry is worth spending a request to replace.
    *

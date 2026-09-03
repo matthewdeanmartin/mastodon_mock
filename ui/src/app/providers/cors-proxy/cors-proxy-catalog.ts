@@ -130,6 +130,16 @@ export interface CorsProxyTemplate {
   routed?: boolean;
 }
 
+/** A native multi-target endpoint offered by a proxy. */
+export interface CorsProxyBatchTemplate {
+  /** The endpoint URL, with `{route}` standing in for the requested policy. */
+  pattern: string;
+  /** Routes the endpoint accepts. Batch support is never inferred. */
+  routes: readonly CorsProxyRoute[];
+  /** Hard request-size ceiling published by the proxy. */
+  maxItems: number;
+}
+
 export interface CorsProxyEntry {
   id: CorsProxyId;
   /** Display name, as the service spells it. */
@@ -137,6 +147,8 @@ export interface CorsProxyEntry {
   /** One sentence: what this service is and who it is for. */
   pitch: string;
   template: CorsProxyTemplate;
+  /** Native batching, when this exact proxy implementation supports it. */
+  batch?: CorsProxyBatchTemplate;
   /**
    * The header this proxy authenticates with, when it has one.
    *
@@ -215,6 +227,11 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
       encodeTarget: true,
       routed: true,
     },
+    batch: {
+      pattern: `${MAWKINGBIRD_PROXY}/batch?route={route}`,
+      routes: ['feeds', 'article', 'twitterapi', 'getxapi'],
+      maxItems: 6,
+    },
     // It forwards exactly the headers each route declares — `x-api-key` for the
     // Twitter sources, `authorization` for Mataroa — and drops everything else.
     // That is more than AllOrigins can do and is the point of running our own.
@@ -243,6 +260,11 @@ export const CORS_PROXY_CATALOG: readonly CorsProxyEntry[] = [
       pattern: `${MAWKINGBIRD_PROXY}/?route={route}&url={url}`,
       encodeTarget: true,
       routed: true,
+    },
+    batch: {
+      pattern: `${MAWKINGBIRD_PROXY}/batch?route={route}`,
+      routes: ['feeds', 'article', 'twitterapi', 'getxapi'],
+      maxItems: 6,
     },
     forwardsCustomHeaders: true,
     // No `keyHeader`: unlike every other paid proxy here, there is no key to

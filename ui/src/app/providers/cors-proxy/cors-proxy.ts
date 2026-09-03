@@ -95,6 +95,18 @@ export interface ProxiedRequest {
   headers: HttpHeaders;
 }
 
+export interface CorsProxyBatchItem {
+  id: string;
+  url: string;
+}
+
+/** A request for a proxy's native multi-target endpoint. */
+export interface ProxiedBatchRequest {
+  url: string;
+  headers: HttpHeaders;
+  body: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CorsProxy {
   private settings = inject(CorsProxySettings);
@@ -125,6 +137,76 @@ export class CorsProxy {
     return {
       url: buildProxiedUrl(config, targetUrl, route),
       headers: proxyHeaders(config),
+    };
+  }
+
+  /** Maximum native batch size for this route, or zero when batching is unavailable. */
+  batchCapacity(route: CorsProxyRoute = 'feeds'): number {
+    const batch = this.settings.resolve()?.entry.batch;
+    return batch?.routes.includes(route) ? batch.maxItems : 0;
+  }
+
+  /**
+   * Build a request for the configured proxy's native batch endpoint.
+   *
+   * Every target passes the same disclosure guard as an ordinary proxied
+   * request. Third-party and custom proxies are deliberately unsupported: a
+   * batch URL is an explicit wire contract, not something safe to guess from a
+   * single-target template.
+   */
+  proxyBatchRequest(
+    items: readonly CorsProxyBatchItem[],
+    route: CorsProxyRoute = 'feeds',
+  ): ProxiedBatchRequest {
+    return this.buildBatchRequest(items, route, false);
+  }
+
+  /** Build a credential-carrying batch after the caller's explicit consent. */
+  proxyCredentialedBatchRequest(
+    items: readonly CorsProxyBatchItem[],
+    consented: boolean,
+    route: CorsProxyRoute,
+  ): ProxiedBatchRequest {
+    if (!consented) {
+      throw new CorsProxyRefusal(
+        'Refusing to send an API key through a CORS proxy without your explicit consent.',
+      );
+    }
+    return this.buildBatchRequest(items, route, true);
+  }
+
+  private buildBatchRequest(
+    items: readonly CorsProxyBatchItem[],
+    route: CorsProxyRoute,
+    credentialed: boolean,
+  ): ProxiedBatchRequest {
+    const config = this.settings.resolve();
+    if (!config) {
+      throw new CorsProxyRefusal('No CORS proxy is configured.');
+    }
+    const batch = config.entry.batch;
+    if (!batch || !batch.routes.includes(route)) {
+      throw new CorsProxyRefusal(`${config.entry.label} does not support ${route} batches.`);
+    }
+    if (items.length < 1 || items.length > batch.maxItems) {
+      throw new CorsProxyRefusal(
+        `A ${route} batch must contain between 1 and ${batch.maxItems} requests.`,
+      );
+    }
+    for (const item of items) {
+      if (!item.id) {
+        throw new CorsProxyRefusal('Every batched request needs an id.');
+      }
+      if (credentialed) {
+        assertProxyableIgnoringCredentialHosts(item.url, this.server.baseUrl());
+      } else {
+        assertProxyable(item.url, this.server.baseUrl());
+      }
+    }
+    return {
+      url: batch.pattern.replace('{route}', route),
+      headers: proxyHeaders(config).set('Content-Type', 'text/plain;charset=UTF-8'),
+      body: JSON.stringify({ requests: items }),
     };
   }
 

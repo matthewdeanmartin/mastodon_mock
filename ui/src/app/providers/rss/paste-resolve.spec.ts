@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { Api } from '../../api';
 import { CorsProxy } from '../cors-proxy/cors-proxy';
+import { CorsProxyBatchFetch } from '../cors-proxy/cors-proxy-batch-fetch';
 import { handleIn, PasteResolve, youtubeFeedFor } from './paste-resolve';
 import { RssFetch } from './rss-fetch';
 
@@ -81,7 +81,7 @@ describe('PasteResolve', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        { provide: HttpClient, useValue: { get: httpGet } },
+        { provide: CorsProxyBatchFetch, useValue: { text: httpGet } },
         { provide: RssFetch, useValue: { fetchFeed } },
         {
           provide: CorsProxy,
