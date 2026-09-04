@@ -300,6 +300,43 @@ This also turned up a latent reactivity bug: `thread.ts` held `currentId` as a
 plain field, and passing it into a `computed` would have meant the Reader
 link's post count never updated. Now a signal.
 
+### Round two of the operator's testing — five reports, five fixes
+
+**Library was on the right; RSS puts it on the left.** Moved. Two reading
+surfaces in one app should not mirror each other.
+
+**The library sat in a beige column.** The paper colour was set on `.read-page`,
+so opening the library painted 290px of sepia behind app furniture. Paper now
+belongs to the reading surface only; the panel declares the site theme
+explicitly.
+
+**A two-post thread showed one post.** Root cause was not the reader:
+`adaptAnonymousStatus` namespaced `Status.id` but left `in_reply_to_id` raw, so
+no post in a remotely-read thread could ever be matched to its parent. Reply
+threading was broken everywhere those posts appear — the reader just made it
+visible. Fixed at the adapter.
+
+**Library links 404'd.** There are two ids for the same post: the feed's
+`anonymous-mastodon:<host>:<rawId>` and the route's base64
+`anonymous-status.<blob>`. Only the second resolves, and the library stored the
+first. Now goes through `pages/read/reader-route-id.ts`; `ThreadLoader` also
+learned to accept the feed form so entries already written resolve.
+
+**"Why does it say I'm anonymous? I'm logged in."** The important one, written
+up as [[kindle-anonymous-fetch-finding]] and now **fixed** for the reader path.
+`anonymous-mastodon` names *the post's origin*, not the session — but the
+operator's real complaint was correct: remote posts were fetched with no
+credentials even when signed in, which is precisely how followers-only and
+unlisted posts go unseen. The reader now resolves them through the home server
+first (`resolve=true`), falling back to the public read when that fails. The
+profile page still has the same gap and is flagged there.
+
+I deferred this twice on bad reasoning before the operator pushed back — once on
+request cost (we economize against paid third-party APIs, not our own server),
+once on shared links (they carry the origin permalink, never these ids), and
+once by calling it a "federation change" when it is one existing method on an
+endpoint we already use.
+
 ### One trap worth recording
 
 `vi.useFakeTimers()` in the position-saving spec leaked into the rest of the
@@ -312,5 +349,5 @@ symptom points at entirely the wrong file.
 
 | | |
 | --- | --- |
-| New tests | 69 (40 store, 12 core integration, 10 panel, 7 chain) |
-| Total | 5779 passing |
+| New tests | 82 (40 store, 12 core integration, 10 panel, 7 chain, 6 route id, 7 resolve) |
+| Total | 5792 passing |

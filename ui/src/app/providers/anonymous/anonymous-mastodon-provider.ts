@@ -112,9 +112,19 @@ export function adaptAnonymousAccount(account: Account, server: string): Account
 export function adaptAnonymousStatus(status: Status, server: string): Status {
   const rawId = status.id;
   const account = adaptAnonymousAccount(status.account, server);
+  const namespace = `anonymous-mastodon:${host(server)}:`;
   return {
     ...status,
-    id: `anonymous-mastodon:${host(server)}:${rawId}`,
+    id: `${namespace}${rawId}`,
+    // Namespaced with the id, not left raw.
+    //
+    // `in_reply_to_id` points at a sibling in the same thread, and every one of
+    // those siblings has just had its own `id` rewritten. Leaving this raw
+    // means no post in an anonymously-read thread can be matched to its parent:
+    // reply threading, and the reader's tweetstorm chain, both silently see a
+    // conversation of unrelated posts. Found via a two-post thread rendering as
+    // one post in reader mode.
+    in_reply_to_id: status.in_reply_to_id ? `${namespace}${status.in_reply_to_id}` : null,
     provider: 'anonymous-mastodon',
     providerRef: {
       server,

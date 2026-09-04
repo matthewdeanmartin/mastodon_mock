@@ -3,6 +3,12 @@
     <p class="muted center">{{ 'reader.page.loading' | transloco }}</p>
   } @else if (chain().length) {
     <div class="read-body" [class.with-library]="libraryOpen()">
+      <!-- The library is on the LEFT, matching /rss, where the list of things
+           to read is the left rail and what you are reading is the right pane.
+           Two reading surfaces in one app should not mirror each other. -->
+      @if (libraryOpen()) {
+        <app-library-panel [currentId]="currentId()" (closed)="toggleLibrary()" />
+      }
       <app-reader-core
         [chain]="chain()"
         layout="page"
@@ -10,9 +16,6 @@
         (toggleLibrary)="toggleLibrary()"
         (exit)="exit()"
       />
-      @if (libraryOpen()) {
-        <app-library-panel [currentId]="currentId()" (closed)="toggleLibrary()" />
-      }
     </div>
   } @else {
     <!-- Never a bare dead end: a document that would not open still leaves the

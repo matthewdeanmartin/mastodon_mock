@@ -18,6 +18,7 @@ import { toNitterUrl } from '../../../providers/twitter/nitter';
 import { serverKnowsStatus } from '../../../providers/provider';
 import { DocumentIdentity, ReaderLibrary } from '../../../providers/read/reader-library';
 import { isDocument } from '../reader-document';
+import { readerRouteId } from '../reader-route-id';
 import { Status } from '../../../models';
 import { HumanTimePipe } from '../../../human-time.pipe';
 import { PreviewCardComponent } from '../../../preview-card/preview-card';
@@ -301,7 +302,10 @@ export class ReaderCore {
       return null;
     }
     return {
-      id: root.id,
+      // The id that can be navigated back to, which is not always `Status.id`
+      // — see `reader-route-id.ts`. Storing the feed id here produced library
+      // rows whose links 404.
+      id: readerRouteId(root),
       url: (article ? result?.finalUrl : root.url) ?? root.url ?? '',
       title: article?.title || this.fallbackTitle(root),
       siteName: article?.siteName ?? (this.expansion.host() || null),

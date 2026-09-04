@@ -5,11 +5,33 @@
    rather than on `.reader` inside the core: a sepia column floating on the app's
    dark background is a strip of paper on a desk, not a page. */
 
+/* The paper colour belongs to the *text*, not to the page.
+
+   It used to be set here, so opening the library painted a 290px column of
+   sepia behind a panel that is app furniture — the operator's "ugly beige
+   column". The reading surface gets the paper; everything else gets the site
+   theme, which is what the reader chose for the app. */
 .read-page {
   min-height: 100vh;
   min-height: 100dvh;
+  background: var(--bg);
+}
+
+/* With no library open the reading surface is the whole page, so the paper
+   should reach the edges rather than sitting in a strip down the middle. */
+.read-body:not(.with-library) {
   background: var(--reader-bg, var(--bg));
   color: var(--reader-fg, inherit);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* With it open, only the reading column is papered. */
+.read-body.with-library app-reader-core {
+  background: var(--reader-bg, var(--bg));
+  color: var(--reader-fg, inherit);
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .center {
@@ -59,9 +81,10 @@
 }
 
 .read-body.with-library {
-  grid-template-columns: minmax(0, 1fr) 290px;
+  /* Library first, then the text — the same order as /rss. */
+  grid-template-columns: 290px minmax(0, 1fr);
   gap: 16px;
-  padding-right: 16px;
+  padding-left: 16px;
   align-items: start;
 }
 
@@ -70,6 +93,6 @@
 @media (max-width: 1100px) {
   .read-body.with-library {
     grid-template-columns: minmax(0, 1fr);
-    padding-right: 0;
+    padding-left: 0;
   }
 }

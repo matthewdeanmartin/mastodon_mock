@@ -2,6 +2,8 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { Api } from '../../api';
+import { Auth } from '../../auth';
+import { SearchServer } from '../../search-server';
 import { Status } from '../../models';
 import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
 import { adaptPost } from '../../providers/bluesky/bluesky-adapter';
@@ -51,6 +53,8 @@ import { messageStatus, parseMessageStatusRouteRef } from '../../providers/paste
 @Injectable()
 export class ThreadLoader {
   private api = inject(Api);
+  private auth = inject(Auth);
+  private searchServer = inject(SearchServer);
   private bsky = inject(BlueskyApi);
   private rss = inject(RssProvider);
   private twitterApi = inject(TwitterApi);
@@ -161,9 +165,9 @@ export class ThreadLoader {
       this.loading.set(false);
       return;
     }
-    const publicRef = parseAnonymousStatusRouteRef(id);
+    const publicRef = parseAnonymousStatusRouteRef(id) ?? parseAnonymousFeedId(id);
     if (publicRef) {
-      this.loadAnonymousPublic(publicRef);
+      this.loadPublicPost(publicRef);
       return;
     }
 
@@ -192,6 +196,79 @@ export class ThreadLoader {
       this.api.getContext(id).subscribe((ctx) => {
         this.ancestors.set(ctx.ancestors);
         this.descendants.set(ctx.descendants);
+      }),
+    );
+  }
+
+  /**
+   * A post that lives on another server: through the home server when we have
+   * one, directly otherwise.
+   *
+   * ## Why this branch exists
+   *
+   * The id says "read this from graz.social". Doing that literally means an
+   * unauthenticated request — `externalFetch()` strips the bearer token, and
+   * correctly so, since it belongs to a different host. The remote server
+   * therefore has no idea who is asking and serves only what is public.
+   *
+   * For a signed-out reader that is the whole story. For a signed-in one it is
+   * a downgrade they never asked for: **followers-only and unlisted posts
+   * silently do not exist**, and instances that require signed fetches refuse
+   * outright. The reader sees a 404 or a thin thread and cannot tell that the
+   * post is there and they are entitled to it.
+   *
+   * These ids reach a signed-in session easily — minted while browsing
+   * anonymously, or from a search against a search server, then kept in
+   * history, a bookmark, or the reader's library. Signing in does not rewrite
+   * them.
+   *
+   * ## How the home server helps
+   *
+   * `GET /api/v2/search?q=<url>&resolve=true` asks our *own* server to fetch
+   * the post over ActivityPub under our identity and hand back a local copy.
+   * That is an ordinary authenticated call to the server we already talk to, on
+   * an endpoint that already exists — not a new capability.
+   *
+   * The public read stays as the fallback, because resolution legitimately
+   * fails: a server may not federate with that instance, or may be slow, or the
+   * post may genuinely be public and unknown to it. Falling back is strictly
+   * better than an error, and the reader keeps whatever the remote will give.
+   */
+  private loadPublicPost(ref: AnonymousPublicRef): void {
+    // Nothing to resolve *with*: no Mastodon token means no home server that
+    // could fetch on our behalf. Bluesky-primary and Anonymous both land here.
+    // A separately configured search server is also not ours to ask — it is a
+    // host we read anonymously by design.
+    if (this.auth.lacksMastodonToken || this.searchServer.active() || !ref.originalUrl) {
+      this.loadAnonymousPublic(ref);
+      return;
+    }
+
+    this.sub.add(
+      this.api.search(ref.originalUrl, 'statuses', { resolve: true, limit: 1 }).subscribe({
+        next: (results) => {
+          const resolved = results.statuses[0];
+          if (!resolved) {
+            // Our server does not know it. The remote may still show it.
+            this.loadAnonymousPublic(ref);
+            return;
+          }
+          this.status.set(resolved);
+          this.publicOriginalUrl.set(ref.originalUrl ?? null);
+          this.loading.set(false);
+          // A local id, so the ordinary context endpoint applies — and with it
+          // the replies our server can see and the remote would not have shown.
+          this.sub.add(
+            this.api.getContext(resolved.id).subscribe({
+              next: (ctx) => {
+                this.ancestors.set(ctx.ancestors);
+                this.descendants.set(ctx.descendants);
+              },
+              error: () => this.publicContextUnavailable.set(true),
+            }),
+          );
+        },
+        error: () => this.loadAnonymousPublic(ref),
       }),
     );
   }
@@ -401,4 +478,39 @@ function flattenReplies(nodes: BskyThreadNode[]): Status[] {
     }
   }
   return out;
+}
+
+/**
+ * The feed-side id for an anonymously-read Mastodon post, as a public ref.
+ *
+ * `anonymous-mastodon:<host>:<rawId>` is what `adaptAnonymousStatus` puts on
+ * `Status.id`; the canonical route form is the base64 blob that also carries
+ * the scheme and the original URL. Links are minted in the route form (see
+ * `reader-route-id.ts`), but a feed id can still reach this page — from a
+ * library entry written before that fix, or from anything else that reasonably
+ * assumed `Status.id` addressed the post.
+ *
+ * Resolving it costs an assumption: the scheme is not in the id, so `https` is
+ * assumed. That is true of every Mastodon server worth reading and is the same
+ * assumption the rest of the app makes, but it is why the encoded form is
+ * canonical rather than this one.
+ */
+function parseAnonymousFeedId(id: string): AnonymousPublicRef | null {
+  const prefix = 'anonymous-mastodon:';
+  if (!id.startsWith(prefix)) {
+    return null;
+  }
+  const body = id.slice(prefix.length);
+  const separator = body.indexOf(':');
+  if (separator <= 0) {
+    return null;
+  }
+  const host = body.slice(0, separator);
+  const statusId = body.slice(separator + 1);
+  // `anonymous-mastodon:rss:<id>` is a different beast built by the same
+  // provider for its RSS bridge; it names no host and cannot be fetched here.
+  if (!statusId || host === 'rss' || !host.includes('.')) {
+    return null;
+  }
+  return { server: `https://${host}`, id: statusId };
 }

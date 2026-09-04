@@ -29,7 +29,11 @@
   max-height: calc(100dvh - 24px);
   border: 1px solid var(--border);
   border-radius: 12px;
+  /* The site theme, explicitly — never the reader's paper colour. This panel is
+     app furniture sitting next to a reading surface, and inheriting sepia or
+     solarized here produced a beige column beside a dark app. */
   background: var(--col-bg);
+  color: var(--text);
   /* App chrome inside a reading surface: it must not inherit the article's
      serif, size, letter-spacing or justification. */
   font-family: var(--app-font-family);
