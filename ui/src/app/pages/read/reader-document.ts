@@ -125,3 +125,25 @@ export function isDocument(chain: Status[], hasExpandedArticle: boolean): boolea
   }
   return chainTextLength(chain) >= DOCUMENT_MIN_CHARS;
 }
+
+/**
+ * A title for a document that has none of its own.
+ *
+ * A tweetstorm has no headline; its first sentence is the closest thing, and is
+ * what the author would have written as one had the medium had a field for it.
+ *
+ * Lives here rather than in the reader because the library's "save for later"
+ * control needs the same title from a feed row, where the reader is not
+ * running. Two implementations of "what do we call this" would drift, and the
+ * shelf would then show a document under one name and the reader under another.
+ */
+export function documentTitle(root: Status): string {
+  const text = plainText(root.content ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) {
+    return root.url ?? '';
+  }
+  const firstSentence = text.split(/(?<=[.!?])\s/)[0] ?? text;
+  return firstSentence.length > 90 ? firstSentence.slice(0, 87) + '…' : firstSentence;
+}

@@ -19,6 +19,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AccountHoverCard } from '../account-hover-card/account-hover-card';
 import { PreviewCardComponent } from '../preview-card/preview-card';
 import { AccountListDialog, AccountListMode } from '../account-list-dialog/account-list-dialog';
+import { SaveToLibrary } from '../pages/read/save-to-library/save-to-library';
 import { Api } from '../api';
 import { Auth } from '../auth';
 import { hashtagNameFrom, profileRouteFor } from '../rendered-html-links';
@@ -327,6 +328,7 @@ function compactContentLinks(content: string, embeddedPostUrl: string | null): s
     BookmarkProviderDialog,
     PreviewCardComponent,
     SignInPrompt,
+    SaveToLibrary,
     TranslocoPipe,
   ],
   templateUrl: './status-card.html',

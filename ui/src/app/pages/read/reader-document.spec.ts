@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Status } from '../../models';
-import { chainTextLength, DOCUMENT_MIN_CHARS, isDocument, readerChain } from './reader-document';
+import {
+  chainTextLength,
+  DOCUMENT_MIN_CHARS,
+  documentTitle,
+  isDocument,
+  readerChain,
+} from './reader-document';
 
 function makeStatus(id: string, accountId: string, inReplyToId: string | null = null): Status {
   return {
@@ -179,5 +185,40 @@ describe('readerChain anchored on the post the reader opened', () => {
       makeStatus('a2', 'author', 'a1'),
     ];
     expect(readerChain(thread, 'a1').map((s) => s.id)).toEqual(['a1', 'a2']);
+  });
+});
+
+/**
+ * A tweetstorm has no headline, so the shelf has to name it from the prose.
+ * Shared with the "save for later" control, which needs the same name from a
+ * feed row — two implementations would let the shelf and the reader disagree
+ * about what a document is called.
+ */
+describe('naming a document that has no title', () => {
+  const titled = (content: string, url = 'https://example.test/1') =>
+    documentTitle({ content, url } as Status);
+
+  it('takes the first sentence', () => {
+    expect(titled('<p>The first one. The second one.</p>')).toBe('The first one.');
+  });
+
+  it('strips markup rather than showing it', () => {
+    expect(titled('<p>A <strong>bold</strong> claim.</p>')).toBe('A bold claim.');
+  });
+
+  it('decodes entities, so an ampersand is not spelled out on the shelf', () => {
+    expect(titled('<p>Tea &amp; sympathy.</p>')).toBe('Tea & sympathy.');
+  });
+
+  it('truncates a long opening sentence with an ellipsis', () => {
+    // 87 kept characters plus the ellipsis: the cap is on what is kept, so the
+    // mark does not push the title past the width it was trimmed to fit.
+    const title = titled(`<p>${'word '.repeat(40)}</p>`);
+    expect(title).toHaveLength(88);
+    expect(title.endsWith('…')).toBe(true);
+  });
+
+  it('falls back to the URL when there is no prose at all', () => {
+    expect(titled('<p><img src="x"></p>', 'https://example.test/9')).toBe('https://example.test/9');
   });
 });

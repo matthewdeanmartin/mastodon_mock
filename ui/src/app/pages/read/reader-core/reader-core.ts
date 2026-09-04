@@ -17,7 +17,7 @@ import { ClientPrefs } from '../../../client-prefs';
 import { toNitterUrl } from '../../../providers/twitter/nitter';
 import { serverKnowsStatus } from '../../../providers/provider';
 import { DocumentIdentity, ReaderLibrary } from '../../../providers/read/reader-library';
-import { isDocument } from '../reader-document';
+import { documentTitle, isDocument } from '../reader-document';
 import { readerRouteId } from '../reader-route-id';
 import { Status } from '../../../models';
 import { HumanTimePipe } from '../../../human-time.pipe';
@@ -307,28 +307,9 @@ export class ReaderCore {
       // rows whose links 404.
       id: readerRouteId(root),
       url: (article ? result?.finalUrl : root.url) ?? root.url ?? '',
-      title: article?.title || this.fallbackTitle(root),
+      title: article?.title || documentTitle(root),
       siteName: article?.siteName ?? (this.expansion.host() || null),
     };
-  }
-
-  /**
-   * A title for a document that has none of its own.
-   *
-   * A tweetstorm has no headline; its first sentence is the closest thing, and
-   * is what the author would have written as one had the medium had a field
-   * for it.
-   */
-  private fallbackTitle(root: Status): string {
-    const text = (root.content ?? '')
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!text) {
-      return root.url ?? '';
-    }
-    const firstSentence = text.split(/(?<=[.!?])\s/)[0] ?? text;
-    return firstSentence.length > 90 ? firstSentence.slice(0, 87) + '\u2026' : firstSentence;
   }
 
   /**

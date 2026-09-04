@@ -1,6 +1,6 @@
 # Finding — remote posts are fetched without credentials, even when signed in
 
-Status: **FIXED** (2026-09-04) for the reader path. The profile page still has it.
+Status: **FIXED** (2026-09-04). Reader path first, profile page second.
 Raised by: matthewdeanmartin, 2026-09-04, while testing [[kindle-2-library-and-progress]]
 Related: [[kindle-0-overview]]
 
@@ -134,17 +134,48 @@ federation is Mastodon's and happens server-side regardless. All that changed
 here is which of our *own* endpoints we call for a post whose URL we already
 hold — `api.search(..., { resolve: true })`, one existing method. A routing fix.
 
-## Still open: the profile page
+## The profile page
 
-`pages/profile/profile.ts:992` dispatches `anonymous-account.*` ids to
-`loadAnonymousPublicProfile` with no session check, exactly as the thread loader
-used to. A signed-in reader opening such a profile still gets a credential-free
-read of the account and its posts, so followers-only posts are missing there too.
+**Fixed (2026-09-04), mirroring the reader.** `pages/profile/profile.ts` used to
+dispatch `anonymous-account.*` ids to `loadAnonymousPublicProfile` with no
+session check, so a signed-in reader opening such a profile got a
+credential-free read of the account *and its posts* — followers-only posts
+missing there exactly as they were in the thread.
 
-Not fixed here because a profile resolves an *account* rather than a status —
-`resolve=true` with `type: 'accounts'` on the handle — and because it belongs to
-the profile page rather than to the reader. The mechanism is the same and the
-fix should mirror this one.
+`loadPublicProfile` now sits in front of it with the same gate and the same
+fallback:
+
+```
+an anonymous-account.* id  →  have a Mastodon token, no search server, and an
+                              origin URL?
+                              ├─ yes → resolve it on the home server
+                              │        (search type=accounts, resolve=true)
+                              │        ├─ resolved → an ordinary local profile
+                              │        └─ unknown or failed → public read
+                              └─ no  → public read, as before
+```
+
+Two things made this smaller than it looked:
+
+**`publicProfileRef` is already the switch.** `loadStatuses`, `loadPinned` and
+`loadCollections` each branch on it to choose the remote API. Leaving it null on
+a successful resolve therefore puts the timeline, pinned posts, collections,
+endorsements *and* relationships on the authenticated path without any of them
+being told about it individually — which is the point, since a header that
+resolved while its timeline stayed anonymous would still be missing the posts.
+
+**The resolved account needs no refetch.** `search` returns the same object
+`getAccount` would, so it is set directly. The handle-mismatch guard in
+`loadLocalAccount` (extracted from `load` in this change) does not apply here
+either: we resolved *by URL*, not by an ambiguous short id, so there is no
+wrong-person case to defend against.
+
+The route is left alone. `/profile/anonymous-account.<blob>` still names an
+account on a server we hold no account on, which is the durable truth about it;
+only where the data came from changes. Rewriting it to the local id would put a
+string in history that means nothing after a sign-out or a server switch.
+
+Seven tests in `profile-public-resolve.spec.ts`, mirroring the thread's.
 
 ## Two other bugs found on the same path
 

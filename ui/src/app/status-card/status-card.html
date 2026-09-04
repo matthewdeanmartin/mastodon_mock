@@ -821,6 +821,12 @@
               <span aria-hidden="true">🔖</span>
             </button>
           }
+          <!-- The reading shelf, beside the bookmark rather than instead of it:
+               a bookmark is a record on your Mastodon account and holds posts,
+               while the library holds documents from every source and knows how
+               far through each one you are. Renders itself away on anything
+               that is not a document, which is most posts. -->
+          <app-save-to-library [status]="display" />
           <!-- Server translation needs a status the server actually has. For a
                read-only provider it could only 404 on an id it cannot resolve,
                so those posts get the AI button below instead. -->

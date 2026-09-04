@@ -9,6 +9,7 @@ import { Api } from '../../api';
 import { accountRoutePath, parseAccountRoute } from '../../account-route';
 import { qualifiedHandle } from '../../account-handle';
 import { Server } from '../../server';
+import { SearchServer } from '../../search-server';
 import { Terminology } from '../../terminology';
 import { Auth } from '../../auth';
 import { LocalModeration } from '../../local-moderation';
@@ -235,6 +236,7 @@ export class Profile implements OnInit, OnDestroy {
   private location = inject(Location);
   private router = inject(Router);
   private server = inject(Server);
+  private searchServer = inject(SearchServer);
   private rss = inject(RssProvider);
   private mataroa = inject(MataroaSettings);
   private blogger = inject(BloggerSession);
@@ -991,9 +993,14 @@ export class Profile implements OnInit, OnDestroy {
     }
     const publicRef = parseAnonymousAccountRouteRef(id);
     if (publicRef) {
-      this.loadAnonymousPublicProfile(publicRef);
+      this.loadPublicProfile(publicRef);
       return;
     }
+    this.loadLocalAccount(id);
+  }
+
+  /** The ordinary path: an account id our own server knows. */
+  private loadLocalAccount(id: string): void {
     this.routeLoadSub.add(
       this.api.getAccount(id).subscribe({
         next: (a) => {
@@ -1055,6 +1062,87 @@ export class Profile implements OnInit, OnDestroy {
     return (
       base.replace(/^https?:\/\//, '') ||
       this.transloco.translate<string>('pages.profile.errors.thisServer')
+    );
+  }
+
+  /**
+   * A profile that lives on another server: through the home server when we
+   * have one, directly otherwise.
+   *
+   * The same fix as `ThreadLoader.loadPublicPost`, applied to accounts, and for
+   * the same reason. An `anonymous-account.*` id says "read this from
+   * graz.social", and doing that literally means an unauthenticated request —
+   * `externalFetch()` strips the bearer token, correctly, since it belongs to a
+   * different host. The remote server therefore has no idea who is asking and
+   * serves only what is public: **followers-only and unlisted posts silently do
+   * not exist** on the profile, and instances requiring signed fetches refuse
+   * outright.
+   *
+   * For a signed-out reader that is the whole story. For a signed-in one it is
+   * a downgrade they never asked for, and these ids reach a signed-in session
+   * easily — minted while browsing anonymously, or by a search server, then kept
+   * in history or a bookmark. Signing in does not rewrite them.
+   *
+   * `GET /api/v2/search?q=<url>&resolve=true&type=accounts` asks our *own*
+   * server to webfinger the account under our identity and hand back a local
+   * copy. Once it has, this is an ordinary profile: `publicProfileRef` stays
+   * null, so statuses, pinned posts, collections, relationships and featured
+   * tags all take the authenticated path without being told about it
+   * individually.
+   *
+   * The public read stays as the fallback, because resolution legitimately
+   * fails — a server may not federate with that instance, or may be slow, or the
+   * account may be public and simply unknown to it. Falling back beats an
+   * error, and the reader keeps whatever the remote will give.
+   *
+   * The route is left alone. `/profile/anonymous-account.<blob>` still names an
+   * account on a server we hold no account on, which is the durable truth about
+   * it; only where the data came from changes.
+   */
+  private loadPublicProfile(ref: AnonymousPublicRef): void {
+    // Nothing to resolve *with*: no Mastodon token means no home server that
+    // could webfinger on our behalf. Bluesky-primary and Anonymous land here.
+    // A separately configured search server is also not ours to ask — it is a
+    // host we read anonymously by design.
+    if (this.auth.lacksMastodonToken || this.searchServer.active() || !ref.originalUrl) {
+      this.loadAnonymousPublicProfile(ref);
+      return;
+    }
+
+    this.routeLoadSub.add(
+      this.api.search(ref.originalUrl, 'accounts', { resolve: true, limit: 1 }).subscribe({
+        next: (results) => {
+          const resolved = results.accounts[0];
+          if (!resolved) {
+            // Our server does not know it. The remote may still show it.
+            this.loadAnonymousPublicProfile(ref);
+            return;
+          }
+          // The resolved account is already the object `getAccount` would
+          // return, so setting it here saves a request. The handle-mismatch
+          // guard in `loadLocalAccount` does not apply: we resolved *by URL*,
+          // not by an ambiguous short id.
+          this.account.set(resolved);
+          this.loading.set(false);
+          this.diagnostics.info('Profile', 'public:resolved', {
+            url: ref.originalUrl,
+            id: resolved.id,
+          });
+          this.loadStatuses(resolved.id);
+          this.loadPinned(resolved.id);
+          this.loadCollections(resolved.id);
+          this.maybeLoadPendingMedia(resolved.id);
+          if (this.capabilities.canManageRelationships) {
+            this.routeLoadSub.add(
+              this.api
+                .relationships([resolved.id])
+                .subscribe((rels) => this.relationship.set(rels[0] ?? null)),
+            );
+          }
+          this.loadFeatured(resolved.id);
+        },
+        error: () => this.loadAnonymousPublicProfile(ref),
+      }),
     );
   }
 

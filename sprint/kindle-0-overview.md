@@ -1,6 +1,9 @@
 # Kindle — Epic overview: the reader page
 
 Status: Sprints 1-2 **COMPLETE** (2026-09-04). Sprint 3 planned.
+Also closed on 2026-09-04, both carried forward from Sprint 2: the profile
+page's credential-free read ([[kindle-anonymous-fetch-finding]]) and the
+library's "save for later" entry point.
 Owner: matthewdeanmartin
 
 Builds on [[project-mimb-readability]] and `sprint/reader-1-article-expansion.md`
@@ -114,8 +117,8 @@ column's container, not the column.
 2. **[[kindle-2-library-and-progress]]** — DONE. The library store (three
    shelves, `rss-read-state`-shaped, Plus-sync seam), the library panel wearing
    the RSS rail's look, position memory, and the progress indicator. The
-   "save without opening" entry point is built in the store but has no UI yet —
-   it collides with Bookmarks and RSS's Read later, which is a product call.
+   "save without opening" entry point landed afterwards (2026-09-04) as its own
+   control on the status card, shown only on rows that are documents.
 3. **[[kindle-3-reading-tools]]** — vocabulary lookup, in-document search,
    highlights with notes, the notes right rail, and the observed-failure LRU
    on top of `UNLIKELY_HOSTS`.

@@ -257,20 +257,49 @@ library takes its first sentence (trimmed to 90 chars). A placeholder title is
 also allowed to improve on a later visit — a post whose linked article gets
 fetched suddenly has a real headline, and the row should show it.
 
-### Still open — the "save for later" entry point
+### The "save for later" entry point — built (2026-09-04)
 
-**Not built, and deliberately.** The plan assumed a "saved without opening"
-path that lands on `intend`; `ReaderLibrary.save()` exists and is tested, but
-nothing calls it. The reason is that the obvious place to put it — a control on
-a status card or an RSS headline row — collides with two things that already
-mean something adjacent: `Bookmarks`, and RSS's own `Read later` star
-(`rss-read-state`'s star map, deliberately never pruned).
+**Resolved as a separate control with its own icon**, per the operator. The
+three gestures stay three, because they answer three different questions:
 
-Three overlapping "keep this for later" gestures on one row is worse than two,
-and picking which of them the library should be, or whether it should absorb
-one, is a product call rather than an implementation detail. Flagged for the
-operator; the `intend` shelf works and is reachable by filing a document there
-by hand from the panel.
+- **Bookmark** is a *server* record on your Mastodon account. It syncs to every
+  client you own, reaches none of your other feeds, and holds **posts**.
+- **Read later** stars an *RSS item within its feed* — `rss-read-state`, beside
+  the read marks, scoped to the RSS page, deliberately never pruned.
+- **The library** is the reading device's shelf: documents from every source
+  together, with how far through each one you are. It is the only one of the
+  three that can answer "what am I in the middle of".
+
+`pages/read/save-to-library/` is one small component so there is one
+implementation of the gesture. It renders **nothing at all** unless the row is a
+document, which is what keeps it from being a third button on every post in the
+timeline — the objection that deferred it. On the cards where it does appear it
+sits beside the bookmark and wears the card's own action geometry.
+
+**It is on the status card and not on the RSS headline row.** That is a
+deliberate narrowing of the decision. On an RSS row "Read later" already means
+"save this article for later" and the star is two centimetres away; a book icon
+beside it saying nearly the same thing is precisely the collision this section
+was written about. On a status card there is no competitor — a bookmark holds a
+post, not a document. An RSS item still reaches the library the moment it is
+opened, through `open()`.
+
+**What it will not offer to save, and why that is right.** `isDocument()` is
+asked with what a feed row actually knows: this post, and no thread around it.
+So an RSS item and an obviously long post qualify; a tweetstorm's *first* post
+does not, because the chain that makes it a document is not loaded in a
+timeline. Rather than guess, the control stays away and `open()` shelves the
+storm correctly when it is read — it does see the chain.
+
+One shared fix fell out: `fallbackTitle` moved from `reader-core` to
+`reader-document.ts` as `documentTitle`, since the control needs the same title
+from a feed row where the reader is not running. Two implementations of "what do
+we call this" would drift and the shelf would then disagree with the reader
+about a document's name. It now goes through `plainText`, so entities decode
+(`&amp;` no longer shows raw in a title) and the title agrees with
+`chainTextLength` about what counts as text.
+
+Six tests in `save-to-library.spec.ts`.
 
 ### Two fixes from the operator's testing
 
