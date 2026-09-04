@@ -224,7 +224,7 @@ export function progressOf(entry: LibraryEntry): number {
     return 1;
   }
   if (entry.pages <= 1) {
-    return entry.page > 1 ? 1 : 0;
+    return 1;
   }
   return Math.min(1, Math.max(0, (entry.page - 1) / (entry.pages - 1)));
 }

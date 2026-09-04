@@ -227,4 +227,12 @@
       </div>
     }
   </div>
+  <!-- Kept inside the toolbar's sticky, opaque box. A separate sticky line
+       used a guessed toolbar height and crossed the prose whenever controls
+       wrapped onto another row. -->
+  @if (progress() !== null) {
+    <div class="progress-track" aria-hidden="true">
+      <div class="progress-fill" [style.width.%]="(progress() ?? 0) * 100"></div>
+    </div>
+  }
 </div>

@@ -10,6 +10,7 @@ import { readerRouteId } from '../reader-route-id';
 import { ClientPrefs } from '../../../client-prefs';
 import { Status } from '../../../models';
 import { ArticleResult } from '../../../providers/article/article-models';
+import { ReadToolbar } from '../read-toolbar/read-toolbar';
 
 /**
  * A host, because `ReaderCore` takes a required input and the interesting
@@ -169,6 +170,18 @@ describe('ReaderCore position saving', () => {
     expect(record).not.toHaveBeenCalled();
     vi.runAllTimers();
     expect(record).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks a settled single-page document read without requiring a page turn', () => {
+    fixture.componentInstance.chain.set([
+      post('rss:feed::one', 80, { provider: 'rss' } as Partial<Status>),
+    ]);
+    fixture.detectChanges();
+
+    expect(library.get('rss:feed::one')?.shelf).toBe('reading');
+    vi.runAllTimers();
+
+    expect(library.get('rss:feed::one')?.shelf).toBe('read');
   });
 
   it('flushes an unsaved position on destroy', () => {
@@ -375,8 +388,8 @@ describe('ReaderCore paging a post chain', () => {
       instance as unknown as { roomBelow(element: HTMLElement): number }
     ).roomBelow(body);
 
-    // 700 - 150 inside reader - 24 bottom gap - one 18px × 1.65 line box.
-    expect(available).toBe(496);
+    // 700 - 150 inside reader - 24 bottom gap - two 18px × 1.65 line boxes.
+    expect(available).toBe(466);
     viewport.mockRestore();
   });
 
@@ -424,6 +437,16 @@ describe('ReaderCore paging a post chain', () => {
       [2, 3],
     ]);
     expect(measuredCandidateSizes.length).toBeGreaterThan(2);
+  });
+
+  it('keeps the progress line inside the sticky toolbar box', () => {
+    const toolbar = TestBed.createComponent(ReadToolbar);
+    toolbar.componentRef.setInput('page', 2);
+    toolbar.componentRef.setInput('pageCount', 3);
+    toolbar.detectChanges();
+
+    const progress = (toolbar.nativeElement as HTMLElement).querySelector('.progress-track');
+    expect(progress?.parentElement?.classList.contains('read-toolbar-outer')).toBe(true);
   });
 
   it('measures an article after an asynchronous fetch inserts its gauge', () => {

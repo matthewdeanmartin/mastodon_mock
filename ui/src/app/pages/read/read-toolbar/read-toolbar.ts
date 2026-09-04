@@ -147,6 +147,9 @@ export class ReadToolbar {
   protected readonly typographyOpen = signal(false);
 
   protected readonly paging = computed(() => this.prefs.readerPageFlip() && this.pageCount() > 1);
+  protected readonly progress = computed<number | null>(() =>
+    this.paging() ? (this.page() - 1) / (this.pageCount() - 1) : null,
+  );
   protected readonly canPrev = computed(() => this.page() > 1);
   protected readonly canNext = computed(() => this.page() < this.pageCount());
 

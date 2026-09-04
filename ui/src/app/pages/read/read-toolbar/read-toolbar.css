@@ -39,6 +39,25 @@
   padding: 6px 10px;
 }
 
+/* Peripheral page progress, attached to the sticky toolbar rather than
+   independently floating over the document. */
+.progress-track {
+  height: 2px;
+  background: var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill {
+    transition: none;
+  }
+}
+
 .tool-group {
   display: flex;
   align-items: center;

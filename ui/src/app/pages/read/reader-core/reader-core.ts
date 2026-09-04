@@ -441,21 +441,6 @@ export class ReaderCore {
   /** Whether the page-turn affordances belong on screen at all. */
   protected readonly paging = computed(() => this.prefs.readerPageFlip() && this.pageCount() > 1);
 
-  /**
-   * How far through, 0 to 1, for the hairline bar under the toolbar.
-   *
-   * Peripheral information: it should read at a glance without being looked
-   * at, which is why it carries no number and no label. Null when there is
-   * nothing to report — one page is not progress, it is a page.
-   */
-  protected readonly progress = computed<number | null>(() => {
-    const pages = this.pageCount();
-    if (pages < 2 || !this.prefs.readerPageFlip()) {
-      return null;
-    }
-    return (this.pageNumber() - 1) / (pages - 1);
-  });
-
   /** 1-based, for the toolbar. */
   protected readonly pageNumber = computed(() =>
     this.pageCount() ? Math.min(this.pageIndex(), this.pageCount() - 1) + 1 : 0,
@@ -554,6 +539,12 @@ export class ReaderCore {
       return;
     }
     this.library.open(identity);
+    // A single unsplittable post needs no measuring gauge. It is already the
+    // whole document, so record its only page instead of leaving it in
+    // "reading" forever merely because there was no Next button to press.
+    if (this.chainBlockList().length <= 1 && !this.expansion.result()?.article) {
+      this.savePosition();
+    }
     // The stored page is applied once the document has actually paginated —
     // `pages()` is empty until an article is fetched. See `restoreIfPending`.
     this.resumePending = this.layout() === 'page';
@@ -753,6 +744,9 @@ export class ReaderCore {
     if (!samePages(this.articlePageGroups(), groups)) {
       this.articlePageGroups.set(groups);
     }
+    // Only now is a one-page result known to be genuinely one page rather than
+    // the fallback shown while an asynchronous article is still unmeasured.
+    this.savePosition();
   };
 
   /**
@@ -778,6 +772,9 @@ export class ReaderCore {
     }
     if (!samePages(this.postPageGroups(), groups)) {
       this.postPageGroups.set(groups);
+    }
+    if (!this.expansion.result()?.article) {
+      this.savePosition();
     }
   }
 
@@ -851,11 +848,12 @@ export class ReaderCore {
       ? ((host.querySelector('.read-toolbar-outer') as HTMLElement | null)?.getBoundingClientRect()
           .height ?? 0)
       : 0;
-    // Keep one configured line box clear in addition to the ordinary bottom
-    // gap. Browser glyph painting and fractional line boxes can extend beyond
-    // the integer box reported by the probe; without this, the final baseline
-    // is the one line users repeatedly found below the fold.
-    const lineClearance = Math.ceil(this.prefs.readerFontSize() * this.prefs.readerLineHeight());
+    // Keep two configured line boxes clear in addition to the ordinary bottom
+    // gap. One was not enough in real browsers: fractional layout and the
+    // sticky chrome still left the final wrapped row below the fold.
+    const lineClearance = Math.ceil(
+      2 * this.prefs.readerFontSize() * this.prefs.readerLineHeight(),
+    );
     return Math.max(
       0,
       viewport -
@@ -917,7 +915,30 @@ export class ReaderCore {
     this.libraryOpen();
     this.observeGauges();
     this.measure();
+    // An async article can enter the DOM before its final styles and layout are
+    // committed. The immediate pass then sees zero-height geometry and falls
+    // back to one page; resize works later because layout is stable by then.
+    // Re-run after two animation frames, through the same working measure path.
+    this.scheduleSettledMeasure();
   });
+
+  private measureFrame: number | null = null;
+
+  private scheduleSettledMeasure(): void {
+    if (typeof requestAnimationFrame === 'undefined') {
+      return;
+    }
+    if (this.measureFrame !== null) {
+      cancelAnimationFrame(this.measureFrame);
+    }
+    this.measureFrame = requestAnimationFrame(() => {
+      this.measureFrame = requestAnimationFrame(() => {
+        this.measureFrame = null;
+        this.observeGauges();
+        this.measure();
+      });
+    });
+  }
 
   /**
    * Images and web fonts can change a gauge after its first render. Observe its
@@ -950,6 +971,9 @@ export class ReaderCore {
       document.removeEventListener('keyup', this.onSelectionKey);
       document.removeEventListener('mouseup', this.onSelectionPointer);
       this.gaugeObserver?.disconnect();
+      if (this.measureFrame !== null) {
+        cancelAnimationFrame(this.measureFrame);
+      }
       this.flushPosition();
     });
   }
@@ -1114,6 +1138,7 @@ export class ReaderCore {
     if (result?.article) {
       this.pageIndex.set(0);
       this.focusArticle();
+      this.scheduleSettledMeasure();
     }
   }
 

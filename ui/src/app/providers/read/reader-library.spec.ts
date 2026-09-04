@@ -159,6 +159,10 @@ describe('progressOf', () => {
     expect(progressOf(entry({ page: 1, pages: 10 }))).toBe(0);
   });
 
+  it('is complete when the whole document is one page', () => {
+    expect(progressOf(entry({ page: 1, pages: 1 }))).toBe(1);
+  });
+
   it('is 1 at the last page', () => {
     expect(progressOf(entry({ page: 10, pages: 10 }))).toBe(1);
   });
@@ -210,6 +214,12 @@ describe('ReaderLibrary', () => {
   it('reaching the end moves a document to read', () => {
     library.open(doc);
     library.recordPosition(doc.id, 10, 10);
+    expect(library.get(doc.id)?.shelf).toBe('read');
+  });
+
+  it('recording a settled one-page document moves it to read', () => {
+    library.open(doc);
+    library.recordPosition(doc.id, 1, 1);
     expect(library.get(doc.id)?.shelf).toBe('read');
   });
 
