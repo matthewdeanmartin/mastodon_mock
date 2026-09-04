@@ -118,3 +118,66 @@ describe('what counts as a document', () => {
     expect(isDocument([contentPost('1', `<p>short${links}</p>`)], false)).toBe(false);
   });
 });
+
+describe('readerChain anchored on the post the reader opened', () => {
+  /**
+   * The bug this covers: a storm written as a reply to somebody else showed as
+   * one post — theirs. `thread[0]` is the conversation root, which is not
+   * necessarily the author of the thing being read.
+   */
+  it("takes the focused author's storm, not the thread root's single post", () => {
+    const thread = [
+      makeStatus('other', 'someone-else'),
+      makeStatus('a1', 'author', 'other'),
+      makeStatus('a2', 'author', 'a1'),
+      makeStatus('a3', 'author', 'a2'),
+    ];
+    expect(readerChain(thread, 'a1').map((s) => s.id)).toEqual(['a1', 'a2', 'a3']);
+  });
+
+  it('walks back to the start when opened from the middle of a storm', () => {
+    // The normal case for a link shared from the middle: without walking back,
+    // the reader gets the second half of an article.
+    const thread = [
+      makeStatus('a1', 'author'),
+      makeStatus('a2', 'author', 'a1'),
+      makeStatus('a3', 'author', 'a2'),
+    ];
+    expect(readerChain(thread, 'a3').map((s) => s.id)).toEqual(['a1', 'a2', 'a3']);
+  });
+
+  it('stops walking back at a post by someone else', () => {
+    // A storm that genuinely begins as a reply starts at the author's own first
+    // line, not at the post they were answering.
+    const thread = [
+      makeStatus('other', 'someone-else'),
+      makeStatus('a1', 'author', 'other'),
+      makeStatus('a2', 'author', 'a1'),
+    ];
+    expect(readerChain(thread, 'a2').map((s) => s.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('falls back to the thread root when the focus id is not in the thread', () => {
+    const thread = [makeStatus('a1', 'author'), makeStatus('a2', 'author', 'a1')];
+    expect(readerChain(thread, 'missing').map((s) => s.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('behaves as before when no focus is given', () => {
+    const thread = [makeStatus('a1', 'author'), makeStatus('a2', 'author', 'a1')];
+    expect(readerChain(thread).map((s) => s.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('does not loop on a post that claims to reply to itself', () => {
+    const self = makeStatus('a1', 'author', 'a1');
+    expect(readerChain([self], 'a1').map((s) => s.id)).toEqual(['a1']);
+  });
+
+  it('leaves other people’s replies out of the middle of a storm', () => {
+    const thread = [
+      makeStatus('a1', 'author'),
+      makeStatus('heckle', 'someone-else', 'a1'),
+      makeStatus('a2', 'author', 'a1'),
+    ];
+    expect(readerChain(thread, 'a1').map((s) => s.id)).toEqual(['a1', 'a2']);
+  });
+});

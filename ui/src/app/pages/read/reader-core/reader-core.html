@@ -3,12 +3,28 @@
   [pageCount]="pageCount()"
   [minutesLeft]="minutesLeft()"
   [canExit]="layout() === 'page'"
+  [libraryEnabled]="layout() === 'page'"
+  [libraryOpen]="libraryOpen()"
   (previousPage)="prevPage()"
   (nextPage)="nextPage()"
+  (toggleLibrary)="toggleLibrary.emit()"
   (exit)="exit.emit()"
 />
 
+<!-- Progress, as a hairline under the bar. No number and no label: this is
+     peripheral information, meant to be sensed rather than read. -->
+@if (progress() !== null) {
+  <div class="progress-track" aria-hidden="true">
+    <div class="progress-fill" [style.width.%]="(progress() ?? 0) * 100"></div>
+  </div>
+}
+
 <article class="reader" [attr.data-paper]="prefs.readerTheme()" [attr.data-layout]="layout()">
+  <!-- Said plainly rather than restored silently: a reader who cannot trust
+       the resume will stop using it. -->
+  @if (approximateResume()) {
+    <p class="resume-note" role="status">{{ 'reader.core.resumedApproximately' | transloco }}</p>
+  }
   @if (root(); as post) {
     @if (post.account; as author) {
       <header class="reader-head">

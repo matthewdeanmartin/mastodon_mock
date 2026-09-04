@@ -36,7 +36,6 @@ import {
 // i18n reader.toolbar.scrollTitle: Read as one continuous column
 // i18n reader.toolbar.library: Library
 // i18n reader.toolbar.libraryTitle: Everything you have opened in the reader
-// i18n reader.toolbar.librarySoon: Coming in the next release
 // i18n reader.toolbar.exit: Exit
 // i18n reader.toolbar.exitTitle: Leave the reader
 // i18n reader.toolbar.done: Done
@@ -87,7 +86,7 @@ export class ReadToolbar {
   /** Minutes of reading left, or null when the document is too short to say. */
   readonly minutesLeft = input<number | null>(null);
 
-  /** Whether the Library button does anything yet. */
+  /** False in the pane, where the sheet would cover the subscription rail. */
   readonly libraryEnabled = input(false);
 
   /** Whether the library panel is currently open, for the pressed state. */

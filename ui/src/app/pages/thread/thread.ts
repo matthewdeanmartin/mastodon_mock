@@ -1,4 +1,4 @@
-import { Component, computed, DestroyRef, inject, OnInit } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../api';
@@ -142,7 +142,7 @@ export class Thread implements OnInit {
   private thread = this.loader.thread;
 
   /** The author chain reader mode renders (root post + same-author self-replies). */
-  protected chain = computed<Status[]>(() => readerChain(this.thread()));
+  protected chain = computed<Status[]>(() => readerChain(this.thread(), this.currentId()));
 
   // ---- Article expansion -------------------------------------------------
   //
@@ -278,7 +278,7 @@ export class Thread implements OnInit {
   // See sprint/kindle-1-page-and-shell.md.
 
   /** Latest route id and `?reader` value. `currentId` is read by the Reader link. */
-  protected currentId = '';
+  protected readonly currentId = signal('');
   private readerParam: string | null = null;
   /** True once a hand-off to the reader page is under way. See `applyReaderMode`. */
   private redirecting = false;
@@ -298,7 +298,7 @@ export class Thread implements OnInit {
       if (!id) {
         return;
       }
-      this.currentId = id;
+      this.currentId.set(id);
       // RSS items are articles, so they hand off unless the link opts out with
       // ?reader=0 — and that decision needs the id, which only arrives here.
       if (this.applyReaderMode()) {
@@ -330,17 +330,17 @@ export class Thread implements OnInit {
       return true;
     }
     // Nothing to hand off until the id is known.
-    if (!this.currentId) {
+    if (!this.currentId()) {
       return false;
     }
     // RSS items are articles, so they default to reader ON unless the link
     // explicitly opts out with ?reader=0.
-    const rssDefault = this.currentId.startsWith('rss:') && this.readerParam !== '0';
+    const rssDefault = this.currentId().startsWith('rss:') && this.readerParam !== '0';
     if (this.readerParam !== '1' && !rssDefault) {
       return false;
     }
     this.redirecting = true;
-    void this.router.navigate(['/read', this.currentId], { replaceUrl: true });
+    void this.router.navigate(['/read', this.currentId()], { replaceUrl: true });
     return true;
   }
 

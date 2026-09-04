@@ -1,6 +1,7 @@
 import {
   Component,
   computed,
+  DestroyRef,
   effect,
   ElementRef,
   inject,
@@ -15,6 +16,8 @@ import { TranslocoService } from '@jsverse/transloco';
 import { ClientPrefs } from '../../../client-prefs';
 import { toNitterUrl } from '../../../providers/twitter/nitter';
 import { serverKnowsStatus } from '../../../providers/provider';
+import { DocumentIdentity, ReaderLibrary } from '../../../providers/read/reader-library';
+import { isDocument } from '../reader-document';
 import { Status } from '../../../models';
 import { HumanTimePipe } from '../../../human-time.pipe';
 import { PreviewCardComponent } from '../../../preview-card/preview-card';
@@ -69,8 +72,17 @@ import { ReadToolbar } from '../read-toolbar/read-toolbar';
 // i18n reader.article.debug.url: URL: {{url}}
 // i18n reader.core.by: by {{author}}
 // i18n reader.core.postCount: {{count}} posts
+// i18n reader.core.resumedApproximately: Picking up roughly where you left off — this article has a different number of pages than last time.
 // i18n reader.core.readOn.nitter: Read on Nitter
 // i18n reader.core.readOn.originalSite: Read on the original site
+
+/**
+ * How long a page turn waits before the position is written.
+ *
+ * Long enough that flipping through five pages is one write, short enough that
+ * an ordinary pause between pages commits. The tab-hide flush covers the rest.
+ */
+const POSITION_SAVE_DELAY_MS = 2_000;
 
 /**
  * One document, rendered for reading.
@@ -114,6 +126,7 @@ export class ReaderCore {
   protected readonly prefs = inject(ClientPrefs);
   protected readonly expansion = inject(ArticleExpansion);
   private readonly transloco = inject(TranslocoService);
+  private readonly library = inject(ReaderLibrary);
 
   /** The author's own chain: one post, or a storm, or an RSS item. */
   readonly chain = input.required<Status[]>();
@@ -123,6 +136,10 @@ export class ReaderCore {
 
   /** Emitted when the reader asks to leave. Only the page acts on it. */
   readonly exit = output<void>();
+
+  /** Whether the library sheet is showing, and the request to toggle it. */
+  readonly libraryOpen = input(false);
+  readonly toggleLibrary = output<void>();
 
   /** The article region, so focus can move to it when it appears. */
   private articleRef = viewChild<ElementRef<HTMLElement>>('expandedArticle');
@@ -171,6 +188,21 @@ export class ReaderCore {
 
   protected readonly pageCount = computed(() => this.pages().length);
 
+  /**
+   * How far through, 0 to 1, for the hairline bar under the toolbar.
+   *
+   * Peripheral information: it should read at a glance without being looked
+   * at, which is why it carries no number and no label. Null when there is
+   * nothing to report — one page is not progress, it is a page.
+   */
+  protected readonly progress = computed<number | null>(() => {
+    const pages = this.pageCount();
+    if (pages < 2 || !this.prefs.readerPageFlip()) {
+      return null;
+    }
+    return (this.pageNumber() - 1) / (pages - 1);
+  });
+
   /** 1-based, for the toolbar. */
   protected readonly pageNumber = computed(() =>
     this.pageCount() ? Math.min(this.pageIndex(), this.pageCount() - 1) + 1 : 0,
@@ -217,32 +249,182 @@ export class ReaderCore {
    * one lands past its end — `pageHtml` clamps, so the reader sees the last
    * page of something they just started.
    */
-  private readonly resetOnNewDocument = effect(() => {
-    // Read the id so the effect re-runs when the document changes. Assigned
-    // rather than dangling: a bare expression statement is both a lint error
-    // and the kind of line a later reader deletes as dead.
+  /**
+   * Take up a new document: shelve it if it qualifies, and resume where the
+   * reader left off.
+   */
+  private readonly onNewDocument = effect(() => {
     const documentId = this.root()?.id ?? '';
-    if (documentId !== this.lastDocumentId) {
-      this.lastDocumentId = documentId;
-      this.pageIndex.set(0);
+    if (documentId === this.lastDocumentId) {
+      return;
     }
+    this.lastDocumentId = documentId;
+    this.pageIndex.set(0);
+    this.approximateResume.set(false);
+    if (!documentId) {
+      return;
+    }
+    const identity = this.identity();
+    if (!identity) {
+      return;
+    }
+    this.library.open(identity);
+    // The stored page is applied once the document has actually paginated —
+    // `pages()` is empty until an article is fetched. See `restoreIfPending`.
+    this.resumePending = this.layout() === 'page';
   });
 
   /** The document the page index currently belongs to. */
   private lastDocumentId = '';
 
+  /** True until the stored position has been applied to this document. */
+  private resumePending = false;
+
+  /** True when the resume landed proportionally rather than exactly. */
+  protected readonly approximateResume = signal(false);
+
+  /**
+   * How this document is identified in the library.
+   *
+   * Null when it is not a document — a short post read in the reader is still
+   * rendered, it is simply not shelved. The operator's rule, stated plainly:
+   * short or never-viewed tweets are never tracked.
+   */
+  private identity(): DocumentIdentity | null {
+    const root = this.root();
+    if (!root) {
+      return null;
+    }
+    const result = this.expansion.result();
+    const article = result?.article ?? null;
+    if (!isDocument(this.chain(), article !== null)) {
+      return null;
+    }
+    return {
+      id: root.id,
+      url: (article ? result?.finalUrl : root.url) ?? root.url ?? '',
+      title: article?.title || this.fallbackTitle(root),
+      siteName: article?.siteName ?? (this.expansion.host() || null),
+    };
+  }
+
+  /**
+   * A title for a document that has none of its own.
+   *
+   * A tweetstorm has no headline; its first sentence is the closest thing, and
+   * is what the author would have written as one had the medium had a field
+   * for it.
+   */
+  private fallbackTitle(root: Status): string {
+    const text = (root.content ?? '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text) {
+      return root.url ?? '';
+    }
+    const firstSentence = text.split(/(?<=[.!?])\s/)[0] ?? text;
+    return firstSentence.length > 90 ? firstSentence.slice(0, 87) + '\u2026' : firstSentence;
+  }
+
+  /**
+   * Apply the stored position once the document has pages to apply it to.
+   *
+   * Split from `onNewDocument` because pagination arrives later: a post's
+   * article is fetched on demand, so at the moment the document is taken up
+   * there is exactly one page and nothing to restore into.
+   */
+  private readonly restoreIfPending = effect(() => {
+    const pages = this.pageCount();
+    if (!this.resumePending || pages < 1) {
+      return;
+    }
+    const identity = this.identity();
+    this.resumePending = false;
+    if (!identity) {
+      return;
+    }
+    const { page, approximate } = this.library.restorePage(identity.id, pages);
+    this.approximateResume.set(approximate && page > 1);
+    this.pageIndex.set(page - 1);
+  });
+
+  /**
+   * Write the position back, at most once every few seconds.
+   *
+   * A `localStorage` write per arrow press is a synchronous serialization of
+   * the whole library on the main thread — and someone paging through a long
+   * article presses that arrow a lot. Debounced, and flushed on
+   * `visibilitychange`, because a reader who closes the tab mid-article must
+   * not lose their position, which is the one thing this feature promises.
+   *
+   * Never from the pane: reading there shelves the document (reading an article
+   * is reading it) but the pane is a preview strip beside a list, not the
+   * surface that owns a position.
+   */
+  private savePosition(): void {
+    if (this.layout() === 'pane') {
+      return;
+    }
+    const identity = this.identity();
+    if (!identity) {
+      return;
+    }
+    this.pendingSave = { id: identity.id, page: this.pageNumber(), pages: this.pageCount() };
+    if (this.saveTimer !== null) {
+      return;
+    }
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.flushPosition();
+    }, POSITION_SAVE_DELAY_MS);
+  }
+
+  private pendingSave: { id: string; page: number; pages: number } | null = null;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Write any pending position immediately. */
+  flushPosition(): void {
+    const pending = this.pendingSave;
+    this.pendingSave = null;
+    if (this.saveTimer !== null) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    if (pending) {
+      this.library.recordPosition(pending.id, pending.page, pending.pages);
+    }
+  }
+
+  private readonly onHide = (): void => {
+    if (document.visibilityState === 'hidden') {
+      this.flushPosition();
+    }
+  };
+
+  constructor() {
+    document.addEventListener('visibilitychange', this.onHide);
+    inject(DestroyRef).onDestroy(() => {
+      document.removeEventListener('visibilitychange', this.onHide);
+      this.flushPosition();
+    });
+  }
+
   prevPage(): void {
     this.pageIndex.update((n) => Math.max(0, n - 1));
+    this.savePosition();
   }
 
   nextPage(): void {
     this.pageIndex.update((n) => Math.min(Math.max(0, this.pageCount() - 1), n + 1));
+    this.savePosition();
   }
 
   /** Jump to a page by 1-based number. Used by the keyboard bindings. */
   goToPage(number: number): void {
     const clamped = Math.min(Math.max(1, number), Math.max(1, this.pageCount()));
     this.pageIndex.set(clamped - 1);
+    this.savePosition();
   }
 
   async expandArticle(force = false): Promise<void> {

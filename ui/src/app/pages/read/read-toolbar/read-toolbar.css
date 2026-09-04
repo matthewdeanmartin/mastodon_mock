@@ -6,22 +6,37 @@
    page whose job is to get out of the way should not have eight of them
    shouting across the top of the text. */
 
-.read-toolbar {
+/* The bar spans the full width and stays put; the controls inside it sit in a
+   centred band.
+
+   The operator's call, and it matches the app: the top bar this replaces
+   (`shell.css .topbar-inner`) puts its tab nav in the middle column rather than
+   spreading brand and account to the two far corners. Controls flung to
+   opposite edges of a 1400px screen make the eye travel the whole width to get
+   from "next page" to "exit", and read as a browser chrome bar rather than as
+   part of the page you are reading. */
+.read-toolbar-outer {
   position: sticky;
   top: 0;
   z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-wrap: wrap;
-  /* Spans the container, not the measure. A 68ch column is sized for reading
-     prose; the toolbar is not prose. */
-  width: 100%;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
   /* Opaque: the article scrolls under this, and translucent chrome over moving
      text is unreadable at exactly the moment someone is trying to read. */
   background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.read-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  /* Wider than the text — the measure is for prose and the toolbar is not
+     prose — but not the whole screen. Roughly the middle half, so there is
+     blank to either side and the controls read as one cluster. */
+  width: min(100%, 52rem);
+  margin: 0 auto;
+  padding: 6px 10px;
 }
 
 .tool-group {
@@ -30,10 +45,12 @@
   gap: 2px;
 }
 
-/* Pushes Library and Exit to the far end, so the controls that act on the text
-   and the controls that leave it are not intermixed. */
-.tool-end {
-  margin-left: auto;
+/* A hairline between clusters: typography and paging are things you do to the
+   text, Library and Exit are things you do instead of reading it. Grouped
+   rather than flung apart. */
+.tool-group + .tool-group {
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
 }
 
 .tool {
@@ -81,6 +98,8 @@
    never covers the first line of the article it is restyling — the whole point
    of changing type is watching the text change. */
 .typography {
+  /* Breaks the row so it sits under the controls rather than beside them —
+     watching the text change is the whole point of changing the type. */
   flex: 1 0 100%;
   display: grid;
   gap: 6px;

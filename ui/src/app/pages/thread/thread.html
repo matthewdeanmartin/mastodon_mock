@@ -7,7 +7,7 @@
          library all belong to a surface that owns the whole screen. The count
          stays, because "Reader (7 posts)" is what tells someone the thing in
          front of them was written as one piece. -->
-    <a class="btn btn-outline" [routerLink]="['/read', currentId]">
+    <a class="btn btn-outline" [routerLink]="['/read', currentId()]">
       📖
       {{
         chain().length > 1

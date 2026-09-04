@@ -1,6 +1,6 @@
 # Kindle — Epic overview: the reader page
 
-Status: Sprint 1 **COMPLETE** (2026-09-04). Sprints 2-3 planned.
+Status: Sprints 1-2 **COMPLETE** (2026-09-04). Sprint 3 planned.
 Owner: matthewdeanmartin
 
 Builds on [[project-mimb-readability]] and `sprint/reader-1-article-expansion.md`
@@ -111,9 +111,11 @@ column's container, not the column.
    reader-mode. The old inline reader is deleted and RSS is re-hosted on the
    shared core. Also extracted `ThreadLoader` and `ArticleExpansion`, and fixed
    a pre-existing `ngSrc`/data-URI crash on RSS status cards. Net −1416 lines.
-2. **[[kindle-2-library-and-progress]]** — the library store (three shelves,
-   `rss-read-state`-shaped, Plus-sync seam), the library panel, position
-   memory, and the progress indicator.
+2. **[[kindle-2-library-and-progress]]** — DONE. The library store (three
+   shelves, `rss-read-state`-shaped, Plus-sync seam), the library panel wearing
+   the RSS rail's look, position memory, and the progress indicator. The
+   "save without opening" entry point is built in the store but has no UI yet —
+   it collides with Bookmarks and RSS's Read later, which is a product call.
 3. **[[kindle-3-reading-tools]]** — vocabulary lookup, in-document search,
    highlights with notes, the notes right rail, and the observed-failure LRU
    on top of `UNLIKELY_HOSTS`.

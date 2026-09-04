@@ -15,6 +15,7 @@ import { ClientPrefs } from '../../client-prefs';
 import { ReadingZen } from '../../reading-zen';
 import { ThreadLoader } from './thread-loader';
 import { ReaderCore } from './reader-core/reader-core';
+import { LibraryPanel } from './library-panel/library-panel';
 import { readerChain } from './reader-document';
 
 // i18n reader.page.loading: Opening…
@@ -48,7 +49,7 @@ import { readerChain } from './reader-document';
  */
 @Component({
   selector: 'app-read-page',
-  imports: [RouterLink, TranslocoPipe, ReaderCore],
+  imports: [RouterLink, TranslocoPipe, ReaderCore, LibraryPanel],
   templateUrl: './read-page.html',
   styleUrl: './read-page.css',
   providers: [ThreadLoader],
@@ -71,7 +72,21 @@ export class ReadPage implements OnInit, OnDestroy {
   protected readonly currentId = signal('');
 
   /** The author's own chain: the document. */
-  protected readonly chain = computed(() => readerChain(this.loader.thread()));
+  protected readonly chain = computed(() => readerChain(this.loader.thread(), this.currentId()));
+
+  /**
+   * Whether the library sheet is showing.
+   *
+   * Off by default, per the brief, and remembered — someone who reads with the
+   * library open is telling us how they like to read, not making a one-off
+   * request. The preference lives in `ClientPrefs` rather than the library
+   * store: it is view state, and the store is shaped for a later sync.
+   */
+  protected readonly libraryOpen = this.prefs.readerLibraryOpen;
+
+  protected toggleLibrary(): void {
+    this.prefs.setReaderLibraryOpen(!this.libraryOpen());
+  }
 
   ngOnInit(): void {
     this.releaseZen = this.readingZen.hold('full');

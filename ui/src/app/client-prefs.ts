@@ -405,6 +405,8 @@ interface StoredPrefs {
   readerTextAlign?: ReaderTextAlign;
   readerTheme?: ReaderTheme;
   readerPageFlip?: boolean;
+  readerLibraryOpen?: boolean;
+  readerLibraryCollapsed?: string[];
   feedReader?: boolean;
   autoRefreshTimeline?: boolean;
   homeWindow?: HomeWindow;
@@ -587,6 +589,18 @@ export class ClientPrefs {
    * makes that the normal way to read rather than one surface's local habit.
    */
   readonly readerPageFlip = signal<boolean>(true);
+
+  /**
+   * Whether the reader's library panel is showing.
+   *
+   * Off by default, per the brief. A view preference, so it lives here and not
+   * in the library store — mixing panel state into a store shaped for a later
+   * sync is how "my laptop closed the panel on my phone" happens.
+   */
+  readonly readerLibraryOpen = signal<boolean>(false);
+
+  /** Which library shelves are folded away. Shelf ids; unknown values ignored. */
+  readonly readerLibraryCollapsed = signal<readonly string[]>([]);
 
   // Feed-wide toggles (command bar).
   readonly feedReader = signal<boolean>(false);
@@ -1012,6 +1026,14 @@ export class ClientPrefs {
     this.readerPageFlip.set(on);
   }
 
+  setReaderLibraryOpen(open: boolean): void {
+    this.readerLibraryOpen.set(open);
+  }
+
+  setReaderLibraryCollapsed(shelves: readonly string[]): void {
+    this.readerLibraryCollapsed.set([...shelves]);
+  }
+
   setFeedReader(on: boolean): void {
     this.feedReader.set(on);
   }
@@ -1320,6 +1342,12 @@ export class ClientPrefs {
       this.verifiedMode.set(stored.verifiedMode);
     }
     this.loadBool(stored.readerPageFlip, this.readerPageFlip);
+    this.loadBool(stored.readerLibraryOpen, this.readerLibraryOpen);
+    if (Array.isArray(stored.readerLibraryCollapsed)) {
+      this.readerLibraryCollapsed.set(
+        stored.readerLibraryCollapsed.filter((s): s is string => typeof s === 'string'),
+      );
+    }
     this.loadBool(stored.feedReader, this.feedReader);
     this.loadBool(stored.autoRefreshTimeline, this.autoRefreshTimeline);
     // `today` was the old implicit default. Treat a stored copy as that legacy
@@ -1469,6 +1497,8 @@ export class ClientPrefs {
       readerWordSpacing: this.readerWordSpacing(),
       readerTextAlign: this.readerTextAlign(),
       readerPageFlip: this.readerPageFlip(),
+      readerLibraryOpen: this.readerLibraryOpen(),
+      readerLibraryCollapsed: [...this.readerLibraryCollapsed()],
       feedReader: this.feedReader(),
       autoRefreshTimeline: this.autoRefreshTimeline(),
       homeWindow: this.homeWindow(),

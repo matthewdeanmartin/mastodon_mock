@@ -347,6 +347,13 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Which RSS items have been read, as item id → timestamp. Private for the same reason the subscription list is: it is a record of what the user actually read, item by item, which is more revealing than the feed list it derives from. The timestamp exists for a future 90-day prune.',
   },
   {
+    base: 'mockingbird_reader_library',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: "The reader's library: document id → {url, title, shelf, page, timestamps}. Private for the same reason mockingbird_rss_read is, and more so — this is a list of the long-form things someone chose to read, with how far through each they got. Pruned at a year and 2,000 entries; see providers/read/reader-library.ts.",
+  },
+  {
     base: 'mockingbird_rss_starred',
     storage: 'local',
     suffix: 'account',

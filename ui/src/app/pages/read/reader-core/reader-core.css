@@ -6,6 +6,12 @@
 
 :host {
   display: block;
+  /* The toolbar's own height (6px padding + control + 6px padding + its rule).
+     Declared here rather than inside the toolbar because the progress hairline
+     is a sibling of it, not a child, and a custom property set on the
+     toolbar's :host would not reach across. Both read this one name, so the
+     two cannot drift apart silently. */
+  --reader-toolbar-height: 34px;
 }
 
 .reader {
@@ -263,4 +269,40 @@
   font-size: 14px;
   letter-spacing: normal;
   word-spacing: normal;
+}
+
+/* Progress, as a hairline under the toolbar. Deliberately without a number: it
+   is meant to be sensed at the edge of vision, and a percentage invites you to
+   look at it instead of at the text. */
+.progress-track {
+  position: sticky;
+  /* Directly under the toolbar, which is also sticky. The offset tracks the
+     toolbar's own height: 6px padding + ~21px of control + 6px padding + its
+     1px rule. Kept as a variable so the two cannot drift silently. */
+  top: var(--reader-toolbar-height, 34px);
+  z-index: 2;
+  height: 2px;
+  background: var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill {
+    transition: none;
+  }
+}
+
+/* Said once, quietly, at the top of a resumed document. */
+.resume-note {
+  margin: 0 0 16px;
+  font-family: var(--app-font-family);
+  font-size: 13px;
+  letter-spacing: normal;
+  word-spacing: normal;
+  opacity: 0.75;
 }

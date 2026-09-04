@@ -2,7 +2,18 @@
   @if (loader.loading()) {
     <p class="muted center">{{ 'reader.page.loading' | transloco }}</p>
   } @else if (chain().length) {
-    <app-reader-core [chain]="chain()" layout="page" (exit)="exit()" />
+    <div class="read-body" [class.with-library]="libraryOpen()">
+      <app-reader-core
+        [chain]="chain()"
+        layout="page"
+        [libraryOpen]="libraryOpen()"
+        (toggleLibrary)="toggleLibrary()"
+        (exit)="exit()"
+      />
+      @if (libraryOpen()) {
+        <app-library-panel [currentId]="currentId()" (closed)="toggleLibrary()" />
+      }
+    </div>
   } @else {
     <!-- Never a bare dead end: a document that would not open still leaves the
          thread view and, for a feed item, the list it came from. -->

@@ -24,22 +24,63 @@ import { plainText } from '../search/search-refine';
 export const DOCUMENT_MIN_CHARS = 500;
 
 /**
- * Extract the author's own chain from a thread: the first post plus every later
- * post where the same author replied to any post already in the chain.
+ * Extract one author's own chain from a thread: where they started writing,
+ * plus every later post where they replied to something already in the chain.
  *
  * This covers both storm styles — replying to your own previous post, and
- * replying repeatedly to the root. Posts by other people, and the author's
- * side-replies to them, are not part of the article.
+ * replying repeatedly to your own first one. Posts by other people, and the
+ * author's side-replies to them, are not part of the article.
+ *
+ * ## Whose chain, and where it starts
+ *
+ * `focusId` names the post the reader actually opened; the chain is *that*
+ * author's, and it begins at the earliest post of theirs that reaches the
+ * focused post through an unbroken run of their own replies.
+ *
+ * Both halves of that matter, and getting either wrong shows the reader one
+ * post where a storm should be:
+ *
+ * - **Whose.** Taking the thread's first post meant that a storm written as a
+ *   reply to somebody else produced a one-post "article" — that other person's
+ *   post — because every subsequent post failed the same-author test.
+ * - **Where.** Starting at the focused post itself would drop the beginning of
+ *   a storm whenever the reader arrived on post four of nine, which is the
+ *   normal case for a link shared from the middle.
+ *
+ * Walking back stops at the first post that is not the author's, so a storm
+ * that genuinely begins as a reply to someone else begins at the author's own
+ * first line, not at the post they were answering.
  */
-export function readerChain(thread: Status[]): Status[] {
+export function readerChain(thread: Status[], focusId?: string): Status[] {
   if (!thread.length) {
     return [];
   }
-  const root = thread[0];
+
+  const byId = new Map(thread.map((s) => [s.id, s]));
+  const focus = (focusId && byId.get(focusId)) || thread[0];
+  const authorId = focus.account.id;
+
+  // Walk back through the author's own replies to find where they started.
+  let root = focus;
+  const seen = new Set([root.id]);
+  for (;;) {
+    const parentId = root.in_reply_to_id;
+    if (parentId === null || parentId === undefined || seen.has(parentId)) {
+      break;
+    }
+    const parent = byId.get(parentId);
+    if (!parent || parent.account.id !== authorId) {
+      break;
+    }
+    root = parent;
+    seen.add(parent.id);
+  }
+
+  // Then forward, in thread order, taking the author's replies to the chain.
   const chain = [root];
   const chainIds = new Set([root.id]);
-  const authorId = root.account.id;
-  for (const s of thread.slice(1)) {
+  const startedAt = thread.indexOf(root);
+  for (const s of thread.slice(startedAt + 1)) {
     if (s.account.id === authorId && s.in_reply_to_id !== null && chainIds.has(s.in_reply_to_id)) {
       chain.push(s);
       chainIds.add(s.id);

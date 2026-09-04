@@ -1,6 +1,6 @@
 # Kindle 2 — The library, position, and progress
 
-Status: PLANNED
+Status: **COMPLETE** (2026-09-04)
 Epic: [[kindle-0-overview]]
 Depends on: [[kindle-1-page-and-shell]]
 
@@ -211,3 +211,106 @@ page index; the bar and readout are otherwise identical.
 - **The panel over the pane.** In `layout="pane"` the library sheet must not
   cover the RSS left rail; scope it to the pane, or suppress the Library button
   there entirely and reach the library from the reader page only.
+
+
+## Outcome (2026-09-04)
+
+Shipped. 5771 tests pass; `make check` green apart from one transient npm-audit
+503 from the registry.
+
+### What landed as planned
+
+The store (`providers/read/reader-library.ts`) is shaped after
+`rss-read-state.ts` exactly as instructed — tolerant `load()`, pure exported
+`pruneLibrary`, a startup prune whose drop count is visible for diagnostics.
+`snapshot()`/`merge()` are pure, tested and called by nothing. Shelves move
+automatically with a sticky manual override. Position memory restores exactly
+when the pagination matches and proportionally when it does not, saying so
+either way. The panel wears the RSS rail's `.rail-row` treatment.
+
+### Decisions taken while building
+
+**Eviction order, not eviction age.** The plan said "never prunes `intend`
+before `read`". Implemented as a strict shelf order — `read`, then `reading`,
+then `intend`, least-recently-opened first within each — and a pinned entry is
+*not* exempt from the cap. Pinning promises that automation will not move a
+shelf, not that `localStorage` has no ceiling; pretending otherwise would just
+relocate the overrun to whatever writes next.
+
+**Position saving is debounced *and* flushed twice.** Every 2s while paging, on
+`visibilitychange` when the tab hides, and on destroy. The plan named the first
+two; destroy is the one that catches an in-app navigation away, which is the
+common case and which `visibilitychange` does not fire for.
+
+**`recordPosition` keeps the furthest page, not the last.** Paging back to
+re-read something earlier must not un-finish a document. Only resets when the
+page *count* changes, since a position measured against a different pagination
+is not comparable.
+
+**The pane shelves but does not position.** As planned, reading an RSS item in
+the split pane puts it on a shelf. It deliberately neither restores nor saves a
+page: the pane is a preview strip beside a list, and dropping someone into page
+7 of an article there is disorienting rather than helpful.
+
+**Titles for things that have none.** A tweetstorm has no headline, so the
+library takes its first sentence (trimmed to 90 chars). A placeholder title is
+also allowed to improve on a later visit — a post whose linked article gets
+fetched suddenly has a real headline, and the row should show it.
+
+### Still open — the "save for later" entry point
+
+**Not built, and deliberately.** The plan assumed a "saved without opening"
+path that lands on `intend`; `ReaderLibrary.save()` exists and is tested, but
+nothing calls it. The reason is that the obvious place to put it — a control on
+a status card or an RSS headline row — collides with two things that already
+mean something adjacent: `Bookmarks`, and RSS's own `Read later` star
+(`rss-read-state`'s star map, deliberately never pruned).
+
+Three overlapping "keep this for later" gestures on one row is worse than two,
+and picking which of them the library should be, or whether it should absorb
+one, is a product call rather than an implementation detail. Flagged for the
+operator; the `intend` shelf works and is reachable by filing a document there
+by hand from the panel.
+
+### Two fixes from the operator's testing
+
+**The toolbar was flung to the corners.** Corrected to a centred band —
+`width: min(100%, 52rem)`, `justify-content: center`, with a hairline rule
+between the "act on the text" cluster and the "stop reading" cluster. This
+matches the app's own top bar (`shell.css .topbar-inner`), which puts its tab
+nav in the middle column rather than spreading brand and account to opposite
+edges. On a 1400px screen the old layout made the eye travel the full width to
+get from "next page" to "exit", and read as browser chrome rather than as part
+of the page.
+
+**`readerChain` showed one post where a storm belonged.** A real bug, found
+while the operator was testing. The chain was anchored on `thread[0]` — the
+*conversation root* — so a storm written as a reply to someone else produced a
+one-post "article" consisting of that other person's post, because every
+subsequent post failed the same-author test. It also lost the beginning of a
+storm whenever the reader arrived on post four of nine, which is the normal
+case for a link shared from the middle.
+
+Now anchored on the post the reader actually opened: take *that* author, walk
+back through their own replies to where they started, then forward. Walking
+back stops at the first post that is not theirs, so a storm that genuinely
+begins as a reply starts at the author's own first line. Seven tests.
+
+This also turned up a latent reactivity bug: `thread.ts` held `currentId` as a
+plain field, and passing it into a `computed` would have meant the Reader
+link's post count never updated. Now a signal.
+
+### One trap worth recording
+
+`vi.useFakeTimers()` in the position-saving spec leaked into the rest of the
+run: fake timers are global, so every later spec file saw a clock that never
+advanced, and it surfaced as an unrelated `bulk-actions` retry test failing.
+Fixed with an `afterEach(() => vi.useRealTimers())`. Worth knowing because the
+symptom points at entirely the wrong file.
+
+### Numbers
+
+| | |
+| --- | --- |
+| New tests | 69 (40 store, 12 core integration, 10 panel, 7 chain) |
+| Total | 5779 passing |

@@ -47,3 +47,29 @@
 .tool:hover {
   background: var(--hover);
 }
+
+/* The reading column, and the library beside it when it is open.
+
+   Grid rather than flex so the panel's 290px is a track the text cannot eat
+   into: the measure is the point of this page, and a library that squeezed the
+   prose to make room for itself would be trading the feature for the furniture. */
+.read-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.read-body.with-library {
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 16px;
+  padding-right: 16px;
+  align-items: start;
+}
+
+/* Below this the two do not fit side by side. The panel drops underneath rather
+   than narrowing the column — see library-panel.css for the matching rule. */
+@media (max-width: 1100px) {
+  .read-body.with-library {
+    grid-template-columns: minmax(0, 1fr);
+    padding-right: 0;
+  }
+}
