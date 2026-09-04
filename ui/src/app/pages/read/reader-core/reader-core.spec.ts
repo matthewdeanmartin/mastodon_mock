@@ -9,6 +9,7 @@ import { ReaderLibrary } from '../../../providers/read/reader-library';
 import { readerRouteId } from '../reader-route-id';
 import { ClientPrefs } from '../../../client-prefs';
 import { Status } from '../../../models';
+import { ArticleResult } from '../../../providers/article/article-models';
 
 /**
  * A host, because `ReaderCore` takes a required input and the interesting
@@ -374,7 +375,8 @@ describe('ReaderCore paging a post chain', () => {
       instance as unknown as { roomBelow(element: HTMLElement): number }
     ).roomBelow(body);
 
-    expect(available).toBe(526); // 700 - 150 inside the reader - 24 bottom gap.
+    // 700 - 150 inside reader - 24 bottom gap - one 18px × 1.65 line box.
+    expect(available).toBe(496);
     viewport.mockRestore();
   });
 
@@ -422,6 +424,91 @@ describe('ReaderCore paging a post chain', () => {
       [2, 3],
     ]);
     expect(measuredCandidateSizes.length).toBeGreaterThan(2);
+  });
+
+  it('measures an article after an asynchronous fetch inserts its gauge', () => {
+    fixture.componentInstance.chain.set([post('1', 900)]);
+    fixture.detectChanges();
+    const instance = core();
+    const internal = instance as unknown as {
+      expansion: { result: { set(value: ArticleResult): void } };
+      fitGaugePages(gauge: HTMLElement, available: number): number[][];
+    };
+    const originalFit = internal.fitGaugePages.bind(instance);
+    const measuredBlockCounts: number[] = [];
+    internal.fitGaugePages = (gauge, available) => {
+      measuredBlockCounts.push(gauge.children.length);
+      return originalFit(gauge, available);
+    };
+
+    internal.expansion.result.set({
+      requestedUrl: 'https://example.com/story',
+      finalUrl: 'https://example.com/story',
+      card: null,
+      diagnosis: 'ok',
+      fetchedAt: '2026-09-04T00:00:00.000Z',
+      article: {
+        title: 'A fetched story',
+        byline: null,
+        siteName: 'Example',
+        markdown: `${'First paragraph. '.repeat(80)}\n\n${'Second paragraph. '.repeat(80)}`,
+        images: [],
+        quality: 'good',
+        metrics: {
+          wordCount: 320,
+          linkDensity: 0,
+          paragraphCount: 2,
+          textToMarkupRatio: 1,
+        },
+      },
+    });
+    fixture.detectChanges();
+
+    expect(measuredBlockCounts).toContain(2);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('.reader-article-body'),
+    ).not.toBeNull();
+  });
+
+  it('remeasures when a retained core receives another library document', () => {
+    fixture.componentInstance.chain.set(storm(2));
+    fixture.detectChanges();
+    const instance = core();
+    const internal = instance as unknown as {
+      fitGaugePages(gauge: HTMLElement, available: number): number[][];
+    };
+    const originalFit = internal.fitGaugePages.bind(instance);
+    let measurements = 0;
+    internal.fitGaugePages = (gauge, available) => {
+      measurements++;
+      return originalFit(gauge, available);
+    };
+
+    fixture.componentInstance.routeId.set('replacement');
+    fixture.componentInstance.chain.set([
+      post('replacement', 300),
+      post('replacement-reply', 300, { in_reply_to_id: 'replacement' }),
+    ]);
+    fixture.detectChanges();
+
+    expect(measurements).toBeGreaterThan(0);
+  });
+
+  it('names the configured Twitter mirror rather than calling Sotwe Nitter', () => {
+    fixture.componentInstance.chain.set([
+      post('tweet', 300, {
+        provider: 'twitter',
+        url: 'https://x.com/NASA/status/2095947707605266436',
+      }),
+    ]);
+    fixture.detectChanges();
+
+    const source = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '.reader-source a',
+    );
+    expect(source?.textContent).toContain('www.sotwe.com');
+    expect(source?.textContent).not.toContain('Nitter');
+    expect(source?.href).toContain('sotwe.com/tweet/2095947707605266436');
   });
 
   it('shows the whole chain in scroll mode, whatever the measurements say', () => {

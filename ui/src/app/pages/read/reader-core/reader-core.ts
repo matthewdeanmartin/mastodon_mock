@@ -1,12 +1,11 @@
 import {
-  afterNextRender,
+  afterRenderEffect,
   Component,
   computed,
   DestroyRef,
   effect,
   ElementRef,
   inject,
-  Injector,
   input,
   output,
   signal,
@@ -17,7 +16,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslocoService } from '@jsverse/transloco';
 import { ClientPrefs } from '../../../client-prefs';
-import { toNitterUrl } from '../../../providers/twitter/nitter';
+import { nitterHost, toNitterUrl } from '../../../providers/twitter/nitter';
 import { serverKnowsStatus } from '../../../providers/provider';
 import { DocumentIdentity, ReaderLibrary } from '../../../providers/read/reader-library';
 import { documentTitle, isDocument } from '../reader-document';
@@ -90,7 +89,7 @@ import { ReadingTools } from '../reading-tools';
 // i18n reader.core.by: by {{author}}
 // i18n reader.core.postCount: {{count}} posts
 // i18n reader.core.resumedApproximately: Picking up roughly where you left off — this article has a different number of pages than last time.
-// i18n reader.core.readOn.nitter: Read on Nitter
+// i18n reader.core.readOn.twitterMirror: Read on {{host}}
 // i18n reader.core.readOn.originalSite: Read on the original site
 
 /**
@@ -175,12 +174,6 @@ export class ReaderCore {
   private readonly transloco = inject(TranslocoService);
   private readonly library = inject(ReaderLibrary);
   protected readonly tools = inject(ReadingTools);
-  /**
-   * Declared with the other injections, above the effect that uses it: class
-   * fields initialise in source order, so an `inject` below the effect would be
-   * `undefined` at the moment the effect is created.
-   */
-  private readonly injector = inject(Injector);
 
   /** The author's own chain: one post, or a storm, or an RSS item. */
   readonly chain = input.required<Status[]>();
@@ -858,11 +851,19 @@ export class ReaderCore {
       ? ((host.querySelector('.read-toolbar-outer') as HTMLElement | null)?.getBoundingClientRect()
           .height ?? 0)
       : 0;
-    // The bottom breathing room mirrors the column's own padding, so the last
-    // line of a page is not flush against the edge of the screen.
+    // Keep one configured line box clear in addition to the ordinary bottom
+    // gap. Browser glyph painting and fractional line boxes can extend beyond
+    // the integer box reported by the probe; without this, the final baseline
+    // is the one line users repeatedly found below the fold.
+    const lineClearance = Math.ceil(this.prefs.readerFontSize() * this.prefs.readerLineHeight());
     return Math.max(
       0,
-      viewport - shellHeight - toolbarHeight - contentOffset - READER_PAGE_BOTTOM_GAP,
+      viewport -
+        shellHeight -
+        toolbarHeight -
+        contentOffset -
+        READER_PAGE_BOTTOM_GAP -
+        lineClearance,
     );
   }
 
@@ -900,8 +901,10 @@ export class ReaderCore {
    * Every typography preference is read so the effect depends on it: a reader
    * who presses `A+` must get pages sized for the new type, not the old.
    */
-  private readonly remeasure = effect(() => {
-    // Read the dependencies explicitly; the measurement itself is imperative.
+  private readonly remeasure = afterRenderEffect(() => {
+    // Read dependencies here so every later article fetch, retained-component
+    // library navigation and typography change gets a measurement after its
+    // new gauge is in the DOM.
     this.gaugeHtml();
     this.chainGauge();
     this.chain();
@@ -912,14 +915,8 @@ export class ReaderCore {
     this.prefs.readerWordSpacing();
     this.prefs.readerPageFlip();
     this.libraryOpen();
-    // After the browser has laid the gauge out, not during this tick.
-    afterNextRender(
-      () => {
-        this.observeGauges();
-        this.measure();
-      },
-      { injector: this.injector },
-    );
+    this.observeGauges();
+    this.measure();
   });
 
   /**
@@ -1155,10 +1152,10 @@ export class ReaderCore {
    * ordinary Mastodon post cannot favourite it either, and does not need to be
    * sent off-site to read what is already on screen.
    *
-   * Tweets go to Nitter rather than x.com, matching the card toolbar — sending
-   * a reader to a login wall is the thing this app exists to avoid. Everything
-   * else keeps its own URL, because an RSS item's original site is the whole
-   * point of the link.
+   * Tweets go to the configured public mirror rather than x.com, matching the
+   * card toolbar — sending a reader to a login wall is the thing this app
+   * exists to avoid. Everything else keeps its own URL, because an RSS item's
+   * original site is the whole point of the link.
    */
   protected readonly originalLink = computed<{ url: string; label: string } | null>(() => {
     const post = this.root();
@@ -1167,7 +1164,14 @@ export class ReaderCore {
     }
     if (post.provider === 'twitter') {
       const url = toNitterUrl(post.url);
-      return url ? { url, label: this.transloco.translate('reader.core.readOn.nitter') } : null;
+      return url
+        ? {
+            url,
+            label: this.transloco.translate('reader.core.readOn.twitterMirror', {
+              host: nitterHost(),
+            }),
+          }
+        : null;
     }
     return post.url
       ? { url: post.url, label: this.transloco.translate('reader.core.readOn.originalSite') }
