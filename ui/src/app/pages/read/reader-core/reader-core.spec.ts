@@ -307,3 +307,96 @@ describe('ReaderCore shelving under the id it was opened with', () => {
     expect(Object.keys(library.snapshot())).toHaveLength(1);
   });
 });
+
+/**
+ * Page mode has to actually produce pages you can turn, with something to click.
+ *
+ * The operator's report: "Page: still have to scroll, the text is taller than
+ * the viewport. Also nothing visible to click on." Both were true. A page was
+ * ~500 words — "about a screenful and a half" by `article-pages.ts`'s own
+ * comment — so page mode still scrolled, and the only page-turn controls were
+ * two small arrows at the top of the screen.
+ */
+
+/**
+ * Page mode on a tweetstorm — the document this reader was built for, and the
+ * one page mode used to miss entirely.
+ *
+ * The operator's report: "Page: still have to scroll... nothing visible to
+ * click on." Both followed from the same cause. `pages()` was derived from the
+ * *fetched article*, so a storm with nothing to fetch had zero pages, the
+ * toolbar's pager was hidden, and page mode was identical to scrolling.
+ */
+describe('ReaderCore paging a post chain', () => {
+  let fixture: ComponentFixture<Host>;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    fixture = TestBed.createComponent(Host);
+  });
+
+  afterEach(() => localStorage.clear());
+
+  const core = (): ReaderCore =>
+    fixture.debugElement.query((node) => node.componentInstance instanceof ReaderCore)
+      .componentInstance as ReaderCore;
+
+  const storm = (n: number): Status[] => Array.from({ length: n }, (_, i) => post(`${i + 1}`, 300));
+
+  /**
+   * jsdom reports every height as zero, so the measured path cannot run and the
+   * component falls back to one page — which is the documented behaviour for an
+   * unmeasurable viewport, and is what a server-rendered pass gets too.
+   */
+  it('falls back to a single page when nothing can be measured', () => {
+    fixture.componentInstance.chain.set(storm(8));
+    fixture.detectChanges();
+
+    expect(core().pageCountForTest()).toBe(1);
+    // And it still renders every post, rather than hiding seven of them.
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.reader-posts .reader-post'),
+    ).toHaveLength(8);
+  });
+
+  it('shows the whole chain in scroll mode, whatever the measurements say', () => {
+    TestBed.inject(ClientPrefs).setReaderPageFlip(false);
+    fixture.componentInstance.chain.set(storm(8));
+    fixture.detectChanges();
+
+    expect(core().pageCountForTest()).toBe(1);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.reader-posts .reader-post'),
+    ).toHaveLength(8);
+  });
+
+  /** A single post is not a storm; there is nothing to paginate. */
+  it('does not paginate a document of one post', () => {
+    fixture.componentInstance.chain.set(storm(1));
+    fixture.detectChanges();
+
+    expect(core().pageCountForTest()).toBe(1);
+  });
+
+  /** The gauge is only worth rendering when there is a chain to measure. */
+  it('lays out a measuring gauge only for a storm in page mode', () => {
+    fixture.componentInstance.chain.set(storm(1));
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.reader-gauge')).toBeNull();
+
+    fixture.componentInstance.chain.set(storm(5));
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.reader-gauge')).not.toBeNull();
+  });
+
+  it('hides the gauge from assistive technology, which must not read it twice', () => {
+    fixture.componentInstance.chain.set(storm(5));
+    fixture.detectChanges();
+
+    const gauge = (fixture.nativeElement as HTMLElement).querySelector('.reader-gauge');
+    expect(gauge?.getAttribute('aria-hidden')).toBe('true');
+  });
+});

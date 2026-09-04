@@ -178,18 +178,33 @@
         </p>
       }
 
-      <!-- The posts themselves: one long post, or a storm read as one thing. -->
-      @for (p of chain(); track p.id) {
-        <section class="reader-post" [innerHTML]="p.content"></section>
-        @for (m of p.media_attachments; track m.id) {
-          <img
-            class="reader-media"
-            [src]="m.preview_url || m.url"
-            [alt]="m.description || ''"
-            loading="lazy"
-            decoding="async"
-          />
+      <!-- The posts themselves: one long post, or a storm read as one thing.
+           In page mode this is the current page's posts rather than all of them
+           — a forty-post storm is exactly the document someone wants to turn
+           pages through, and it is the case page mode used to miss entirely. -->
+      <div #postBody class="reader-posts">
+        @for (p of visiblePosts(); track p.id) {
+          <section class="reader-post" [innerHTML]="p.content"></section>
+          @for (m of p.media_attachments; track m.id) {
+            <img
+              class="reader-media"
+              [src]="m.preview_url || m.url"
+              [alt]="m.description || ''"
+              loading="lazy"
+              decoding="async"
+            />
+          }
         }
+      </div>
+
+      <!-- The chain laid out but not shown, so each post's height can be
+           measured. Same trick as the article gauge, same reason. -->
+      @if (chainGauge()) {
+        <div #postGauge class="reader-gauge" aria-hidden="true">
+          @for (p of chain(); track p.id) {
+            <section class="reader-post" [innerHTML]="p.content"></section>
+          }
+        </div>
       }
     }
 
@@ -221,6 +236,14 @@
            added by wrapping nodes in that output (`mark-passages.ts`), never by
            building markup from the reader's own text. -->
         <div #articleBody class="reader-article-body" [innerHTML]="pageHtml()"></div>
+
+        <!-- The whole document, laid out but never shown, so each block's real
+             height can be measured. `visibility: hidden` rather than
+             `display: none`: a display-none subtree has no layout and every
+             height comes back zero. -->
+        @if (gaugeHtml(); as gauge) {
+          <div #gauge class="reader-gauge" aria-hidden="true" [innerHTML]="gauge"></div>
+        }
 
         <!-- Anchored inside the body, which is its positioning context and the
            container selections are scoped to. -->
@@ -282,6 +305,31 @@
           </a>
         </div>
       </section>
+    }
+    <!-- Page turning you can click.
+         The toolbar arrows are small and far from where the eyes are; a
+         mouse reader should be able to turn the page from the page, the way
+         a touch reader taps its edge. Wide, quiet targets down each side —
+         invisible until hovered, so they cost the reading nothing. -->
+    @if (paging()) {
+      <button
+        class="page-edge prev"
+        type="button"
+        [disabled]="pageNumber() <= 1"
+        [attr.aria-label]="'reader.toolbar.previousPage' | transloco"
+        (click)="prevPage()"
+      >
+        <span aria-hidden="true">‹</span>
+      </button>
+      <button
+        class="page-edge next"
+        type="button"
+        [disabled]="pageNumber() >= pageCount()"
+        [attr.aria-label]="'reader.toolbar.nextPage' | transloco"
+        (click)="nextPage()"
+      >
+        <span aria-hidden="true">›</span>
+      </button>
     }
   </article>
 

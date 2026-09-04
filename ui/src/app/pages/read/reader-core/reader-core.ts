@@ -1,10 +1,12 @@
 import {
+  afterNextRender,
   Component,
   computed,
   DestroyRef,
   effect,
   ElementRef,
   inject,
+  Injector,
   input,
   output,
   signal,
@@ -27,6 +29,8 @@ import { ArticleExpansion } from '../article-expansion';
 import { articleTarget } from '../../../providers/article/article-target';
 import { renderMarkdown } from '../../../providers/article/markdown-render';
 import { paginateMarkdown } from '../../rss/article-pages';
+import { fitToPages } from '../fit-to-viewport';
+import { documentBlocks } from '../reader-anchor';
 import { ReadToolbar } from '../read-toolbar/read-toolbar';
 import { DocumentSearchDialog } from '../document-search/document-search-dialog';
 import { SearchMatch } from '../document-search';
@@ -98,6 +102,14 @@ import { ReadingTools } from '../reading-tools';
 const POSITION_SAVE_DELAY_MS = 2_000;
 
 /**
+ * Breathing room below the last line of a page.
+ *
+ * Mirrors the reading column's own bottom padding so a page ends the way the
+ * document does, rather than with text flush against the edge of the screen.
+ */
+const READER_PAGE_BOTTOM_GAP = 24;
+
+/**
  * One document, rendered for reading.
  *
  * ## What this is
@@ -151,6 +163,12 @@ export class ReaderCore {
   private readonly transloco = inject(TranslocoService);
   private readonly library = inject(ReaderLibrary);
   protected readonly tools = inject(ReadingTools);
+  /**
+   * Declared with the other injections, above the effect that uses it: class
+   * fields initialise in source order, so an `inject` below the effect would be
+   * `undefined` at the moment the effect is created.
+   */
+  private readonly injector = inject(Injector);
 
   /** The author's own chain: one post, or a storm, or an RSS item. */
   readonly chain = input.required<Status[]>();
@@ -255,16 +273,140 @@ export class ReaderCore {
     return root?.provider === 'rss' && root.rssFullContent === false;
   });
 
-  /** The extracted article split into pages, empty until something is fetched. */
+  /**
+   * The height one page has to fit in, measured from the viewport.
+   *
+   * Re-measured on resize and on any typography change, because every one of
+   * those changes what fits. Zero until the first measurement, which
+   * `fitToPages` reads as "unmeasured" and answers with a single page.
+   */
+  private readonly available = signal(0);
+
+  /**
+   * The extracted article, split into pages that actually fit the screen.
+   *
+   * ## Why this is measured rather than counted
+   *
+   * It used to be `paginateMarkdown`, which slices at ~500 words — "about a
+   * screenful and a half" by its own comment. That is the bug the operator
+   * found: in page-flip mode the reader still had to scroll, so turning the
+   * page bought nothing and the two modes were indistinguishable. A page is not
+   * a quantity of words, it is what fits, and what fits depends on the type
+   * size, the line height, the measure and the window.
+   *
+   * `paginateMarkdown` is still the fallback for the first render, before
+   * anything has been measured: it gives a sensible shape immediately, and the
+   * measured pass replaces it as soon as the browser has laid the blocks out.
+   */
   protected readonly pages = computed<string[]>(() => {
     const article = this.expansion.result()?.article;
     if (!article) {
       return [];
     }
-    return this.prefs.readerPageFlip() ? paginateMarkdown(article.markdown) : [article.markdown];
+    if (!this.prefs.readerPageFlip()) {
+      return [article.markdown];
+    }
+    const measured = this.measuredPages();
+    return measured ?? paginateMarkdown(article.markdown);
   });
 
-  protected readonly pageCount = computed(() => this.pages().length);
+  /**
+   * The document's blocks grouped by what fits, or null before measurement.
+   *
+   * Depends on `available` and on every typography preference, so changing the
+   * type size re-paginates rather than leaving pages sized for the old one.
+   */
+  private readonly measuredPages = computed<string[] | null>(() => {
+    const article = this.expansion.result()?.article;
+    const available = this.available();
+    const heights = this.blockHeights();
+    if (!article || !available || !heights.length) {
+      return null;
+    }
+    const list = documentBlocks(article.markdown).markdown;
+    if (heights.length !== list.length) {
+      // The measurement is of a different document than the one we are about to
+      // slice — a re-fetch landed between the two. Wait for the next pass
+      // rather than pairing heights with the wrong blocks.
+      return null;
+    }
+    return fitToPages(
+      heights.map((height, index) => ({ index, height })),
+      available,
+    ).map((page) => page.blocks.map((index) => list[index]).join('\n\n'));
+  });
+
+  /** Rendered height of each block, filled in by the measuring pass. */
+  private readonly blockHeights = signal<number[]>([]);
+
+  /** Rendered height of each post in the chain, from the same pass. */
+  private readonly postHeights = signal<number[]>([]);
+
+  /** The room a page of *posts* has, which is not the room the article has. */
+  private readonly chainAvailable = signal(0);
+
+  /**
+   * The posts on the current page, when the chain itself paginates.
+   *
+   * ## Why the chain needs pages at all
+   *
+   * This is the case the epic exists for — "a Kindle app for tweetstorms" — and
+   * it was the one page mode never covered. `pages()` is derived from the
+   * *fetched article*, so a storm with nothing to fetch had zero pages, no
+   * controls, and page mode was indistinguishable from scrolling. A forty-post
+   * storm is exactly the document someone wants to turn pages through.
+   *
+   * A post is the unit, never split: posts were written as separate things and
+   * a page break between two of them is a seam the author already put there.
+   */
+  protected readonly postPages = computed<Status[][]>(() => {
+    const chain = this.chain();
+    if (!this.prefs.readerPageFlip() || chain.length < 2) {
+      return [chain];
+    }
+    const heights = this.postHeights();
+    const available = this.chainAvailable();
+    if (!available || heights.length !== chain.length) {
+      return [chain];
+    }
+    return fitToPages(
+      heights.map((height, index) => ({ index, height })),
+      available,
+    ).map((page) => page.blocks.map((index) => chain[index]));
+  });
+
+  /** The posts to render right now. */
+  protected readonly visiblePosts = computed<Status[]>(() => {
+    const pages = this.postPages();
+    if (pages.length < 2) {
+      return pages[0] ?? [];
+    }
+    return pages[Math.min(this.pageIndex(), pages.length - 1)] ?? [];
+  });
+
+  /**
+   * How many pages this document has.
+   *
+   * The article's, when one was fetched. Otherwise the chain's — which is what
+   * makes page mode work on a tweetstorm, the document this reader was built
+   * for. Never both: an article replaces the chain as the thing being read.
+   */
+  protected readonly pageCount = computed(() =>
+    this.pages().length ? this.pages().length : this.postPages().length,
+  );
+
+  /**
+   * How many pages the document came out as.
+   *
+   * Exposed for tests: jsdom has no layout, so a spec cannot reach the measured
+   * pagination through the DOM and has to ask.
+   */
+  pageCountForTest(): number {
+    return this.pageCount();
+  }
+
+  /** Whether the page-turn affordances belong on screen at all. */
+  protected readonly paging = computed(() => this.prefs.readerPageFlip() && this.pageCount() > 1);
 
   /**
    * How far through, 0 to 1, for the hairline bar under the toolbar.
@@ -535,12 +677,150 @@ export class ReaderCore {
     this.tools.captureSelection(body, this.selectionPoint(body, event));
   };
 
+  /**
+   * Measure one page's worth of room, and how tall each block renders in it.
+   *
+   * ## Why it measures offscreen rather than the live page
+   *
+   * The live body only ever holds the *current* page, so measuring it would
+   * tell us about the blocks we already decided to show — circular. Instead the
+   * whole document is rendered into a hidden element that inherits the reading
+   * column's width and typography, every block is measured there, and the
+   * result decides the pagination. The element is `visibility: hidden` rather
+   * than `display: none` because a `display: none` subtree has no layout and
+   * every height comes back zero.
+   */
+  private readonly measure = (): void => {
+    this.measureChain();
+    const body = this.articleBodyRef()?.nativeElement;
+    const gauge = this.gaugeRef()?.nativeElement;
+    if (!body || !gauge) {
+      return;
+    }
+    // What is left of the window once the toolbar and the column's own padding
+    // have taken their share. `getBoundingClientRect().top` is where the prose
+    // actually starts, which accounts for the header, the byline and anything
+    // else above it without this needing to know they exist.
+    const top = body.getBoundingClientRect().top;
+    const viewport = window.innerHeight || 0;
+    // The bottom breathing room mirrors the column's own padding, so the last
+    // line of a page is not flush against the edge of the screen.
+    const available = Math.max(0, viewport - top - READER_PAGE_BOTTOM_GAP);
+
+    const heights = [...gauge.children].map((child) => {
+      const rect = child.getBoundingClientRect();
+      const style = getComputedStyle(child);
+      // Margins count: they are the space between paragraphs, and a page fitted
+      // without them overflows by exactly the gaps it ignored.
+      return rect.height + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
+    });
+
+    // Only write when something actually changed. The measurement runs after
+    // every render, and a write with the same values would schedule another
+    // render that measures again — a loop that never settles, and in dev mode
+    // an `ExpressionChangedAfterItHasBeenChecked` on the first turn of it.
+    if (this.available() !== available) {
+      this.available.set(available);
+    }
+    const previous = this.blockHeights();
+    if (
+      previous.length !== heights.length ||
+      heights.some((height, index) => Math.abs(height - previous[index]) > 0.5)
+    ) {
+      this.blockHeights.set(heights);
+    }
+  };
+
+  /**
+   * The same measurement for the post chain.
+   *
+   * Separate because the two can be on screen at once — a post that links to an
+   * article shows both — and because the room available differs: the posts
+   * start higher up the column than the article does.
+   */
+  private measureChain(): void {
+    const body = this.postBodyRef()?.nativeElement;
+    const gauge = this.postGaugeRef()?.nativeElement;
+    if (!body || !gauge) {
+      return;
+    }
+    const top = body.getBoundingClientRect().top;
+    const available = Math.max(0, (window.innerHeight || 0) - top - READER_PAGE_BOTTOM_GAP);
+    const heights = [...gauge.children].map((child) => {
+      const rect = child.getBoundingClientRect();
+      const style = getComputedStyle(child);
+      return rect.height + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
+    });
+    // Its own height signal, not `available`: the posts and the article start at
+    // different points down the column and can be on screen together, so one
+    // shared number would be whichever measurement ran last.
+    if (this.chainAvailable() !== available) {
+      this.chainAvailable.set(available);
+    }
+    const previous = this.postHeights();
+    if (
+      previous.length !== heights.length ||
+      heights.some((height, index) => Math.abs(height - previous[index]) > 0.5)
+    ) {
+      this.postHeights.set(heights);
+    }
+  }
+
+  /** The hidden element the whole document is laid out in, for measuring. */
+  private gaugeRef = viewChild<ElementRef<HTMLElement>>('gauge');
+
+  /** The same, for the post chain. */
+  private postGaugeRef = viewChild<ElementRef<HTMLElement>>('postGauge');
+
+  /** Where the posts render, so the room left for them can be measured. */
+  private postBodyRef = viewChild<ElementRef<HTMLElement>>('postBody');
+
+  /** Whether the chain is worth measuring: only a storm in page mode paginates. */
+  protected readonly chainGauge = computed(
+    () => this.prefs.readerPageFlip() && this.chain().length > 1,
+  );
+
+  /** The whole document as HTML, for the gauge only. Never shown to anyone. */
+  protected readonly gaugeHtml = computed(() => {
+    const article = this.expansion.result()?.article;
+    if (!article || !this.prefs.readerPageFlip()) {
+      return null;
+    }
+    return documentBlocks(article.markdown)
+      .markdown.map((block) => renderMarkdown(block))
+      .join('');
+  });
+
+  /**
+   * Re-measure whenever anything that changes what fits changes.
+   *
+   * Every typography preference is read so the effect depends on it: a reader
+   * who presses `A+` must get pages sized for the new type, not the old.
+   */
+  private readonly remeasure = effect(() => {
+    // Read the dependencies explicitly; the measurement itself is imperative.
+    this.gaugeHtml();
+    this.chainGauge();
+    this.chain();
+    this.prefs.readerFontSize();
+    this.prefs.readerFontFamily();
+    this.prefs.readerLineHeight();
+    this.prefs.readerLetterSpacing();
+    this.prefs.readerWordSpacing();
+    this.prefs.readerPageFlip();
+    this.libraryOpen();
+    // After the browser has laid the gauge out, not during this tick.
+    afterNextRender(() => this.measure(), { injector: this.injector });
+  });
+
   constructor() {
     document.addEventListener('visibilitychange', this.onHide);
+    window.addEventListener('resize', this.measure);
     document.addEventListener('keyup', this.onSelectionKey);
     document.addEventListener('mouseup', this.onSelectionPointer);
     inject(DestroyRef).onDestroy(() => {
       document.removeEventListener('visibilitychange', this.onHide);
+      window.removeEventListener('resize', this.measure);
       document.removeEventListener('keyup', this.onSelectionKey);
       document.removeEventListener('mouseup', this.onSelectionPointer);
       this.flushPosition();

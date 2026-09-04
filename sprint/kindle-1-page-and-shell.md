@@ -236,3 +236,57 @@ item that is a feed fetch saved on every reader open.
   on the thread page, but the reader page does not render them yet. The reader
   is a document surface and comments are a conversation; where they belong is a
   Sprint 2 question, not an oversight to fix quickly.
+
+## Page mode did not paginate (fixed 2026-09-04)
+
+Reported by the operator: *"Page: still have to scroll, the text is taller than
+the viewport. Also nothing visible to click on. Scroll: well, I still had to
+scroll anyhow."* All three observations were correct and had two causes.
+
+**A page was a word count, not a page.** `article-pages.ts` slices at ~500
+words, which its own comment describes as "about a screenful and a half". So in
+page-flip mode the reader still scrolled, the page turn bought nothing, and the
+two modes were indistinguishable — which is exactly what was reported.
+
+`fit-to-viewport.ts` replaces the count with a measurement. The whole document
+is laid out in a hidden gauge that inherits the reading column's width and
+typography, every block is measured there, and pages are filled until the next
+block would overflow. A page is now *what fits*, which is what a page means.
+Re-measured on resize and on every typography change, because each of those
+changes what fits. `paginateMarkdown` stays as the first-render fallback and as
+the answer when nothing can be measured — a pagination invented from a guessed
+height would land every page turn somewhere arbitrary.
+
+Two rules the fitting obeys, both about not making the reading worse:
+
+- **Never split inside a block.** A paragraph broken across a page turn loses
+  your place at the seam and gains nothing; a slightly short page is better. A
+  block taller than the page gets a page of its own and overflows it, because
+  refusing to show it is not an option.
+- **A minimum fill of 55%.** Without it a run of tall blocks yields a string of
+  nearly-empty pages, and the reader turns four pages to read two screens.
+
+**A tweetstorm had no pages at all.** `pages()` was derived from the *fetched
+article*, so a storm — the document this epic exists for — had zero pages, the
+toolbar's pager was hidden by `paging()`, and there was nothing to click even in
+principle. The chain now paginates by the same measurement, with a post as the
+unit and never split: posts were written as separate things, so a break between
+two of them is a seam the author already put there.
+
+**Nothing visible to click.** The only page-turn controls were two small arrows
+at the top of the screen, far from where the eyes are. There are now wide quiet
+targets down each side of the page — invisible until hovered so they cost the
+reading nothing, always visible on keyboard focus, and hidden entirely on touch
+(`@media (hover: none)`), where a permanently grey band down each side would be
+worse than the toolbar. Both are real buttons with labels, so a screen reader
+gets them too.
+
+### What could not be verified here
+
+jsdom has no layout: every `getBoundingClientRect` returns zero, so the measured
+path cannot execute in a spec. The tests cover `fitToPages` directly (10 tests,
+including the unmeasurable-viewport fallback) and the behaviour around it — that
+an unmeasurable viewport yields one page with every post still rendered, that
+scroll mode always shows the whole chain, that the gauge appears only for a
+storm in page mode and is `aria-hidden`. **The measurement against real layout
+is not covered by a test and wants a look in a browser.**
