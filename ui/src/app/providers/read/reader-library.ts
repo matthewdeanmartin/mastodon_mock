@@ -128,7 +128,7 @@ function load(key: string): LibraryMap {
         pages: Number.isFinite(value.pages) && value.pages > 0 ? Math.floor(value.pages) : 1,
       };
     }
-    return out;
+    return dedupeLibrary(out);
   } catch {
     return {};
   }
@@ -227,6 +227,86 @@ export function progressOf(entry: LibraryEntry): number {
     return 1;
   }
   return Math.min(1, Math.max(0, (entry.page - 1) / (entry.pages - 1)));
+}
+
+/** A stable comparison key for one document reached through different route ids. */
+export function libraryDocumentUrl(raw: string): string {
+  const value = raw.trim();
+  if (!value) {
+    return '';
+  }
+  try {
+    const url = new URL(value);
+    url.hash = '';
+    url.hostname = url.hostname.toLowerCase();
+    const drop: string[] = [];
+    url.searchParams.forEach((_value, key) => {
+      if (/^(utm_.+|fbclid|gclid|mc_[ce]id|igshid|ref|ref_src|source)$/i.test(key)) {
+        drop.push(key);
+      }
+    });
+    for (const key of drop) {
+      url.searchParams.delete(key);
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * Collapse entries that name the same URL under different route ids.
+ *
+ * The newer route id is retained because it is the one most recently proven to
+ * open. A hand-filed shelf wins; otherwise Read wins over in-progress, while
+ * the furthest proportional position supplies progress.
+ */
+export function dedupeLibrary(map: LibraryMap): LibraryMap {
+  const out: LibraryMap = {};
+  const idByUrl = new Map<string, string>();
+  for (const [id, candidate] of Object.entries(map)) {
+    const key = libraryDocumentUrl(candidate.url);
+    const previousId = key ? idByUrl.get(key) : undefined;
+    if (!previousId) {
+      out[id] = candidate;
+      if (key) {
+        idByUrl.set(key, id);
+      }
+      continue;
+    }
+    const previous = out[previousId];
+    const newerIsCandidate = candidate.openedAt >= previous.openedAt;
+    const keepId = newerIsCandidate ? id : previousId;
+    const newer = newerIsCandidate ? candidate : previous;
+    // A newly opened entry starts as pages=1/page=1 before measurement. That is
+    // not evidence it outranks a measured ten-page position, even though a
+    // genuinely settled one-page document is complete once recorded.
+    const mergeProgress = (entry: LibraryEntry): number =>
+      entry.pages <= 1 && entry.shelf !== 'read' ? 0 : progressOf(entry);
+    const progressEntry =
+      mergeProgress(candidate) >= mergeProgress(previous) ? candidate : previous;
+    const shelfRank: Record<Shelf, number> = { intend: 0, reading: 1, read: 2 };
+    const shelfEntry =
+      candidate.pinnedShelf !== previous.pinnedShelf
+        ? candidate.pinnedShelf
+          ? candidate
+          : previous
+        : shelfRank[candidate.shelf] >= shelfRank[previous.shelf]
+          ? candidate
+          : previous;
+    delete out[previousId];
+    out[keepId] = {
+      ...newer,
+      shelf: shelfEntry.shelf,
+      pinnedShelf: shelfEntry.pinnedShelf,
+      page: progressEntry.page,
+      pages: progressEntry.pages,
+      addedAt: Math.min(candidate.addedAt, previous.addedAt),
+      openedAt: Math.max(candidate.openedAt, previous.openedAt),
+    };
+    idByUrl.set(key, keepId);
+  }
+  return out;
 }
 
 /**
@@ -451,7 +531,8 @@ export class ReaderLibrary {
   }
 
   private persist(map: LibraryMap): void {
-    this.entries.set(map);
-    localStorage.setItem(this.key, JSON.stringify(map));
+    const unique = dedupeLibrary(map);
+    this.entries.set(unique);
+    localStorage.setItem(this.key, JSON.stringify(unique));
   }
 }

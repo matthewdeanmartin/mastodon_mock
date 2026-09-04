@@ -380,16 +380,24 @@ describe('ReaderCore paging a post chain', () => {
     const instance = core();
     const host = fixture.nativeElement.querySelector('app-reader-core') as HTMLElement;
     const body = fixture.nativeElement.querySelector('.reader-posts') as HTMLElement;
+    const toolbar = host.querySelector('.read-toolbar-outer') as HTMLElement;
+    const banner = document.createElement('div');
+    banner.className = 'test-build-banner';
+    document.body.appendChild(banner);
     const viewport = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(700);
     vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(rectAt(2_000));
     vi.spyOn(body, 'getBoundingClientRect').mockReturnValue(rectAt(2_150));
+    vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(rectAt(0));
+    vi.spyOn(banner, 'getBoundingClientRect').mockReturnValue(rectAt(0));
 
     const available = (
       instance as unknown as { roomBelow(element: HTMLElement): number }
     ).roomBelow(body);
 
-    // 700 - 150 inside reader - 24 bottom gap - two 18px × 1.65 line boxes.
-    expect(available).toBe(466);
+    // 700 - 150 inside reader - 100 toolbar - 100 test banner - 24 bottom gap
+    // - two 18px × 1.65 line boxes.
+    expect(available).toBe(266);
+    banner.remove();
     viewport.mockRestore();
   });
 

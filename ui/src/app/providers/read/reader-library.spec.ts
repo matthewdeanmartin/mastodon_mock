@@ -7,6 +7,8 @@ import {
   LibraryEntry,
   LibraryMap,
   ReaderLibrary,
+  dedupeLibrary,
+  libraryDocumentUrl,
   mergeLibraries,
   progressOf,
   pruneLibrary,
@@ -172,6 +174,37 @@ describe('progressOf', () => {
   });
 });
 
+describe('library document identity', () => {
+  it('ignores fragments and tracking parameters when comparing URLs', () => {
+    expect(libraryDocumentUrl('https://Example.com/story?utm_source=x#comments')).toBe(
+      'https://example.com/story',
+    );
+  });
+
+  it('collapses route-id duplicates and preserves the completed copy', () => {
+    const unique = dedupeLibrary({
+      oldRoute: entry({
+        url: 'https://example.com/story?utm_source=feed',
+        shelf: 'read',
+        page: 8,
+        pages: 8,
+        openedAt: 100,
+      }),
+      newRoute: entry({
+        url: 'https://example.com/story#top',
+        shelf: 'reading',
+        page: 1,
+        pages: 8,
+        openedAt: 200,
+      }),
+    });
+
+    expect(Object.keys(unique)).toEqual(['newRoute']);
+    expect(unique['newRoute'].shelf).toBe('read');
+    expect(unique['newRoute'].page).toBe(8);
+  });
+});
+
 // ------------------------------------------------------------------ the store
 
 describe('ReaderLibrary', () => {
@@ -209,6 +242,16 @@ describe('ReaderLibrary', () => {
     // Still the same entry, so "when did I save this" survives.
     expect(entry.addedAt).toBe(100);
     expect(entry.openedAt).toBe(200);
+  });
+
+  it('opening the same URL through another route id replaces rather than duplicates it', () => {
+    library.open({ ...doc, id: 'old-route', url: 'https://example.com/a?utm_source=feed' }, 100);
+    library.recordPosition('old-route', 10, 10, 150);
+
+    library.open({ ...doc, id: 'new-route', url: 'https://example.com/a#article' }, 200);
+
+    expect(Object.keys(library.snapshot())).toEqual(['new-route']);
+    expect(library.get('new-route')?.shelf).toBe('read');
   });
 
   it('reaching the end moves a document to read', () => {
@@ -275,9 +318,9 @@ describe('ReaderLibrary', () => {
   });
 
   it('shelf() lists most recently opened first', () => {
-    library.open({ ...doc, id: 'a' }, 100);
-    library.open({ ...doc, id: 'b' }, 300);
-    library.open({ ...doc, id: 'c' }, 200);
+    library.open({ ...doc, id: 'a', url: 'https://example.com/a' }, 100);
+    library.open({ ...doc, id: 'b', url: 'https://example.com/b' }, 300);
+    library.open({ ...doc, id: 'c', url: 'https://example.com/c' }, 200);
     expect(library.shelf('reading').map((e) => e.id)).toEqual(['b', 'c', 'a']);
   });
 
@@ -353,7 +396,10 @@ describe('ReaderLibrary', () => {
     const stale = Date.now() - LIBRARY_MAX_AGE_MS - 1;
     localStorage.setItem(
       storageKey(),
-      JSON.stringify({ a: entry({ openedAt: stale }), b: entry({ openedAt: stale }) }),
+      JSON.stringify({
+        a: entry({ url: 'https://example.com/a', openedAt: stale }),
+        b: entry({ url: 'https://example.com/b', openedAt: stale }),
+      }),
     );
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});

@@ -844,10 +844,15 @@ export class ReaderCore {
       this.layout() === 'pane'
         ? (document.querySelector<HTMLElement>('.topbar')?.getBoundingClientRect().height ?? 0)
         : 0;
-    const toolbarHeight = isArticle
-      ? ((host.querySelector('.read-toolbar-outer') as HTMLElement | null)?.getBoundingClientRect()
-          .height ?? 0)
-      : 0;
+    // Deduct persistent chrome explicitly. The initial page has not necessarily
+    // been scrolled to the anchor yet, so relying on content offsets alone
+    // overestimates the viewport by exactly the test banner/tool bar users see.
+    const toolbarHeight =
+      (host.querySelector('.read-toolbar-outer') as HTMLElement | null)?.getBoundingClientRect()
+        .height ?? 0;
+    const testBannerHeight =
+      document.querySelector<HTMLElement>('.test-build-banner')?.getBoundingClientRect().height ??
+      0;
     // Keep two configured line boxes clear in addition to the ordinary bottom
     // gap. One was not enough in real browsers: fractional layout and the
     // sticky chrome still left the final wrapped row below the fold.
@@ -859,6 +864,7 @@ export class ReaderCore {
       viewport -
         shellHeight -
         toolbarHeight -
+        testBannerHeight -
         contentOffset -
         READER_PAGE_BOTTOM_GAP -
         lineClearance,
