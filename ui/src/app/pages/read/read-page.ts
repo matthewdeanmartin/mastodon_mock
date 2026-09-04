@@ -20,6 +20,15 @@ import { ComposeShareRequest, ShareDialog } from '../../share-dialog/share-dialo
 import { Drafts } from '../../drafts';
 import { readerChain } from './reader-document';
 
+/**
+ * How long Exit waits before deciding that Back did not work.
+ *
+ * A history navigation cannot be awaited, so leaving is verified rather than
+ * assumed. Long enough for the router to settle; short enough that the fallback
+ * does not read as the button having hung.
+ */
+const EXIT_FALLBACK_MS = 120;
+
 // i18n reader.page.loading: Opening…
 // i18n reader.page.notFound: We couldn't open that to read.
 // i18n reader.page.viewThread: View as a thread
@@ -147,16 +156,45 @@ export class ReadPage implements OnInit, OnDestroy {
   /**
    * Leave the reader.
    *
-   * Back rather than a fixed destination when there is history to go back to:
-   * the reader is reached from a feed, a thread, a search or the RSS pane, and
-   * sending everyone to the thread view would strand four of those five.
-   * Falls back to the thread when this page was opened cold (a shared link).
+   * ## Why this is Back, and why that is not enough on its own
+   *
+   * Back, because the reader is reached from a feed, a thread, a search or the
+   * RSS pane, and sending everyone to the thread view would strand four of
+   * those five somewhere they did not come from.
+   *
+   * But Back only means "leave" while the reader occupies **one** history
+   * entry. It did not: opening a document from the library pushed a new
+   * `/read/:id`, so after reading three things Exit walked back through them one
+   * at a time and never left — reported by the operator as *"I click exit... it
+   * doesn't exit reader, it goes to the previous thread in reader mode."* The
+   * library's links now use `replaceUrl`, which is the real fix; moving within
+   * the reader is not travelling somewhere new.
+   *
+   * This still guards the case, because history is not ours to trust: a browser
+   * restore, a redirect, or a link opened in a new tab can all leave the entry
+   * we would land on pointing back at the reader. If Back does not actually get
+   * us out, go somewhere that certainly does.
    */
   protected exit(): void {
-    if (history.length > 1) {
-      history.back();
+    if (history.length <= 1) {
+      this.leaveToThread();
       return;
     }
+    const leaving = this.router.url;
+    history.back();
+    // A history navigation is asynchronous and cannot be awaited. If we are
+    // still on a reader URL shortly afterwards, Back did not take us out of the
+    // reader and the fallback is the honest answer. The timeout is long enough
+    // for the router to settle and short enough not to be seen as a hang.
+    setTimeout(() => {
+      if (this.router.url.startsWith('/read/') && this.router.url === leaving) {
+        this.leaveToThread();
+      }
+    }, EXIT_FALLBACK_MS);
+  }
+
+  /** The one destination that is always right: this document, as a thread. */
+  private leaveToThread(): void {
     void this.router.navigate(['/statuses', this.currentId()], {
       queryParams: { reader: '0' },
     });

@@ -305,3 +305,85 @@ describe('ReadPage', () => {
     fixture.destroy();
   });
 });
+
+/**
+ * Exit has to leave the reader, not step back one document inside it.
+ *
+ * The operator's report: *"I click read, I click on something in the library, I
+ * click exit... it doesn't exit reader, it goes to the previous thread in
+ * reader mode."* Exit is `history.back()`, which only means "leave" while the
+ * reader occupies one history entry — and the library's links were pushing a
+ * new one per document.
+ */
+describe('ReadPage exit', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+  });
+
+  function open(id: string): ComponentFixture<ReadPage> {
+    const fixture = setUp(id);
+    httpMock.expectOne(`/api/v1/statuses/${id}`).flush(makeStatus(id));
+    httpMock.expectOne(`/api/v1/statuses/${id}/context`).flush({ ancestors: [], descendants: [] });
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('goes back when there is somewhere to go back to', () => {
+    const fixture = open('1');
+    const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);
+    const length = vi.spyOn(history, 'length', 'get').mockReturnValue(3);
+
+    (fixture.componentInstance as unknown as { exit(): void }).exit();
+
+    expect(back).toHaveBeenCalled();
+    back.mockRestore();
+    length.mockRestore();
+    fixture.destroy();
+  });
+
+  /** Opened cold from a shared link: there is no history to go back into. */
+  it('falls back to the thread when the page was opened cold', async () => {
+    const fixture = open('1');
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const length = vi.spyOn(history, 'length', 'get').mockReturnValue(1);
+
+    (fixture.componentInstance as unknown as { exit(): void }).exit();
+
+    expect(navigate).toHaveBeenCalledWith(['/statuses', '1'], {
+      queryParams: { reader: '0' },
+    });
+    navigate.mockRestore();
+    length.mockRestore();
+    fixture.destroy();
+  });
+
+  /**
+   * History is not ours to trust — a browser restore or a redirect can leave the
+   * entry we land on still pointing at the reader. Verified rather than assumed,
+   * because a history navigation cannot be awaited.
+   */
+  it('leaves anyway when going back did not get us out of the reader', async () => {
+    const fixture = open('1');
+    const router = TestBed.inject(Router);
+    const length = vi.spyOn(history, 'length', 'get').mockReturnValue(3);
+    // Back does nothing, as it would if the previous entry were also the reader.
+    const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);
+    vi.spyOn(router, 'url', 'get').mockReturnValue('/read/1');
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    (fixture.componentInstance as unknown as { exit(): void }).exit();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(navigate).toHaveBeenCalledWith(['/statuses', '1'], {
+      queryParams: { reader: '0' },
+    });
+    back.mockRestore();
+    navigate.mockRestore();
+    length.mockRestore();
+    fixture.destroy();
+  });
+});

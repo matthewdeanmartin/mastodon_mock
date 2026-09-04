@@ -424,3 +424,40 @@ symptom points at entirely the wrong file.
 | --- | --- |
 | New tests | 82 (40 store, 12 core integration, 10 panel, 7 chain, 6 route id, 7 resolve) |
 | Total | 5792 passing |
+
+## Exit walked back through the library instead of leaving (fixed 2026-09-04)
+
+Reported by the operator: *"'exit' is a back button? This is surprising. I click
+read, I click on something in the library, I click exit... it doesn't exit
+reader, it goes to the previous thread in reader mode."*
+
+Exit is `history.back()`, and the reasoning for that is still right: the reader
+is reached from a feed, a thread, a search or the RSS pane, and sending everyone
+to the thread view would strand four of those five somewhere they did not come
+from.
+
+But Back only means "leave" while the reader occupies **one** history entry, and
+it did not. The library panel's rows were plain `routerLink`s, so every document
+opened from the library pushed another `/read/:id`. Read three things and Exit
+stepped back through them one at a time, never leaving — and the browser's own
+Back button had the same problem, which nobody had reported yet.
+
+**The fix is `replaceUrl` on the library's links.** Opening a document from the
+library is moving *within* the reader, not travelling somewhere new, so it
+should not accumulate history. `thread.ts:343` already does exactly this for the
+`?reader=1` redirect, for the same reason; this makes the two consistent. One
+reader entry, whatever you read.
+
+The thread page's Reader *button* keeps its push: that is a real navigation from
+one surface to another, and Back from the reader should return to the thread.
+
+Exit also stopped taking Back on faith. A history navigation cannot be awaited,
+so it checks shortly afterwards whether the URL is still a reader URL and falls
+back to the thread view if it is. History is not ours to trust — a browser
+restore, a redirect, or a tab restored from a session can all leave the entry we
+land on pointing back here.
+
+Four tests: back when there is history, the thread fallback on a cold open, the
+fallback when Back does not get us out, and — the one that pins the actual bug —
+that the library's rows carry `replaceUrl`. That last one fails if the attribute
+is removed.

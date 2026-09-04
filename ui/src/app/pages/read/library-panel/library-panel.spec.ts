@@ -207,3 +207,34 @@ describe('LibraryPanel clearing everything', () => {
     expect(el().textContent).toContain('Nothing here yet');
   });
 });
+
+/**
+ * Opening a document from the library is moving *within* the reader.
+ *
+ * If those navigations push, every document opened this session goes into
+ * history and Exit — which is `history.back()` — walks back through them one at
+ * a time instead of leaving. Reported by the operator: *"I click read, I click
+ * on something in the library, I click exit... it doesn't exit reader, it goes
+ * to the previous thread in reader mode."*
+ */
+describe('LibraryPanel navigation and history', () => {
+  let fixture: ComponentFixture<LibraryPanel>;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    TestBed.inject(ReaderLibrary).open({
+      id: '1',
+      url: 'https://example.com/1',
+      title: 'A long read',
+    });
+    fixture = TestBed.createComponent(LibraryPanel);
+    fixture.detectChanges();
+  });
+
+  it('replaces the history entry rather than pushing a new one', () => {
+    const link = (fixture.nativeElement as HTMLElement).querySelector('.rail-feed');
+    // The attribute is how `RouterLink` is told; its presence is the contract.
+    expect(link?.hasAttribute('replaceurl')).toBe(true);
+  });
+});

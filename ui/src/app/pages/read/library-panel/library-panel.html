@@ -27,9 +27,16 @@
         @if (!shelf.collapsed) {
           @for (row of shelf.rows; track row.id) {
             <div class="row-wrap" [class.active]="row.id === currentId()">
+              <!-- `replaceUrl`: opening a document from the library is moving
+                   *within* the reader, not travelling to a new place. Pushing
+                   would put every document opened this session into history, so
+                   Exit (and the browser's Back) would walk back through them one
+                   at a time instead of leaving — which is what the operator hit.
+                   One reader entry, whatever you read. -->
               <a
                 class="rail-row rail-feed nested"
                 [routerLink]="['/read', row.id]"
+                replaceUrl
                 [attr.aria-current]="row.id === currentId() ? 'true' : null"
               >
                 <span class="names">
