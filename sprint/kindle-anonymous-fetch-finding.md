@@ -177,6 +177,22 @@ string in history that means nothing after a sign-out or a server switch.
 
 Seven tests in `profile-public-resolve.spec.ts`, mirroring the thread's.
 
+## A bug this fix caused, found the same day
+
+Resolving a remote post returns an **ordinary local status** — that is the whole
+point — but the reader's library was deriving its key from the loaded status
+rather than from the route. So a `/read/anonymous-status.<blob>` URL shelved the
+document under the resolved *local* id, which no library row pointed at, and
+every open added another entry. Reported by the operator as the library
+re-adding the same item over and over.
+
+Fixed in `ReaderCore` by taking the route id as an input instead of re-deriving
+one; written up in [[kindle-2-library-and-progress]]. Worth stating plainly here
+because it is the cost of this change and the kind of thing it will cause again:
+**after resolution, the status in hand is not the status the URL names.** Any
+code that recovers an identifier from the loaded post rather than from the route
+is wrong on this path.
+
 ## Two other bugs found on the same path
 
 Both surfaced by the operator's report, both independent of the above:

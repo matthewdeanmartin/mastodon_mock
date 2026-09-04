@@ -149,3 +149,61 @@ describe('LibraryPanel', () => {
     expect(el().querySelectorAll('.row-menu')).toHaveLength(1);
   });
 });
+
+/**
+ * Emptying the shelves.
+ *
+ * Asked for after the library filled with duplicates of one document — see the
+ * `routeId` fix in `reader-core`. It stays useful after that bug: a year-long
+ * shelf is the sort of thing someone wants to start over on.
+ */
+describe('LibraryPanel clearing everything', () => {
+  let fixture: ComponentFixture<LibraryPanel>;
+  let library: ReaderLibrary;
+
+  const el = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+  const buttonSaying = (text: string): HTMLButtonElement | undefined =>
+    [...el().querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    library = TestBed.inject(ReaderLibrary);
+    fixture = TestBed.createComponent(LibraryPanel);
+    library.open({ id: '1', url: 'https://example.com/1', title: 'One' });
+    library.open({ id: '2', url: 'https://example.com/2', title: 'Two' });
+    fixture.detectChanges();
+  });
+
+  it('offers nothing to clear when the library is empty', () => {
+    library.clear();
+    fixture.detectChanges();
+    expect(buttonSaying('Clear all')).toBeUndefined();
+  });
+
+  /** One press must not empty a shelf that cannot be rebuilt. */
+  it('asks before clearing, and keeps everything if the answer is no', () => {
+    buttonSaying('Clear all')!.click();
+    fixture.detectChanges();
+
+    expect(el().textContent).toContain('Clear all 2?');
+    expect(library.total()).toBe(2);
+
+    buttonSaying('Keep them')!.click();
+    fixture.detectChanges();
+
+    expect(library.total()).toBe(2);
+    expect(el().textContent).not.toContain('Clear all 2?');
+  });
+
+  it('empties every shelf on the second press', () => {
+    buttonSaying('Clear all')!.click();
+    fixture.detectChanges();
+    buttonSaying('Clear all')!.click();
+    fixture.detectChanges();
+
+    expect(library.total()).toBe(0);
+    expect(el().textContent).toContain('Nothing here yet');
+  });
+});

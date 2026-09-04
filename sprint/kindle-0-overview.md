@@ -1,6 +1,6 @@
 # Kindle — Epic overview: the reader page
 
-Status: Sprints 1-2 **COMPLETE** (2026-09-04). Sprint 3 planned.
+Status: Sprints 1-3 **COMPLETE** (2026-09-04). The epic is done.
 Also closed on 2026-09-04, both carried forward from Sprint 2: the profile
 page's credential-free read ([[kindle-anonymous-fetch-finding]]) and the
 library's "save for later" entry point.
@@ -119,9 +119,11 @@ column's container, not the column.
    the RSS rail's look, position memory, and the progress indicator. The
    "save without opening" entry point landed afterwards (2026-09-04) as its own
    control on the status card, shown only on rows that are documents.
-3. **[[kindle-3-reading-tools]]** — vocabulary lookup, in-document search,
-   highlights with notes, the notes right rail, and the observed-failure LRU
-   on top of `UNLIKELY_HOSTS`.
+3. **[[kindle-3-reading-tools]]** — DONE. Vocabulary lookup (Wiktionary by
+   detected language), in-document search over the source markdown, highlights
+   anchored to document blocks with a quote check, the notes rail, and the
+   observed-failure LRU. Also wired `UNLIKELY_HOSTS`/`inspectUrl`, which turned
+   out to be dead code, into the one pre-fetch warning both sources now share.
 
 ## What this epic does not do
 

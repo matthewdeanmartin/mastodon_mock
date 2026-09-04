@@ -1,4 +1,10 @@
 import { effect, inject, Injectable, signal, WritableSignal } from '@angular/core';
+import {
+  DEFAULT_DICTIONARY,
+  DictionaryId,
+  dictionaryById,
+  isValidDictionaryTemplate,
+} from './providers/read/dictionaries';
 import { scopedKey } from './account-scope';
 import { isCanaryBuild } from './build-flavor';
 import { ProviderId } from './models';
@@ -407,6 +413,8 @@ interface StoredPrefs {
   readerPageFlip?: boolean;
   readerLibraryOpen?: boolean;
   readerLibraryCollapsed?: string[];
+  readerDictionary?: DictionaryId;
+  readerDictionaryCustom?: string;
   feedReader?: boolean;
   autoRefreshTimeline?: boolean;
   homeWindow?: HomeWindow;
@@ -578,6 +586,18 @@ export class ClientPrefs {
   readonly readerTextAlign = signal<ReaderTextAlign>('left');
   /** Paper colour for the article body only — see {@link ReaderTheme}. */
   readonly readerTheme = signal<ReaderTheme>('app');
+
+  /**
+   * Which dictionary "Define" opens.
+   *
+   * A preference rather than a constant because a dictionary is a personal
+   * choice — a learner and a lexicographer want different sites, and someone
+   * reading in a language the catalogue does not cover wants their own.
+   */
+  readonly readerDictionary = signal<DictionaryId>(DEFAULT_DICTIONARY);
+
+  /** The reader's own `{word}` template, used when `readerDictionary` is custom. */
+  readonly readerDictionaryCustom = signal<string>('');
 
   /**
    * Whether the reader page turns pages rather than scrolling.
@@ -1000,6 +1020,26 @@ export class ClientPrefs {
     }
   }
 
+  setReaderDictionary(id: DictionaryId): void {
+    this.readerDictionary.set(dictionaryById(id).id);
+  }
+
+  /**
+   * Store a custom lookup template, if it is one.
+   *
+   * Validated here rather than at use: a template that fails is a setting the
+   * reader can still see and correct, while one that fails at lookup time is a
+   * button that silently does nothing.
+   */
+  setReaderDictionaryCustom(template: string): boolean {
+    const trimmed = template.trim();
+    if (trimmed && !isValidDictionaryTemplate(trimmed)) {
+      return false;
+    }
+    this.readerDictionaryCustom.set(trimmed);
+    return true;
+  }
+
   setReaderFontWeight(weight: number): void {
     this.readerFontWeight.set(clamp(Math.round(weight / 100) * 100, 300, 700));
   }
@@ -1369,6 +1409,12 @@ export class ClientPrefs {
     if (typeof stored.readerTheme === 'string') {
       this.setReaderTheme(stored.readerTheme);
     }
+    if (typeof stored.readerDictionary === 'string') {
+      this.setReaderDictionary(stored.readerDictionary);
+    }
+    if (typeof stored.readerDictionaryCustom === 'string') {
+      this.setReaderDictionaryCustom(stored.readerDictionaryCustom);
+    }
     if (typeof stored.readerLineHeight === 'number') {
       this.setReaderLineHeight(stored.readerLineHeight);
     }
@@ -1491,6 +1537,8 @@ export class ClientPrefs {
       readerFontSize: this.readerFontSize(),
       readerFontFamily: this.readerFontFamily(),
       readerTheme: this.readerTheme(),
+      readerDictionary: this.readerDictionary(),
+      readerDictionaryCustom: this.readerDictionaryCustom(),
       readerFontWeight: this.readerFontWeight(),
       readerLineHeight: this.readerLineHeight(),
       readerLetterSpacing: this.readerLetterSpacing(),

@@ -83,6 +83,18 @@
     }
 
     <div class="tool-group">
+      @if (canSearch()) {
+        <button
+          class="tool"
+          type="button"
+          [class.active]="searchOpen()"
+          [attr.aria-expanded]="searchOpen()"
+          [title]="'reader.toolbar.searchTitle' | transloco"
+          (click)="findInDocument.emit()"
+        >
+          {{ 'reader.toolbar.search' | transloco }}
+        </button>
+      }
       <button
         class="tool"
         type="button"
@@ -171,6 +183,41 @@
             <option value="justify">{{ 'reader.toolbar.align.justify' | transloco }}</option>
           </select>
         </label>
+
+        <!-- Where "Define" sends a word. Here rather than in Settings because
+             it is a reading control, and the reader is where anyone discovers
+             they want to change it. -->
+        <label class="typo-row">
+          <span class="typo-label">{{ 'reader.toolbar.dictionary' | transloco }}</span>
+          <select [value]="prefs.readerDictionary()" (change)="setDictionary($event)">
+            @for (entry of dictionaries; track entry.id) {
+              <option [value]="entry.id">{{ entry.label }}</option>
+            }
+          </select>
+        </label>
+
+        @if (prefs.readerDictionary() === 'custom') {
+          <label class="typo-row typo-stack">
+            <span class="typo-label">{{ 'reader.toolbar.dictionaryTemplate' | transloco }}</span>
+            <input
+              type="url"
+              [value]="prefs.readerDictionaryCustom()"
+              [placeholder]="customTemplateExample"
+              [attr.aria-invalid]="customTemplateBad() ? 'true' : null"
+              (change)="setCustomDictionary($event)"
+            />
+            <!-- Rejected at the point of typing, not silently at lookup time:
+                 a template that fails later is a button that does nothing. -->
+            <span class="muted small">
+              {{
+                (customTemplateBad()
+                  ? 'reader.toolbar.dictionaryTemplateBad'
+                  : 'reader.toolbar.dictionaryTemplateHint'
+                ) | transloco
+              }}
+            </span>
+          </label>
+        }
 
         <div class="typo-row typo-done">
           <button class="tool" type="button" (click)="closeTypography()">

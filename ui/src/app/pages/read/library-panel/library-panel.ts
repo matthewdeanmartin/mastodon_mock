@@ -23,6 +23,10 @@ import { ClientPrefs } from '../../../client-prefs';
 // i18n reader.library.remove: Remove
 // i18n reader.library.automatic: Follow my progress
 // i18n reader.library.pinnedHint: Filed by hand
+// i18n reader.library.clearAll: Clear all
+// i18n reader.library.clearAllConfirm: Clear all {{count}}?
+// i18n reader.library.clearAllCancel: Keep them
+// i18n reader.library.clearAllTitle: Remove every document from the library
 
 /** One shelf, with the heading it gets and the order it appears in. */
 const SHELVES: readonly { id: Shelf; labelKey: string }[] = [
@@ -116,5 +120,29 @@ export class LibraryPanel {
   protected remove(id: string): void {
     this.library.remove(id);
     this.openMenu.set(null);
+  }
+
+  /**
+   * Whether "Clear all" is waiting for a second press.
+   *
+   * Two presses rather than a `confirm()` dialog: the panel is a sheet over a
+   * page someone is reading, and a modal would tear them out of it for a
+   * decision that belongs in the sheet. Emptying a shelf that caps at a year of
+   * reading is not undoable, so it does not happen on one stray tap.
+   */
+  protected readonly confirmingClear = signal(false);
+
+  protected askClearAll(): void {
+    this.openMenu.set(null);
+    this.confirmingClear.set(true);
+  }
+
+  protected cancelClearAll(): void {
+    this.confirmingClear.set(false);
+  }
+
+  protected clearAll(): void {
+    this.library.clear();
+    this.confirmingClear.set(false);
   }
 }

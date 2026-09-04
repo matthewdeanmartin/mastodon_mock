@@ -6,6 +6,7 @@ import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReaderCore } from './reader-core';
 import { ReaderLibrary } from '../../../providers/read/reader-library';
+import { readerRouteId } from '../reader-route-id';
 import { ClientPrefs } from '../../../client-prefs';
 import { Status } from '../../../models';
 
@@ -16,11 +17,12 @@ import { Status } from '../../../models';
  */
 @Component({
   imports: [ReaderCore],
-  template: `<app-reader-core [chain]="chain()" [layout]="layout()" />`,
+  template: `<app-reader-core [chain]="chain()" [layout]="layout()" [routeId]="routeId()" />`,
 })
 class Host {
   readonly chain = signal<Status[]>([]);
   readonly layout = signal<'page' | 'pane'>('page');
+  readonly routeId = signal<string>('');
 }
 
 /** `n` characters of prose, so the document-length rule can be exercised. */
@@ -57,8 +59,9 @@ describe('ReaderCore and the library', () => {
     library = TestBed.inject(ReaderLibrary);
   });
 
-  function show(chain: Status[], layout: 'page' | 'pane' = 'page'): void {
+  function show(chain: Status[], layout: 'page' | 'pane' = 'page', routeId = ''): void {
     fixture.componentInstance.layout.set(layout);
+    fixture.componentInstance.routeId.set(routeId || (chain[0]?.id ?? ''));
     fixture.componentInstance.chain.set(chain);
     fixture.detectChanges();
   }
@@ -192,5 +195,115 @@ describe('ReaderCore position saving', () => {
     vi.runAllTimers();
 
     expect(record).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The reader must shelve a document under **the id it was opened with**.
+ *
+ * Reported from the app: clicking a library row re-added the same document as a
+ * new entry, over and over, "like the binary goop in the URL changes
+ * constantly". It was not changing — but the reader was *re-deriving* it.
+ *
+ * A post read from a server we hold no account on is addressed two ways: the
+ * feed's `anonymous-mastodon:<host>:<id>`, and the route's base64 blob of
+ * `{server, id, originalUrl}`. `ThreadLoader` accepts both. The reader used to
+ * rebuild an id from the loaded status, which meant the string it shelved under
+ * was not necessarily the string in the address bar — so the row you clicked
+ * and the row that got written were different rows, and the library grew by one
+ * every time you opened anything.
+ */
+describe('ReaderCore shelving under the id it was opened with', () => {
+  let fixture: ComponentFixture<Host>;
+  let library: ReaderLibrary;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    fixture = TestBed.createComponent(Host);
+    library = TestBed.inject(ReaderLibrary);
+  });
+
+  afterEach(() => localStorage.clear());
+
+  function open(routeId: string, chain: Status[]): void {
+    fixture.componentInstance.layout.set('page');
+    fixture.componentInstance.routeId.set(routeId);
+    fixture.componentInstance.chain.set(chain);
+    fixture.detectChanges();
+  }
+
+  /** The remote post as the loader hands it back, whichever id opened it. */
+  const remote = (): Status[] => [
+    post('anonymous-mastodon:graz.social:117', 900, {
+      provider: 'anonymous-mastodon',
+      providerRef: { server: 'https://graz.social', statusId: '117', accountId: '7' },
+      url: 'https://graz.social/@publicvoit/117',
+    } as Partial<Status>),
+  ];
+
+  it('shelves under the route id, not one rebuilt from the post', () => {
+    open('anonymous-status.SOMEBLOB', remote());
+
+    expect(Object.keys(library.snapshot())).toEqual(['anonymous-status.SOMEBLOB']);
+  });
+
+  /**
+   * The reported loop, end to end.
+   *
+   * The route holds the blob, but the home server resolved the post, so what
+   * the loader hands back is an **ordinary local status** — a different id, and
+   * no `anonymous-mastodon` provider to rebuild a blob from. Deriving the key
+   * from that status shelved the document under the local id while the row the
+   * reader clicked pointed at the blob, so every open wrote a new entry.
+   */
+  it('does not add a second entry when the home server resolved the post', () => {
+    const resolved = (): Status[] => [
+      post('local-42', 900, { url: 'https://graz.social/@publicvoit/117' } as Partial<Status>),
+    ];
+
+    open('anonymous-status.SOMEBLOB', resolved());
+    expect(Object.keys(library.snapshot())).toEqual(['anonymous-status.SOMEBLOB']);
+
+    // Clicking the row navigates to the same blob; resolution happens again.
+    fixture.componentInstance.chain.set([]);
+    fixture.detectChanges();
+    open('anonymous-status.SOMEBLOB', resolved());
+
+    expect(Object.keys(library.snapshot())).toHaveLength(1);
+  });
+
+  /**
+   * The card and the reader must agree on the key.
+   *
+   * `SaveToLibrary` on a feed row *derives* an id, which is right — it is
+   * building the link it will navigate to. The reader then opens that link and
+   * must shelve under the id it arrived with, or "save for later" and "open it"
+   * would file the same document twice.
+   */
+  it('takes up the entry a feed row saved, rather than filing a second one', () => {
+    const feedStatus = remote()[0];
+    const savedUnder = readerRouteId(feedStatus);
+    library.save({ id: savedUnder, url: feedStatus.url ?? '', title: 'Saved from the feed' });
+
+    open(savedUnder, remote());
+
+    expect(Object.keys(library.snapshot())).toEqual([savedUnder]);
+    expect(library.get(savedUnder)?.shelf).toBe('reading');
+  });
+
+  /** Two opens of one document by one id must leave one entry, always. */
+  it('does not add a second entry when the same document is reopened', () => {
+    open('anonymous-mastodon:graz.social:117', remote());
+    const shelved = Object.keys(library.snapshot());
+    expect(shelved).toHaveLength(1);
+
+    fixture.componentInstance.chain.set([]);
+    fixture.detectChanges();
+    open(shelved[0], remote());
+
+    expect(Object.keys(library.snapshot())).toHaveLength(1);
   });
 });

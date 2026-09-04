@@ -347,6 +347,20 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
     note: 'Which RSS items have been read, as item id → timestamp. Private for the same reason the subscription list is: it is a record of what the user actually read, item by item, which is more revealing than the feed list it derives from. The timestamp exists for a future 90-day prune.',
   },
   {
+    base: 'mockingbird_reader_annotations',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: "The reader's highlights and notes: document id → [{anchor, note, timestamps}]. Private, and the most revealing store in the reader — a note is the user's own writing about a passage they chose to mark. Anchored to the extracted markdown rather than the remote page; see providers/read/reader-annotations.ts. Pruned at two years (longer than the library, because nothing can reconstruct a note) and 5,000 entries, and included in export for the same reason.",
+  },
+  {
+    base: 'mockingbird_article_observed_failures',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'private',
+    note: 'Hosts where article expansion has failed on this device: host → {attempts, failures, lastDiagnosis, lastSeen}. Private because it is a record of sites the user tried to read. Only host-attributable verdicts (paywall, bot-check, …) are counted, a single success clears a host, and the map is LRU-bounded at 200. Local only: nothing is sent anywhere. See providers/article/observed-failures.ts.',
+  },
+  {
     base: 'mockingbird_reader_library',
     storage: 'local',
     suffix: 'account',

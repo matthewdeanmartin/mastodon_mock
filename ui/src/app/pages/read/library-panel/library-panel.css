@@ -193,6 +193,19 @@
   background: color-mix(in srgb, var(--danger, #c2255c) 18%, transparent);
 }
 
+/* Mirrors `.library-head`: a rule above rather than below, so the footer reads
+   as part of the panel's frame and not as another row in the list. The body
+   scrolls between them, so this stays reachable however long the shelves get. */
+.library-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+
 /* Below the width where a 290px panel and a reading measure both fit, the panel
    stops being a rail and becomes a full-width sheet. The measure is the point
    of the page; narrowing the text to make room for a list is the wrong trade. */

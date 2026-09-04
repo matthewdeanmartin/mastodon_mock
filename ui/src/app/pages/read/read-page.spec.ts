@@ -215,6 +215,67 @@ describe('ReadPage', () => {
     expect(core.next).not.toHaveBeenCalled();
   });
 
+  /**
+   * Taking Ctrl/Cmd+F is only defensible where the browser's own find would
+   * mislead — and it would: in page-flip mode it searches the one page on
+   * screen and reports "not found" for a phrase three pages back.
+   */
+  it('takes Ctrl+F when the document paginated, and opens its own search', () => {
+    const fixture = loaded();
+    const core = fixture.debugElement.query((node) => node.componentInstance instanceof ReaderCore)
+      .componentInstance as ReaderCore;
+    vi.spyOn(core, 'canSearch').mockReturnValue(true);
+    const open = vi.spyOn(core, 'openSearch').mockImplementation(() => undefined);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'f',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(event);
+
+    expect(open).toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('accepts Cmd+F too, for the platform that uses it', () => {
+    const fixture = loaded();
+    const core = fixture.debugElement.query((node) => node.componentInstance instanceof ReaderCore)
+      .componentInstance as ReaderCore;
+    vi.spyOn(core, 'canSearch').mockReturnValue(true);
+    const open = vi.spyOn(core, 'openSearch').mockImplementation(() => undefined);
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'F', metaKey: true, bubbles: true, cancelable: true }),
+    );
+
+    expect(open).toHaveBeenCalled();
+  });
+
+  /**
+   * On a document that did not paginate the browser's find is the better tool
+   * — it marks every hit live — and taking it away would be hostile for nothing.
+   */
+  it('leaves Ctrl+F to the browser on a document with one page', () => {
+    const fixture = loaded();
+    const core = fixture.debugElement.query((node) => node.componentInstance instanceof ReaderCore)
+      .componentInstance as ReaderCore;
+    vi.spyOn(core, 'canSearch').mockReturnValue(false);
+    const open = vi.spyOn(core, 'openSearch').mockImplementation(() => undefined);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'f',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(event);
+
+    expect(open).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
   it('Escape leaves the reader, going back where there is somewhere to go', () => {
     const fixture = loaded();
     const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);

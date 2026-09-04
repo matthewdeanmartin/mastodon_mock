@@ -89,4 +89,33 @@
       }
     }
   </nav>
+
+  <!-- Only when there is something to clear, and never as a bare button: the
+       second press is the confirmation, so a stray tap costs nothing. -->
+  @if (total()) {
+    <div class="library-foot">
+      @if (confirmingClear()) {
+        <!-- Announced: the prompt replaces the button in place, which a screen
+             reader would otherwise pass over in silence. -->
+        <span class="muted small" role="status">
+          {{ 'reader.library.clearAllConfirm' | transloco: { count: total() } }}
+        </span>
+        <button class="tool danger" type="button" (click)="clearAll()">
+          {{ 'reader.library.clearAll' | transloco }}
+        </button>
+        <button class="tool" type="button" (click)="cancelClearAll()">
+          {{ 'reader.library.clearAllCancel' | transloco }}
+        </button>
+      } @else {
+        <button
+          class="tool"
+          type="button"
+          [title]="'reader.library.clearAllTitle' | transloco"
+          (click)="askClearAll()"
+        >
+          {{ 'reader.library.clearAll' | transloco }}
+        </button>
+      }
+    </div>
+  }
 </aside>

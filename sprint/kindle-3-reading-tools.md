@@ -1,6 +1,6 @@
 # Kindle 3 — Reading tools: vocabulary, search, highlights, notes
 
-Status: PLANNED
+Status: **COMPLETE** (2026-09-04)
 Epic: [[kindle-0-overview]]
 Depends on: [[kindle-2-library-and-progress]]
 
@@ -172,3 +172,107 @@ this sprint** — the proxy-side collection is future work named in
   output, never re-serializing user-supplied strings into HTML.
 - **`Ctrl+F` interception is hostile if the reader wanted the browser's.** Only
   intercept on the reader route, and only when the document actually paginated.
+
+## What was built
+
+All five sections, plus two things the sprint assumed existed and did not.
+
+### 3a — vocabulary
+
+`providers/read/dictionaries.ts` holds the registry, shaped like
+`shortener-catalog.ts`. Wiktionary (default), Merriam-Webster, Dictionary.com,
+and a custom `{word}` template validated for http(s) *and* for containing
+`{word}` before it is saved — a template missing the placeholder silently opens
+the same page every time, which reads as a broken feature rather than a bad
+setting.
+
+Language comes from `detectLanguage` over the article text rather than from a
+declared tag, because an article's language tag is frequently the *site's*: a
+German post on an English platform is tagged `en` and is still German. Sixteen
+Wiktionary editions are listed — the large ones only, since a subdomain with a
+few thousand entries is a worse destination than the English one.
+
+The provider picker lives in the reader's typography popover rather than in
+Settings: it is a reading control, and the reader is where anyone discovers they
+want to change it.
+
+### 3b — in-document search
+
+`document-search.ts` searches the paginated markdown, so a match's page is a
+lookup. Case-insensitive substring with whitespace collapsed on both sides, so a
+phrase still matches when the source wrapped it. Capped at 200 matches. Not a
+regex, deliberately: a reader typing `(` wants the paren, not a syntax error.
+
+`Ctrl/Cmd+F` is intercepted **only when the document actually paginated**. On a
+single-page document the browser's own find is the better tool — it marks every
+hit live — and taking it away would be hostile for nothing. Three tests cover
+exactly that boundary.
+
+### 3c/3d — highlights, notes, and the rail
+
+Anchors index blocks of the **document**, not of the page, so they survive a
+type-size change. `article-pages.ts`'s `blocks()` was exported rather than
+duplicated: two definitions of "a block" would let an anchor point at a
+different paragraph than pagination put on the page.
+
+The quote check works as specified — a drifted anchor is listed in the rail as
+"passage moved" with the reader's words intact, and is never drawn in the text.
+
+The rail appears only when a note has been *written*. A bare highlight is not a
+note: someone marking passages as they read asked for marks in the text, not a
+column beside it.
+
+**`mark-passages.ts` is where the security trap was.** It never builds HTML from
+user text: it walks the rendered DOM and wraps existing nodes with
+`surroundContents`/`extractContents`. There is no injection point to get wrong,
+which is stronger than sanitising one. Two tests assert it directly — a quote
+full of angle brackets, and one crafted to inject an attribute.
+
+### 3e — observed failures
+
+`providers/article/observed-failures.ts`, LRU-bounded at 200 and tested by
+overfilling. Only host-attributable verdicts count; `network` and `rate-limited`
+are facts about us or the moment, and `junk`/`not-html`/`too-large` are facts
+about one URL — one PDF does not make a domain unreadable. A single success
+clears the host outright rather than decrementing it, because the evidence is
+that it works.
+
+## Two things the sprint assumed were shipped
+
+Worth recording, because the doc was written as though both existed.
+
+**`UNLIKELY_HOSTS` and `inspectUrl` were dead code.** Nothing called them. The
+"same 'Try anyway' wording as the shipped list" therefore described a surface
+that had never been built. Rather than invent a second one, `beforeFetch()` now
+folds both sources into a single answer — the shipped list first (it is
+reviewable, works on the first attempt, and knows things experience cannot, like
+a PDF never extracting), then what this device has seen. Which is what actually
+makes them indistinguishable to the reader.
+
+**There is no Storage Diagnostics surface** consuming `prunedOnLoad` or an
+export. `exportJson()` and `snapshot()` are built and tested and wait for one;
+`ReaderLibrary.prunedOnLoad` has been in the same position since Sprint 2.
+
+## Deviations
+
+**The notes rail's Share goes through an output, not a dialog.** `ReaderCore`
+has no share dialog — the RSS pane owns one, and now the read page does too. Two
+dialogs on one screen would be two things that could be open at once, so the
+core emits `shareQuote` and the host decides.
+
+**Selection is caught at the document, not on the article body.** A `(mouseup)`
+on the prose trips `interactive-supports-focus`, and it is right to: an element
+with interaction handlers ought to be focusable, and making prose a tab stop
+would put a focusable element with no purpose in front of every keyboard reader.
+Both listeners check the selection is inside the body before acting, so the
+container scoping the sprint insisted on is unchanged.
+
+**The toolbar output is `findInDocument`, not `search`.** A bare `search` output
+shadows the DOM event of that name.
+
+## Test coverage
+
+126 new tests: dictionaries 18, document-search 12, reader-anchor 12,
+annotations 18, observed-failures 20, mark-passages 10, reading-tools 18,
+selection-tools 6, search dialog 8, notes rail 7, plus 3 for Ctrl+F on the read
+page (which fail if the interception is removed or widened).

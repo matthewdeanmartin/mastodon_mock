@@ -10,6 +10,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslocoService } from '@jsverse/transloco';
@@ -27,7 +28,17 @@ import { articleTarget } from '../../../providers/article/article-target';
 import { renderMarkdown } from '../../../providers/article/markdown-render';
 import { paginateMarkdown } from '../../rss/article-pages';
 import { ReadToolbar } from '../read-toolbar/read-toolbar';
+import { DocumentSearchDialog } from '../document-search/document-search-dialog';
+import { SearchMatch } from '../document-search';
+import { NotesRail, RailNote } from '../notes-rail/notes-rail';
+import { SelectionPoint, SelectionTools } from '../selection-tools/selection-tools';
+import { markPassages } from '../mark-passages';
+import { ReadingTools } from '../reading-tools';
 
+// i18n reader.note.label: Your note on this passage
+// i18n reader.note.placeholder: What did you want to remember?
+// i18n reader.note.save: Save
+// i18n reader.note.cancel: Cancel
 // i18n reader.article.blocker: Fetching the full text needs a CORS proxy, which isn't set up on this device.
 // i18n reader.article.chooseProxy: Choose a proxy
 // i18n reader.article.fetch: Fetch article
@@ -35,6 +46,7 @@ import { ReadToolbar } from '../read-toolbar/read-toolbar';
 // i18n reader.article.fetching: Fetching article…
 // i18n reader.article.fetchingWait: Fetching the article, please wait.
 // i18n reader.article.tryAgain: Try again
+// i18n reader.article.tryAnyway: Try anyway
 // i18n reader.article.whatWentWrong: What went wrong?
 // i18n reader.article.openHost: Open on {{host}}
 // i18n reader.article.readOriginal: Read the original
@@ -118,19 +130,53 @@ const POSITION_SAVE_DELAY_MS = 2_000;
  */
 @Component({
   selector: 'app-reader-core',
-  imports: [RouterLink, TranslocoPipe, HumanTimePipe, PreviewCardComponent, ReadToolbar],
+  imports: [
+    RouterLink,
+    TranslocoPipe,
+    FormsModule,
+    HumanTimePipe,
+    PreviewCardComponent,
+    ReadToolbar,
+    SelectionTools,
+    DocumentSearchDialog,
+    NotesRail,
+  ],
   templateUrl: './reader-core.html',
   styleUrl: './reader-core.css',
-  providers: [ArticleExpansion],
+  providers: [ArticleExpansion, ReadingTools],
 })
 export class ReaderCore {
   protected readonly prefs = inject(ClientPrefs);
   protected readonly expansion = inject(ArticleExpansion);
   private readonly transloco = inject(TranslocoService);
   private readonly library = inject(ReaderLibrary);
+  protected readonly tools = inject(ReadingTools);
 
   /** The author's own chain: one post, or a storm, or an RSS item. */
   readonly chain = input.required<Status[]>();
+
+  /**
+   * The id this document was opened with — the one in the address bar.
+   *
+   * **The library keys on this, and must not re-derive it.** Rebuilding an id
+   * from the loaded status produces a key that need not match the URL it was
+   * reached by, and then clicking a library row shelves a *second* entry for a
+   * document already on the shelf — reported as the library re-adding the same
+   * item over and over. Two ways that happens:
+   *
+   * - A post read from a server we hold no account on is addressable two ways —
+   *   the feed's `anonymous-mastodon:<host>:<id>` and the route's base64 blob —
+   *   and `ThreadLoader` accepts both.
+   * - When the home server resolves such a post, what comes back is an
+   *   **ordinary local status**: a local id, no `anonymous-mastodon` provider,
+   *   nothing to rebuild the blob from. After resolution the status in hand is
+   *   simply not the status the URL names.
+   *
+   * Empty only from a host that does not know its route (the RSS pane passes
+   * the item id it opened); `readerRouteId` remains the fallback so nothing
+   * regresses to shelving a feed id that 404s.
+   */
+  readonly routeId = input('');
 
   /** Where this is being rendered. See the class comment. */
   readonly layout = input<'page' | 'pane'>('page');
@@ -142,8 +188,27 @@ export class ReaderCore {
   readonly libraryOpen = input(false);
   readonly toggleLibrary = output<void>();
 
+  /**
+   * A passage the reader wants to share, as a quote.
+   *
+   * An output rather than a dialog of its own: the share dialog belongs to the
+   * host — the RSS pane already owns one — and two of them on one screen would
+   * be two things that could be open at once. The host decides; this only says
+   * what was quoted.
+   */
+  readonly shareQuote = output<string>();
+
   /** The article region, so focus can move to it when it appears. */
   private articleRef = viewChild<ElementRef<HTMLElement>>('expandedArticle');
+
+  /**
+   * The prose itself, which is the container selections are scoped to.
+   *
+   * Deliberately narrower than `articleRef`: that section also holds the title,
+   * the byline and the action row, and a selection dragged across the byline is
+   * not a passage from the article.
+   */
+  private articleBodyRef = viewChild<ElementRef<HTMLElement>>('articleBody');
 
   /** Zero-based index of the page being read. */
   private readonly pageIndex = signal(0);
@@ -168,6 +233,18 @@ export class ReaderCore {
    * existing. The section renders and `expansion.blocker` says what is missing.
    */
   protected readonly canExpand = computed(() => this.articleUrl() !== null);
+
+  /**
+   * What we can say about this URL before spending a fetch on it.
+   *
+   * Two sources, one answer: the shipped host list and what this device has
+   * observed. Deliberately indistinguishable to the reader — see
+   * `observed-failures.ts`.
+   */
+  protected readonly fetchWarning = computed(() => this.expansion.beforeFetch(this.articleUrl()));
+
+  /** False only for the cases no amount of trying fixes, like a PDF. */
+  protected readonly fetchWorthTrying = computed(() => this.fetchWarning()?.worthTrying !== false);
 
   /**
    * Whether the offered fetch fills in the *rest* of an already-partial RSS
@@ -209,15 +286,43 @@ export class ReaderCore {
     this.pageCount() ? Math.min(this.pageIndex(), this.pageCount() - 1) + 1 : 0,
   );
 
-  /** The current page, rendered to HTML. */
+  /**
+   * The current page, rendered to HTML and marked.
+   *
+   * Marking happens here, over the renderer's output, because that output is
+   * the safe HTML — see `mark-passages.ts` for why wrapping DOM nodes rather
+   * than building markup is what keeps it safe.
+   */
   protected readonly pageHtml = computed(() => {
     const pages = this.pages();
     if (!pages.length) {
       return null;
     }
     const index = Math.min(this.pageIndex(), pages.length - 1);
-    return renderMarkdown(pages[index] ?? '');
+    const rendered = renderMarkdown(pages[index] ?? '');
+    return markPassages(rendered, this.tools.intactQuotes(), this.tools.markedText());
   });
+
+  /**
+   * Keep the reading tools pointed at the document on screen.
+   *
+   * The tools need the *source* markdown (anchors index into it) and the page
+   * slices (so a highlight's page is a lookup). Both change when an article is
+   * fetched or the type size changes the pagination.
+   */
+  private readonly feedTools = effect(() => {
+    const article = this.expansion.result()?.article;
+    this.tools.setDocument(this.documentKey(), article?.markdown ?? '', this.pages());
+  });
+
+  /** The key annotations are stored under: the id this document was opened with. */
+  private readonly documentKey = computed(() => {
+    const root = this.root();
+    return this.routeId() || (root ? readerRouteId(root) : '');
+  });
+
+  /** Notes for the rail, which only appears when something is written in it. */
+  protected readonly railNotes = computed(() => (this.tools.hasNotes() ? this.tools.notes() : []));
 
   /**
    * Minutes of reading left, or null when it is not worth saying.
@@ -302,10 +407,10 @@ export class ReaderCore {
       return null;
     }
     return {
-      // The id that can be navigated back to, which is not always `Status.id`
-      // — see `reader-route-id.ts`. Storing the feed id here produced library
-      // rows whose links 404.
-      id: readerRouteId(root),
+      // The id the address bar actually holds. Only when a host cannot supply
+      // one do we derive it — see `reader-route-id.ts` for why `Status.id` is
+      // not always the answer, and `routeId` for why deriving it is not either.
+      id: this.routeId() || readerRouteId(root),
       url: (article ? result?.finalUrl : root.url) ?? root.url ?? '',
       title: article?.title || documentTitle(root),
       siteName: article?.siteName ?? (this.expansion.host() || null),
@@ -387,29 +492,190 @@ export class ReaderCore {
     }
   };
 
+  /**
+   * Keyboard selection, caught at the document.
+   *
+   * Not a `(keyup)` on the article body: prose is a selection surface, not a
+   * control, and giving it a key handler would mean giving it a tab stop —
+   * putting a focusable element with no purpose in front of every reader who
+   * navigates by keyboard. Shift+arrow selection still has to raise the tools,
+   * so the listener lives here and checks that the selection is inside the body
+   * before doing anything.
+   */
+  /**
+   * Read the selection after a pointer gesture.
+   *
+   * At the document rather than on the body, for the same reason as
+   * `onSelectionKey`: prose is a selection surface, not a control, and an
+   * element with interaction handlers is one that ought to be focusable. The
+   * container passed to `selectionWithin` is still the **article body** — a
+   * selection in the notes rail must not become a quote from the article, which
+   * is the trap `share-selection.ts` exists to document.
+   */
+  private readonly onSelectionPointer = (event: MouseEvent): void => {
+    const body = this.articleBodyRef()?.nativeElement;
+    if (!body) {
+      return;
+    }
+    this.tools.captureSelection(body, this.selectionPoint(body, event));
+  };
+
+  private readonly onSelectionKey = (event: KeyboardEvent): void => {
+    if (!event.shiftKey && event.key !== 'Escape') {
+      return;
+    }
+    const body = this.articleBodyRef()?.nativeElement;
+    if (!body) {
+      return;
+    }
+    if (event.key === 'Escape') {
+      this.tools.dismiss();
+      return;
+    }
+    this.tools.captureSelection(body, this.selectionPoint(body, event));
+  };
+
   constructor() {
     document.addEventListener('visibilitychange', this.onHide);
+    document.addEventListener('keyup', this.onSelectionKey);
+    document.addEventListener('mouseup', this.onSelectionPointer);
     inject(DestroyRef).onDestroy(() => {
       document.removeEventListener('visibilitychange', this.onHide);
+      document.removeEventListener('keyup', this.onSelectionKey);
+      document.removeEventListener('mouseup', this.onSelectionPointer);
       this.flushPosition();
     });
   }
 
   prevPage(): void {
-    this.pageIndex.update((n) => Math.max(0, n - 1));
-    this.savePosition();
+    this.turnTo(this.pageIndex() - 1);
   }
 
   nextPage(): void {
-    this.pageIndex.update((n) => Math.min(Math.max(0, this.pageCount() - 1), n + 1));
-    this.savePosition();
+    this.turnTo(this.pageIndex() + 1);
   }
 
   /** Jump to a page by 1-based number. Used by the keyboard bindings. */
   goToPage(number: number): void {
-    const clamped = Math.min(Math.max(1, number), Math.max(1, this.pageCount()));
-    this.pageIndex.set(clamped - 1);
+    this.turnTo(Math.min(Math.max(1, number), Math.max(1, this.pageCount())) - 1);
+  }
+
+  /**
+   * Every page turn goes through here.
+   *
+   * Because every page turn has to dismiss the selection popover. It is
+   * anchored to coordinates in the page that just left, so leaving it up points
+   * it at whatever happens to be there now — and a stale popover whose buttons
+   * still work would highlight the wrong passage.
+   */
+  private turnTo(index: number): void {
+    this.tools.dismiss();
+    this.tools.markedText.set('');
+    this.pageIndex.set(Math.min(Math.max(0, index), Math.max(0, this.pageCount() - 1)));
     this.savePosition();
+  }
+
+  /**
+   * Where to put the popover: centred over the selection, in coordinates
+   * relative to the article body, which is the positioned ancestor.
+   */
+  private selectionPoint(body: HTMLElement, event: MouseEvent | KeyboardEvent): SelectionPoint {
+    const selection = typeof window === 'undefined' ? null : window.getSelection();
+    const container = body.getBoundingClientRect();
+    if (selection && selection.rangeCount) {
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
+      if (rect.width || rect.height) {
+        return {
+          x: rect.left + rect.width / 2 - container.left,
+          y: rect.top - container.top,
+        };
+      }
+    }
+    // No measurable rect — jsdom, or a keyboard selection. Fall back to the
+    // pointer when there is one, and to the top of the body when there is not.
+    const fallbackX = event instanceof MouseEvent ? event.clientX - container.left : 0;
+    const fallbackY = event instanceof MouseEvent ? event.clientY - container.top : 0;
+    return { x: fallbackX, y: fallbackY };
+  }
+
+  /**
+   * Open the configured dictionary in a new tab.
+   *
+   * `noopener` because we are handing a tab to a third-party site and it has no
+   * business reaching back into this one.
+   */
+  protected define(word: string): void {
+    const url = this.tools.defineUrl(word);
+    this.tools.dismiss();
+    if (url && typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  /** Whether Ctrl/Cmd+F should be taken over. See {@link openSearch}. */
+  canSearch(): boolean {
+    return this.pageCount() > 1;
+  }
+
+  /**
+   * Open in-document search.
+   *
+   * Only offered when the document actually paginated: on a single page the
+   * browser's own find is strictly better than ours — it marks every hit live
+   * and it is the tool the reader already knows — and taking it away would be
+   * hostile for no gain.
+   */
+  openSearch(): void {
+    if (!this.canSearch()) {
+      return;
+    }
+    this.tools.dismiss();
+    this.tools.searchOpen.set(true);
+  }
+
+  /** Go to a match: turn to its page, then mark it there. */
+  protected goToMatch(match: SearchMatch): void {
+    this.tools.searchOpen.set(false);
+    this.turnTo(match.page - 1);
+    this.tools.markedText.set(match.text);
+  }
+
+  /** Go to a note's passage from the rail. */
+  protected goToNote(note: RailNote): void {
+    if (note.page === null) {
+      return;
+    }
+    this.turnTo(note.page - 1);
+  }
+
+  /** Open or close in-document search from the toolbar. */
+  protected toggleSearch(): void {
+    if (this.tools.searchOpen()) {
+      this.tools.searchOpen.set(false);
+      return;
+    }
+    this.openSearch();
+  }
+
+  /**
+   * Share the selected passage.
+   *
+   * The selection is read *before* anything else happens, because opening a
+   * dialog moves focus and collapses it — the trap `share-selection.ts` exists
+   * to document. Here the text is already captured in `tools.selection`, so the
+   * ordering is safe by construction rather than by care.
+   */
+  protected shareSelection(): void {
+    const quote = this.tools.selection().trim();
+    this.tools.dismiss();
+    if (quote) {
+      this.shareQuote.emit(quote);
+    }
+  }
+
+  /** Share a note's passage from the rail, quoting what it was made on. */
+  protected shareNote(note: RailNote): void {
+    this.shareQuote.emit(note.annotation.anchor.quote);
   }
 
   async expandArticle(force = false): Promise<void> {

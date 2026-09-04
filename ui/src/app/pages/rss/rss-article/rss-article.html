@@ -1,5 +1,10 @@
 <div class="rss-article">
-  <app-reader-core [chain]="chain()" layout="pane" />
+  <app-reader-core
+    [chain]="chain()"
+    [routeId]="status().id"
+    layout="pane"
+    (shareQuote)="shareSelection($event)"
+  />
 
   <!-- Offered after the article, where someone has actually read the thing.
        Highlight a passage first and it travels as a quote. -->

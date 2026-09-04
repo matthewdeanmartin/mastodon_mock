@@ -44,12 +44,18 @@ function wordCount(text: string): number {
 /**
  * Split markdown into top-level blocks on blank lines.
  *
+ * Exported because highlight anchors index into this same list
+ * (`reader-anchor.ts`). Two definitions of "a block" would mean an anchor
+ * pointing at a different paragraph than the one pagination put on the page,
+ * which is precisely the drift the quote check exists to catch — better not to
+ * create it in the first place.
+ *
  * Fenced code blocks are kept whole: a blank line inside a fence is part of the
  * code, and breaking a page there would split a listing across pages and — worse
  * — leave an unterminated fence that the markdown renderer would then apply to
  * the rest of the page.
  */
-function blocks(markdown: string): string[] {
+export function blocks(markdown: string): string[] {
   const lines = markdown.split('\n');
   const out: string[] = [];
   let current: string[] = [];

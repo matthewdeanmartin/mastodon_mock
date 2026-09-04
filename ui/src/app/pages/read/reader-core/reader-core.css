@@ -306,3 +306,106 @@
   word-spacing: normal;
   opacity: 0.75;
 }
+
+/* The toolbar and anything that hangs off it (in-document search). Positioned
+   so the dialog can anchor under the bar rather than float over the text the
+   reader is trying to search. */
+.reader-bar {
+  position: relative;
+}
+
+/* The reading column and the notes rail, side by side. The column keeps its
+   measure; the rail takes what it needs beside it and nothing from it. */
+.reader-with-rail {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  justify-content: center;
+}
+
+.reader-with-rail > .reader {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Below the width where both fit, the rail goes under the text — see
+   `notes-rail.css`, which makes the same call from its side. */
+@media (max-width: 1100px) {
+  .reader-with-rail {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* The article body is the positioning context for the selection popover, which
+   is anchored in coordinates relative to it. */
+.reader-article-body {
+  position: relative;
+}
+
+/* A marked passage. Deliberately a wash rather than a block of colour: the
+   point is to find the sentence again, not to make it hard to read. */
+.reader-highlight {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+/* The search hit reads differently from a highlight, because it means something
+   different: one is a mark the reader made, the other is where they just
+   landed. */
+.reader-search-hit {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  outline: 2px solid var(--accent);
+}
+
+.note-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.note-composer textarea {
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  resize: vertical;
+}
+
+.note-composer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.note-composer .tool {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.note-composer .tool:hover {
+  background: var(--hover);
+}
+
+/* Said before the button, so the reader decides with it in view rather than
+   discovering it after spending a fetch. */
+.fetch-warning {
+  margin: 0 0 6px;
+}

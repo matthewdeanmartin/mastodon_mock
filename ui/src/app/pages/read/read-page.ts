@@ -16,6 +16,8 @@ import { ReadingZen } from '../../reading-zen';
 import { ThreadLoader } from './thread-loader';
 import { ReaderCore } from './reader-core/reader-core';
 import { LibraryPanel } from './library-panel/library-panel';
+import { ComposeShareRequest, ShareDialog } from '../../share-dialog/share-dialog';
+import { Drafts } from '../../drafts';
 import { readerChain } from './reader-document';
 
 // i18n reader.page.loading: Opening…
@@ -49,7 +51,7 @@ import { readerChain } from './reader-document';
  */
 @Component({
   selector: 'app-read-page',
-  imports: [RouterLink, TranslocoPipe, ReaderCore, LibraryPanel],
+  imports: [RouterLink, TranslocoPipe, ReaderCore, LibraryPanel, ShareDialog],
   templateUrl: './read-page.html',
   styleUrl: './read-page.css',
   providers: [ThreadLoader],
@@ -58,6 +60,7 @@ export class ReadPage implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private drafts = inject(Drafts);
   private readingZen = inject(ReadingZen);
 
   protected readonly prefs = inject(ClientPrefs);
@@ -83,6 +86,35 @@ export class ReadPage implements OnInit, OnDestroy {
    * store: it is view state, and the store is shaped for a later sync.
    */
   protected readonly libraryOpen = this.prefs.readerLibraryOpen;
+
+  /** The share dialog, opened by the reader's selection popover. */
+  protected readonly showShare = signal(false);
+  protected readonly shareQuote = signal('');
+
+  protected shareSelection(quote: string): void {
+    this.shareQuote.set(quote);
+    this.showShare.set(true);
+  }
+
+  /**
+   * Park a prefilled draft and send the reader to the composer.
+   *
+   * The same handoff the RSS pane makes, for the same reason: there is no
+   * composer on this page, and dropping the request would leave someone with a
+   * closed dialog and nothing to show for the destination they picked.
+   */
+  protected composeShare(request: ComposeShareRequest): void {
+    this.drafts.handoff({
+      segments: [request.text],
+      spoilerText: '',
+      sensitive: false,
+      visibility: '',
+      poll: null,
+      target: request.target === 'both' ? 'fedi' : request.target,
+    });
+    this.showShare.set(false);
+    void this.router.navigate(['/write']);
+  }
 
   protected toggleLibrary(): void {
     this.prefs.setReaderLibraryOpen(!this.libraryOpen());
@@ -141,6 +173,22 @@ export class ReadPage implements OnInit, OnDestroy {
    * reader using ⌘← to go back should go back.
    */
   onKeydown = (event: KeyboardEvent): void => {
+    // Before the modifier guard, because this binding *is* a modifier one.
+    //
+    // Taking Ctrl/Cmd+F is only defensible where the browser's own find would
+    // mislead: in page-flip mode it searches the one page on screen and reports
+    // "not found" for a phrase three pages back. `canSearch()` is false on a
+    // document that did not paginate, so on those the browser keeps its key —
+    // there, its find is the better tool and ours would be a worse copy.
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'f') {
+      const core = this.core();
+      if (core?.canSearch()) {
+        event.preventDefault();
+        event.stopPropagation();
+        core.openSearch();
+      }
+      return;
+    }
     if (event.metaKey || event.ctrlKey || event.altKey) {
       return;
     }

@@ -301,6 +301,50 @@ about a document's name. It now goes through `plainText`, so entities decode
 
 Six tests in `save-to-library.spec.ts`.
 
+### The library re-added the same document on every open (2026-09-04)
+
+Reported by the operator: clicking a library row re-added the item as currently
+being read, over and over — "it is like the binary goop in the URL changes
+constantly". It was not changing. The reader was **re-deriving** it.
+
+`ReaderCore.identity()` built the library key with `readerRouteId(root)`, from
+the *loaded status*, rather than using the id the document was opened with. Two
+things then made the derived key differ from the one in the address bar:
+
+- A post read from a server we hold no account on is addressable two ways — the
+  feed's `anonymous-mastodon:<host>:<id>` and the route's base64 blob — and
+  `ThreadLoader` accepts both.
+- Worse, and the actual cause here: once the home-server resolution landed (see
+  [[kindle-anonymous-fetch-finding]]), a resolved remote post comes back as an
+  **ordinary local status**. It has a local id and no `anonymous-mastodon`
+  provider, so `readerRouteId` returns that local id — while the URL still holds
+  the blob. Every open wrote a fresh entry under a key no row pointed at.
+
+The fix: `ReaderCore` takes a `routeId` input and shelves under it. The reader
+knows the id it was opened with; that is the authority, and re-deriving one was
+never going to be reliable across a path that can legitimately swap the status
+underneath it. `read-page` passes `currentId()`, the RSS pane passes the item's
+id, and `readerRouteId` stays as the fallback so a host with no route id does
+not regress to shelving a feed id that 404s.
+
+`readerRouteId` keeps its job on the *card* side, where deriving is correct:
+`SaveToLibrary` is building the link it will navigate to. Because the reader now
+shelves under the id it arrives with, the two agree — saving from a feed row and
+then opening it files one document, not two. Tested.
+
+Four tests in `reader-core.spec.ts`, two of which fail without the fix.
+
+### Clear all (2026-09-04)
+
+Asked for while the duplicates were on screen. `ReaderLibrary.clear()` already
+existed for Storage Diagnostics; the panel now has a footer that calls it.
+
+Two presses rather than a `confirm()` dialog — the panel is a sheet over a page
+someone is reading, and a modal would tear them out of it for a decision that
+belongs in the sheet. The second press is the confirmation, and the count is in
+the prompt ("Clear all 12?") so the size of what is about to go is visible. The
+footer is absent entirely when there is nothing to clear.
+
 ### Two fixes from the operator's testing
 
 **The toolbar was flung to the corners.** Corrected to a centred band —

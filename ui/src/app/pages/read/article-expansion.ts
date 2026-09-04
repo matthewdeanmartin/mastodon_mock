@@ -4,6 +4,8 @@ import { ArticleFetch } from '../../providers/article/article-fetch';
 import { ArticleQuota } from '../../providers/article/article-quota';
 import { ArticleReadingTally } from '../../providers/article/article-reading-tally';
 import { ArticleDiagnosis, ArticleResult } from '../../providers/article/article-models';
+import { inspectUrl } from '../../providers/article/article-diagnosis';
+import { ObservedFailures } from '../../providers/article/observed-failures';
 import { PageDiagnostics } from '../../page-diagnostics';
 
 /**
@@ -88,6 +90,7 @@ export class ArticleExpansion {
   private tally = inject(ArticleReadingTally);
   private transloco = inject(TranslocoService);
   private log = inject(PageDiagnostics);
+  private observed = inject(ObservedFailures);
 
   readonly quota = inject(ArticleQuota);
 
@@ -133,6 +136,43 @@ export class ArticleExpansion {
       return result.finalUrl;
     }
   });
+
+  /**
+   * A warning from what this device has already seen at this host.
+   *
+   * Null when there is nothing to say, which is the common case. When it is
+   * set, the button becomes "Try anyway" and the sentence is the same one the
+   * shipped `UNLIKELY_HOSTS` list produces — the two sources are deliberately
+   * indistinguishable to the reader, because a hint is a hint whether it came
+   * from a table or from experience.
+   */
+  beforeFetch(
+    url: string | null,
+  ): { diagnosis: ArticleDiagnosis; worthTrying: boolean; note: string } | null {
+    if (!url) {
+      return null;
+    }
+    // The shipped list first: it is reviewable by a human, it works on the very
+    // first attempt, and it knows things experience cannot (a PDF is never
+    // going to extract, however many times it is tried).
+    const shipped = inspectUrl(url);
+    if (shipped) {
+      return { ...shipped, note: this.noteFor(shipped.diagnosis) };
+    }
+    // Then what this device has actually seen. Always worth trying: unlike the
+    // shipped list, this is a pattern rather than a fact, and a site that has
+    // started working again should cost one click to discover.
+    const observed = this.observed.warnFor(url);
+    return observed
+      ? { diagnosis: observed, worthTrying: true, note: this.noteFor(observed) }
+      : null;
+  }
+
+  /** The sentence a diagnosis earns — one table, so every surface agrees. */
+  private noteFor(diagnosis: ArticleDiagnosis): string {
+    const key = DIAGNOSIS_NOTES[diagnosis];
+    return key ? this.transloco.translate<string>(key) : '';
+  }
 
   /** The diagnosis worth showing, when the result is not a clean article. */
   readonly failure = computed<ArticleDiagnosis | null>(() => {
@@ -249,6 +289,9 @@ export class ArticleExpansion {
         // phone. Only a rendered article counts.
         this.tally.recordOne();
       }
+      // What this device has learned about the host, whichever way it went.
+      // A success clears the record; only host-attributable failures count.
+      this.observed.record(url, result.diagnosis);
       this.log.info('Reader', 'article:expanded', {
         diagnosis: result.diagnosis,
         rendered: result.article !== null,

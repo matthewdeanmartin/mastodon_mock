@@ -66,6 +66,17 @@ export class RssArticle {
   }
 
   /**
+   * Share a passage picked in the reader's own selection popover.
+   *
+   * The quote arrives already captured — the reader read it before anything
+   * moved focus — so this only has to open the dialog around it.
+   */
+  protected shareSelection(quote: string): void {
+    this.shareQuote.set(quote);
+    this.showShare.set(true);
+  }
+
+  /**
    * Park a prefilled draft and send the reader to the composer.
    *
    * There is no composer on this page to open inline, and dropping the request

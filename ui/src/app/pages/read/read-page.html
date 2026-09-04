@@ -11,7 +11,9 @@
       }
       <app-reader-core
         [chain]="chain()"
+        [routeId]="currentId()"
         layout="page"
+        (shareQuote)="shareSelection($event)"
         [libraryOpen]="libraryOpen()"
         (toggleLibrary)="toggleLibrary()"
         (exit)="exit()"
@@ -39,3 +41,12 @@
     </div>
   }
 </div>
+
+@if (showShare() && loader.status(); as shared) {
+  <app-share-dialog
+    [status]="shared"
+    [quote]="shareQuote()"
+    (compose)="composeShare($event)"
+    (closed)="showShare.set(false)"
+  />
+}

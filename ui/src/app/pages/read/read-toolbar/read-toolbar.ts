@@ -7,6 +7,7 @@ import {
   ReaderTheme,
   READER_FONT_OPTIONS,
 } from '../../../client-prefs';
+import { DICTIONARIES, DictionaryId } from '../../../providers/read/dictionaries';
 
 // i18n reader.toolbar.label: Reader controls
 // i18n reader.toolbar.typography: Text
@@ -34,6 +35,12 @@ import {
 // i18n reader.toolbar.pageFlipTitle: Read a page at a time
 // i18n reader.toolbar.scroll: Scroll
 // i18n reader.toolbar.scrollTitle: Read as one continuous column
+// i18n reader.toolbar.dictionary: Dictionary
+// i18n reader.toolbar.dictionaryTemplate: Dictionary address
+// i18n reader.toolbar.dictionaryTemplateHint: Use {word} where the word goes.
+// i18n reader.toolbar.dictionaryTemplateBad: That needs to be an http(s) address containing {word}.
+// i18n reader.toolbar.search: Find
+// i18n reader.toolbar.searchTitle: Find a passage in this document (Ctrl+F)
 // i18n reader.toolbar.library: Library
 // i18n reader.toolbar.libraryTitle: Everything you have opened in the reader
 // i18n reader.toolbar.exit: Exit
@@ -89,6 +96,18 @@ export class ReadToolbar {
   /** False in the pane, where the sheet would cover the subscription rail. */
   readonly libraryEnabled = input(false);
 
+  /**
+   * Whether in-document search is offered.
+   *
+   * False on a document that did not paginate: there, the browser's own find
+   * already searches everything there is, and ours would be a worse version of
+   * a tool the reader already has.
+   */
+  readonly canSearch = input(false);
+
+  /** Whether the search dialog is showing, for the pressed state. */
+  readonly searchOpen = input(false);
+
   /** Whether the library panel is currently open, for the pressed state. */
   readonly libraryOpen = input(false);
 
@@ -97,8 +116,32 @@ export class ReadToolbar {
 
   readonly previousPage = output<void>();
   readonly nextPage = output<void>();
+  /**
+   * Named `findInDocument` rather than `search`: a bare `search` output shadows
+   * the DOM event of that name, so a host binding `(search)` would be ambiguous
+   * about whether it meant ours or the browser's.
+   */
+  readonly findInDocument = output<void>();
   readonly toggleLibrary = output<void>();
   readonly exit = output<void>();
+
+  protected readonly dictionaries = DICTIONARIES;
+
+  /** Bound rather than inlined: `{word}` in a template is Angular's syntax. */
+  protected readonly customTemplateExample = 'https://example.com/define/{word}';
+
+  /** True when the typed template was refused. See `dictionaries.ts`. */
+  protected readonly customTemplateBad = signal(false);
+
+  protected setDictionary(event: Event): void {
+    this.prefs.setReaderDictionary((event.target as HTMLSelectElement).value as DictionaryId);
+    this.customTemplateBad.set(false);
+  }
+
+  protected setCustomDictionary(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.customTemplateBad.set(!this.prefs.setReaderDictionaryCustom(value));
+  }
 
   /** Whether the typography popover is showing. */
   protected readonly typographyOpen = signal(false);
