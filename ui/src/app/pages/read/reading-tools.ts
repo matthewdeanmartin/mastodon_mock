@@ -40,6 +40,7 @@ export class ReadingTools {
   private readonly documentId = signal('');
   private readonly markdown = signal('');
   private readonly paginated = signal<readonly string[]>([]);
+  private readonly renderedPages = signal(false);
 
   /** The live selection, and where to put the popover. */
   readonly selection = signal('');
@@ -85,7 +86,11 @@ export class ReadingTools {
       return {
         annotation,
         moved: !intact,
-        page: intact ? pageOfBlock(pages, annotation.anchor.block) : null,
+        page: intact
+          ? this.renderedPages()
+            ? pageOfQuote(pages, annotation.anchor.quote)
+            : pageOfBlock(pages, annotation.anchor.block)
+          : null,
       };
     });
   });
@@ -116,7 +121,7 @@ export class ReadingTools {
   readonly selectionIsWord = computed(() => isSingleWord(this.selection()));
 
   /** Point the tools at a document. Clears everything belonging to the last one. */
-  setDocument(id: string, markdown: string, pages: readonly string[]): void {
+  setDocument(id: string, markdown: string, pages: readonly string[], rendered = false): void {
     if (id !== this.documentId()) {
       this.dismiss();
       this.searchOpen.set(false);
@@ -125,6 +130,7 @@ export class ReadingTools {
     }
     this.markdown.set(markdown);
     this.paginated.set(pages);
+    this.renderedPages.set(rendered);
   }
 
   /**
@@ -252,4 +258,18 @@ export class ReadingTools {
       .find((entry) => entry.anchor.block === anchor.block && entry.anchor.start === anchor.start);
     return match?.id ?? null;
   }
+}
+
+/** Quotes can start mid-paragraph and continue onto the next native column. */
+export function pageOfQuote(pages: readonly string[], quote: string): number | null {
+  const normalize = (value: string): string => value.replace(/\s+/g, ' ').trim();
+  const needle = normalize(quote);
+  if (!needle) return null;
+  for (let index = 0; index < pages.length; index++) {
+    const start = normalize(pages[index]);
+    const joined = normalize(pages.slice(index).join(''));
+    const at = joined.indexOf(needle);
+    if (at >= 0 && at < start.length) return index + 1;
+  }
+  return null;
 }

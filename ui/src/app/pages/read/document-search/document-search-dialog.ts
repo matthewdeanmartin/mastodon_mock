@@ -48,6 +48,7 @@ import { findInPages, SearchMatch } from '../document-search';
 export class DocumentSearchDialog {
   /** The document, already paginated — the same slices the reader turns. */
   readonly pages = input<readonly string[]>([]);
+  readonly continuous = input(false);
 
   /** The page showing now, so its matches can be marked as "here". */
   readonly currentPage = input(1);
@@ -61,7 +62,7 @@ export class DocumentSearchDialog {
   private readonly field = viewChild<ElementRef<HTMLInputElement>>('field');
 
   protected readonly matches = computed<SearchMatch[]>(() =>
-    findInPages(this.pages(), this.query()),
+    findInPages(this.pages(), this.query(), this.continuous()),
   );
 
   /** Split for rendering, so the match can be marked without building HTML. */

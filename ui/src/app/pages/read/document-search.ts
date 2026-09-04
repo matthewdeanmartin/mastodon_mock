@@ -45,7 +45,26 @@ export const MAX_MATCHES = 200;
  * Whitespace in the query is collapsed against whitespace in the text, so a
  * phrase still matches when the markdown wrapped it across two lines.
  */
-export function findInPages(pages: readonly string[], query: string): SearchMatch[] {
+export function findInPages(
+  pages: readonly string[],
+  query: string,
+  continuous = false,
+): SearchMatch[] {
+  // Native columns may break inside a word or phrase. Search the continuous
+  // text and map each hit back to the page on which it begins.
+  if (continuous && pages.length > 1) {
+    const starts: number[] = [];
+    let offset = 0;
+    for (const page of pages) {
+      starts.push(offset);
+      offset += page.length;
+    }
+    return findInPages([pages.join('')], query).map((match) => {
+      let index = 0;
+      while (index + 1 < starts.length && starts[index + 1] <= match.offset) index++;
+      return { ...match, page: index + 1, offset: match.offset - starts[index] };
+    });
+  }
   const needle = query.trim().toLowerCase().replace(/\s+/g, ' ');
   if (needle.length < 2) {
     // One character matches most of the document and helps nobody.

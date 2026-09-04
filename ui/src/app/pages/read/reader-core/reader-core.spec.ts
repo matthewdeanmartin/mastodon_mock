@@ -390,13 +390,14 @@ describe('ReaderCore paging a post chain', () => {
     vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(rectAt(0));
     vi.spyOn(banner, 'getBoundingClientRect').mockReturnValue(rectAt(0));
 
-    const available = (
-      instance as unknown as { roomBelow(element: HTMLElement): number }
-    ).roomBelow(body);
-
-    // 700 - 150 inside reader - 100 toolbar - 100 test banner - 24 bottom gap
-    // - two 18px × 1.65 line boxes.
-    expect(available).toBe(266);
+    (instance as unknown as { measure(): void }).measure();
+    // The outer viewport excludes only persistent chrome. The CSS grid gives
+    // the toolbar its own row, so its height is never guessed or deducted twice.
+    expect(host.style.getPropertyValue('--reader-viewport-height')).toBe('700px');
+    expect(host.style.getPropertyValue('--reader-outer-chrome')).toBe('100px');
+    vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(rectAt(4_000));
+    (instance as unknown as { measure(): void }).measure();
+    expect(host.style.getPropertyValue('--reader-viewport-height')).toBe('700px');
     banner.remove();
     viewport.mockRestore();
   });
@@ -414,37 +415,32 @@ describe('ReaderCore paging a post chain', () => {
     // And it still renders every prose block, rather than hiding the overflow.
     expect(
       (fixture.nativeElement as HTMLElement).querySelectorAll('.reader-posts .reader-post'),
-    ).toHaveLength(16);
+    ).toHaveLength(8);
   });
 
-  it('iteratively checks composed candidate pages and adjusts their boundaries', () => {
+  it('turns the native viewport without replacing or losing document text', () => {
     fixture.componentInstance.chain.set(storm(2));
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
-    const gauges = [...element.querySelectorAll<HTMLElement>('.reader-gauge')];
-    const gauge = gauges.find((candidate) => candidate.children.length === 4)!;
-    const probe = element.querySelector<HTMLElement>('.reader-page-probe')!;
-    const measuredCandidateSizes: number[] = [];
-    Object.defineProperty(probe, 'scrollHeight', {
-      configurable: true,
-      get: () => {
-        measuredCandidateSizes.push(probe.children.length);
-        return probe.children.length * 200;
-      },
-    });
-
-    const pages = (
-      core() as unknown as {
-        fitGaugePages(gauge: HTMLElement, available: number): number[][];
-      }
-    ).fitGaugePages(gauge, 450);
-
-    expect(pages).toEqual([
-      [0, 1],
-      [2, 3],
-    ]);
-    expect(measuredCandidateSizes.length).toBeGreaterThan(2);
+    const viewport = element.querySelector<HTMLElement>('.reader-viewport')!;
+    const body = element.querySelector<HTMLElement>('.reader-posts')!;
+    const text = body.textContent;
+    const internal = core() as unknown as {
+      columnText: { set(pages: string[]): void };
+      columnLayout: { stride: number };
+    };
+    internal.columnText.set(['first', 'second', 'third']);
+    internal.columnLayout.stride = 648;
+    core().nextPage();
+    expect(viewport.scrollLeft).toBe(648);
+    core().nextPage();
+    core().nextPage();
+    expect(viewport.scrollLeft).toBe(1296);
+    core().prevPage();
+    expect(viewport.scrollLeft).toBe(648);
+    expect(body.textContent).toBe(text);
+    expect(element.querySelector('.reader-posts')).toBe(body);
   });
 
   it('keeps the progress line inside the sticky toolbar box', () => {
@@ -457,19 +453,21 @@ describe('ReaderCore paging a post chain', () => {
     expect(progress?.parentElement?.classList.contains('read-toolbar-outer')).toBe(true);
   });
 
-  it('measures an article after an asynchronous fetch inserts its gauge', () => {
+  it('measures the live article after an asynchronous fetch inserts it', () => {
     fixture.componentInstance.chain.set([post('1', 900)]);
     fixture.detectChanges();
     const instance = core();
     const internal = instance as unknown as {
       expansion: { result: { set(value: ArticleResult): void } };
-      fitGaugePages(gauge: HTMLElement, available: number): number[][];
+      measure(): void;
     };
-    const originalFit = internal.fitGaugePages.bind(instance);
+    const originalMeasure = internal.measure.bind(instance);
     const measuredBlockCounts: number[] = [];
-    internal.fitGaugePages = (gauge, available) => {
-      measuredBlockCounts.push(gauge.children.length);
-      return originalFit(gauge, available);
+    internal.measure = () => {
+      measuredBlockCounts.push(
+        fixture.nativeElement.querySelector('.reader-article-body')?.children.length ?? 0,
+      );
+      originalMeasure();
     };
 
     internal.expansion.result.set({
@@ -506,13 +504,13 @@ describe('ReaderCore paging a post chain', () => {
     fixture.detectChanges();
     const instance = core();
     const internal = instance as unknown as {
-      fitGaugePages(gauge: HTMLElement, available: number): number[][];
+      measure(): void;
     };
-    const originalFit = internal.fitGaugePages.bind(instance);
+    const originalMeasure = internal.measure.bind(instance);
     let measurements = 0;
-    internal.fitGaugePages = (gauge, available) => {
+    internal.measure = () => {
       measurements++;
-      return originalFit(gauge, available);
+      originalMeasure();
     };
 
     fixture.componentInstance.routeId.set('replacement');
@@ -550,7 +548,7 @@ describe('ReaderCore paging a post chain', () => {
     expect(core().pageCountForTest()).toBe(1);
     expect(
       (fixture.nativeElement as HTMLElement).querySelectorAll('.reader-posts .reader-post'),
-    ).toHaveLength(16);
+    ).toHaveLength(8);
   });
 
   /** jsdom cannot measure it, but one long post is still prepared for paging. */
@@ -561,22 +559,30 @@ describe('ReaderCore paging a post chain', () => {
     expect(core().pageCountForTest()).toBe(1);
   });
 
-  /** A long single post needs the gauge too: it may be several pages itself. */
-  it('lays out a measuring gauge for any multi-block document in page mode', () => {
+  /** A single paragraph needs native fragmentation just as much as a storm. */
+  it('uses the bounded viewport for both one long post and a storm', () => {
     fixture.componentInstance.chain.set(storm(1));
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.reader-gauge')).not.toBeNull();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector(
+        'app-reader-core.reader-paged .reader-viewport .reader',
+      ),
+    ).not.toBeNull();
 
     fixture.componentInstance.chain.set(storm(5));
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.reader-gauge')).not.toBeNull();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.reader-viewport .reader-post'),
+    ).toHaveLength(5);
   });
 
-  it('hides the gauge from assistive technology, which must not read it twice', () => {
+  it('renders only one document copy for assistive technology', () => {
     fixture.componentInstance.chain.set(storm(5));
     fixture.detectChanges();
 
-    const gauge = (fixture.nativeElement as HTMLElement).querySelector('.reader-gauge');
-    expect(gauge?.getAttribute('aria-hidden')).toBe('true');
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('.reader-gauge')).toBeNull();
+    expect(element.querySelectorAll('.reader-posts')).toHaveLength(1);
+    expect(element.querySelector('.reader-posts')?.getAttribute('aria-hidden')).not.toBe('true');
   });
 });

@@ -197,6 +197,53 @@ body {
   object-fit: contain;
 }
 
+/* innerHTML descendants do not receive Angular's scoped style attributes.
+   Keep reading typography here so live text and native column layout agree. */
+app-reader-core .reader :is(p, ul, ol) {
+  margin: 0 0 1em;
+}
+
+app-reader-core .reader :is(h2, h3, h4, h5, h6) {
+  margin: 1em 0 0.5em;
+  line-height: 1.3;
+}
+
+app-reader-core .reader blockquote {
+  margin: 1em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--border);
+}
+
+app-reader-core .reader pre {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  line-height: 1.5;
+  white-space: break-spaces;
+  overflow-wrap: anywhere;
+}
+
+app-reader-core.reader-paged .reader :is(pre, blockquote, li, p, section, div) {
+  break-inside: auto;
+  orphans: 1;
+  widows: 1;
+}
+
+app-reader-core.reader-paged .reader img {
+  max-height: max(1px, calc(var(--reader-page-height) - 2em));
+  max-width: 100%;
+  object-fit: contain;
+}
+
+app-reader-core .reader .reader-highlight {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: inherit;
+}
+
+app-reader-core .reader .reader-search-hit {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: inherit;
+}
+
 a {
   color: var(--accent);
   text-decoration: none;

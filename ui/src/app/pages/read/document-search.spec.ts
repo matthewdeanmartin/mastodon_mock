@@ -81,4 +81,16 @@ describe('searching a document rather than a page', () => {
     expect(findInPages([], 'otters')).toHaveLength(0);
     expect(findInPages([''], 'otters')).toHaveLength(0);
   });
+
+  it('finds phrases and words split by native page boundaries', () => {
+    const [phrase] = findInPages(
+      ['Before. The remem', 'bered ', 'passage continues.'],
+      'remembered passage',
+      true,
+    );
+    expect(phrase.page).toBe(1);
+    expect(phrase.offset).toBe(12);
+    expect(phrase.text).toBe('remembered passage');
+    expect(findInPages(['Before. ', 'The passage.'], 'passage', true)[0].page).toBe(2);
+  });
 });

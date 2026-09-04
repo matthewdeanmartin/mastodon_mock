@@ -10,6 +10,7 @@ import {
   output,
   signal,
   viewChild,
+  untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -27,9 +28,7 @@ import { PreviewCardComponent } from '../../../preview-card/preview-card';
 import { ArticleExpansion } from '../article-expansion';
 import { articleTarget } from '../../../providers/article/article-target';
 import { renderMarkdown } from '../../../providers/article/markdown-render';
-import { paginateMarkdown } from '../../rss/article-pages';
-import { chainBlocks, PostBlock } from '../post-blocks';
-import { documentBlocks } from '../reader-anchor';
+import { ColumnPages, columnOf, readColumnPages } from '../column-pages';
 import { ReadToolbar } from '../read-toolbar/read-toolbar';
 import { DocumentSearchDialog } from '../document-search/document-search-dialog';
 import { SearchMatch } from '../document-search';
@@ -101,25 +100,6 @@ import { ReadingTools } from '../reading-tools';
 const POSITION_SAVE_DELAY_MS = 2_000;
 
 /**
- * Breathing room below the last line of a page.
- *
- * Mirrors the reading column's own bottom padding so a page ends the way the
- * document does, rather than with text flush against the edge of the screen.
- */
-const READER_PAGE_BOTTOM_GAP = 24;
-
-function samePages(left: readonly number[][], right: readonly number[][]): boolean {
-  return (
-    left.length === right.length &&
-    left.every(
-      (page, pageIndex) =>
-        page.length === right[pageIndex]?.length &&
-        page.every((block, blockIndex) => block === right[pageIndex][blockIndex]),
-    )
-  );
-}
-
-/**
  * One document, rendered for reading.
  *
  * ## What this is
@@ -166,6 +146,7 @@ function samePages(left: readonly number[][], right: readonly number[][]): boole
   templateUrl: './reader-core.html',
   styleUrl: './reader-core.css',
   providers: [ArticleExpansion, ReadingTools],
+  host: { '[class.reader-paged]': 'prefs.readerPageFlip()' },
 })
 export class ReaderCore {
   private readonly host = inject(ElementRef<HTMLElement>);
@@ -278,162 +259,16 @@ export class ReaderCore {
     return root?.provider === 'rss' && root.rssFullContent === false;
   });
 
-  /**
-   * The height one page has to fit in, measured from the viewport.
-   *
-   * Re-measured on resize and on any typography change, because every one of
-   * those changes what fits. Zero until the first measurement, while the
-   * reader uses its one-page fallback.
-   */
-  private readonly available = signal(0);
+  private readonly columnsRef = viewChild<ElementRef<HTMLElement>>('columns');
+  private readonly viewportRef = viewChild<ElementRef<HTMLElement>>('pageViewport');
+  private readonly columnText = signal<string[]>([]);
+  private columnLayout: ColumnPages = { text: [], starts: [], stride: 0 };
+  private layoutReady = signal(false);
+  private focusFetchedArticle = false;
 
-  /**
-   * The extracted article, split into pages that actually fit the screen.
-   *
-   * ## Why this is measured rather than counted
-   *
-   * It used to be `paginateMarkdown`, which slices at ~500 words — "about a
-   * screenful and a half" by its own comment. That is the bug the operator
-   * found: in page-flip mode the reader still had to scroll, so turning the
-   * page bought nothing and the two modes were indistinguishable. A page is not
-   * a quantity of words, it is what fits, and what fits depends on the type
-   * size, the line height, the measure and the window.
-   *
-   * `paginateMarkdown` is still the fallback for the first render, before
-   * anything has been measured: it gives a sensible shape immediately, and the
-   * measured pass replaces it as soon as the browser has laid the blocks out.
-   */
-  protected readonly pages = computed<string[]>(() => {
-    const article = this.expansion.result()?.article;
-    if (!article) {
-      return [];
-    }
-    if (!this.prefs.readerPageFlip()) {
-      return [article.markdown];
-    }
-    const measured = this.measuredPages();
-    return measured ?? paginateMarkdown(article.markdown);
-  });
+  protected readonly pages = computed<string[]>(() => this.columnText());
+  protected readonly pageCount = computed(() => Math.max(1, this.pages().length));
 
-  /**
-   * The document's blocks grouped by what fits, or null before measurement.
-   *
-   * Depends on `available` and on every typography preference, so changing the
-   * type size re-paginates rather than leaving pages sized for the old one.
-   */
-  private readonly measuredPages = computed<string[] | null>(() => {
-    const article = this.expansion.result()?.article;
-    const available = this.available();
-    const groups = this.articlePageGroups();
-    if (!article || !available || !groups.length) {
-      return null;
-    }
-    const list = documentBlocks(article.markdown).markdown;
-    if (groups.flat().length !== list.length) {
-      // The measurement is of a different document than the one we are about to
-      // slice — a re-fetch landed between the two. Wait for the next pass
-      // rather than pairing heights with the wrong blocks.
-      return null;
-    }
-    return groups.map((group) => group.map((index) => list[index]).join('\n\n'));
-  });
-
-  /** Browser-verified article and post pages, as indices into their block lists. */
-  private readonly articlePageGroups = signal<number[][]>([]);
-  private readonly postPageGroups = signal<number[][]>([]);
-
-  /** The room a page of *posts* has, which is not the room the article has. */
-  private readonly chainAvailable = signal(0);
-
-  /**
-   * The posts on the current page, when the chain itself paginates.
-   *
-   * ## Why the chain needs pages at all
-   *
-   * This is the case the epic exists for — "a Kindle app for tweetstorms" — and
-   * it was the one page mode never covered. `pages()` is derived from the
-   * *fetched article*, so a storm with nothing to fetch had zero pages, no
-   * controls, and page mode was indistinguishable from scrolling. A forty-post
-   * storm is exactly the document someone wants to turn pages through.
-   *
-   * A post is the unit, never split: posts were written as separate things and
-   * a page break between two of them is a seam the author already put there.
-   */
-  /** Every block of every post, which is the unit a page is built from. */
-  protected readonly chainBlockList = computed<PostBlock[]>(() => chainBlocks(this.chain()));
-
-  /**
-   * The chain's blocks grouped into pages that fit.
-   *
-   * **A block, not a post.** Paginating post-by-post works for a tweetstorm and
-   * does nothing for a single long tweet — one post is one unit, so it lands on
-   * one page and that page is as tall as the post. A paragraph is the unit that
-   * makes both cases work, and it is the same unit the article pagination and
-   * the highlight anchors already use.
-   */
-  protected readonly postPages = computed<PostBlock[][]>(() => {
-    const blocks = this.chainBlockList();
-    if (!this.prefs.readerPageFlip() || blocks.length < 2) {
-      return [blocks];
-    }
-    const available = this.chainAvailable();
-    const groups = this.postPageGroups();
-    if (!available || groups.flat().length !== blocks.length) {
-      return [blocks];
-    }
-    return groups.map((group) => group.map((index) => blocks[index]));
-  });
-
-  /** The blocks to render right now. */
-  protected readonly visibleBlocks = computed<PostBlock[]>(() => {
-    const pages = this.postPages();
-    if (pages.length < 2) {
-      return pages[0] ?? [];
-    }
-    return pages[Math.min(this.pageIndex(), pages.length - 1)] ?? [];
-  });
-
-  /**
-   * Media for the posts represented on this page.
-   *
-   * Attached to the page its post's *last* block falls on, so a picture arrives
-   * after the words that introduce it rather than on the page where the post
-   * happened to start.
-   */
-  protected readonly visibleMedia = computed(() => {
-    const all = this.chainBlockList();
-    const visible = this.visibleBlocks();
-    const chain = this.chain();
-    // A post's media belongs on the page holding its last block: a picture
-    // should arrive after the words that introduce it, not on the page where
-    // the post happened to begin.
-    return chain.flatMap((status, post) => {
-      const lastBlock = all.filter((block) => block.post === post).at(-1);
-      const ends = lastBlock ? visible.includes(lastBlock) : false;
-      // A post with no blocks at all (media-only) rides with whatever page its
-      // neighbours put it on; showing it once beats never showing it.
-      const mediaOnly = !lastBlock && visible.length > 0 && post === chain.length - 1;
-      return ends || mediaOnly ? (status.media_attachments ?? []) : [];
-    });
-  });
-
-  /**
-   * How many pages this document has.
-   *
-   * The article's, when one was fetched. Otherwise the chain's — which is what
-   * makes page mode work on a tweetstorm, the document this reader was built
-   * for. Never both: an article replaces the chain as the thing being read.
-   */
-  protected readonly pageCount = computed(() =>
-    this.pages().length ? this.pages().length : this.postPages().length,
-  );
-
-  /**
-   * How many pages the document came out as.
-   *
-   * Exposed for tests: jsdom has no layout, so a spec cannot reach the measured
-   * pagination through the DOM and has to ask.
-   */
   pageCountForTest(): number {
     return this.pageCount();
   }
@@ -446,21 +281,16 @@ export class ReaderCore {
     this.pageCount() ? Math.min(this.pageIndex(), this.pageCount() - 1) + 1 : 0,
   );
 
-  /**
-   * The current page, rendered to HTML and marked.
-   *
-   * Marking happens here, over the renderer's output, because that output is
-   * the safe HTML — see `mark-passages.ts` for why wrapping DOM nodes rather
-   * than building markup is what keeps it safe.
-   */
+  /** One article DOM: page turns move the viewport instead of replacing prose. */
   protected readonly pageHtml = computed(() => {
-    const pages = this.pages();
-    if (!pages.length) {
-      return null;
-    }
-    const index = Math.min(this.pageIndex(), pages.length - 1);
-    const rendered = renderMarkdown(pages[index] ?? '');
-    return markPassages(rendered, this.tools.intactQuotes(), this.tools.markedText());
+    const article = this.expansion.result()?.article;
+    return article
+      ? markPassages(
+          renderMarkdown(article.markdown),
+          this.tools.intactQuotes(),
+          this.tools.markedText(),
+        )
+      : null;
   });
 
   /**
@@ -472,7 +302,7 @@ export class ReaderCore {
    */
   private readonly feedTools = effect(() => {
     const article = this.expansion.result()?.article;
-    this.tools.setDocument(this.documentKey(), article?.markdown ?? '', this.pages());
+    this.tools.setDocument(this.documentKey(), article?.markdown ?? '', this.pages(), true);
   });
 
   /** The key annotations are stored under: the id this document was opened with. */
@@ -520,11 +350,14 @@ export class ReaderCore {
    * reader left off.
    */
   private readonly onNewDocument = effect(() => {
-    const documentId = this.root()?.id ?? '';
+    const documentId = this.root() ? this.documentKey() : '';
     if (documentId === this.lastDocumentId) {
       return;
     }
+    this.flushPosition();
     this.lastDocumentId = documentId;
+    this.layoutReady.set(false);
+    this.columnLayout = { text: [], starts: [], stride: 0 };
     // ReaderCore now stays mounted while the library loads the next document.
     // Its per-document article state therefore has to be cleared explicitly
     // when the replacement lands; previously destruction did this by accident.
@@ -539,14 +372,6 @@ export class ReaderCore {
       return;
     }
     this.library.open(identity);
-    // A single unsplittable post needs no measuring gauge. It is already the
-    // whole document, so record its only page instead of leaving it in
-    // "reading" forever merely because there was no Next button to press.
-    if (this.chainBlockList().length <= 1 && !this.expansion.result()?.article) {
-      this.savePosition();
-    }
-    // The stored page is applied once the document has actually paginated —
-    // `pages()` is empty until an article is fetched. See `restoreIfPending`.
     this.resumePending = this.layout() === 'page';
   });
 
@@ -596,7 +421,7 @@ export class ReaderCore {
    */
   private readonly restoreIfPending = effect(() => {
     const pages = this.pageCount();
-    if (!this.resumePending || pages < 1) {
+    if (!this.layoutReady() || !this.resumePending || pages < 1) {
       return;
     }
     const identity = this.identity();
@@ -607,6 +432,8 @@ export class ReaderCore {
     const { page, approximate } = this.library.restorePage(identity.id, pages);
     this.approximateResume.set(approximate && page > 1);
     this.pageIndex.set(page - 1);
+    this.scrollColumn();
+    this.savePosition();
   });
 
   /**
@@ -623,7 +450,7 @@ export class ReaderCore {
    * surface that owns a position.
    */
   private savePosition(): void {
-    if (this.layout() === 'pane') {
+    if (this.layout() === 'pane' || !this.layoutReady()) {
       return;
     }
     const identity = this.identity();
@@ -705,278 +532,132 @@ export class ReaderCore {
     this.tools.captureSelection(body, this.selectionPoint(body, event));
   };
 
-  /**
-   * Measure one page's worth of room, then fit complete candidate pages into it.
-   *
-   * ## Why it measures offscreen rather than the live page
-   *
-   * The live body only ever holds the *current* page, so measuring it would
-   * tell us about the blocks we already decided to show — circular. Instead the
-   * whole document is rendered into a hidden element that inherits the reading
-   * column's width and typography. A second hidden element repeatedly lays out
-   * candidate pages, and the result decides the pagination. It is
-   * `visibility: hidden` rather
-   * than `display: none` because a `display: none` subtree has no layout and
-   * every height comes back zero.
-   */
+  /** CSS gives the body the space left after the toolbar, with no text-height estimates. */
   private readonly measure = (): void => {
-    this.measureChain();
-    const body = this.articleBodyRef()?.nativeElement;
-    const gauge = this.gaugeRef()?.nativeElement;
-    if (!body || !gauge) {
-      return;
+    const columns = this.columnsRef()?.nativeElement;
+    if (!columns) return;
+    const host = this.host.nativeElement;
+    const chrome = ['.test-build-banner', ...(this.layout() === 'pane' ? ['.topbar'] : [])].reduce(
+      (sum, selector) =>
+        sum + (document.querySelector(selector)?.getBoundingClientRect().height ?? 0),
+      0,
+    );
+    host.style.setProperty(
+      '--reader-viewport-height',
+      (window.visualViewport?.height ?? window.innerHeight) + 'px',
+    );
+    host.style.setProperty('--reader-outer-chrome', chrome + 'px');
+    columns.style.setProperty('--reader-page-height', columns.clientHeight + 'px');
+    const oldStart = this.columnLayout.starts[this.pageIndex()];
+    const next = this.prefs.readerPageFlip()
+      ? readColumnPages(columns)
+      : { text: [columns.textContent ?? ''], starts: [null], stride: 0 };
+    this.columnLayout = next;
+    if (JSON.stringify(this.columnText()) !== JSON.stringify(next.text)) {
+      this.columnText.set(next.text);
     }
-    // What is left of the window once the toolbar and the column's own padding
-    // have taken their share. `getBoundingClientRect().top` is where the prose
-    // actually starts, which accounts for the header, the byline and anything
-    // else above it without this needing to know they exist.
-    const available = this.roomBelow(body);
-
-    const groups = this.fitGaugePages(gauge, available);
-
-    // Only write when something actually changed. The measurement runs after
-    // every render, and a write with the same values would schedule another
-    // render that measures again — a loop that never settles, and in dev mode
-    // an `ExpressionChangedAfterItHasBeenChecked` on the first turn of it.
-    if (this.available() !== available) {
-      this.available.set(available);
+    if (
+      oldStart?.startContainer.isConnected &&
+      next.stride &&
+      !this.resumePending &&
+      !this.focusFetchedArticle
+    ) {
+      const rect = oldStart.getClientRects()[0];
+      if (rect)
+        this.pageIndex.set(
+          Math.min(
+            next.text.length - 1,
+            columnOf(rect, columns.getBoundingClientRect(), next.stride),
+          ),
+        );
     }
-    if (!samePages(this.articlePageGroups(), groups)) {
-      this.articlePageGroups.set(groups);
+    if (this.focusFetchedArticle && this.articleRef() && next.stride) {
+      const rect = this.articleRef()!.nativeElement.getClientRects()[0];
+      if (rect) this.pageIndex.set(columnOf(rect, columns.getBoundingClientRect(), next.stride));
+      this.focusFetchedArticle = false;
     }
-    // Only now is a one-page result known to be genuinely one page rather than
-    // the fallback shown while an asynchronous article is still unmeasured.
-    this.savePosition();
+    this.layoutReady.set(true);
+    this.scrollColumn();
+    if (!this.resumePending) this.savePosition();
   };
 
-  /**
-   * The same measurement for the post chain.
-   *
-   * Separate because the two can be on screen at once — a post that links to an
-   * article shows both — and because the room available differs: the posts
-   * start higher up the column than the article does.
-   */
-  private measureChain(): void {
-    const body = this.postBodyRef()?.nativeElement;
-    const gauge = this.postGaugeRef()?.nativeElement;
-    if (!body || !gauge) {
-      return;
-    }
-    const available = this.roomBelow(body);
-    const groups = this.fitGaugePages(gauge, available);
-    // Its own height signal, not `available`: the posts and the article start at
-    // different points down the column and can be on screen together, so one
-    // shared number would be whichever measurement ran last.
-    if (this.chainAvailable() !== available) {
-      this.chainAvailable.set(available);
-    }
-    if (!samePages(this.postPageGroups(), groups)) {
-      this.postPageGroups.set(groups);
-    }
-    if (!this.expansion.result()?.article) {
-      this.savePosition();
-    }
-  }
-
-  /**
-   * Find the largest run of real rendered blocks that fits each page.
-   *
-   * Each probe is laid out by the browser at the reader's actual width and
-   * typography. Binary search adjusts the candidate until it finds the final
-   * fitting block, then repeats with the remainder. This verifies the composed
-   * page itself instead of guessing from character counts or adding individual
-   * box heights (which gets margin collapse and inline fragments wrong).
-   */
-  private fitGaugePages(gauge: HTMLElement, available: number): number[][] {
-    const probe = this.pageProbeRef()?.nativeElement;
-    const source = [...gauge.children];
-    if (!probe || !source.length || available <= 0) {
-      return [];
-    }
-    const pages: number[][] = [];
-    let start = 0;
-    while (start < source.length) {
-      let low = start + 1;
-      let high = source.length;
-      let best = start + 1;
-      while (low <= high) {
-        const end = Math.floor((low + high) / 2);
-        probe.replaceChildren(...source.slice(start, end).map((node) => node.cloneNode(true)));
-        const height = Math.max(probe.getBoundingClientRect().height, probe.scrollHeight);
-        if (height <= 0) {
-          // No layout engine (SSR/jsdom): preserve the documented one-page
-          // fallback rather than manufacturing arbitrary pages.
-          probe.replaceChildren();
-          return [source.map((_, index) => index)];
-        }
-        if (height <= available) {
-          best = end;
-          low = end + 1;
-        } else {
-          high = end - 1;
-        }
-      }
-      pages.push(Array.from({ length: best - start }, (_, index) => start + index));
-      start = best;
-    }
-    probe.replaceChildren();
-    return pages;
-  }
-
-  /** How much room a page of this element has, independent of feed scroll position. */
-  private roomBelow(element: HTMLElement): number {
-    const viewport = window.innerHeight || 0;
-    const host = this.host.nativeElement;
-    const article = this.articleRef()?.nativeElement;
-    const isArticle = element === this.articleBodyRef()?.nativeElement && article !== undefined;
-    const anchor = isArticle ? article : host;
-    const contentOffset = Math.max(
-      0,
-      element.getBoundingClientRect().top - anchor.getBoundingClientRect().top,
-    );
-
-    // A page is measured for the position a page turn actually puts it in, not
-    // for wherever its RSS row happens to sit in a long feed. The shell header
-    // remains visible in the RSS pane; the full-page reader hides it. An
-    // expanded article is itself the page anchor, so its sticky reader toolbar
-    // also occupies the top of the viewport.
-    const shellHeight =
-      this.layout() === 'pane'
-        ? (document.querySelector<HTMLElement>('.topbar')?.getBoundingClientRect().height ?? 0)
-        : 0;
-    // Deduct persistent chrome explicitly. The initial page has not necessarily
-    // been scrolled to the anchor yet, so relying on content offsets alone
-    // overestimates the viewport by exactly the test banner/tool bar users see.
-    const toolbarHeight =
-      (host.querySelector('.read-toolbar-outer') as HTMLElement | null)?.getBoundingClientRect()
-        .height ?? 0;
-    const testBannerHeight =
-      document.querySelector<HTMLElement>('.test-build-banner')?.getBoundingClientRect().height ??
-      0;
-    // Keep two configured line boxes clear in addition to the ordinary bottom
-    // gap. One was not enough in real browsers: fractional layout and the
-    // sticky chrome still left the final wrapped row below the fold.
-    const lineClearance = Math.ceil(
-      2 * this.prefs.readerFontSize() * this.prefs.readerLineHeight(),
-    );
-    return Math.max(
-      0,
-      viewport -
-        shellHeight -
-        toolbarHeight -
-        testBannerHeight -
-        contentOffset -
-        READER_PAGE_BOTTOM_GAP -
-        lineClearance,
-    );
-  }
-
-  /** The hidden element the whole document is laid out in, for measuring. */
-  private gaugeRef = viewChild<ElementRef<HTMLElement>>('gauge');
-
-  /** The same, for the post chain. */
-  private postGaugeRef = viewChild<ElementRef<HTMLElement>>('postGauge');
-
-  /** Where the posts render, so the room left for them can be measured. */
-  private postBodyRef = viewChild<ElementRef<HTMLElement>>('postBody');
-
-  /** A real-width scratch page used by the iterative fitter. */
-  private pageProbeRef = viewChild<ElementRef<HTMLElement>>('pageProbe');
-
-  /** Whether the chain is worth measuring: any multi-block document can paginate. */
-  protected readonly chainGauge = computed(
-    () => this.prefs.readerPageFlip() && this.chainBlockList().length > 1,
-  );
-
-  /** The whole document as HTML, for the gauge only. Never shown to anyone. */
-  protected readonly gaugeHtml = computed(() => {
-    const article = this.expansion.result()?.article;
-    if (!article || !this.prefs.readerPageFlip()) {
-      return null;
-    }
-    return documentBlocks(article.markdown)
-      .markdown.map((block) => renderMarkdown(block))
-      .join('');
-  });
-
-  /**
-   * Re-measure whenever anything that changes what fits changes.
-   *
-   * Every typography preference is read so the effect depends on it: a reader
-   * who presses `A+` must get pages sized for the new type, not the old.
-   */
   private readonly remeasure = afterRenderEffect(() => {
-    // Read dependencies here so every later article fetch, retained-component
-    // library navigation and typography change gets a measurement after its
-    // new gauge is in the DOM.
-    this.gaugeHtml();
-    this.chainGauge();
     this.chain();
+    this.pageHtml();
     this.prefs.readerFontSize();
     this.prefs.readerFontFamily();
+    this.prefs.readerFontWeight();
+    this.prefs.readerTextAlign();
     this.prefs.readerLineHeight();
     this.prefs.readerLetterSpacing();
     this.prefs.readerWordSpacing();
     this.prefs.readerPageFlip();
     this.libraryOpen();
-    this.observeGauges();
-    this.measure();
-    // An async article can enter the DOM before its final styles and layout are
-    // committed. The immediate pass then sees zero-height geometry and falls
-    // back to one page; resize works later because layout is stable by then.
-    // Re-run after two animation frames, through the same working measure path.
-    this.scheduleSettledMeasure();
+    untracked(() => {
+      this.observeLayout();
+      this.measure();
+      this.scheduleSettledMeasure();
+    });
   });
 
   private measureFrame: number | null = null;
 
-  private scheduleSettledMeasure(): void {
-    if (typeof requestAnimationFrame === 'undefined') {
-      return;
-    }
-    if (this.measureFrame !== null) {
-      cancelAnimationFrame(this.measureFrame);
-    }
+  private scheduleSettledMeasure = (): void => {
+    if (typeof requestAnimationFrame === 'undefined' || this.measureFrame !== null) return;
     this.measureFrame = requestAnimationFrame(() => {
-      this.measureFrame = requestAnimationFrame(() => {
-        this.measureFrame = null;
-        this.observeGauges();
-        this.measure();
-      });
+      this.measureFrame = null;
+      this.measure();
     });
+  };
+
+  private readonly layoutObserver =
+    typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(this.scheduleSettledMeasure);
+
+  private observeLayout(): void {
+    this.layoutObserver?.disconnect();
+    const columns = this.columnsRef()?.nativeElement;
+    const bar = this.host.nativeElement.querySelector('.reader-bar');
+    if (columns) this.layoutObserver?.observe(columns);
+    if (bar) this.layoutObserver?.observe(bar);
   }
 
-  /**
-   * Images and web fonts can change a gauge after its first render. Observe its
-   * actual box so that late layout does not silently make a fitted page taller
-   * than the viewport.
-   */
-  private readonly gaugeObserver =
-    typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => this.measure());
+  private scrollColumn(): void {
+    const viewport = this.viewportRef()?.nativeElement;
+    if (!viewport) return;
+    const index = Math.min(this.pageIndex(), this.pageCount() - 1);
+    viewport.scrollLeft = this.prefs.readerPageFlip() ? index * this.columnLayout.stride : 0;
+    viewport.scrollTop = 0;
+  }
 
-  private observeGauges(): void {
-    this.gaugeObserver?.disconnect();
-    const article = this.gaugeRef()?.nativeElement;
-    const posts = this.postGaugeRef()?.nativeElement;
-    if (article) {
-      this.gaugeObserver?.observe(article);
+  /** Tabbing to a link can reveal another column; keep the toolbar in sync. */
+  protected onColumnScroll(): void {
+    const viewport = this.viewportRef()?.nativeElement;
+    if (!viewport || !this.columnLayout.stride) return;
+    const index = Math.round(viewport.scrollLeft / this.columnLayout.stride);
+    if (index !== this.pageIndex()) {
+      this.pageIndex.set(Math.min(this.pageCount() - 1, index));
+      this.savePosition();
     }
-    if (posts) {
-      this.gaugeObserver?.observe(posts);
-    }
+    this.scrollColumn();
   }
 
   constructor() {
     document.addEventListener('visibilitychange', this.onHide);
-    window.addEventListener('resize', this.measure);
+    window.addEventListener('resize', this.scheduleSettledMeasure);
+    window.visualViewport?.addEventListener('resize', this.scheduleSettledMeasure);
+    this.host.nativeElement.addEventListener('load', this.scheduleSettledMeasure, true);
+    document.fonts?.addEventListener('loadingdone', this.scheduleSettledMeasure);
     document.addEventListener('keyup', this.onSelectionKey);
     document.addEventListener('mouseup', this.onSelectionPointer);
     inject(DestroyRef).onDestroy(() => {
       document.removeEventListener('visibilitychange', this.onHide);
-      window.removeEventListener('resize', this.measure);
+      window.removeEventListener('resize', this.scheduleSettledMeasure);
+      window.visualViewport?.removeEventListener('resize', this.scheduleSettledMeasure);
+      this.host.nativeElement.removeEventListener('load', this.scheduleSettledMeasure, true);
+      document.fonts?.removeEventListener('loadingdone', this.scheduleSettledMeasure);
       document.removeEventListener('keyup', this.onSelectionKey);
       document.removeEventListener('mouseup', this.onSelectionPointer);
-      this.gaugeObserver?.disconnect();
+      this.layoutObserver?.disconnect();
       if (this.measureFrame !== null) {
         cancelAnimationFrame(this.measureFrame);
       }
@@ -1009,6 +690,7 @@ export class ReaderCore {
     this.tools.dismiss();
     this.tools.markedText.set('');
     this.pageIndex.set(Math.min(Math.max(0, index), Math.max(0, this.pageCount() - 1)));
+    this.scrollColumn();
     this.savePosition();
     // A page turn puts you at the top of the new page. Without this the reader
     // keeps whatever scroll position the last page left them at, so page two
@@ -1019,21 +701,15 @@ export class ReaderCore {
     }
   }
 
-  /** Put the page at the same viewport position it was measured for. */
+  /** Bring an RSS reader opened further down the feed into view. */
   private scrollToPageStart(): void {
-    const article = this.expansion.result()?.article ? this.articleRef()?.nativeElement : null;
-    const anchor = article ?? this.host.nativeElement;
-    const shellHeight =
-      this.layout() === 'pane'
-        ? (document.querySelector<HTMLElement>('.topbar')?.getBoundingClientRect().height ?? 0)
-        : 0;
-    const toolbarHeight = article
-      ? ((
-          this.host.nativeElement.querySelector('.read-toolbar-outer') as HTMLElement | null
-        )?.getBoundingClientRect().height ?? 0)
-      : 0;
-    const top = window.scrollY + anchor.getBoundingClientRect().top - shellHeight - toolbarHeight;
-    window.scrollTo({ top: Math.max(0, top), behavior: 'instant' as ScrollBehavior });
+    if (!this.prefs.readerPageFlip()) return;
+    const host = this.host.nativeElement;
+    const chrome = Number.parseFloat(host.style.getPropertyValue('--reader-outer-chrome')) || 0;
+    window.scrollTo({
+      top: Math.max(0, window.scrollY + host.getBoundingClientRect().top - chrome),
+      behavior: 'instant' as ScrollBehavior,
+    });
   }
 
   /**
@@ -1042,7 +718,9 @@ export class ReaderCore {
    */
   private selectionPoint(body: HTMLElement, event: MouseEvent | KeyboardEvent): SelectionPoint {
     const selection = typeof window === 'undefined' ? null : window.getSelection();
-    const container = body.getBoundingClientRect();
+    const container = (
+      this.host.nativeElement.querySelector('.reader-with-rail') ?? body
+    ).getBoundingClientRect();
     if (selection && selection.rangeCount) {
       const rect = selection.getRangeAt(0).getBoundingClientRect();
       if (rect.width || rect.height) {
@@ -1142,7 +820,8 @@ export class ReaderCore {
   async expandArticle(force = false): Promise<void> {
     const result = await this.expansion.expand(this.articleUrl(), force);
     if (result?.article) {
-      this.pageIndex.set(0);
+      this.resumePending = false;
+      this.focusFetchedArticle = true;
       this.focusArticle();
       this.scheduleSettledMeasure();
     }
@@ -1162,7 +841,8 @@ export class ReaderCore {
    */
   private focusArticle(): void {
     queueMicrotask(() => {
-      this.articleRef()?.nativeElement.focus({ preventScroll: false });
+      this.measure();
+      this.articleRef()?.nativeElement.focus({ preventScroll: this.prefs.readerPageFlip() });
       // The first fetched page follows the same positioning contract as every
       // later page turn. Native focus scrolling only makes the region visible;
       // it does not account for either sticky toolbar.

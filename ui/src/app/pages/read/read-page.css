@@ -30,8 +30,7 @@
 .read-body.with-library app-reader-core {
   background: var(--reader-bg, var(--bg));
   color: var(--reader-fg, inherit);
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 0;
 }
 
 .center {

@@ -1,0 +1,81 @@
+npm notice run ui@0.0.0 test:subset
+npm notice run node scripts/run-test-subset.mjs src/app/pages/read
+Using Vitest configuration file: C:\github\mimb\mastodon_mock\ui\vitest.config.ts
+> Building...
+√ Building...
+Initial chunk files                                           | Names                                                      |  Raw size
+setup-test-setup.js                                           | setup-test-setup                                           | 420.39 kB | 
+chunk-7X4ASIPL.js                                             | -                                                          | 276.89 kB | 
+chunk-IRSVPGW2.js                                             | -                                                          | 251.74 kB | 
+chunk-NVUFZ5MU.js                                             | -                                                          | 235.43 kB | 
+spec-app-pages-read-read-page.js                              | spec-app-pages-read-read-page                              | 129.72 kB | 
+chunk-OGCA55TQ.js                                             | -                                                          |  93.37 kB | 
+chunk-EUZCMFWU.js                                             | -                                                          |  58.85 kB | 
+chunk-7GHYJO5Z.js                                             | -                                                          |  49.52 kB | 
+chunk-KP6I7PHJ.js                                             | -                                                          |  32.68 kB | 
+spec-app-pages-read-reader-core-reader-core.js                | spec-app-pages-read-reader-core-reader-core                |  17.84 kB | 
+chunk-CAZTPIUY.js                                             | -                                                          |  16.49 kB | 
+styles.css                                                    | styles                                                     |  15.28 kB | 
+chunk-TSDNPVA4.js                                             | -                                                          |  14.83 kB | 
+chunk-3UB4SSDO.js                                             | -                                                          |  12.31 kB | 
+chunk-MQ5HI455.js                                             | -                                                          |  11.94 kB | 
+chunk-NS3FX7FH.js                                             | -                                                          |  11.46 kB | 
+chunk-U7UNX2NS.js                                             | -                                                          |  10.44 kB | 
+chunk-ZUG5ZPKR.js                                             | -                                                          |  10.10 kB | 
+spec-app-pages-read-save-to-library-save-to-library.js        | spec-app-pages-read-save-to-library-save-to-library        |  10.07 kB | 
+spec-app-pages-read-post-blocks.js                            | spec-app-pages-read-post-blocks                            |   9.55 kB | 
+chunk-EK5YAMR5.js                                             | -                                                          |   8.13 kB | 
+spec-app-pages-read-library-panel-library-panel.js            | spec-app-pages-read-library-panel-library-panel            |   7.45 kB | 
+spec-app-pages-read-reader-document.js                        | spec-app-pages-read-reader-document                        |   7.00 kB | 
+spec-app-pages-read-reading-tools.js                          | spec-app-pages-read-reading-tools                          |   6.75 kB | 
+chunk-HZXEPMDQ.js                                             | -                                                          |   5.27 kB | 
+spec-app-pages-read-thread-loader.js                          | spec-app-pages-read-thread-loader                          |   5.04 kB | 
+chunk-2RZVY4AD.js                                             | -                                                          |   4.62 kB | 
+spec-app-pages-read-reader-anchor.js                          | spec-app-pages-read-reader-anchor                          |   3.51 kB | 
+spec-app-pages-read-document-search.js                        | spec-app-pages-read-document-search                        |   3.34 kB | 
+spec-app-pages-read-mark-passages.js                          | spec-app-pages-read-mark-passages                          |   3.26 kB | 
+spec-app-pages-read-notes-rail-notes-rail.js                  | spec-app-pages-read-notes-rail-notes-rail                  |   3.08 kB | 
+spec-app-pages-read-document-search-document-search-dialog.js | spec-app-pages-read-document-search-document-search-dialog |   3.02 kB | 
+chunk-NAO6NIFW.js                                             | -                                                          |   2.80 kB | 
+spec-app-pages-read-reader-route-id.js                        | spec-app-pages-read-reader-route-id                        |   2.75 kB | 
+chunk-QH3OMYTK.js                                             | -                                                          |   2.54 kB | 
+chunk-KGAGEWYW.js                                             | -                                                          |   2.43 kB | 
+spec-app-pages-read-column-pages.js                           | spec-app-pages-read-column-pages                           |   2.38 kB | 
+chunk-H3UF5KNN.js                                             | -                                                          |   2.28 kB | 
+chunk-BUTTGKR5.js                                             | -                                                          |   2.17 kB | 
+spec-app-pages-read-selection-tools-selection-tools.js        | spec-app-pages-read-selection-tools-selection-tools        |   2.14 kB | 
+chunk-XQAFYBZS.js                                             | -                                                          |   1.79 kB | 
+chunk-U3ZECPHQ.js                                             | -                                                          |   1.54 kB | 
+init-testbed.js                                               | init-testbed                                               |   1.21 kB | 
+vitest-mock-patch.js                                          | vitest-mock-patch                                          | 974 bytes | 
+chunk-WZJHI5QB.js                                             | -                                                          | 673 bytes | 
+
+                                                              | Initial total                                              |   1.78 MB
+
+Lazy chunk files                                              | Names                                                      |  Raw size
+chunk-BQJ4OBN4.js                                             | profile-sync                                               |  71.77 kB | 
+
+Application bundle generation complete. [20.746 seconds] - 2026-09-04T22:52:43.575Z
+
+▲ [WARNING] NG8113: HumanTimePipe is not used within the template of Thread [plugin angular-compiler]
+
+    src/app/pages/thread/thread.ts:60:4:
+      60 │     HumanTimePipe,
+         ╵     ~~~~~~~~~~~~~
+
+
+▲ [WARNING] NG8113: PreviewCardComponent is not used within the template of Thread [plugin angular-compiler]
+
+    src/app/pages/thread/thread.ts:63:4:
+      63 │     PreviewCardComponent,
+         ╵     ~~~~~~~~~~~~~~~~~~~~
+
+
+
+ RUN  v4.1.10 C:/github/mimb/mastodon_mock/ui
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
