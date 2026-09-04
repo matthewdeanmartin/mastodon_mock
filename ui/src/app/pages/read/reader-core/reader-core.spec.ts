@@ -394,6 +394,36 @@ describe('ReaderCore paging a post chain', () => {
     ).toHaveLength(16);
   });
 
+  it('iteratively checks composed candidate pages and adjusts their boundaries', () => {
+    fixture.componentInstance.chain.set(storm(2));
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const gauges = [...element.querySelectorAll<HTMLElement>('.reader-gauge')];
+    const gauge = gauges.find((candidate) => candidate.children.length === 4)!;
+    const probe = element.querySelector<HTMLElement>('.reader-page-probe')!;
+    const measuredCandidateSizes: number[] = [];
+    Object.defineProperty(probe, 'scrollHeight', {
+      configurable: true,
+      get: () => {
+        measuredCandidateSizes.push(probe.children.length);
+        return probe.children.length * 200;
+      },
+    });
+
+    const pages = (
+      core() as unknown as {
+        fitGaugePages(gauge: HTMLElement, available: number): number[][];
+      }
+    ).fitGaugePages(gauge, 450);
+
+    expect(pages).toEqual([
+      [0, 1],
+      [2, 3],
+    ]);
+    expect(measuredCandidateSizes.length).toBeGreaterThan(2);
+  });
+
   it('shows the whole chain in scroll mode, whatever the measurements say', () => {
     TestBed.inject(ClientPrefs).setReaderPageFlip(false);
     fixture.componentInstance.chain.set(storm(8));

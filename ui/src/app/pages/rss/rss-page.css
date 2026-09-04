@@ -277,6 +277,12 @@
   margin-left: auto;
 }
 
+.read-in-reader {
+  margin-left: auto;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .link-btn {
   border: none;
   background: none;

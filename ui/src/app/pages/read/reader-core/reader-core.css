@@ -463,6 +463,13 @@
   z-index: -1;
 }
 
+/* Keep candidate margins inside the measured box instead of allowing them to
+   collapse through its edge. The result is slightly conservative and can
+   never create the bottom overflow Pages mode forbids. */
+.reader-page-probe {
+  display: flow-root;
+}
+
 /* Page turning from the page itself.
 
    The toolbar arrows are small and sit far from where the eyes are; someone

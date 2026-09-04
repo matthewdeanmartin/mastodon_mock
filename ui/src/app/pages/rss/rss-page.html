@@ -193,7 +193,11 @@
           @if (expandedId() === s.id) {
             <div class="expanded-item">
               <app-status-card [status]="s" filterContext="account" />
-              <app-rss-article [status]="s" />
+              <div class="item-tools">
+                <a class="link-btn read-in-reader" [routerLink]="['/read', s.id]">
+                  📖 {{ 'pages.rss.readInReader' | transloco }}
+                </a>
+              </div>
             </div>
           }
         } @else {
@@ -224,8 +228,10 @@
                     | transloco
                 }}
               </button>
+              <a class="link-btn read-in-reader" [routerLink]="['/read', s.id]">
+                📖 {{ 'pages.rss.readInReader' | transloco }}
+              </a>
             </div>
-            <app-rss-article [status]="s" />
           </div>
         }
       } @empty {

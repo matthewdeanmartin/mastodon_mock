@@ -341,6 +341,11 @@
         <span aria-hidden="true">›</span>
       </button>
     }
+
+    <!-- Populated imperatively for one synchronous measurement at a time. It
+         has the live page's width and typography, so the browser can answer
+         whether each candidate page genuinely fits. -->
+    <div #pageProbe class="reader-gauge reader-page-probe" aria-hidden="true"></div>
   </article>
 
   <!-- Present only when the document has a note written on it. An empty rail on

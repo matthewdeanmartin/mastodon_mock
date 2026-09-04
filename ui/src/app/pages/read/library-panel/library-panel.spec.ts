@@ -62,6 +62,18 @@ describe('LibraryPanel', () => {
     expect(current?.querySelector('[aria-current="true"]')).not.toBeNull();
   });
 
+  it('does not move a clicked row when opening it updates the recent order', () => {
+    library.open(doc('1', 'First row'), 100);
+    library.open(doc('2', 'Second row'), 200);
+    fixture.detectChanges();
+    expect(rowTitles()).toEqual(['Second row', 'First row']);
+
+    library.open(doc('1', 'First row'), 300);
+    fixture.detectChanges();
+
+    expect(rowTitles()).toEqual(['Second row', 'First row']);
+  });
+
   it('shows how far through each document is', () => {
     library.open(doc('1', 'Half done'));
     library.recordPosition('1', 6, 11);

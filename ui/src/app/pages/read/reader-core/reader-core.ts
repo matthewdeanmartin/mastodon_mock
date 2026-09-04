@@ -29,7 +29,6 @@ import { ArticleExpansion } from '../article-expansion';
 import { articleTarget } from '../../../providers/article/article-target';
 import { renderMarkdown } from '../../../providers/article/markdown-render';
 import { paginateMarkdown } from '../../rss/article-pages';
-import { fitToPages } from '../fit-to-viewport';
 import { chainBlocks, PostBlock } from '../post-blocks';
 import { documentBlocks } from '../reader-anchor';
 import { ReadToolbar } from '../read-toolbar/read-toolbar';
@@ -109,6 +108,17 @@ const POSITION_SAVE_DELAY_MS = 2_000;
  * document does, rather than with text flush against the edge of the screen.
  */
 const READER_PAGE_BOTTOM_GAP = 24;
+
+function samePages(left: readonly number[][], right: readonly number[][]): boolean {
+  return (
+    left.length === right.length &&
+    left.every(
+      (page, pageIndex) =>
+        page.length === right[pageIndex]?.length &&
+        page.every((block, blockIndex) => block === right[pageIndex][blockIndex]),
+    )
+  );
+}
 
 /**
  * One document, rendered for reading.
@@ -279,8 +289,8 @@ export class ReaderCore {
    * The height one page has to fit in, measured from the viewport.
    *
    * Re-measured on resize and on any typography change, because every one of
-   * those changes what fits. Zero until the first measurement, which
-   * `fitToPages` reads as "unmeasured" and answers with a single page.
+   * those changes what fits. Zero until the first measurement, while the
+   * reader uses its one-page fallback.
    */
   private readonly available = signal(0);
 
@@ -321,28 +331,23 @@ export class ReaderCore {
   private readonly measuredPages = computed<string[] | null>(() => {
     const article = this.expansion.result()?.article;
     const available = this.available();
-    const heights = this.blockHeights();
-    if (!article || !available || !heights.length) {
+    const groups = this.articlePageGroups();
+    if (!article || !available || !groups.length) {
       return null;
     }
     const list = documentBlocks(article.markdown).markdown;
-    if (heights.length !== list.length) {
+    if (groups.flat().length !== list.length) {
       // The measurement is of a different document than the one we are about to
       // slice — a re-fetch landed between the two. Wait for the next pass
       // rather than pairing heights with the wrong blocks.
       return null;
     }
-    return fitToPages(
-      heights.map((height, index) => ({ index, height })),
-      available,
-    ).map((page) => page.blocks.map((index) => list[index]).join('\n\n'));
+    return groups.map((group) => group.map((index) => list[index]).join('\n\n'));
   });
 
-  /** Rendered height of each block, filled in by the measuring pass. */
-  private readonly blockHeights = signal<number[]>([]);
-
-  /** Rendered height of each post in the chain, from the same pass. */
-  private readonly postHeights = signal<number[]>([]);
+  /** Browser-verified article and post pages, as indices into their block lists. */
+  private readonly articlePageGroups = signal<number[][]>([]);
+  private readonly postPageGroups = signal<number[][]>([]);
 
   /** The room a page of *posts* has, which is not the room the article has. */
   private readonly chainAvailable = signal(0);
@@ -378,15 +383,12 @@ export class ReaderCore {
     if (!this.prefs.readerPageFlip() || blocks.length < 2) {
       return [blocks];
     }
-    const heights = this.postHeights();
     const available = this.chainAvailable();
-    if (!available || heights.length !== blocks.length) {
+    const groups = this.postPageGroups();
+    if (!available || groups.flat().length !== blocks.length) {
       return [blocks];
     }
-    return fitToPages(
-      heights.map((height, index) => ({ index, height })),
-      available,
-    ).map((page) => page.blocks.map((index) => blocks[index]));
+    return groups.map((group) => group.map((index) => blocks[index]));
   });
 
   /** The blocks to render right now. */
@@ -720,15 +722,16 @@ export class ReaderCore {
   };
 
   /**
-   * Measure one page's worth of room, and how tall each block renders in it.
+   * Measure one page's worth of room, then fit complete candidate pages into it.
    *
    * ## Why it measures offscreen rather than the live page
    *
    * The live body only ever holds the *current* page, so measuring it would
    * tell us about the blocks we already decided to show — circular. Instead the
    * whole document is rendered into a hidden element that inherits the reading
-   * column's width and typography, every block is measured there, and the
-   * result decides the pagination. The element is `visibility: hidden` rather
+   * column's width and typography. A second hidden element repeatedly lays out
+   * candidate pages, and the result decides the pagination. It is
+   * `visibility: hidden` rather
    * than `display: none` because a `display: none` subtree has no layout and
    * every height comes back zero.
    */
@@ -745,13 +748,7 @@ export class ReaderCore {
     // else above it without this needing to know they exist.
     const available = this.roomBelow(body);
 
-    const heights = [...gauge.children].map((child) => {
-      const rect = child.getBoundingClientRect();
-      const style = getComputedStyle(child);
-      // Margins count: they are the space between paragraphs, and a page fitted
-      // without them overflows by exactly the gaps it ignored.
-      return rect.height + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
-    });
+    const groups = this.fitGaugePages(gauge, available);
 
     // Only write when something actually changed. The measurement runs after
     // every render, and a write with the same values would schedule another
@@ -760,12 +757,8 @@ export class ReaderCore {
     if (this.available() !== available) {
       this.available.set(available);
     }
-    const previous = this.blockHeights();
-    if (
-      previous.length !== heights.length ||
-      heights.some((height, index) => Math.abs(height - previous[index]) > 0.5)
-    ) {
-      this.blockHeights.set(heights);
+    if (!samePages(this.articlePageGroups(), groups)) {
+      this.articlePageGroups.set(groups);
     }
   };
 
@@ -783,37 +776,64 @@ export class ReaderCore {
       return;
     }
     const available = this.roomBelow(body);
-    const heights = [...gauge.children].map((child) => {
-      const rect = child.getBoundingClientRect();
-      const style = getComputedStyle(child);
-      return rect.height + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
-    });
+    const groups = this.fitGaugePages(gauge, available);
     // Its own height signal, not `available`: the posts and the article start at
     // different points down the column and can be on screen together, so one
     // shared number would be whichever measurement ran last.
     if (this.chainAvailable() !== available) {
       this.chainAvailable.set(available);
     }
-    const previous = this.postHeights();
-    if (
-      previous.length !== heights.length ||
-      heights.some((height, index) => Math.abs(height - previous[index]) > 0.5)
-    ) {
-      this.postHeights.set(heights);
+    if (!samePages(this.postPageGroups(), groups)) {
+      this.postPageGroups.set(groups);
     }
   }
 
   /**
-   * How much room a page of this element has, independent of scroll position.
+   * Find the largest run of real rendered blocks that fits each page.
    *
-   * `getBoundingClientRect().top` is relative to the **viewport**, so on a
-   * scrolled page it goes negative and `viewport - top` comes out larger than
-   * the screen — pages then grow the further down you are, which is one of the
-   * two reasons page mode still overflowed. Adding the scroll offset back
-   * converts it to a document coordinate, and subtracting the scroll position
-   * gives where the element sits on screen *when the page is at the top*, which
-   * is where a page turn always leaves it.
+   * Each probe is laid out by the browser at the reader's actual width and
+   * typography. Binary search adjusts the candidate until it finds the final
+   * fitting block, then repeats with the remainder. This verifies the composed
+   * page itself instead of guessing from character counts or adding individual
+   * box heights (which gets margin collapse and inline fragments wrong).
    */
+  private fitGaugePages(gauge: HTMLElement, available: number): number[][] {
+    const probe = this.pageProbeRef()?.nativeElement;
+    const source = [...gauge.children];
+    if (!probe || !source.length || available <= 0) {
+      return [];
+    }
+    const pages: number[][] = [];
+    let start = 0;
+    while (start < source.length) {
+      let low = start + 1;
+      let high = source.length;
+      let best = start + 1;
+      while (low <= high) {
+        const end = Math.floor((low + high) / 2);
+        probe.replaceChildren(...source.slice(start, end).map((node) => node.cloneNode(true)));
+        const height = Math.max(probe.getBoundingClientRect().height, probe.scrollHeight);
+        if (height <= 0) {
+          // No layout engine (SSR/jsdom): preserve the documented one-page
+          // fallback rather than manufacturing arbitrary pages.
+          probe.replaceChildren();
+          return [source.map((_, index) => index)];
+        }
+        if (height <= available) {
+          best = end;
+          low = end + 1;
+        } else {
+          high = end - 1;
+        }
+      }
+      pages.push(Array.from({ length: best - start }, (_, index) => start + index));
+      start = best;
+    }
+    probe.replaceChildren();
+    return pages;
+  }
+
+  /** How much room a page of this element has, independent of feed scroll position. */
   private roomBelow(element: HTMLElement): number {
     const viewport = window.innerHeight || 0;
     const host = this.host.nativeElement;
@@ -854,6 +874,9 @@ export class ReaderCore {
 
   /** Where the posts render, so the room left for them can be measured. */
   private postBodyRef = viewChild<ElementRef<HTMLElement>>('postBody');
+
+  /** A real-width scratch page used by the iterative fitter. */
+  private pageProbeRef = viewChild<ElementRef<HTMLElement>>('pageProbe');
 
   /** Whether the chain is worth measuring: any multi-block document can paginate. */
   protected readonly chainGauge = computed(

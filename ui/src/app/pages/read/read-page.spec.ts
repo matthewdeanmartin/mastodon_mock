@@ -9,6 +9,7 @@ import { ReaderCore } from './reader-core/reader-core';
 import { ReadingZen } from '../../reading-zen';
 import { ClientPrefs } from '../../client-prefs';
 import { Status } from '../../models';
+import { ReaderLibrary } from '../../providers/read/reader-library';
 
 /**
  * The real `ReaderCore` is used, not a stub.
@@ -71,6 +72,9 @@ describe('ReadPage', () => {
     const params = new Subject<ReturnType<typeof convertToParamMap>>();
     TestBed.overrideProvider(ActivatedRoute, { useValue: { paramMap: params } });
     TestBed.inject(ClientPrefs).setReaderLibraryOpen(true);
+    const library = TestBed.inject(ReaderLibrary);
+    library.open({ id: '1', url: 'https://example.com/1', title: 'Document 1' }, 1);
+    library.open({ id: '2', url: 'https://example.com/2', title: 'Document 2' }, 2);
     httpMock = TestBed.inject(HttpTestingController);
     const fixture = TestBed.createComponent(ReadPage);
     fixture.detectChanges();
@@ -89,12 +93,14 @@ describe('ReadPage', () => {
     expect(element.querySelector('app-reader-core')).not.toBeNull();
     expect(element.textContent).toContain('Document 1');
     expect(element.textContent).toContain('Opening');
+    expect(element.querySelector('.row-wrap.active')?.textContent).toContain('Document 1');
 
     httpMock.expectOne('/api/v1/statuses/2').flush(makeStatus('2'));
     httpMock.expectOne('/api/v1/statuses/2/context').flush({ ancestors: [], descendants: [] });
     fixture.detectChanges();
     expect(element.textContent).toContain('Document 2');
     expect(element.querySelector('.document-loading')).toBeNull();
+    expect(element.querySelector('.row-wrap.active')?.textContent).toContain('Document 2');
   });
 
   // ------------------------------------------------------------------- zen

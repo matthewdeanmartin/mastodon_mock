@@ -75,15 +75,41 @@ export class LibraryPanel {
 
   readonly closed = output<void>();
 
+  /**
+   * Row positions while this panel is mounted.
+   *
+   * The store exposes most-recently-opened order, which is useful when a fresh
+   * panel opens. It is hostile during navigation, though: finishing a load
+   * updates `openedAt`, moves the clicked row to the top, and makes the title
+   * under the pointer appear to turn into another document. Keep the opening
+   * order for rows that remain on a shelf; genuinely new rows join the end.
+   */
+  private readonly rowOrder: Record<Shelf, string[]> = {
+    intend: [],
+    reading: [],
+    read: [],
+  };
+
   protected readonly shelves = computed(() =>
     SHELVES.map((shelf) => ({
       ...shelf,
-      rows: this.library.shelf(shelf.id),
+      rows: this.stableRows(shelf.id),
       collapsed: this.prefs.readerLibraryCollapsed().includes(shelf.id),
     })),
   );
 
   protected readonly total = this.library.total;
+
+  private stableRows(shelf: Shelf): ReturnType<ReaderLibrary['shelf']> {
+    const rows = this.library.shelf(shelf);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const retained = this.rowOrder[shelf].filter((id) => byId.has(id));
+    const retainedIds = new Set(retained);
+    const added = rows.map((row) => row.id).filter((id) => !retainedIds.has(id));
+    const order = [...retained, ...added];
+    this.rowOrder[shelf] = order;
+    return order.map((id) => byId.get(id)!);
+  }
 
   /** Whichever row's menu is open, by id. At most one at a time. */
   protected readonly openMenu = signal<string | null>(null);

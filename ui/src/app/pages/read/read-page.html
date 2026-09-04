@@ -7,7 +7,7 @@
            to read is the left rail and what you are reading is the right pane.
            Two reading surfaces in one app should not mirror each other. -->
       @if (libraryOpen()) {
-        <app-library-panel [currentId]="currentId()" (closed)="toggleLibrary()" />
+        <app-library-panel [currentId]="displayedId()" (closed)="toggleLibrary()" />
       }
       <div class="read-document" [attr.aria-busy]="loader.loading()">
         @if (loader.loading()) {

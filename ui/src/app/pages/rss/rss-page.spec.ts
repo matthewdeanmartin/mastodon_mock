@@ -287,6 +287,33 @@ describe('RssPage', () => {
       expect(TestBed.inject(RssReadState).readCount()).toBe(0);
     });
 
+    it('renders each RSS item once and offers a direct Reader link', async () => {
+      const fixture = await twoFolders();
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(element.querySelectorAll('app-status-card')).toHaveLength(2);
+      expect(element.querySelectorAll('app-reader-core')).toHaveLength(0);
+      const links = [...element.querySelectorAll<HTMLAnchorElement>('.read-in-reader')];
+      expect(links).toHaveLength(2);
+      expect(links.every((link) => link.textContent?.includes('Read in Reader'))).toBe(true);
+      expect(decodeURIComponent(links[0].getAttribute('href') ?? '')).toContain('/read/rss:');
+    });
+
+    it('uses the same direct Reader link for an expanded headline', async () => {
+      feeds.set(URL_A, feed('A', 'Alpha item', '2026-08-20T00:00:00Z'));
+      TestBed.inject(RssSubscriptions).add(URL_A, 'A');
+      TestBed.inject(ClientPrefs).setRssDensity('headlines');
+      const fixture = setUp();
+      await fixture.whenStable();
+      fixture.componentInstance['toggleExpanded'](fixture.componentInstance['statuses']()[0]);
+      fixture.detectChanges();
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(element.querySelectorAll('app-status-card')).toHaveLength(1);
+      expect(element.querySelector('app-reader-core')).toBeNull();
+      expect(element.querySelector('.read-in-reader')?.textContent).toContain('Read in Reader');
+    });
+
     it('mark-all-read covers only the selected folder', async () => {
       const fixture = await twoFolders();
       const readState = TestBed.inject(RssReadState);
