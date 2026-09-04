@@ -1,76 +1,21 @@
-@if (target()) {
-  <div class="rss-article">
-    @if (!result()) {
-      @if (!available()) {
-        <p class="muted small">
-          {{ 'pages.rss.article.fullTextNeedsProxy' | transloco }}
-          <a routerLink="/settings/rss">{{ 'pages.rss.article.corsProxy' | transloco }}</a
-          >{{ 'pages.rss.period' | transloco }}
-        </p>
-      } @else if (!quota.allowed()) {
-        <p class="muted small">
-          {{ 'pages.rss.article.quotaReached' | transloco }}
-        </p>
-      } @else {
-        <button class="btn btn-sm" type="button" [disabled]="expanding()" (click)="expand()">
-          @if (expanding()) {
-            {{ 'pages.rss.article.fetching' | transloco }}
-          } @else {
-            {{ 'pages.rss.article.fetchFull' | transloco }}
-          }
-        </button>
-        @if (quota.remaining() === 1) {
-          <span class="muted small quota">{{ 'pages.rss.article.oneFreeLeft' | transloco }}</span>
-        }
-      }
-      <!-- Announced separately: without it a screen-reader user presses the
-           button, hears nothing, and has no idea a fetch is under way. -->
-      @if (expanding()) {
-        <span class="visually-hidden" role="status">{{
-          'pages.rss.article.fetchingPleaseWait' | transloco
-        }}</span>
-      }
-    } @else if (failure(); as diagnosis) {
-      <p class="muted small">
-        {{ 'pages.rss.article.couldntRead' | transloco: { diagnosis: diagnosis } }}
-        <a [href]="status().url" target="_blank" rel="noopener noreferrer">{{
-          'pages.rss.article.openOriginal' | transloco
-        }}</a>
-      </p>
-    } @else {
-      <article class="article-body" [innerHTML]="pageHtml()"></article>
+<div class="rss-article">
+  <app-reader-core [chain]="chain()" layout="pane" />
 
-      @if (pageCount() > 1) {
-        <nav class="pager" [attr.aria-label]="'pages.rss.article.pages' | transloco">
-          <button class="btn btn-sm" type="button" [disabled]="!canPrev()" (click)="prevPage()">
-            {{ 'pages.rss.article.previous' | transloco }}
-          </button>
-          <span class="muted small" role="status">{{
-            'pages.rss.article.pageOf' | transloco: { page: pageNumber(), total: pageCount() }
-          }}</span>
-          <button class="btn btn-sm" type="button" [disabled]="!canNext()" (click)="nextPage()">
-            {{ 'pages.rss.article.next' | transloco }}
-          </button>
-        </nav>
-      }
+  <!-- Offered after the article, where someone has actually read the thing.
+       Highlight a passage first and it travels as a quote. -->
+  <p class="share-line">
+    <button class="btn btn-sm" type="button" (click)="openShare()">
+      {{ 'pages.rss.article.share' | transloco }}
+    </button>
+    <span class="muted small">{{ 'pages.rss.article.highlightFirst' | transloco }}</span>
+  </p>
+</div>
 
-      <!-- Offered after the article, where someone has actually read the thing.
-           Highlight a passage first and it travels as a quote. -->
-      <p class="share-line">
-        <button class="btn btn-sm" type="button" (click)="openShare()">
-          {{ 'pages.rss.article.share' | transloco }}
-        </button>
-        <span class="muted small">{{ 'pages.rss.article.highlightFirst' | transloco }}</span>
-      </p>
-    }
-  </div>
-
-  @if (showShare()) {
-    <app-share-dialog
-      [status]="status()"
-      [quote]="shareQuote()"
-      (compose)="composeShare($event)"
-      (closed)="showShare.set(false)"
-    />
-  }
+@if (showShare()) {
+  <app-share-dialog
+    [status]="status()"
+    [quote]="shareQuote()"
+    (compose)="composeShare($event)"
+    (closed)="showShare.set(false)"
+  />
 }

@@ -1188,6 +1188,27 @@ export class StatusCard {
    */
   private optimistic = signal<Partial<Pick<Status, 'favourited' | 'reblogged'>> | null>(null);
 
+  /**
+   * An avatar URL, and whether `NgOptimizedImage` is allowed to handle it.
+   *
+   * `ngSrc` throws NG02952 on a `data:` URI, and some providers legitimately
+   * use one: `RSS_AVATAR` is an inline SVG precisely so a feed's icon costs no
+   * external fetch. Binding it to `ngSrc` crashed the card — reachable today
+   * from the RSS pane, which renders feed items as status cards.
+   *
+   * So the directive is used where it earns its keep (remote avatars, which are
+   * the overwhelming majority and the ones that benefit from lazy loading and
+   * fixed dimensions) and skipped where it cannot apply. A data URI needs
+   * neither: it is already in the document and cannot be fetched twice.
+   */
+  protected avatarSrc(account: { avatar_static?: string; avatar?: string }): {
+    url: string;
+    optimizable: boolean;
+  } {
+    const url = account.avatar_static || account.avatar || 'favicon-32x32.png';
+    return { url, optimizable: !url.startsWith('data:') };
+  }
+
   get display(): Status {
     const s = this.status();
     const base = s.reblog ?? s;

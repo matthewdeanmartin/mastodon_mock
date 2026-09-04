@@ -45,13 +45,23 @@
            the same destination with the same name, so a described avatar makes
            every post announce its author twice. -->
       <a class="avatar-link" [routerLink]="accountLink" tabindex="-1" aria-hidden="true">
-        <img
-          class="avatar"
-          [ngSrc]="display.account.avatar_static || display.account.avatar || 'favicon-32x32.png'"
-          alt=""
-          width="48"
-          height="48"
-        />
+        @if (avatarSrc(display.account); as avatar) {
+          @if (avatar.optimizable) {
+            <img class="avatar" [ngSrc]="avatar.url" alt="" width="48" height="48" />
+          } @else {
+            <!-- A data: URI (an RSS feed's inline icon). NgOptimizedImage
+                 refuses these outright — see `avatarSrc`. -->
+            <img
+              class="avatar"
+              [src]="avatar.url"
+              alt=""
+              width="48"
+              height="48"
+              loading="lazy"
+              decoding="async"
+            />
+          }
+        }
       </a>
       <app-account-hover-card [account]="display.account" />
     </span>
@@ -273,13 +283,27 @@
       @if (!cwCollapsed() && quotedStatus(); as q) {
         <a class="quote-card" [routerLink]="quoteThreadLink(q)" (click)="$event.stopPropagation()">
           <div class="quote-meta">
-            <img
-              class="quote-avatar"
-              [ngSrc]="q.account.avatar_static || q.account.avatar || 'favicon-32x32.png'"
-              [alt]="q.account.username"
-              width="20"
-              height="20"
-            />
+            @if (avatarSrc(q.account); as avatar) {
+              @if (avatar.optimizable) {
+                <img
+                  class="quote-avatar"
+                  [ngSrc]="avatar.url"
+                  [alt]="q.account.username"
+                  width="20"
+                  height="20"
+                />
+              } @else {
+                <img
+                  class="quote-avatar"
+                  [src]="avatar.url"
+                  [alt]="q.account.username"
+                  width="20"
+                  height="20"
+                  loading="lazy"
+                  decoding="async"
+                />
+              }
+            }
             <span class="quote-name">{{ q.account.display_name || q.account.username }}</span>
             <span class="acct muted">&#64;{{ q.account.acct }}</span>
           </div>

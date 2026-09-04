@@ -469,11 +469,11 @@ describe('StatusCard', () => {
   });
 
   it('still offers the original when the post has one', () => {
-    const f = setUp(
-      makeStatus({ id: 'bsky:2', provider: 'bluesky', url: 'https://bsky.app/p/2' }),
-    );
+    const f = setUp(makeStatus({ id: 'bsky:2', provider: 'bluesky', url: 'https://bsky.app/p/2' }));
 
-    const link = (f.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>('.open-original');
+    const link = (f.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      '.open-original',
+    );
     expect(link?.getAttribute('href')).toBe('https://bsky.app/p/2');
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Status } from '../../models';
-import { readerChain } from './reader-chain';
+import { chainTextLength, DOCUMENT_MIN_CHARS, isDocument, readerChain } from './reader-document';
 
 function makeStatus(id: string, accountId: string, inReplyToId: string | null = null): Status {
   return {
@@ -57,5 +57,64 @@ describe('readerChain', () => {
     const p2 = makeStatus('2', 'a', '1');
     const hijack = makeStatus('3', 'b', '2');
     expect(readerChain([p1, p2, hijack]).map((s) => s.id)).toEqual(['1', '2']);
+  });
+});
+
+/** `n` characters of prose, wrapped in a paragraph the way a real post is. */
+function prose(n: number): string {
+  return `<p>${'word '.repeat(Math.ceil(n / 5)).slice(0, n)}</p>`;
+}
+
+function contentPost(id: string, content: string, provider?: string): Status {
+  return {
+    id,
+    content,
+    provider,
+    in_reply_to_id: null,
+    account: { id: 'a', username: 'a', acct: 'a', display_name: 'A' },
+  } as unknown as Status;
+}
+
+describe('what counts as a document', () => {
+  it('a short single post is not a document', () => {
+    expect(isDocument([contentPost('1', prose(120))], false)).toBe(false);
+  });
+
+  it('a long single post is a document', () => {
+    expect(isDocument([contentPost('1', prose(DOCUMENT_MIN_CHARS + 50))], false)).toBe(true);
+  });
+
+  it('a chain of short posts is a document — a storm is one piece of writing', () => {
+    const chain = [
+      contentPost('1', prose(80)),
+      contentPost('2', prose(80)),
+      contentPost('3', prose(80)),
+    ];
+    expect(chainTextLength(chain)).toBeLessThan(DOCUMENT_MIN_CHARS);
+    expect(isDocument(chain, false)).toBe(true);
+  });
+
+  it('an RSS item is a document however short its teaser', () => {
+    expect(isDocument([contentPost('1', prose(30), 'rss')], false)).toBe(true);
+  });
+
+  it('a short post with an expanded article is a document', () => {
+    // The post is a sentence and a link; the thing being read is the article.
+    expect(isDocument([contentPost('1', prose(60))], true)).toBe(true);
+  });
+
+  it('an empty chain is not a document', () => {
+    expect(isDocument([], false)).toBe(false);
+    expect(isDocument([], true)).toBe(false);
+  });
+
+  /**
+   * The threshold counts prose, not markup. A post padded out with mention and
+   * hashtag anchors is still a short post, and shelving it would fill the
+   * library with exactly the ordinary chatter the rule exists to keep out.
+   */
+  it('markup does not count toward the length', () => {
+    const links = '<a href="https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">x</a>'.repeat(12);
+    expect(isDocument([contentPost('1', `<p>short${links}</p>`)], false)).toBe(false);
   });
 });

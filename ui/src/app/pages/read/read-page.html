@@ -1,0 +1,27 @@
+<div class="read-page" [attr.data-paper]="prefs.readerTheme()">
+  @if (loader.loading()) {
+    <p class="muted center">{{ 'reader.page.loading' | transloco }}</p>
+  } @else if (chain().length) {
+    <app-reader-core [chain]="chain()" layout="page" (exit)="exit()" />
+  } @else {
+    <!-- Never a bare dead end: a document that would not open still leaves the
+         thread view and, for a feed item, the list it came from. -->
+    <div class="read-empty">
+      <p class="muted">{{ loader.loadError() ?? ('reader.page.notFound' | transloco) }}</p>
+      <p>
+        <a class="tool" [routerLink]="['/statuses', currentId()]" [queryParams]="{ reader: '0' }">
+          {{ 'reader.page.viewThread' | transloco }}
+        </a>
+        @if (loader.isRss()) {
+          <a
+            class="tool"
+            [routerLink]="['/rss']"
+            [queryParams]="loader.rssFeedUrl() ? { feed: loader.rssFeedUrl() } : {}"
+          >
+            {{ 'reader.page.backToRss' | transloco }}
+          </a>
+        }
+      </p>
+    </div>
+  }
+</div>

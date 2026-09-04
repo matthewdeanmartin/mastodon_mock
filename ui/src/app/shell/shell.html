@@ -13,7 +13,7 @@
      footer live here, outside the outlet, so /write cannot hide them itself.
      This is deliberately a superset of the global zen preference: with both on,
      the result is indistinguishable from writing zen alone. -->
-@if (!writingZen.active()) {
+@if (!chromeHidden()) {
   <a class="skip-link" href="#main" (click)="skipToMain($event)">{{
     'shell.skipToMain' | transloco
   }}</a>
@@ -454,20 +454,20 @@
   class="layout"
   [class.layout-wide]="wide()"
   [class.layout-zen]="!wide() && railsHidden()"
-  [class.layout-writing-zen]="writingZen.active()"
+  [class.layout-writing-zen]="chromeHidden()"
 >
-  @if (!wide() && !railsHidden() && !writingZen.active()) {
+  @if (!wide() && !railsHidden() && !chromeHidden()) {
     <aside class="rail rail-left">
       <app-left-rail />
     </aside>
   }
   <main class="column" id="main" tabindex="-1" #mainColumn>
     <router-outlet />
-    @if (!writingZen.active()) {
+    @if (!chromeHidden()) {
       <app-app-footer />
     }
   </main>
-  @if (!wide() && !railsHidden() && !writingZen.active()) {
+  @if (!wide() && !railsHidden() && !chromeHidden()) {
     <aside class="rail rail-right">
       <app-right-rail />
     </aside>

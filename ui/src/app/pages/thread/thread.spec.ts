@@ -3,19 +3,15 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ClientPrefs } from '../../client-prefs';
 import { Auth } from '../../auth';
 import { Account, Context, Status } from '../../models';
-import { DEFAULT_NITTER_HOST } from '../../providers/twitter/nitter';
 import { Thread } from './thread';
 import { anonymousStatusRouteRef } from '../../providers/anonymous/anonymous-route-ref';
 import { settleRssCache } from '../../testing/settle-rss-cache';
 import { TwitterApi } from '../../providers/twitter/twitter-api';
 import { TwitterFeed } from '../../providers/twitter/twitter-feed';
-import { BlueskyApi } from '../../providers/bluesky/bluesky-api';
-import { BlueskySession } from '../../providers/bluesky/bluesky-session';
 
 interface ThreadInternals {
   status: WritableSignal<Status | null>;
@@ -98,6 +94,33 @@ function setUpWithId(
   const fixture = TestBed.createComponent(Thread);
   fixture.detectChanges();
   return fixture;
+}
+
+/**
+ * Set up the page and capture what it asks the router to do.
+ *
+ * The spy has to be installed *after* `setUpWithId` — `TestBed.inject` before
+ * `overrideProvider` instantiates the module and makes the override throw — but
+ * the redirect fires during `detectChanges()` inside setUp. So the route is
+ * overridden first, the component created without an initial change detection
+ * pass, the spy installed, and only then is the component started.
+ */
+function setUpWatchingRouter(
+  statusId: string,
+  queryParams: Record<string, string> = {},
+): { fixture: ComponentFixture<Thread>; navigate: ReturnType<typeof vi.fn> } {
+  TestBed.overrideProvider(ActivatedRoute, {
+    useValue: {
+      paramMap: of(convertToParamMap({ id: statusId })),
+      queryParamMap: of(convertToParamMap(queryParams)),
+    },
+  });
+  httpMock = TestBed.inject(HttpTestingController);
+  const fixture = TestBed.createComponent(Thread);
+  const navigate = vi.fn().mockResolvedValue(true);
+  vi.spyOn(TestBed.inject(Router), 'navigate').mockImplementation(navigate);
+  fixture.detectChanges();
+  return { fixture, navigate };
 }
 
 describe('Thread', () => {
@@ -268,33 +291,19 @@ describe('Thread', () => {
     expect(spy).toHaveBeenCalledWith('/home');
   });
 
-  // ---------------------------------------------------------------- reader mode
-
-  interface ReaderInternals {
-    readerMode: WritableSignal<boolean>;
-    chain: () => Status[];
-  }
-
-  function readerInternals(fixture: ComponentFixture<Thread>): ReaderInternals {
-    return fixture.componentInstance as unknown as ReaderInternals;
-  }
+  // ------------------------------------------------------ hand-off to the reader
+  //
+  // Reader mode used to be a signal on this component. It is a page now
+  // (`/read/:id`), so what this page owes the reader is a correct hand-off: the
+  // link, and the redirect for anyone arriving on an old `?reader=1` URL. How
+  // the document then *renders* is tested against the reader, not here — see
+  // `pages/read/`.
 
   function selfReply(id: string, inReplyToId: string): Status {
     return { ...makeStatus(id), in_reply_to_id: inReplyToId };
   }
 
-  it('the Reader toggle is always offered on a loaded thread', () => {
-    const fixture = setUpWithId('1');
-    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
-    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
-    fixture.detectChanges();
-
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('.reader-bar')).not.toBeNull();
-    expect(readerInternals(fixture).readerMode()).toBe(false);
-  });
-
-  it('reader mode renders the author chain as an article', () => {
+  it('offers a Reader link on a loaded thread, counting the author chain', () => {
     const fixture = setUpWithId('1');
     httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
     httpMock
@@ -302,115 +311,66 @@ describe('Thread', () => {
       .flush(makeContext([], [selfReply('2', '1'), selfReply('3', '2')]));
     fixture.detectChanges();
 
-    const r = readerInternals(fixture);
-    expect(r.chain().map((s) => s.id)).toEqual(['1', '2', '3']);
-
-    fixture.componentInstance.toggleReader();
-    fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('article.reader')).not.toBeNull();
-    expect(el.querySelectorAll('.reader-post')).toHaveLength(3);
-    expect(el.querySelector('app-status-card')).toBeNull();
+    const link = [...el.querySelectorAll<HTMLAnchorElement>('a.btn')].find((a) =>
+      a.textContent?.includes('Reader'),
+    );
+    expect(link).toBeTruthy();
+    expect(link!.getAttribute('href')).toContain('/read/1');
+    // The count is what tells someone the thing in front of them was written
+    // as one piece rather than as three separate posts.
+    expect(link!.textContent).toContain('3');
   });
 
-  it('?reader=1 opens the thread directly in reader mode', () => {
-    const fixture = setUpWithId('1', { reader: '1' });
+  it('?reader=1 redirects to the reader page, replacing the history entry', () => {
+    const { navigate } = setUpWatchingRouter('1', { reader: '1' });
+
+    // `replaceUrl` is the part that matters: without it the thread URL stays on
+    // the stack, so Back from the reader bounces straight forward again and the
+    // reader is trapped.
+    expect(navigate).toHaveBeenCalledWith(['/read', '1'], { replaceUrl: true });
+  });
+
+  it('redirects only once, though two route streams both ask', () => {
+    // `applyReaderMode` runs from paramMap *and* queryParamMap. An unguarded
+    // navigate re-enters through the second while the first is still settling.
+    const { navigate } = setUpWatchingRouter('1', { reader: '1' });
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not redirect an ordinary thread view', () => {
+    const { fixture, navigate } = setUpWatchingRouter('1');
     httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
-    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext([], [selfReply('2', '1')]));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
     fixture.detectChanges();
 
-    expect(readerInternals(fixture).readerMode()).toBe(true);
-    expect((fixture.nativeElement as HTMLElement).querySelector('article.reader')).not.toBeNull();
-  });
-
-  describe('reader mode on a read-only tweet', () => {
-    /**
-     * A thread page showing one tweet, with the provider stubbed.
-     *
-     * The focus post is served from the feed cache exactly as it is in the app,
-     * so no request is made — which is also the behaviour worth protecting.
-     */
-    function setUpTwitter(): ComponentFixture<Thread> {
-      const post: Status = {
-        ...makeStatus('twitter:2083317461269598348'),
-        provider: 'twitter',
-        url: 'https://x.com/NASA/status/2083317461269598348',
-        replies_count: 2,
-        reblogs_count: 5,
-        favourites_count: 99,
-      };
-      TestBed.overrideProvider(TwitterFeed, {
-        useValue: { hydrated: Promise.resolve(), findCached: () => post },
-      });
-      TestBed.overrideProvider(TwitterApi, {
-        useValue: {
-          getReplies: () => of({ statuses: [], cursor: null, hasMore: false, skipped: 0 }),
-        },
-      });
-      return setUpWithId('twitter:2083317461269598348', { reader: '1' });
-    }
-
-    it('offers no reply, boost or favourite buttons', async () => {
-      // Reader mode chose its action row with `isRss() || isAnonymousPublic()`
-      // — a denylist — so tweets, added long afterwards, landed in the
-      // *writable* branch. Verified in a browser: a signed-in reader saw live
-      // 💬/🔁/⭐ buttons and a composer for actions that cannot exist.
-      const fixture = setUpTwitter();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const el = fixture.nativeElement as HTMLElement;
-      expect(el.querySelector('.reader-actions')).toBeNull();
-      expect(el.querySelector('app-compose')).toBeNull();
-    });
-
-    it('sends the reader to Nitter rather than x.com', async () => {
-      const fixture = setUpTwitter();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
-        'a.reader-original',
-      );
-      // The point is that it leaves x.com, not which mirror it lands on — the
-      // default host moves whenever the current one goes down.
-      expect(link?.href).toContain(DEFAULT_NITTER_HOST);
-      expect(link?.href).not.toContain('x.com');
-    });
-
-    it('still offers a bookmark, which is local and therefore possible', async () => {
-      // Parity with the anonymous reader: bookmarking touches no server.
-      const fixture = setUpTwitter();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const el = fixture.nativeElement as HTMLElement;
-      const labels = [...el.querySelectorAll('button')].map((b) => b.textContent ?? '');
-      expect(labels.some((text) => text.includes('Bookmark'))).toBe(true);
-    });
-
-    it('does not offer "open in chat" for an account that exists only on Twitter', async () => {
-      const fixture = setUpTwitter();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      expect(internalsWithChat(fixture).chatPartner()).toBeNull();
-    });
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   function internalsWithChat(fixture: ComponentFixture<Thread>): { chatPartner: () => unknown } {
     return fixture.componentInstance as unknown as { chatPartner: () => unknown };
   }
 
-  it('A+/A− buttons adjust the persisted reader font size', () => {
-    const fixture = setUpWithId('1');
-    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
-    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext([], [selfReply('2', '1')]));
+  it('does not offer "open in chat" for an account that exists only on Twitter', async () => {
+    const post: Status = {
+      ...makeStatus('twitter:2083317461269598348'),
+      provider: 'twitter',
+      url: 'https://x.com/NASA/status/2083317461269598348',
+    };
+    TestBed.overrideProvider(TwitterFeed, {
+      useValue: { hydrated: Promise.resolve(), findCached: () => post },
+    });
+    TestBed.overrideProvider(TwitterApi, {
+      useValue: {
+        getReplies: () => of({ statuses: [], cursor: null, hasMore: false, skipped: 0 }),
+      },
+    });
+    const fixture = setUpWithId('twitter:2083317461269598348');
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-    const prefs = TestBed.inject(ClientPrefs);
-    const before = prefs.readerFontSize();
-    fixture.componentInstance.bumpReaderFont(2);
-    expect(prefs.readerFontSize()).toBe(before + 2);
+    expect(internalsWithChat(fixture).chatPartner()).toBeNull();
   });
 
   it('uses the Bluesky reply composer beneath a Bluesky thread', () => {
@@ -424,59 +384,6 @@ describe('Thread', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-bsky-reply')).not.toBeNull();
     expect(el.querySelector('app-compose')).toBeNull();
-  });
-
-  it('uses the Bluesky reply composer in reader mode too', () => {
-    const fixture = setUpWithId('1');
-    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
-    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
-
-    const post = makeBskyStatus();
-    internals(fixture).status.set(post);
-    fixture.componentInstance.toggleReader();
-    fixture.componentInstance.toggleReaderReply(post.id);
-    fixture.detectChanges();
-
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('.reader-reply app-bsky-reply')).not.toBeNull();
-    expect(el.querySelector('.reader-reply app-compose')).toBeNull();
-  });
-
-  it('stores reader-mode Bluesky bookmarks on Bluesky, never Mastodon', () => {
-    const createBookmark = vi.fn(() => of({}));
-    TestBed.overrideProvider(BlueskyApi, { useValue: { createBookmark } });
-    TestBed.overrideProvider(BlueskySession, { useValue: { linked: () => true } });
-    const fixture = setUpWithId('1');
-    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
-    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
-
-    const post = makeBskyStatus();
-    internals(fixture).status.set(post);
-    fixture.componentInstance.toggleBookmark(post);
-
-    expect(createBookmark).toHaveBeenCalledWith('at://did:plc:x/app.bsky.feed.post/1', 'cid-1');
-    expect(internals(fixture).status()?.bookmarked).toBe(true);
-    httpMock.expectNone((request) => request.url.includes('/bookmark'));
-  });
-
-  it('names Bluesky when a reader-mode bookmark fails', () => {
-    TestBed.overrideProvider(BlueskyApi, {
-      useValue: { createBookmark: () => throwError(() => new Error('expired')) },
-    });
-    TestBed.overrideProvider(BlueskySession, { useValue: { linked: () => true } });
-    const fixture = setUpWithId('1');
-    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
-    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
-
-    const post = makeBskyStatus();
-    internals(fixture).status.set(post);
-    fixture.componentInstance.toggleReader();
-    fixture.componentInstance.toggleBookmark(post);
-    fixture.detectChanges();
-
-    const alert = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
-    expect(alert?.textContent).toContain('on Bluesky');
-    expect(alert?.textContent).toContain('Settings → Connections');
   });
 
   // ---------------------------------------------------------------------- RSS
@@ -509,8 +416,19 @@ describe('Thread', () => {
   </channel>
 </rss>`;
 
-  it('opens an RSS item in reader mode by default and loads its comment feed as replies', async () => {
-    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
+  it('redirects an RSS item to the reader, which is what a feed item is', () => {
+    // RSS items are articles, so they open in the reader unless the link says
+    // ?reader=0. That used to mean "flip a signal"; it now means "go there".
+    const id = 'rss:https://blog.example.com/feed.xml::g1';
+    const { navigate } = setUpWatchingRouter(id);
+
+    expect(navigate).toHaveBeenCalledWith(['/read', id], { replaceUrl: true });
+  });
+
+  it('?reader=0 keeps an RSS item on the thread view', async () => {
+    const { fixture, navigate } = setUpWatchingRouter('rss:https://blog.example.com/feed.xml::g1', {
+      reader: '0',
+    });
 
     // The feed cache is consulted before the network, so the request is issued
     // on a microtask rather than synchronously during setUp.
@@ -521,27 +439,32 @@ describe('Thread', () => {
     await settleRssCache();
     fixture.detectChanges();
 
-    const parentId = 'rss:https://blog.example.com/feed.xml::g1';
-    expect(internals(fixture).status()?.id).toBe(parentId);
-    // RSS defaults straight into reader mode.
-    expect(fixture.componentInstance['readerMode']()).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(internals(fixture).status()?.id).toBe('rss:https://blog.example.com/feed.xml::g1');
+  });
+
+  it('loads a declared comment feed as replies', async () => {
+    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1', { reader: '0' });
+
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
+    await settleRssCache();
+    httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
+    await settleRssCache();
+    fixture.detectChanges();
+
     // The comment became a descendant reply attributed to its author.
+    const parentId = 'rss:https://blog.example.com/feed.xml::g1';
     const descendants = internals(fixture).descendants();
     expect(descendants).toHaveLength(1);
     expect(descendants[0].in_reply_to_id).toBe(parentId);
     expect(descendants[0].account.display_name).toBe('Dana');
-
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('.reader-comments')).not.toBeNull();
-    // Read-only: no reply composer or action buttons in the RSS reader.
-    expect(el.querySelector('.reader-actions')).toBeNull();
-    expect(el.querySelector('.reader-original')).not.toBeNull();
   });
 
   it('offers a way back to the RSS reader, pointing at the feed it came from', async () => {
     // Leaving an article used to strand the reader on a page that looks like a
     // timeline, with no route back to /rss.
-    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
+    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1', { reader: '0' });
 
     await settleRssCache();
     httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
@@ -562,83 +485,13 @@ describe('Thread', () => {
     );
   });
 
-  it('calls the reader toggle "View as thread" on an RSS item', async () => {
-    // "Exit reader" described leaving a mode; on a feed item what it actually
-    // does is swap to the thread view, and it is not the way back to /rss.
-    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
-
-    await settleRssCache();
-    httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
-    await settleRssCache();
-    httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
-    await settleRssCache();
-    fixture.detectChanges();
-
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('View as thread');
-    expect(text).not.toContain('Exit reader');
-  });
-
-  it('leaves an ordinary post saying "Exit reader", with no RSS return link', () => {
-    const fixture = setUpWithId('1');
-    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
-    httpMock.expectOne('/api/v1/statuses/1/context').flush(makeContext());
-    fixture.componentInstance['readerMode'].set(true);
-    fixture.detectChanges();
-
-    const element = fixture.nativeElement as HTMLElement;
-    expect(element.textContent).toContain('Exit reader');
-    expect(element.textContent).not.toContain('Return to RSS reader');
-  });
-
-  it('offers "Fetch rest of article" for a teaser-only RSS item', async () => {
-    // RSS_FEED's item has only <description>, no <content:encoded> — a
-    // publisher that expects the reader to click through for the rest.
-    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
-
-    await settleRssCache();
-    httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);
-    await settleRssCache();
-    httpMock.expectOne('https://blog.example.com/hello/comments').flush(COMMENT_FEED);
-    await settleRssCache();
-    fixture.detectChanges();
-
-    const instance = fixture.componentInstance as unknown as {
-      canExpand(): boolean;
-      expandsRssTeaser(): boolean;
-    };
-    expect(instance.canExpand()).toBe(true);
-    expect(instance.expandsRssTeaser()).toBe(true);
-  });
-
-  it('suppresses expansion entirely for a full-content RSS item', async () => {
-    const fullFeed = `<?xml version="1.0"?>
-<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
-  <channel><title>B</title>
-  <item><title>Post</title><link>https://c.example/p</link><guid>g10</guid>
-  <description>&lt;p&gt;teaser&lt;/p&gt;</description>
-  <content:encoded>&lt;![CDATA[&lt;p&gt;the whole article, already here&lt;/p&gt;]]&gt;</content:encoded>
-  </item>
-</channel></rss>`;
-    const fixture = setUpWithId('rss:https://c.example/feed::g10');
-
-    await settleRssCache();
-    httpMock.expectOne('https://c.example/feed').flush(fullFeed);
-    await settleRssCache();
-    fixture.detectChanges();
-
-    const instance = fixture.componentInstance as unknown as { canExpand(): boolean };
-    expect(instance.canExpand()).toBe(false);
-    expect((fixture.nativeElement as HTMLElement).querySelector('.reader-expand')).toBeNull();
-  });
-
-  it('shows the no-comment-feed note for RSS items without one', async () => {
+  it('records that a feed declared no comment feed', async () => {
     const feedNoComments = `<?xml version="1.0"?>
 <rss version="2.0"><channel><title>B</title>
   <item><title>Post</title><link>https://b.example/p</link><guid>g9</guid>
   <description>&lt;p&gt;Body&lt;/p&gt;</description></item>
 </channel></rss>`;
-    const fixture = setUpWithId('rss:https://b.example/feed::g9');
+    const fixture = setUpWithId('rss:https://b.example/feed::g9', { reader: '0' });
 
     await settleRssCache();
     httpMock.expectOne('https://b.example/feed').flush(feedNoComments);
@@ -646,10 +499,7 @@ describe('Thread', () => {
     fixture.detectChanges();
 
     expect(internals(fixture).descendants()).toHaveLength(0);
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('.reader-comments-note')?.textContent).toContain(
-      "doesn't publish comments",
-    );
+    expect(fixture.componentInstance['rssHasCommentFeed']()).toBe(false);
   });
 
   // ---------------------------------------------------------------- open in chat
@@ -715,7 +565,9 @@ describe('Thread', () => {
   });
 
   it('hides "open in chat" entirely for a read-only RSS thread, rather than showing it disabled', async () => {
-    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1');
+    // ?reader=0: without it an RSS id hands off to the reader and this page
+    // never renders the toolbar under test.
+    const fixture = setUpWithId('rss:https://blog.example.com/feed.xml::g1', { reader: '0' });
 
     await settleRssCache();
     httpMock.expectOne('https://blog.example.com/feed.xml').flush(RSS_FEED);

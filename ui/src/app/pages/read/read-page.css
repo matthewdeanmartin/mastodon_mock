@@ -1,0 +1,49 @@
+/* The reader page: a book, not a screen with a book on it.
+
+   The chrome is gone (a `full` reading-zen hold), so this element is what the
+   viewer actually sees edge to edge. That is why the paper colour lives here
+   rather than on `.reader` inside the core: a sepia column floating on the app's
+   dark background is a strip of paper on a desk, not a page. */
+
+.read-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--reader-bg, var(--bg));
+  color: var(--reader-fg, inherit);
+}
+
+.center {
+  text-align: center;
+  padding: 48px 16px;
+}
+
+.read-empty {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 64px 24px;
+  text-align: center;
+}
+
+.read-empty p {
+  margin: 0 0 16px;
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 4px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--bg-subtle, rgba(127, 127, 127, 0.12));
+  color: inherit;
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tool:hover {
+  background: var(--hover);
+}

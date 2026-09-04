@@ -2,76 +2,20 @@
   <p class="muted center">{{ 'pages.thread.loading' | transloco }}</p>
 } @else if (status(); as s) {
   <div class="reader-bar">
-    @if (readerMode()) {
-      <div class="reader-font">
-        <button
-          class="btn btn-outline btn-sm"
-          (click)="bumpReaderFont(-1)"
-          [title]="'pages.thread.reader.smallerText' | transloco"
-        >
-          A−
-        </button>
-        <span class="muted">
-          {{ 'pages.thread.reader.fontSize' | transloco: { size: prefs.readerFontSize() } }}
-        </span>
-        <button
-          class="btn btn-outline btn-sm"
-          (click)="bumpReaderFont(1)"
-          [title]="'pages.thread.reader.largerText' | transloco"
-        >
-          A+
-        </button>
-
-        <!-- Typeface and paper, at hand while reading rather than buried in
-             Settings — these are the two things people change mid-article. Both
-             persist through ClientPrefs. -->
-        <select
-          class="reader-select"
-          [attr.aria-label]="'pages.thread.reader.fontFamily' | transloco"
-          [title]="'pages.thread.reader.fontFamily' | transloco"
-          [value]="prefs.readerFontFamily()"
-          (change)="setReaderFont($event)"
-        >
-          @for (font of readerFonts; track font.id) {
-            <option [value]="font.id">{{ font.label }}</option>
-          }
-        </select>
-
-        <select
-          class="reader-select"
-          [attr.aria-label]="'pages.thread.reader.articleTheme' | transloco"
-          [title]="'pages.thread.reader.articleThemeTitle' | transloco"
-          [value]="prefs.readerTheme()"
-          (change)="setReaderTheme($event)"
-        >
-          <option value="app">{{ 'pages.thread.reader.theme.matchApp' | transloco }}</option>
-          <option value="light">{{ 'pages.thread.reader.theme.light' | transloco }}</option>
-          <option value="sepia">{{ 'pages.thread.reader.theme.sepia' | transloco }}</option>
-          <option value="dark">{{ 'pages.thread.reader.theme.dark' | transloco }}</option>
-          <option value="solarized">
-            {{ 'pages.thread.reader.theme.solarized' | transloco }}
-          </option>
-        </select>
-      </div>
-    }
-    <!-- An RSS article opens in reader mode by default, so "Exit reader" was the
-         only way out — and it dropped the reader on a page that looks like a
-         timeline, with no route back to /rss. For a feed item the toggle says
-         what it actually does (swap to the thread view) and the way back to the
-         reading list is its own button below. -->
-    <button class="btn btn-outline" [class.active]="readerMode()" (click)="toggleReader()">
+    <!-- Reader mode is its own page now (see sprint/kindle-0-overview.md), so
+         this is a link rather than a toggle: the typography, pagination and
+         library all belong to a surface that owns the whole screen. The count
+         stays, because "Reader (7 posts)" is what tells someone the thing in
+         front of them was written as one piece. -->
+    <a class="btn btn-outline" [routerLink]="['/read', currentId]">
       📖
       {{
-        readerMode()
-          ? isRss()
-            ? ('pages.thread.reader.viewAsThread' | transloco)
-            : ('pages.thread.reader.exit' | transloco)
-          : chain().length > 1
-            ? ('pages.thread.reader.withCount'
-              | transloco: { count: chain().length, posts: words().posts })
-            : ('pages.thread.reader.reader' | transloco)
+        chain().length > 1
+          ? ('pages.thread.reader.withCount'
+            | transloco: { count: chain().length, posts: words().posts })
+          : ('pages.thread.reader.reader' | transloco)
       }}
-    </button>
+    </a>
 
     @if (isRss()) {
       <a
@@ -115,421 +59,71 @@
     }
   </div>
 
-  @if (readerMode()) {
-    <article class="reader" [attr.data-paper]="prefs.readerTheme()">
-      @if (chain()[0].account; as author) {
-        <header class="reader-head">
-          <img
-            class="reader-avatar"
-            [src]="author.avatar_static || author.avatar"
-            [alt]="author.username"
-            loading="lazy"
-            decoding="async"
-          />
-          <div>
-            <div class="reader-author">{{ author.display_name || author.username }}</div>
-            <div class="muted">
-              &#64;{{ author.acct }} · {{ chain()[0].created_at | humanTime }}
-              @if (!isRss()) {
-                ·
-                {{
-                  'pages.thread.reader.postCount'
-                    | transloco: { count: chain().length, posts: words().posts }
-                }}
-              }
-            </div>
-          </div>
-        </header>
+  @if (isAnonymousPublic() && publicContextUnavailable()) {
+    <p class="muted center">
+      {{ 'pages.thread.anonymous.contextUnavailable' | transloco }}
+      @if (publicOriginalUrl(); as originalUrl) {
+        <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">
+          {{ 'pages.thread.anonymous.openOriginal' | transloco }} </a
+        >.
       }
-      <!-- Article expansion. The post that links out stays above, because it is
-           the reader's context for why they are reading this at all — someone's
-           "here is my new piece" is part of the article, not noise before it.
-           The expanded document then follows and can be very long. -->
-      @if (canExpand()) {
-        <section class="reader-expand">
-          <!-- Checked first: this is about whether a fetch is possible at all,
-               so it must not sit behind "has a fetch already happened". -->
-          @if (expansionBlocker(); as blocker) {
-            <!-- The proxy selection lives in localStorage and does not travel
-                 between devices, so the same account on a second browser has
-                 none configured. Saying so beats rendering nothing, which is
-                 indistinguishable from the feature not existing. -->
-            <p class="reader-expand-note">{{ blocker }}</p>
-            <a class="btn btn-outline btn-sm" routerLink="/settings/connections/cors-proxy">
-              {{ 'pages.thread.article.chooseProxy' | transloco }}
-            </a>
-          } @else if (expansion(); as result) {
-            @if (expansionNote(); as note) {
-              <p class="reader-expand-note" role="status">{{ note }}</p>
-            }
-            <!-- The why, in the page rather than only in the console. Folded
-                 away so it costs nothing to ignore, and available without
-                 devtools so that the people most likely to report a problem
-                 can actually say what happened. -->
-            @if (expansionDebug().length) {
-              <details class="reader-expand-debug">
-                <summary>{{ 'pages.thread.article.whatWentWrong' | transloco }}</summary>
-                <ul>
-                  @for (line of expansionDebug(); track line) {
-                    <li>{{ line }}</li>
-                  }
-                </ul>
-              </details>
-            }
-            <!-- The fallback ladder, and it must never end in nothing: a card
-                 when metadata survived, a plain labelled link when it did not,
-                 and a way to try again either way. A message with no way
-                 forward is the dead end this feature promised to avoid. -->
-            @if (!result.article) {
-              @if (result.card) {
-                <app-preview-card [card]="result.card" />
-              } @else {
-                <a
-                  class="btn btn-outline btn-sm"
-                  [href]="result.finalUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  ↗
-                  {{ 'pages.thread.article.openHost' | transloco: { host: expandedHost() } }}
-                </a>
-              }
-              <!-- Disabled at zero quota rather than silently doing nothing:
-                   the failure spent nothing, but a retry is still a fetch. -->
-              @if (retriesLeft() > 0) {
-                <button
-                  class="btn btn-outline btn-sm"
-                  [disabled]="expanding() || !quota.allowed()"
-                  (click)="expandArticle(true)"
-                >
-                  {{ 'pages.thread.article.tryAgain' | transloco }}
-                </button>
-              }
-            }
-          } @else {
-            <button
-              class="btn btn-outline btn-sm"
-              [disabled]="expanding() || !quota.allowed()"
-              (click)="expandArticle()"
-            >
-              @if (expanding()) {
-                {{ 'pages.thread.article.fetching' | transloco }}
-              } @else if (expandsRssTeaser()) {
-                📄 {{ 'pages.thread.article.fetchRest' | transloco }}
-              } @else {
-                📄 {{ 'pages.thread.article.fetch' | transloco }}
-              }
-            </button>
-            <!-- Fetching a third-party page takes seconds. Without this a
-                 screen-reader user hears nothing between pressing the button
-                 and the article arriving, which reads as "nothing happened". -->
-            <span class="sr-only" role="status">
-              @if (expanding()) {
-                {{ 'pages.thread.article.fetchingWait' | transloco }}
-              }
-            </span>
-            <!-- Said plainly and without a countdown badge. The limit exists so
-                 someone can find out whether this works before paying for it,
-                 not to nag; the number is only worth showing once it is nearly
-                 spent. -->
-            @if (!quota.allowed()) {
-              <span class="muted reader-expand-quota">
-                {{ 'pages.thread.article.quotaExhausted' | transloco }}
-              </span>
-            } @else if (!quota.unlimited() && quota.remaining() === 1) {
-              <span class="muted reader-expand-quota">
-                {{ 'pages.thread.article.quotaOneLeft' | transloco }}
-              </span>
-            }
-          }
-        </section>
-      }
-
-      @for (post of chain(); track post.id) {
-        <section class="reader-post" [innerHTML]="post.content"></section>
-        @for (m of post.media_attachments; track m.id) {
-          <img
-            class="reader-media"
-            [src]="m.preview_url || m.url"
-            [alt]="m.description || ''"
-            loading="lazy"
-            decoding="async"
-          />
-        }
-        @if (readOnlyPost()) {
-          @if (readerOriginalLink(post); as original) {
-            <a
-              class="btn btn-outline btn-sm reader-original"
-              [href]="original.url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ↗ {{ original.label }}
-            </a>
-          }
-          <!-- Bookmarking is local for these posts, so it works regardless of
-               session — including for Twitter, where it previously did not appear. -->
-          @if (!isMessageStatus()) {
-            <button
-              class="btn btn-outline btn-sm reader-original"
-              [class.active]="post.bookmarked"
-              (click)="toggleBookmark(post)"
-            >
-              🔖
-              {{
-                (post.bookmarked
-                  ? 'pages.thread.bookmark.bookmarked'
-                  : 'pages.thread.bookmark.bookmark'
-                ) | transloco
-              }}
-            </button>
-          }
-        } @else {
-          <div class="reader-actions">
-            <button
-              class="raction"
-              [class.on]="replyingTo() === post.id"
-              (click)="toggleReaderReply(post.id)"
-              [title]="'pages.thread.reply.title' | transloco"
-              [attr.aria-label]="'pages.thread.reply.title' | transloco"
-            >
-              <span aria-hidden="true">💬</span> {{ post.replies_count }}
-            </button>
-            <button
-              class="raction"
-              [class.on]="post.reblogged"
-              (click)="toggleReblog(post)"
-              [title]="post.reblogged ? words().UndoBoost : words().Boost"
-              [attr.aria-label]="post.reblogged ? words().UndoBoost : words().Boost"
-            >
-              <span aria-hidden="true">🔁</span> {{ post.reblogs_count }}
-            </button>
-            <button
-              class="raction"
-              [class.on]="post.favourited"
-              (click)="toggleFavourite(post)"
-              [title]="
-                (post.favourited
-                  ? 'pages.thread.actions.undoFavourite'
-                  : 'pages.thread.actions.favourite'
-                ) | transloco
-              "
-              [attr.aria-label]="
-                (post.favourited
-                  ? 'pages.thread.actions.undoFavourite'
-                  : 'pages.thread.actions.favourite'
-                ) | transloco
-              "
-            >
-              <span aria-hidden="true">⭐</span> {{ post.favourites_count }}
-            </button>
-            <button
-              class="raction"
-              [class.on]="post.bookmarked"
-              (click)="toggleBookmark(post)"
-              [title]="
-                (post.bookmarked
-                  ? 'pages.thread.actions.removeBookmark'
-                  : 'pages.thread.actions.bookmark'
-                ) | transloco
-              "
-              [attr.aria-label]="
-                (post.bookmarked
-                  ? 'pages.thread.actions.removeBookmark'
-                  : 'pages.thread.actions.bookmark'
-                ) | transloco
-              "
-            >
-              <span aria-hidden="true">🔖</span>
-            </button>
-          </div>
-          @if (readerActionError(); as actionError) {
-            <p class="reader-action-error" role="alert">{{ actionError }}</p>
-          }
-          @if (replyingTo() === post.id) {
-            <div class="reader-reply">
-              @if (isBluesky(post)) {
-                <app-bsky-reply [replyTo]="post" (posted)="onReaderReplied($event)" />
-              } @else {
-                <app-compose
-                  [inReplyToId]="post.id"
-                  [replyToHandle]="post.account.acct"
-                  [placeholder]="'pages.thread.reply.placeholder' | transloco"
-                  (posted)="onReaderReplied($event)"
-                />
-              }
-            </div>
-          }
-        }
-      }
-
-      <!-- The expanded article itself, below the post that linked to it. Can be
-           very long, which is the point — this is the reading surface. -->
-      @if (expansion()?.article; as article) {
-        <section
-          #expandedArticle
-          class="reader-article"
-          [attr.aria-label]="
-            'pages.thread.article.expandedLabel' | transloco: { title: article.title }
-          "
-          tabindex="-1"
-        >
-          <h2 class="reader-article-title">{{ article.title }}</h2>
-          <!-- Attribution, not decoration: the reader is looking at someone
-               else's writing reformatted by us, and should be able to see whose
-               and from where without hunting for the link. -->
-          <p class="muted reader-article-meta">
-            @if (article.byline) {
-              {{ article.byline }} ·
-            }
-            {{ 'pages.thread.article.expandedFrom' | transloco: { host: expandedHost() } }}
-            @if (article.metrics.wordCount) {
-              ·
-              {{
-                'pages.thread.article.wordCount' | transloco: { count: article.metrics.wordCount }
-              }}
-            }
-          </p>
-          <!-- Safe by construction rather than by trust: this HTML came from a
-               markdown renderer whose vocabulary has no script, no event
-               handler, and no attribute beyond a scheme-checked href/src. -->
-          <div class="reader-article-body" [innerHTML]="expandedHtml()"></div>
-          <div class="reader-article-actions">
-            <button class="btn btn-outline btn-sm" (click)="collapseArticle()">
-              {{ 'pages.thread.article.collapse' | transloco }}
-            </button>
-            <button
-              class="btn btn-outline btn-sm"
-              [disabled]="expanding() || !quota.allowed()"
-              (click)="expandArticle(true)"
-            >
-              {{ 'pages.thread.article.refetch' | transloco }}
-            </button>
-            <a
-              class="btn btn-outline btn-sm"
-              [href]="expansion()!.finalUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ↗ {{ 'pages.thread.article.readOriginal' | transloco }}
-            </a>
-          </div>
-        </section>
-      }
-
-      @if (comments().length) {
-        <section class="reader-comments">
-          <h2 class="comments-title">
-            {{
-              (comments().length === 1
-                ? 'pages.thread.comments.one'
-                : 'pages.thread.comments.other'
-              ) | transloco: { count: comments().length }
-            }}
-          </h2>
-          @for (c of comments(); track c.id) {
-            <div class="comment">
-              <img
-                class="comment-avatar"
-                [src]="c.account.avatar_static || c.account.avatar"
-                [alt]="c.account.username"
-                loading="lazy"
-                decoding="async"
-              />
-              <div class="comment-body">
-                <div class="comment-meta">
-                  <span class="comment-author">
-                    {{ c.account.display_name || c.account.username }}
-                  </span>
-                  <span class="muted">&#64;{{ c.account.acct }}</span>
-                  <span class="muted">· {{ c.created_at | humanTime }}</span>
-                </div>
-                <div class="comment-content" [innerHTML]="c.content"></div>
-              </div>
-            </div>
-          }
-        </section>
-      }
-
-      @if (isRss() && !comments().length) {
-        <p class="muted reader-comments-note">
-          @if (rssHasCommentFeed() && !rssCommentsUnavailable()) {
-            {{ 'pages.thread.comments.loading' | transloco }}
-          } @else if (rssHasCommentFeed()) {
-            {{ 'pages.thread.comments.loadFailed' | transloco }}
-          } @else {
-            {{ 'pages.thread.comments.noFeed' | transloco }}
-          }
-        </p>
-      }
-    </article>
-  } @else {
-    @if (isAnonymousPublic() && publicContextUnavailable()) {
-      <p class="muted center">
-        {{ 'pages.thread.anonymous.contextUnavailable' | transloco }}
-        @if (publicOriginalUrl(); as originalUrl) {
-          <a [href]="originalUrl" target="_blank" rel="noopener noreferrer">
-            {{ 'pages.thread.anonymous.openOriginal' | transloco }} </a
-          >.
-        }
-      </p>
-    }
-    @for (a of ancestors(); track a.id) {
-      <app-status-card
-        [status]="a"
-        filterContext="thread"
-        [showSource]="true"
-        (changed)="onContextChanged($event)"
-        (deleted)="onContextDeleted($event)"
-        (replied)="onReply($event)"
-      />
-    }
+    </p>
+  }
+  @for (a of ancestors(); track a.id) {
     <app-status-card
-      [status]="s"
+      [status]="a"
       filterContext="thread"
       [showSource]="true"
-      (changed)="onChanged($event)"
-      (deleted)="onFocusedDeleted()"
+      (changed)="onContextChanged($event)"
+      (deleted)="onContextDeleted($event)"
       (replied)="onReply($event)"
     />
-    @if (isBluesky(s)) {
-      <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
-    } @else if (isLocal(s)) {
-      <app-local-compose [inReplyTo]="s.id" (posted)="onReply($event)" />
-    } @else if (isTwitter()) {
-      <!-- No composer: replying on Twitter needs an authenticated Twitter account, which
-           this app never asks for. Ancestors are not fetched either (one
-           request per level, unknown depth), so the mirror is how a reader reaches
-           the rest of the conversation — and it costs nothing. -->
-      @if (twitterError(); as error) {
-        <p class="muted center">{{ error }}</p>
-      }
-      @if (nitterThreadUrl(); as url) {
-        <p class="muted center">
-          {{ 'pages.thread.twitter.repliesOnly' | transloco }}
-          <a [href]="url" target="_blank" rel="noopener noreferrer">
-            {{ 'pages.thread.twitter.readConversation' | transloco: { host: nitterLabel } }} ↗
-          </a>
-        </p>
-      }
-    } @else if (!isRss() && !isAnonymousPublic() && !isMessageStatus()) {
-      <app-compose
-        [inReplyToId]="s.id"
-        [replyToHandle]="s.account.acct"
-        [placeholder]="'pages.thread.reply.placeholder' | transloco"
-        (posted)="onReply($event)"
-      />
+  }
+  <app-status-card
+    [status]="s"
+    filterContext="thread"
+    [showSource]="true"
+    (changed)="onChanged($event)"
+    (deleted)="onFocusedDeleted()"
+    (replied)="onReply($event)"
+  />
+  @if (isBluesky(s)) {
+    <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
+  } @else if (isLocal(s)) {
+    <app-local-compose [inReplyTo]="s.id" (posted)="onReply($event)" />
+  } @else if (isTwitter()) {
+    <!-- No composer: replying on Twitter needs an authenticated Twitter account, which
+         this app never asks for. Ancestors are not fetched either (one
+         request per level, unknown depth), so the mirror is how a reader reaches
+         the rest of the conversation — and it costs nothing. -->
+    @if (twitterError(); as error) {
+      <p class="muted center">{{ error }}</p>
     }
-    @for (d of descendants(); track d.id) {
-      <app-status-card
-        [status]="d"
-        filterContext="thread"
-        [showSource]="true"
-        (changed)="onContextChanged($event)"
-        (deleted)="onContextDeleted($event)"
-        (replied)="onReply($event)"
-      />
+    @if (nitterThreadUrl(); as url) {
+      <p class="muted center">
+        {{ 'pages.thread.twitter.repliesOnly' | transloco }}
+        <a [href]="url" target="_blank" rel="noopener noreferrer">
+          {{ 'pages.thread.twitter.readConversation' | transloco: { host: nitterLabel } }} ↗
+        </a>
+      </p>
     }
+  } @else if (!isRss() && !isAnonymousPublic() && !isMessageStatus()) {
+    <app-compose
+      [inReplyToId]="s.id"
+      [replyToHandle]="s.account.acct"
+      [placeholder]="'pages.thread.reply.placeholder' | transloco"
+      (posted)="onReply($event)"
+    />
+  }
+  @for (d of descendants(); track d.id) {
+    <app-status-card
+      [status]="d"
+      filterContext="thread"
+      [showSource]="true"
+      (changed)="onContextChanged($event)"
+      (deleted)="onContextDeleted($event)"
+      (replied)="onReply($event)"
+    />
   }
 } @else if (loadError(); as error) {
   <!-- A post id only means something on the server that issued it, and unlike

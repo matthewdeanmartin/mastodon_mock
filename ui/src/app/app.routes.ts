@@ -855,6 +855,19 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/thread/thread').then((m) => m.Thread),
       },
       {
+        // The reader: one document, the whole screen. Takes the same ids as
+        // `statuses/:id` (including the `rss:` prefix), so a link to a post and
+        // a link to reading it address the same thing. `statuses/:id?reader=1`
+        // redirects here. See sprint/kindle-0-overview.md.
+        //
+        // Deliberately not anonymous-guarded: reading is the thing a visitor
+        // with no account is most likely to want, and the article pipeline
+        // already works without a session.
+        path: 'read/:id',
+        title: 'Reader',
+        loadComponent: () => import('./pages/read/read-page').then((m) => m.ReadPage),
+      },
+      {
         // Friendly alias for Eliza's synthetic profile (id `eliza:self`).
         path: 'eliza',
         title: 'Eliza',

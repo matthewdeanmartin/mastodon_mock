@@ -1,73 +1,54 @@
 import { Component, computed, ElementRef, inject, input, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { RouterLink } from '@angular/router';
 import { Router } from '@angular/router';
 import { ComposeShareRequest, ShareDialog } from '../../../share-dialog/share-dialog';
 import { selectionWithin } from '../../../share-dialog/share-selection';
 import { Drafts } from '../../../drafts';
-import { ArticleFetch } from '../../../providers/article/article-fetch';
-import { ArticleQuota } from '../../../providers/article/article-quota';
-import { ArticleReadingTally } from '../../../providers/article/article-reading-tally';
-import { ArticleResult } from '../../../providers/article/article-models';
-import { articleTarget } from '../../../providers/article/article-target';
-import { renderMarkdown } from '../../../providers/article/markdown-render';
-import { PageDiagnostics } from '../../../page-diagnostics';
 import { Status } from '../../../models';
-import { paginateMarkdown } from '../article-pages';
+import { ReaderCore } from '../../read/reader-core/reader-core';
 
-// i18n pages.rss.article.fullTextNeedsProxy: The full text of this item lives on the publisher's site. Fetching it needs a
-// i18n pages.rss.article.corsProxy: CORS proxy
-// i18n pages.rss.article.quotaReached: That's both of today's free articles. Mawkingbird Plus lifts the limit.
-// i18n pages.rss.article.fetching: Fetching article…
-// i18n pages.rss.article.fetchFull: 📄 Fetch full article
-// i18n pages.rss.article.oneFreeLeft: One free article left today
-// i18n pages.rss.article.fetchingPleaseWait: Fetching article, please wait.
-// i18n pages.rss.article.couldntRead: Couldn't read the full article ({{diagnosis}}).
-// i18n pages.rss.article.openOriginal: Open the original ↗
-// i18n pages.rss.article.pages: Article pages
-// i18n pages.rss.article.previous: ‹ Previous
-// i18n pages.rss.article.pageOf: Page {{page}} of {{total}}
-// i18n pages.rss.article.next: Next ›
 // i18n pages.rss.article.share: Share this ↗
 // i18n pages.rss.article.highlightFirst: Highlight a passage first to quote it.
 
 /**
- * The full text of an RSS item, fetched on demand and shown a page at a time.
+ * An RSS item read inside the split pane.
  *
- * ## One extraction pipeline, two entry points
+ * ## What is left here
  *
- * This does **not** extract anything itself. It calls `ArticleFetch.expand()` —
- * the same call reader mode makes from the thread view — and renders what comes
- * back. A second extractor would be a second set of quality gates, a second
- * cache, and a second thing to fix whenever a publisher changes their markup.
- * The only thing this adds on top is pagination, which is a presentation
- * decision over an already-extracted document (see `article-pages.ts`).
+ * Sharing, and nothing else. Everything about *reading* — fetching the full
+ * text, explaining a refusal, paginating, the typography controls — moved to
+ * `ReaderCore`, which the reader page also uses. This component is now the
+ * pane's local wrapper around it.
  *
- * ## Quota
+ * That is the whole point of the change. This file and the thread page's reader
+ * mode were two implementations of the same feature that had quietly drifted:
+ * this one paginated and printed the raw diagnosis slug in parentheses
+ * ("Couldn't read the full article (bot-check)"); the other explained every
+ * diagnosis in a sentence and never paginated at all. Neither was wrong about
+ * its own surface; having two was wrong. See
+ * `sprint/kindle-1-page-and-shell.md` §1b.
  *
- * Spending follows the rule `thread.ts` established, for the same reason: only
- * the caller knows whether an article was actually *rendered*, so a cache hit, a
- * failure, and a page the quality gate rejected all cost nothing. `recordFetch`
- * before the request, `consume` only once `result.article` exists.
+ * ## Why `layout="pane"`
  *
- * Offered only for items the feed did not already give in full — `articleTarget`
- * returns null for a `rssFullContent` item, because there is nothing left to
- * fetch and offering the button would re-download text already on screen.
+ * The pane is ~700px beside a 290px subscription rail. The core drops its own
+ * measure and padding there (the pane already provides both) and hides Exit,
+ * because in the pane there is nothing to exit *to* — the pane is the page.
  */
 @Component({
   selector: 'app-rss-article',
-  imports: [RouterLink, ShareDialog, TranslocoPipe],
+  imports: [ShareDialog, TranslocoPipe, ReaderCore],
   templateUrl: './rss-article.html',
   styleUrl: './rss-article.css',
 })
 export class RssArticle {
-  private articles = inject(ArticleFetch);
-  private diagnostics = inject(PageDiagnostics);
   private host = inject(ElementRef<HTMLElement>);
   private drafts = inject(Drafts);
   private router = inject(Router);
-  protected quota = inject(ArticleQuota);
-  private tally = inject(ArticleReadingTally);
+
+  readonly status = input.required<Status>();
+
+  /** The core reads a chain; an RSS item is a chain of one. */
+  protected readonly chain = computed<Status[]>(() => [this.status()]);
 
   protected showShare = signal(false);
   protected shareQuote = signal('');
@@ -105,84 +86,5 @@ export class RssArticle {
     });
     this.showShare.set(false);
     void this.router.navigate(['/write']);
-  }
-
-  readonly status = input.required<Status>();
-
-  protected readonly expanding = signal(false);
-  protected readonly result = signal<ArticleResult | null>(null);
-  protected readonly page = signal(0);
-
-  /** The URL to fetch, or null when the feed already gave the whole item. */
-  protected readonly target = computed(() => articleTarget(this.status()));
-
-  /** Whether expansion can be offered at all — it needs a CORS proxy. */
-  protected readonly available = computed(() => this.articles.available());
-
-  /** The extracted article split into pages. Empty until something is fetched. */
-  protected readonly pages = computed(() => {
-    const article = this.result()?.article;
-    return article ? paginateMarkdown(article.markdown) : [];
-  });
-
-  protected readonly pageCount = computed(() => this.pages().length);
-
-  /** The current page, rendered to HTML. */
-  protected readonly pageHtml = computed(() => {
-    const pages = this.pages();
-    const index = Math.min(this.page(), pages.length - 1);
-    return index >= 0 && pages[index] !== undefined ? renderMarkdown(pages[index]) : '';
-  });
-
-  /** 1-based, for "Page 2 of 5". */
-  protected readonly pageNumber = computed(() => Math.min(this.page(), this.pageCount() - 1) + 1);
-
-  protected readonly canPrev = computed(() => this.page() > 0);
-  protected readonly canNext = computed(() => this.page() < this.pageCount() - 1);
-
-  /** The failure explanation, when there is one worth showing. */
-  protected readonly failure = computed(() => {
-    const result = this.result();
-    return result && !result.article ? result.diagnosis : null;
-  });
-
-  async expand(): Promise<void> {
-    const url = this.target();
-    if (!url || this.expanding() || !this.quota.allowed()) {
-      return;
-    }
-    this.expanding.set(true);
-    try {
-      // Entitlement is deliberately not persisted, so it starts false on every
-      // reload; settle it before the local counter can refuse a subscriber.
-      if (!(await this.quota.authorize())) {
-        return;
-      }
-      this.quota.recordFetch();
-      const result = await this.articles.expand(url);
-      this.result.set(result);
-      this.page.set(0);
-      if (result.article) {
-        // Only a rendered article costs one of the day's free fetches. Through
-        // the tally rather than the quota directly, so a supporter's running
-        // total also reaches their account and is the same on their phone.
-        this.tally.recordOne();
-      }
-      this.diagnostics.info('RssPage', 'article:expanded', {
-        diagnosis: result.diagnosis,
-        rendered: result.article !== null,
-        pages: this.pageCount(),
-      });
-    } finally {
-      this.expanding.set(false);
-    }
-  }
-
-  protected prevPage(): void {
-    this.page.update((n) => Math.max(0, n - 1));
-  }
-
-  protected nextPage(): void {
-    this.page.update((n) => Math.min(this.pageCount() - 1, n + 1));
   }
 }

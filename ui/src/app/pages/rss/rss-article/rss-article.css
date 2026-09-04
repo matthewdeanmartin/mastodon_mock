@@ -1,3 +1,10 @@
+/* The pane's wrapper around the shared reader.
+
+   Everything about rendering the article — the measure, the body typography,
+   the pager, the code scrollers — moved to `pages/read/reader-core`, which the
+   reader page uses too. What is left here is the pane's own padding and the
+   share line. */
+
 .rss-article {
   display: flex;
   flex-direction: column;
@@ -11,60 +18,6 @@
   align-self: flex-start;
 }
 
-/* Reading measure, not pane width: a 900px line is hard to track back from.
-   The article is the one thing in this pane meant to be read continuously. */
-.article-body {
-  max-width: 68ch;
-  line-height: 1.6;
-}
-
-.article-body :is(h1, h2, h3) {
-  line-height: 1.25;
-  margin: 1.2em 0 0.4em;
-}
-
-.article-body p {
-  margin: 0 0 1em;
-}
-
-.article-body img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-}
-
-/* Code and tables get their own scroller so a wide listing cannot make the
-   whole pane scroll sideways. */
-.article-body pre {
-  overflow-x: auto;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--bg);
-}
-
-.article-body blockquote {
-  margin: 0 0 1em;
-  padding-left: 12px;
-  border-left: 3px solid var(--border);
-  color: var(--text-muted);
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-
-.pager .btn-sm {
-  align-self: auto;
-}
-
-.quota {
-  margin-left: 8px;
-}
-
 .muted {
   color: var(--text-muted);
 }
@@ -73,18 +26,8 @@
   font-size: 13px;
 }
 
-/* Available to assistive tech, invisible on screen. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-/* Sits under the article, after the pager — the point at which someone has
-   actually finished reading and might want to pass it on. */
+/* Sits under the article — the point at which someone has actually finished
+   reading and might want to pass it on. */
 .share-line {
   display: flex;
   align-items: center;

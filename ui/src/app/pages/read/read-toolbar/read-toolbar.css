@@ -1,0 +1,127 @@
+/* The reader's controls: compact, flat and square.
+
+   Deliberately the home feed's filter-row treatment (see `pages/home/home.css`)
+   rather than the app's rounded `.btn` pills — the operator's call, and the
+   right one: a rounded, bordered, padded button reads as "do something", and a
+   page whose job is to get out of the way should not have eight of them
+   shouting across the top of the text. */
+
+.read-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  /* Spans the container, not the measure. A 68ch column is sized for reading
+     prose; the toolbar is not prose. */
+  width: 100%;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  /* Opaque: the article scrolls under this, and translucent chrome over moving
+     text is unreadable at exactly the moment someone is trying to read. */
+  background: var(--bg);
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Pushes Library and Exit to the far end, so the controls that act on the text
+   and the controls that leave it are not intermixed. */
+.tool-end {
+  margin-left: auto;
+}
+
+.tool {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.tool.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tool:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pager .position {
+  min-width: 4.5em;
+  padding: 0 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.remaining {
+  font-size: 12px;
+  padding-left: 4px;
+}
+
+/* The typography popover. Anchored under the bar rather than floating, so it
+   never covers the first line of the article it is restyling — the whole point
+   of changing type is watching the text change. */
+.typography {
+  flex: 1 0 100%;
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--col-bg);
+}
+
+.typo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.typo-label {
+  flex: 0 0 8em;
+  font-size: 13px;
+  color: var(--muted, inherit);
+}
+
+.typo-value {
+  min-width: 3.5em;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.typo-row select,
+.typo-row input[type='range'] {
+  font: inherit;
+  font-size: 13px;
+}
+
+.typo-done {
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  /* On a phone the label column costs more than it explains. */
+  .typo-label {
+    flex-basis: 5.5em;
+  }
+}

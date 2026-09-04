@@ -185,6 +185,18 @@ export class Shell implements OnInit {
 
   /** Rails hidden: the saved preference, or a reader-mode hold. */
   protected readonly railsHidden = computed(() => this.prefs.zenMode() || this.readingZen.active());
+
+  /**
+   * Header and footer hidden: writing zen, or the reader page's `full` hold.
+   *
+   * Both are the same claim — "this surface is the whole screen" — made by two
+   * features that hide an identical superset of the chrome. Kept as one
+   * computed so the five places that ask cannot drift apart, which they did
+   * while `railsHidden` and the writing-zen checks were maintained separately.
+   */
+  protected readonly chromeHidden = computed(
+    () => this.writingZen.active() || this.readingZen.chromeHidden(),
+  );
   protected serverAbout = inject(ServerAbout);
   protected featureFlags = inject(FeatureFlags);
   /** POSSE queue depth, for the "Waiting to publish" row and its count. */

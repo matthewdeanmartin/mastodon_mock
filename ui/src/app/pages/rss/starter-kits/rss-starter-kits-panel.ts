@@ -15,6 +15,10 @@ import { firstValueFrom } from 'rxjs';
 import { Status } from '../../../models';
 import { TranslocoPipe } from '@jsverse/transloco';
 
+// The link text this panel shares with the rest of /rss. Declared here because
+// this is now its only user — it used to live in `rss-article.ts`, whose own
+// article copy moved to the shared reader.
+// i18n pages.rss.article.corsProxy: CORS proxy
 // i18n pages.rss.kits.startWithKit: Start with a kit
 // i18n pages.rss.kits.intro: One click subscribes you to a themed set of feeds, filed into its own folder. You can remove any of them later on the
 // i18n pages.rss.kits.page:  page.

@@ -404,6 +404,7 @@ interface StoredPrefs {
   readerWordSpacing?: number;
   readerTextAlign?: ReaderTextAlign;
   readerTheme?: ReaderTheme;
+  readerPageFlip?: boolean;
   feedReader?: boolean;
   autoRefreshTimeline?: boolean;
   homeWindow?: HomeWindow;
@@ -575,6 +576,17 @@ export class ClientPrefs {
   readonly readerTextAlign = signal<ReaderTextAlign>('left');
   /** Paper colour for the article body only — see {@link ReaderTheme}. */
   readonly readerTheme = signal<ReaderTheme>('app');
+
+  /**
+   * Whether the reader page turns pages rather than scrolling.
+   *
+   * On by default, which is the change from how reading worked before it had a
+   * page of its own: a long article in an endless scroll has no position you
+   * can return to and no sense of how much is left. A page does both, and
+   * `article-pages.ts` was already splitting documents for the RSS pane — this
+   * makes that the normal way to read rather than one surface's local habit.
+   */
+  readonly readerPageFlip = signal<boolean>(true);
 
   // Feed-wide toggles (command bar).
   readonly feedReader = signal<boolean>(false);
@@ -996,6 +1008,10 @@ export class ClientPrefs {
     }
   }
 
+  setReaderPageFlip(on: boolean): void {
+    this.readerPageFlip.set(on);
+  }
+
   setFeedReader(on: boolean): void {
     this.feedReader.set(on);
   }
@@ -1303,6 +1319,7 @@ export class ClientPrefs {
     ) {
       this.verifiedMode.set(stored.verifiedMode);
     }
+    this.loadBool(stored.readerPageFlip, this.readerPageFlip);
     this.loadBool(stored.feedReader, this.feedReader);
     this.loadBool(stored.autoRefreshTimeline, this.autoRefreshTimeline);
     // `today` was the old implicit default. Treat a stored copy as that legacy
@@ -1451,6 +1468,7 @@ export class ClientPrefs {
       readerLetterSpacing: this.readerLetterSpacing(),
       readerWordSpacing: this.readerWordSpacing(),
       readerTextAlign: this.readerTextAlign(),
+      readerPageFlip: this.readerPageFlip(),
       feedReader: this.feedReader(),
       autoRefreshTimeline: this.autoRefreshTimeline(),
       homeWindow: this.homeWindow(),
