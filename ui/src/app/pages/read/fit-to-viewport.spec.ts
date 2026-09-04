@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitToPages, MeasuredBlock, MIN_FILL, pageOfMeasuredBlock } from './fit-to-viewport';
+import { fitToPages, MeasuredBlock, pageOfMeasuredBlock } from './fit-to-viewport';
 
 /** `n` blocks of the given height, numbered from 0. */
 const blocks = (heights: number[]): MeasuredBlock[] =>
@@ -39,27 +39,16 @@ describe('fitting blocks to a page', () => {
   it('gives an oversized block its own page rather than dropping it', () => {
     const pages = fitToPages(blocks([100, 2000, 100]), 700);
 
-    expect(pages.map((page) => page.blocks)).toEqual([[0, 1], [2]]);
+    // Nothing else is added to the already-overflowing block. Upstream block
+    // splitting is responsible for making prose blocks small enough to fit.
+    expect(pages.map((page) => page.blocks)).toEqual([[0], [1], [2]]);
   });
 
-  /**
-   * Without the minimum fill, a run of tall-ish blocks produces a string of
-   * nearly-empty pages and the reader turns four pages to read two screens.
-   */
-  it('overfills rather than leaving a page mostly empty', () => {
-    // 300 of 700 is under the 55% floor, so the second block joins it even
-    // though the total exceeds the height.
+  it('never combines blocks when their measured height exceeds the viewport', () => {
     const pages = fitToPages(blocks([300, 500]), 700);
-    expect(pages).toEqual([{ blocks: [0, 1] }]);
+    expect(pages).toEqual([{ blocks: [0] }, { blocks: [1] }]);
 
-    // 500 of 700 is over the floor, so the next block starts a page.
     expect(fitToPages(blocks([500, 500]), 700).map((page) => page.blocks)).toEqual([[0], [1]]);
-  });
-
-  it('uses the documented floor', () => {
-    const available = 1000;
-    const justUnder = available * MIN_FILL - 1;
-    expect(fitToPages(blocks([justUnder, 900]), available)).toHaveLength(1);
   });
 
   /**

@@ -84,6 +84,19 @@
   margin-bottom: 1em;
 }
 
+/* Pieces of one oversized paragraph remain one flowing paragraph when several
+   fit on the same page. Only its final piece restores the normal block gap. */
+.reader-post-fragment {
+  display: inline;
+  margin: 0;
+}
+
+.reader-post-fragment-end::after {
+  content: '';
+  display: block;
+  margin-bottom: 1em;
+}
+
 .reader-post p {
   margin: 0 0 1em;
 }

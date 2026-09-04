@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReadPage } from './read-page';
 import { ReaderCore } from './reader-core/reader-core';
@@ -24,7 +24,7 @@ import { Status } from '../../models';
 function makeStatus(id: string): Status {
   return {
     id,
-    content: '<p>A post long enough to be worth reading on its own terms.</p>',
+    content: `<p>Document ${id}, long enough to be worth reading on its own terms.</p>`,
     in_reply_to_id: null,
     created_at: '2026-09-01T00:00:00.000Z',
     account: { id: 'a', username: 'ann', acct: 'ann', display_name: 'Ann' },
@@ -65,6 +65,36 @@ describe('ReadPage', () => {
     fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).querySelector('app-reader-core')).not.toBeNull();
+  });
+
+  it('keeps the library and current document mounted while another document loads', () => {
+    const params = new Subject<ReturnType<typeof convertToParamMap>>();
+    TestBed.overrideProvider(ActivatedRoute, { useValue: { paramMap: params } });
+    TestBed.inject(ClientPrefs).setReaderLibraryOpen(true);
+    httpMock = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(ReadPage);
+    fixture.detectChanges();
+
+    params.next(convertToParamMap({ id: '1' }));
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    httpMock.expectOne('/api/v1/statuses/1/context').flush({ ancestors: [], descendants: [] });
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Document 1');
+
+    params.next(convertToParamMap({ id: '2' }));
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('app-library-panel')).not.toBeNull();
+    expect(element.querySelector('app-reader-core')).not.toBeNull();
+    expect(element.textContent).toContain('Document 1');
+    expect(element.textContent).toContain('Opening');
+
+    httpMock.expectOne('/api/v1/statuses/2').flush(makeStatus('2'));
+    httpMock.expectOne('/api/v1/statuses/2/context').flush({ ancestors: [], descendants: [] });
+    fixture.detectChanges();
+    expect(element.textContent).toContain('Document 2');
+    expect(element.querySelector('.document-loading')).toBeNull();
   });
 
   // ------------------------------------------------------------------- zen

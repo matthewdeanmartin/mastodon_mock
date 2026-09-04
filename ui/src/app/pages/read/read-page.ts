@@ -2,6 +2,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   OnDestroy,
   OnInit,
@@ -19,6 +20,7 @@ import { LibraryPanel } from './library-panel/library-panel';
 import { ComposeShareRequest, ShareDialog } from '../../share-dialog/share-dialog';
 import { Drafts } from '../../drafts';
 import { readerChain } from './reader-document';
+import { Status } from '../../models';
 
 /**
  * How long Exit waits before deciding that Back did not work.
@@ -83,8 +85,30 @@ export class ReadPage implements OnInit, OnDestroy {
   /** The id currently being read, for the "view as thread" link. */
   protected readonly currentId = signal('');
 
-  /** The author's own chain: the document. */
-  protected readonly chain = computed(() => readerChain(this.loader.thread(), this.currentId()));
+  /**
+   * The document that is actually on screen.
+   *
+   * Kept separate from the route being loaded so choosing another library row
+   * does not tear down the whole reading surface and the library while its
+   * request is in flight. The old page remains readable until the replacement
+   * is ready, which is the SPA transition the library promises.
+   */
+  private readonly displayedThread = signal<Status[]>([]);
+  protected readonly displayedId = signal('');
+
+  /** The author's own chain: the displayed document, not the pending route. */
+  protected readonly chain = computed(() =>
+    readerChain(this.displayedThread(), this.displayedId()),
+  );
+
+  /** Atomically replace the displayed document once its load has settled. */
+  private readonly showLoadedDocument = effect(() => {
+    if (this.loader.loading()) {
+      return;
+    }
+    this.displayedThread.set(this.loader.thread());
+    this.displayedId.set(this.currentId());
+  });
 
   /**
    * Whether the library sheet is showing.

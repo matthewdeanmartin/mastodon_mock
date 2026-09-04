@@ -184,7 +184,12 @@
            pages through, and it is the case page mode used to miss entirely. -->
       <div #postBody class="reader-posts">
         @for (block of visibleBlocks(); track $index) {
-          <section class="reader-post" [innerHTML]="block.html"></section>
+          <section
+            class="reader-post"
+            [class.reader-post-fragment]="block.fragment"
+            [class.reader-post-fragment-end]="block.fragmentEnd"
+            [innerHTML]="block.html"
+          ></section>
         }
         @for (m of visibleMedia(); track m.id) {
           <img
@@ -202,7 +207,12 @@
       @if (chainGauge()) {
         <div #postGauge class="reader-gauge" aria-hidden="true">
           @for (block of chainBlockList(); track $index) {
-            <section class="reader-post" [innerHTML]="block.html"></section>
+            <section
+              class="reader-post"
+              [class.reader-post-fragment]="block.fragment"
+              [class.reader-post-fragment-end]="block.fragmentEnd"
+              [innerHTML]="block.html"
+            ></section>
           }
         </div>
       }

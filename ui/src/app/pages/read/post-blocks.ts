@@ -47,7 +47,18 @@ export interface PostBlock {
   post: number;
   /** Safe HTML for this block — the `outerHTML` of an element already parsed. */
   html: string;
+  /** A piece of one oversized paragraph, rendered inline with its neighbours. */
+  fragment?: boolean;
+  /** The last piece, after which normal paragraph spacing resumes. */
+  fragmentEnd?: boolean;
 }
+
+/**
+ * Keep prose units comfortably below even a short reading viewport. Real
+ * layout still decides page boundaries; this only prevents one uninterrupted
+ * paragraph from becoming an indivisible multi-screen "page".
+ */
+const PROSE_FRAGMENT_CHARS = 280;
 
 /**
  * Split one post's HTML into top-level blocks.
@@ -84,7 +95,7 @@ export function splitPostHtml(html: string): string[] {
         continue;
       }
       flushLoose();
-      blocks.push(...splitOnLineBreaks(element));
+      blocks.push(...splitProseElement(element));
       continue;
     }
     if (node.nodeType === Node.TEXT_NODE) {
@@ -94,6 +105,96 @@ export function splitPostHtml(html: string): string[] {
   flushLoose();
 
   return blocks.length ? blocks : html.trim() ? [html] : [];
+}
+
+/** Split at authored line breaks first, then split oversized prose at words. */
+function splitProseElement(element: Element): string[] {
+  const lines = splitOnLineBreaks(element);
+  return lines.flatMap((line) => {
+    const holder = document.createElement('div');
+    holder.innerHTML = line;
+    const parsed = holder.firstElementChild;
+    return parsed ? splitLongProse(parsed) : [line];
+  });
+}
+
+/**
+ * Break one long paragraph without cutting its inline markup.
+ *
+ * DOM Ranges clone balanced fragments of links/emphasis even when a boundary
+ * falls inside them. Each piece is emitted as an inline span so adjacent pieces
+ * on the same fitted page still flow as one paragraph.
+ */
+function splitLongProse(element: Element): string[] {
+  if (element.tagName !== 'P' || (element.textContent ?? '').length <= PROSE_FRAGMENT_CHARS) {
+    return [element.outerHTML];
+  }
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  let full = '';
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    nodes.push(node);
+    full += node.data;
+  }
+  if (!nodes.length) {
+    return [element.outerHTML];
+  }
+
+  const boundaries = proseBoundaries(full);
+  if (boundaries.length < 2) {
+    return [element.outerHTML];
+  }
+  return boundaries.slice(0, -1).map((start, index) => {
+    const end = boundaries[index + 1];
+    const range = document.createRange();
+    const from = textPoint(nodes, start);
+    const to = textPoint(nodes, end);
+    range.setStart(from.node, from.offset);
+    range.setEnd(to.node, to.offset);
+    const wrapper = document.createElement('span');
+    wrapper.appendChild(range.cloneContents());
+    return wrapper.outerHTML;
+  });
+}
+
+/** Global text offsets at word boundaries, including both ends. */
+function proseBoundaries(text: string): number[] {
+  const points = [0];
+  let start = 0;
+  while (text.length - start > PROSE_FRAGMENT_CHARS) {
+    const limit = start + PROSE_FRAGMENT_CHARS;
+    const floor = start + Math.floor(PROSE_FRAGMENT_CHARS * 0.6);
+    let end = text.lastIndexOf(' ', limit);
+    if (end < floor) {
+      end = text.indexOf(' ', limit);
+    }
+    if (end <= start) {
+      end = Math.min(text.length, limit);
+    }
+    points.push(end);
+    start = end;
+    while (start < text.length && /\s/.test(text[start])) {
+      start++;
+    }
+    points[points.length - 1] = start;
+  }
+  points.push(text.length);
+  return points;
+}
+
+/** Locate a global character offset inside a run of text nodes. */
+function textPoint(nodes: readonly Text[], offset: number): { node: Text; offset: number } {
+  let seen = 0;
+  for (const node of nodes) {
+    const end = seen + node.data.length;
+    if (offset <= end) {
+      return { node, offset: offset - seen };
+    }
+    seen = end;
+  }
+  const last = nodes[nodes.length - 1];
+  return { node: last, offset: last.data.length };
 }
 
 /**
@@ -172,7 +273,13 @@ function isInline(element: Element): boolean {
 
 /** Every block of every post in the chain, in reading order. */
 export function chainBlocks(chain: readonly Status[]): PostBlock[] {
-  return chain.flatMap((status, post) =>
-    splitPostHtml(status.content ?? '').map((html) => ({ post, html })),
-  );
+  return chain.flatMap((status, post) => {
+    const split = splitPostHtml(status.content ?? '');
+    return split.map((html, index) => ({
+      post,
+      html,
+      fragment: html.startsWith('<span>'),
+      fragmentEnd: html.startsWith('<span>') && !split[index + 1]?.startsWith('<span>'),
+    }));
+  });
 }

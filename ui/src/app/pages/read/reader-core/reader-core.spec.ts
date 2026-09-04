@@ -346,6 +346,38 @@ describe('ReaderCore paging a post chain', () => {
 
   const storm = (n: number): Status[] => Array.from({ length: n }, (_, i) => post(`${i + 1}`, 300));
 
+  const rectAt = (top: number): DOMRect =>
+    ({
+      x: 0,
+      y: top,
+      top,
+      left: 0,
+      right: 600,
+      bottom: top + 100,
+      width: 600,
+      height: 100,
+      toJSON: () => ({}),
+    }) as DOMRect;
+
+  it('sizes an RSS page independently of how far down the feed its item sits', () => {
+    fixture.componentInstance.layout.set('pane');
+    fixture.componentInstance.chain.set(storm(2));
+    fixture.detectChanges();
+    const instance = core();
+    const host = fixture.nativeElement.querySelector('app-reader-core') as HTMLElement;
+    const body = fixture.nativeElement.querySelector('.reader-posts') as HTMLElement;
+    const viewport = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(700);
+    vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(rectAt(2_000));
+    vi.spyOn(body, 'getBoundingClientRect').mockReturnValue(rectAt(2_150));
+
+    const available = (
+      instance as unknown as { roomBelow(element: HTMLElement): number }
+    ).roomBelow(body);
+
+    expect(available).toBe(526); // 700 - 150 inside the reader - 24 bottom gap.
+    viewport.mockRestore();
+  });
+
   /**
    * jsdom reports every height as zero, so the measured path cannot run and the
    * component falls back to one page — which is the documented behaviour for an
@@ -356,10 +388,10 @@ describe('ReaderCore paging a post chain', () => {
     fixture.detectChanges();
 
     expect(core().pageCountForTest()).toBe(1);
-    // And it still renders every post, rather than hiding seven of them.
+    // And it still renders every prose block, rather than hiding the overflow.
     expect(
       (fixture.nativeElement as HTMLElement).querySelectorAll('.reader-posts .reader-post'),
-    ).toHaveLength(8);
+    ).toHaveLength(16);
   });
 
   it('shows the whole chain in scroll mode, whatever the measurements say', () => {
@@ -370,22 +402,22 @@ describe('ReaderCore paging a post chain', () => {
     expect(core().pageCountForTest()).toBe(1);
     expect(
       (fixture.nativeElement as HTMLElement).querySelectorAll('.reader-posts .reader-post'),
-    ).toHaveLength(8);
+    ).toHaveLength(16);
   });
 
-  /** A single post is not a storm; there is nothing to paginate. */
-  it('does not paginate a document of one post', () => {
+  /** jsdom cannot measure it, but one long post is still prepared for paging. */
+  it('falls back safely for a long document of one post', () => {
     fixture.componentInstance.chain.set(storm(1));
     fixture.detectChanges();
 
     expect(core().pageCountForTest()).toBe(1);
   });
 
-  /** The gauge is only worth rendering when there is a chain to measure. */
-  it('lays out a measuring gauge only for a storm in page mode', () => {
+  /** A long single post needs the gauge too: it may be several pages itself. */
+  it('lays out a measuring gauge for any multi-block document in page mode', () => {
     fixture.componentInstance.chain.set(storm(1));
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('.reader-gauge')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.reader-gauge')).not.toBeNull();
 
     fixture.componentInstance.chain.set(storm(5));
     fixture.detectChanges();

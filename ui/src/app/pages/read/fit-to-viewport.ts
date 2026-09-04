@@ -41,17 +41,6 @@ export interface FittedPage {
 }
 
 /**
- * How short a page is allowed to get before we stop respecting the limit.
- *
- * Without this a run of tall blocks produces a string of nearly-empty pages: a
- * block that is 60% of the page height would sit alone on each one, and the
- * reader would turn four pages to read what looks like two screens of text. At
- * that point overflowing slightly is the better trade, so a page always takes
- * at least one block and only *then* starts checking whether the next one fits.
- */
-export const MIN_FILL = 0.55;
-
-/**
  * Group measured blocks into pages that fit `available` pixels.
  *
  * Always returns at least one page so callers never special-case empty input.
@@ -84,13 +73,10 @@ export function fitToPages(blocks: readonly MeasuredBlock[], available: number):
       used += block.height;
       continue;
     }
-    // It does not fit. Take it anyway when the page is still mostly empty,
-    // rather than leaving a page that is barely used.
-    if (used < available * MIN_FILL) {
-      current.push(block.index);
-      used += block.height;
-      continue;
-    }
+    // It does not fit. Page mode is a hard viewport boundary: a short page is
+    // preferable to a nominal "page" that still has to be scrolled. The only
+    // exception is an individual block taller than the viewport, which is
+    // handled above by putting that block on a page of its own.
     pages.push({ blocks: current });
     current = [block.index];
     used = block.height;

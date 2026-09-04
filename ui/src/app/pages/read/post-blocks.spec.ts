@@ -88,6 +88,31 @@ describe('splitting a post into blocks', () => {
     expect(splitPostHtml('<p>a single sentence</p>')).toEqual(['<p>a single sentence</p>']);
   });
 
+  it('splits one uninterrupted long paragraph into page-sized prose fragments', () => {
+    const prose = Array.from({ length: 160 }, (_, i) => `word${i}`).join(' ');
+    const blocks = splitPostHtml(`<p>${prose}</p>`);
+
+    expect(blocks.length).toBeGreaterThan(1);
+    expect(blocks.every((block) => block.startsWith('<span>'))).toBe(true);
+    expect(blocks.join(' ')).toContain('word0');
+    expect(blocks.join(' ')).toContain('word159');
+  });
+
+  it('keeps inline markup balanced when long prose is split through it', () => {
+    const linked = Array.from({ length: 100 }, (_, i) => `linked${i}`).join(' ');
+    const blocks = splitPostHtml(
+      `<p>Before <a href="https://example.test">${linked}</a> after.</p>`,
+    );
+
+    expect(blocks.length).toBeGreaterThan(1);
+    for (const block of blocks) {
+      const holder = document.createElement('div');
+      holder.innerHTML = block;
+      expect(holder.querySelectorAll('script')).toHaveLength(0);
+      expect(holder.textContent?.trim()).not.toBe('');
+    }
+  });
+
   /** A trailing `<br>` is spacing, not an empty line worth a block. */
   it('drops blank lines rather than making pages of them', () => {
     expect(splitPostHtml('<p>one<br><br>two<br></p>')).toEqual(['<p>one</p>', '<p>two</p>']);

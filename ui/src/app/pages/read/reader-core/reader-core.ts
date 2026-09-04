@@ -159,6 +159,7 @@ const READER_PAGE_BOTTOM_GAP = 24;
   providers: [ArticleExpansion, ReadingTools],
 })
 export class ReaderCore {
+  private readonly host = inject(ElementRef<HTMLElement>);
   protected readonly prefs = inject(ClientPrefs);
   protected readonly expansion = inject(ArticleExpansion);
   private readonly transloco = inject(TranslocoService);
@@ -544,6 +545,10 @@ export class ReaderCore {
       return;
     }
     this.lastDocumentId = documentId;
+    // ReaderCore now stays mounted while the library loads the next document.
+    // Its per-document article state therefore has to be cleared explicitly
+    // when the replacement lands; previously destruction did this by accident.
+    this.expansion.collapse();
     this.pageIndex.set(0);
     this.approximateResume.set(false);
     if (!documentId) {
@@ -810,11 +815,35 @@ export class ReaderCore {
    * is where a page turn always leaves it.
    */
   private roomBelow(element: HTMLElement): number {
-    const documentTop = element.getBoundingClientRect().top + window.scrollY;
     const viewport = window.innerHeight || 0;
+    const host = this.host.nativeElement;
+    const article = this.articleRef()?.nativeElement;
+    const isArticle = element === this.articleBodyRef()?.nativeElement && article !== undefined;
+    const anchor = isArticle ? article : host;
+    const contentOffset = Math.max(
+      0,
+      element.getBoundingClientRect().top - anchor.getBoundingClientRect().top,
+    );
+
+    // A page is measured for the position a page turn actually puts it in, not
+    // for wherever its RSS row happens to sit in a long feed. The shell header
+    // remains visible in the RSS pane; the full-page reader hides it. An
+    // expanded article is itself the page anchor, so its sticky reader toolbar
+    // also occupies the top of the viewport.
+    const shellHeight =
+      this.layout() === 'pane'
+        ? (document.querySelector<HTMLElement>('.topbar')?.getBoundingClientRect().height ?? 0)
+        : 0;
+    const toolbarHeight = isArticle
+      ? ((host.querySelector('.read-toolbar-outer') as HTMLElement | null)?.getBoundingClientRect()
+          .height ?? 0)
+      : 0;
     // The bottom breathing room mirrors the column's own padding, so the last
     // line of a page is not flush against the edge of the screen.
-    return Math.max(0, viewport - documentTop - READER_PAGE_BOTTOM_GAP);
+    return Math.max(
+      0,
+      viewport - shellHeight - toolbarHeight - contentOffset - READER_PAGE_BOTTOM_GAP,
+    );
   }
 
   /** The hidden element the whole document is laid out in, for measuring. */
@@ -826,7 +855,7 @@ export class ReaderCore {
   /** Where the posts render, so the room left for them can be measured. */
   private postBodyRef = viewChild<ElementRef<HTMLElement>>('postBody');
 
-  /** Whether the chain is worth measuring: only a storm in page mode paginates. */
+  /** Whether the chain is worth measuring: any multi-block document can paginate. */
   protected readonly chainGauge = computed(
     () => this.prefs.readerPageFlip() && this.chainBlockList().length > 1,
   );
@@ -861,8 +890,34 @@ export class ReaderCore {
     this.prefs.readerPageFlip();
     this.libraryOpen();
     // After the browser has laid the gauge out, not during this tick.
-    afterNextRender(() => this.measure(), { injector: this.injector });
+    afterNextRender(
+      () => {
+        this.observeGauges();
+        this.measure();
+      },
+      { injector: this.injector },
+    );
   });
+
+  /**
+   * Images and web fonts can change a gauge after its first render. Observe its
+   * actual box so that late layout does not silently make a fitted page taller
+   * than the viewport.
+   */
+  private readonly gaugeObserver =
+    typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => this.measure());
+
+  private observeGauges(): void {
+    this.gaugeObserver?.disconnect();
+    const article = this.gaugeRef()?.nativeElement;
+    const posts = this.postGaugeRef()?.nativeElement;
+    if (article) {
+      this.gaugeObserver?.observe(article);
+    }
+    if (posts) {
+      this.gaugeObserver?.observe(posts);
+    }
+  }
 
   constructor() {
     document.addEventListener('visibilitychange', this.onHide);
@@ -874,6 +929,7 @@ export class ReaderCore {
       window.removeEventListener('resize', this.measure);
       document.removeEventListener('keyup', this.onSelectionKey);
       document.removeEventListener('mouseup', this.onSelectionPointer);
+      this.gaugeObserver?.disconnect();
       this.flushPosition();
     });
   }
@@ -908,9 +964,26 @@ export class ReaderCore {
     // keeps whatever scroll position the last page left them at, so page two
     // opens halfway down — and the measurement, which assumes a page starts at
     // the top, would be describing a layout nobody is looking at.
-    if (this.layout() === 'page' && typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    if (typeof window !== 'undefined') {
+      this.scrollToPageStart();
     }
+  }
+
+  /** Put the page at the same viewport position it was measured for. */
+  private scrollToPageStart(): void {
+    const article = this.expansion.result()?.article ? this.articleRef()?.nativeElement : null;
+    const anchor = article ?? this.host.nativeElement;
+    const shellHeight =
+      this.layout() === 'pane'
+        ? (document.querySelector<HTMLElement>('.topbar')?.getBoundingClientRect().height ?? 0)
+        : 0;
+    const toolbarHeight = article
+      ? ((
+          this.host.nativeElement.querySelector('.read-toolbar-outer') as HTMLElement | null
+        )?.getBoundingClientRect().height ?? 0)
+      : 0;
+    const top = window.scrollY + anchor.getBoundingClientRect().top - shellHeight - toolbarHeight;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'instant' as ScrollBehavior });
   }
 
   /**
@@ -1039,6 +1112,10 @@ export class ReaderCore {
   private focusArticle(): void {
     queueMicrotask(() => {
       this.articleRef()?.nativeElement.focus({ preventScroll: false });
+      // The first fetched page follows the same positioning contract as every
+      // later page turn. Native focus scrolling only makes the region visible;
+      // it does not account for either sticky toolbar.
+      this.scrollToPageStart();
     });
   }
 

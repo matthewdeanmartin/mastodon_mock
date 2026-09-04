@@ -50,6 +50,25 @@
   margin: 0 0 16px;
 }
 
+.read-document {
+  position: relative;
+  min-width: 0;
+}
+
+/* Keep the current page in place while another library document loads. */
+.document-loading {
+  position: fixed;
+  top: 44px;
+  right: 16px;
+  z-index: 5;
+  margin: 0;
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: var(--bg);
+  font-family: var(--app-font-family);
+  font-size: 13px;
+}
+
 .tool {
   display: inline-flex;
   align-items: center;
