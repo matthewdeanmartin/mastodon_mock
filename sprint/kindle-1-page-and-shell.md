@@ -290,3 +290,58 @@ an unmeasurable viewport yields one page with every post still rendered, that
 scroll mode always shows the whole chain, that the gauge appears only for a
 storm in page mode and is `aria-hidden`. **The measurement against real layout
 is not covered by a test and wants a look in a browser.**
+
+## Pages still overflowed; a long single post never split (fixed 2026-09-04)
+
+Three more reports from the operator, all one root cause plus two compounding
+measurement bugs.
+
+> "the pages are still taller than the viewport… I don't see page splitting for
+> one long tweet."
+> "RSS, if I view as thread, it does open in reader, but no splitting no matter
+> how long the article is."
+> "long first tweet (vertically tall, lots of line breaks), no splitting"
+
+**The unit was wrong.** The first pass paginated the chain *post by post*, which
+works for a tweetstorm and does nothing for one long post: one post is one unit,
+so it lands on one page and that page is as tall as the post. The RSS case is
+the same bug wearing different clothes — a full-content RSS item is a `Status`
+whose `content` is the whole article (`rss-adapter.ts:241`), so it takes the
+post path, not the fetched-article path.
+
+`post-blocks.ts` makes the unit a **block**: a paragraph, heading, list or
+image. That is the unit `article-pages.ts` already splits markdown into and the
+one highlight anchors index, so a document has one idea of what a block is
+whatever it was made of.
+
+**And `<br>` runs had to split too.** The operator's example
+(`statuses/117136053979504519`) is a "Week in Fediverse" digest: structurally 14
+paragraphs, but two of them are long runs of `<br>`-separated links and the
+largest is 1,454 characters. Splitting on paragraphs alone still left a block
+several screens tall. Splitting the line breaks as well takes that same post to
+**32 blocks with the largest at 409** — measured against the real content, not a
+synthetic fixture. The lines were already separate things; the author put the
+breaks there, so a page boundary between two of them is a seam that existed
+already.
+
+Safety is unchanged and worth restating: every block is the `outerHTML` of an
+element that was already in the parsed tree, and a split line is a clone of its
+own wrapper with already-parsed children moved into it. Nothing is concatenated
+or rebuilt from text, so a block is exactly as safe as the post it came from.
+
+### Two measurement bugs found while fixing it
+
+**`available` grew as you scrolled.** `getBoundingClientRect().top` is relative
+to the *viewport*, so on a scrolled page it goes negative and `viewport - top`
+comes out larger than the screen — pages got taller the further down you were.
+`roomBelow()` converts to a document coordinate first.
+
+**Nothing reset the scroll on a page turn.** Turning a page left the reader
+wherever the last one ended, so page two opened halfway down — and the next
+measurement then described a layout nobody was looking at. `turnTo` now scrolls
+to the top in `page` layout.
+
+Fifteen tests in `post-blocks.spec.ts`, including the digest shape from the
+operator's actual post, a break nested in a list item (which must *not* tear the
+list apart), and blank lines from a trailing `<br>` (which must not become pages
+of their own).

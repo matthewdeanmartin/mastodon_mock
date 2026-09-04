@@ -183,26 +183,26 @@
            — a forty-post storm is exactly the document someone wants to turn
            pages through, and it is the case page mode used to miss entirely. -->
       <div #postBody class="reader-posts">
-        @for (p of visiblePosts(); track p.id) {
-          <section class="reader-post" [innerHTML]="p.content"></section>
-          @for (m of p.media_attachments; track m.id) {
-            <img
-              class="reader-media"
-              [src]="m.preview_url || m.url"
-              [alt]="m.description || ''"
-              loading="lazy"
-              decoding="async"
-            />
-          }
+        @for (block of visibleBlocks(); track $index) {
+          <section class="reader-post" [innerHTML]="block.html"></section>
+        }
+        @for (m of visibleMedia(); track m.id) {
+          <img
+            class="reader-media"
+            [src]="m.preview_url || m.url"
+            [alt]="m.description || ''"
+            loading="lazy"
+            decoding="async"
+          />
         }
       </div>
 
-      <!-- The chain laid out but not shown, so each post's height can be
+      <!-- Every block laid out but not shown, so each one's height can be
            measured. Same trick as the article gauge, same reason. -->
       @if (chainGauge()) {
         <div #postGauge class="reader-gauge" aria-hidden="true">
-          @for (p of chain(); track p.id) {
-            <section class="reader-post" [innerHTML]="p.content"></section>
+          @for (block of chainBlockList(); track $index) {
+            <section class="reader-post" [innerHTML]="block.html"></section>
           }
         </div>
       }

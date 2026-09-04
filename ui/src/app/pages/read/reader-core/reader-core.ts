@@ -30,6 +30,7 @@ import { articleTarget } from '../../../providers/article/article-target';
 import { renderMarkdown } from '../../../providers/article/markdown-render';
 import { paginateMarkdown } from '../../rss/article-pages';
 import { fitToPages } from '../fit-to-viewport';
+import { chainBlocks, PostBlock } from '../post-blocks';
 import { documentBlocks } from '../reader-anchor';
 import { ReadToolbar } from '../read-toolbar/read-toolbar';
 import { DocumentSearchDialog } from '../document-search/document-search-dialog';
@@ -359,29 +360,65 @@ export class ReaderCore {
    * A post is the unit, never split: posts were written as separate things and
    * a page break between two of them is a seam the author already put there.
    */
-  protected readonly postPages = computed<Status[][]>(() => {
-    const chain = this.chain();
-    if (!this.prefs.readerPageFlip() || chain.length < 2) {
-      return [chain];
+  /** Every block of every post, which is the unit a page is built from. */
+  protected readonly chainBlockList = computed<PostBlock[]>(() => chainBlocks(this.chain()));
+
+  /**
+   * The chain's blocks grouped into pages that fit.
+   *
+   * **A block, not a post.** Paginating post-by-post works for a tweetstorm and
+   * does nothing for a single long tweet — one post is one unit, so it lands on
+   * one page and that page is as tall as the post. A paragraph is the unit that
+   * makes both cases work, and it is the same unit the article pagination and
+   * the highlight anchors already use.
+   */
+  protected readonly postPages = computed<PostBlock[][]>(() => {
+    const blocks = this.chainBlockList();
+    if (!this.prefs.readerPageFlip() || blocks.length < 2) {
+      return [blocks];
     }
     const heights = this.postHeights();
     const available = this.chainAvailable();
-    if (!available || heights.length !== chain.length) {
-      return [chain];
+    if (!available || heights.length !== blocks.length) {
+      return [blocks];
     }
     return fitToPages(
       heights.map((height, index) => ({ index, height })),
       available,
-    ).map((page) => page.blocks.map((index) => chain[index]));
+    ).map((page) => page.blocks.map((index) => blocks[index]));
   });
 
-  /** The posts to render right now. */
-  protected readonly visiblePosts = computed<Status[]>(() => {
+  /** The blocks to render right now. */
+  protected readonly visibleBlocks = computed<PostBlock[]>(() => {
     const pages = this.postPages();
     if (pages.length < 2) {
       return pages[0] ?? [];
     }
     return pages[Math.min(this.pageIndex(), pages.length - 1)] ?? [];
+  });
+
+  /**
+   * Media for the posts represented on this page.
+   *
+   * Attached to the page its post's *last* block falls on, so a picture arrives
+   * after the words that introduce it rather than on the page where the post
+   * happened to start.
+   */
+  protected readonly visibleMedia = computed(() => {
+    const all = this.chainBlockList();
+    const visible = this.visibleBlocks();
+    const chain = this.chain();
+    // A post's media belongs on the page holding its last block: a picture
+    // should arrive after the words that introduce it, not on the page where
+    // the post happened to begin.
+    return chain.flatMap((status, post) => {
+      const lastBlock = all.filter((block) => block.post === post).at(-1);
+      const ends = lastBlock ? visible.includes(lastBlock) : false;
+      // A post with no blocks at all (media-only) rides with whatever page its
+      // neighbours put it on; showing it once beats never showing it.
+      const mediaOnly = !lastBlock && visible.length > 0 && post === chain.length - 1;
+      return ends || mediaOnly ? (status.media_attachments ?? []) : [];
+    });
   });
 
   /**
@@ -701,11 +738,7 @@ export class ReaderCore {
     // have taken their share. `getBoundingClientRect().top` is where the prose
     // actually starts, which accounts for the header, the byline and anything
     // else above it without this needing to know they exist.
-    const top = body.getBoundingClientRect().top;
-    const viewport = window.innerHeight || 0;
-    // The bottom breathing room mirrors the column's own padding, so the last
-    // line of a page is not flush against the edge of the screen.
-    const available = Math.max(0, viewport - top - READER_PAGE_BOTTOM_GAP);
+    const available = this.roomBelow(body);
 
     const heights = [...gauge.children].map((child) => {
       const rect = child.getBoundingClientRect();
@@ -744,8 +777,7 @@ export class ReaderCore {
     if (!body || !gauge) {
       return;
     }
-    const top = body.getBoundingClientRect().top;
-    const available = Math.max(0, (window.innerHeight || 0) - top - READER_PAGE_BOTTOM_GAP);
+    const available = this.roomBelow(body);
     const heights = [...gauge.children].map((child) => {
       const rect = child.getBoundingClientRect();
       const style = getComputedStyle(child);
@@ -766,6 +798,25 @@ export class ReaderCore {
     }
   }
 
+  /**
+   * How much room a page of this element has, independent of scroll position.
+   *
+   * `getBoundingClientRect().top` is relative to the **viewport**, so on a
+   * scrolled page it goes negative and `viewport - top` comes out larger than
+   * the screen — pages then grow the further down you are, which is one of the
+   * two reasons page mode still overflowed. Adding the scroll offset back
+   * converts it to a document coordinate, and subtracting the scroll position
+   * gives where the element sits on screen *when the page is at the top*, which
+   * is where a page turn always leaves it.
+   */
+  private roomBelow(element: HTMLElement): number {
+    const documentTop = element.getBoundingClientRect().top + window.scrollY;
+    const viewport = window.innerHeight || 0;
+    // The bottom breathing room mirrors the column's own padding, so the last
+    // line of a page is not flush against the edge of the screen.
+    return Math.max(0, viewport - documentTop - READER_PAGE_BOTTOM_GAP);
+  }
+
   /** The hidden element the whole document is laid out in, for measuring. */
   private gaugeRef = viewChild<ElementRef<HTMLElement>>('gauge');
 
@@ -777,7 +828,7 @@ export class ReaderCore {
 
   /** Whether the chain is worth measuring: only a storm in page mode paginates. */
   protected readonly chainGauge = computed(
-    () => this.prefs.readerPageFlip() && this.chain().length > 1,
+    () => this.prefs.readerPageFlip() && this.chainBlockList().length > 1,
   );
 
   /** The whole document as HTML, for the gauge only. Never shown to anyone. */
@@ -853,6 +904,13 @@ export class ReaderCore {
     this.tools.markedText.set('');
     this.pageIndex.set(Math.min(Math.max(0, index), Math.max(0, this.pageCount() - 1)));
     this.savePosition();
+    // A page turn puts you at the top of the new page. Without this the reader
+    // keeps whatever scroll position the last page left them at, so page two
+    // opens halfway down — and the measurement, which assumes a page starts at
+    // the top, would be describing a layout nobody is looking at.
+    if (this.layout() === 'page' && typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    }
   }
 
   /**
