@@ -16,8 +16,8 @@ export interface StarterKit {
   blurb: string;
   accounts: readonly StarterAccount[];
   lang?: string;
-  titles?: Readonly<Record<string, string>>;
-  blurbs?: Readonly<Record<string, string>>;
+  titles?: Readonly<Partial<Record<string, string>>>;
+  blurbs?: Readonly<Partial<Record<string, string>>>;
 }
 
 function starter(name: string, handle: string, id: string): StarterAccount {
@@ -123,7 +123,8 @@ export const STARTER_KITS: readonly StarterKit[] = [
 export const STARTER_CATALOG_UPDATED_AT = catalog.generatedAt;
 
 export function starterKitText(kit: StarterKit, locale: string): { title: string; blurb: string } {
-  const language = locale.toLowerCase().split(/[-_]/)[0];
+  // A pack's content language wins even when the app's chrome is in English.
+  const language = (kit.lang ?? locale).toLowerCase().split(/[-_]/)[0];
   return {
     title: kit.titles?.[language] ?? kit.title,
     blurb: kit.blurbs?.[language] ?? kit.blurb,

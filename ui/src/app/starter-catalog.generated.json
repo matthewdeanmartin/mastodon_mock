@@ -20,7 +20,8 @@
         "ko": "동물과 반려동물",
         "uk": "Тварини та улюбленці",
         "tr": "Hayvanlar ve evcil hayvanlar",
-        "el": "Ζώα και κατοικίδια"
+        "el": "Ζώα και κατοικίδια",
+        "zh": "动物与宠物"
       },
       "blurb": {
         "en": "Cats, dogs, and the oldest and best subject on the internet."
@@ -179,10 +180,15 @@
         "ko": "예술과 일러스트",
         "uk": "Мистецтво та ілюстрація",
         "tr": "Sanat ve illüstrasyon",
-        "el": "Τέχνη και εικονογράφηση"
+        "el": "Τέχνη και εικονογράφηση",
+        "zh": "艺术与插画"
       },
       "blurb": {
-        "en": "Painters, illustrators, and digital artists sharing their work."
+        "en": "Painters, illustrators, and digital artists sharing their work.",
+        "de": "Maler, Illustratoren und digitale Künstler teilen ihre Werke.",
+        "es": "Pintores, ilustradores y artistas digitales que comparten su obra.",
+        "fr": "Peintres, illustrateurs et artistes numériques qui partagent leurs œuvres.",
+        "ja": "画家、イラストレーター、デジタルアーティストが作品を紹介します。"
       },
       "icon": "🎨",
       "accounts": [
@@ -338,10 +344,15 @@
         "ko": "예술과 일러스트",
         "uk": "Мистецтво та ілюстрація",
         "tr": "Sanat ve illüstrasyon",
-        "el": "Τέχνη και εικονογράφηση"
+        "el": "Τέχνη και εικονογράφηση",
+        "zh": "艺术与插画"
       },
       "blurb": {
-        "en": "Painters, illustrators, and digital artists sharing their work."
+        "en": "Painters, illustrators, and digital artists sharing their work.",
+        "de": "Maler, Illustratoren und digitale Künstler teilen ihre Werke.",
+        "es": "Pintores, ilustradores y artistas digitales que comparten su obra.",
+        "fr": "Peintres, illustrateurs et artistes numériques qui partagent leurs œuvres.",
+        "ja": "画家、イラストレーター、デジタルアーティストが作品を紹介します。"
       },
       "icon": "🎨",
       "accounts": [
@@ -497,10 +508,15 @@
         "ko": "예술과 일러스트",
         "uk": "Мистецтво та ілюстрація",
         "tr": "Sanat ve illüstrasyon",
-        "el": "Τέχνη και εικονογράφηση"
+        "el": "Τέχνη και εικονογράφηση",
+        "zh": "艺术与插画"
       },
       "blurb": {
-        "en": "Painters, illustrators, and digital artists sharing their work."
+        "en": "Painters, illustrators, and digital artists sharing their work.",
+        "de": "Maler, Illustratoren und digitale Künstler teilen ihre Werke.",
+        "es": "Pintores, ilustradores y artistas digitales que comparten su obra.",
+        "fr": "Peintres, illustrateurs et artistes numériques qui partagent leurs œuvres.",
+        "ja": "画家、イラストレーター、デジタルアーティストが作品を紹介します。"
       },
       "icon": "🎨",
       "accounts": [
@@ -656,10 +672,15 @@
         "ko": "예술과 일러스트",
         "uk": "Мистецтво та ілюстрація",
         "tr": "Sanat ve illüstrasyon",
-        "el": "Τέχνη και εικονογράφηση"
+        "el": "Τέχνη και εικονογράφηση",
+        "zh": "艺术与插画"
       },
       "blurb": {
-        "en": "Painters, illustrators, and digital artists sharing their work."
+        "en": "Painters, illustrators, and digital artists sharing their work.",
+        "de": "Maler, Illustratoren und digitale Künstler teilen ihre Werke.",
+        "es": "Pintores, ilustradores y artistas digitales que comparten su obra.",
+        "fr": "Peintres, illustrateurs et artistes numériques qui partagent leurs œuvres.",
+        "ja": "画家、イラストレーター、デジタルアーティストが作品を紹介します。"
       },
       "icon": "🎨",
       "accounts": [
@@ -749,10 +770,15 @@
         "ko": "예술과 일러스트",
         "uk": "Мистецтво та ілюстрація",
         "tr": "Sanat ve illüstrasyon",
-        "el": "Τέχνη και εικονογράφηση"
+        "el": "Τέχνη και εικονογράφηση",
+        "zh": "艺术与插画"
       },
       "blurb": {
-        "en": "Painters, illustrators, and digital artists sharing their work."
+        "en": "Painters, illustrators, and digital artists sharing their work.",
+        "de": "Maler, Illustratoren und digitale Künstler teilen ihre Werke.",
+        "es": "Pintores, ilustradores y artistas digitales que comparten su obra.",
+        "fr": "Peintres, illustrateurs et artistes numériques qui partagent leurs œuvres.",
+        "ja": "画家、イラストレーター、デジタルアーティストが作品を紹介します。"
       },
       "icon": "🎨",
       "accounts": [
@@ -853,10 +879,14 @@
         "ko": "책과 글쓰기",
         "uk": "Книги та письмо",
         "tr": "Kitaplar ve yazarlık",
-        "el": "Βιβλία και συγγραφή"
+        "el": "Βιβλία και συγγραφή",
+        "zh": "书籍与写作"
       },
       "blurb": {
-        "en": "Authors, critics, and readers talking about what they are reading."
+        "en": "Authors, critics, and readers talking about what they are reading.",
+        "de": "Autoren, Kritiker und Leser sprechen über ihre Lektüre.",
+        "es": "Autores, críticos y lectores que hablan de lo que están leyendo.",
+        "fr": "Auteurs, critiques et lecteurs qui parlent de leurs lectures."
       },
       "icon": "📚",
       "accounts": [
@@ -946,10 +976,14 @@
         "ko": "책과 글쓰기",
         "uk": "Книги та письмо",
         "tr": "Kitaplar ve yazarlık",
-        "el": "Βιβλία και συγγραφή"
+        "el": "Βιβλία και συγγραφή",
+        "zh": "书籍与写作"
       },
       "blurb": {
-        "en": "Authors, critics, and readers talking about what they are reading."
+        "en": "Authors, critics, and readers talking about what they are reading.",
+        "de": "Autoren, Kritiker und Leser sprechen über ihre Lektüre.",
+        "es": "Autores, críticos y lectores que hablan de lo que están leyendo.",
+        "fr": "Auteurs, critiques et lecteurs qui parlent de leurs lectures."
       },
       "icon": "📚",
       "accounts": [
@@ -1105,10 +1139,14 @@
         "ko": "책과 글쓰기",
         "uk": "Книги та письмо",
         "tr": "Kitaplar ve yazarlık",
-        "el": "Βιβλία και συγγραφή"
+        "el": "Βιβλία και συγγραφή",
+        "zh": "书籍与写作"
       },
       "blurb": {
-        "en": "Authors, critics, and readers talking about what they are reading."
+        "en": "Authors, critics, and readers talking about what they are reading.",
+        "de": "Autoren, Kritiker und Leser sprechen über ihre Lektüre.",
+        "es": "Autores, críticos y lectores que hablan de lo que están leyendo.",
+        "fr": "Auteurs, critiques et lecteurs qui parlent de leurs lectures."
       },
       "icon": "📚",
       "accounts": [
@@ -1242,10 +1280,14 @@
         "ko": "책과 글쓰기",
         "uk": "Книги та письмо",
         "tr": "Kitaplar ve yazarlık",
-        "el": "Βιβλία και συγγραφή"
+        "el": "Βιβλία και συγγραφή",
+        "zh": "书籍与写作"
       },
       "blurb": {
-        "en": "Authors, critics, and readers talking about what they are reading."
+        "en": "Authors, critics, and readers talking about what they are reading.",
+        "de": "Autoren, Kritiker und Leser sprechen über ihre Lektüre.",
+        "es": "Autores, críticos y lectores que hablan de lo que están leyendo.",
+        "fr": "Auteurs, critiques et lecteurs qui parlent de leurs lectures."
       },
       "icon": "📚",
       "accounts": [
@@ -1379,10 +1421,14 @@
         "ko": "시민 생활",
         "uk": "Громадське життя",
         "tr": "Yurttaşlık",
-        "el": "Δημόσιος βίος"
+        "el": "Δημόσιος βίος",
+        "zh": "公共生活"
       },
       "blurb": {
-        "en": "Local government, courts, and how public decisions actually get made."
+        "en": "Local government, courts, and how public decisions actually get made.",
+        "de": "Kommunalpolitik, Gerichte und wie öffentliche Entscheidungen tatsächlich zustande kommen.",
+        "fr": "Collectivités locales, tribunaux et processus de décision publique.",
+        "nl": "Lokaal bestuur, rechtbanken en hoe publieke besluiten werkelijk tot stand komen."
       },
       "icon": "🗳️",
       "accounts": [
@@ -1538,10 +1584,14 @@
         "ko": "시민 생활",
         "uk": "Громадське життя",
         "tr": "Yurttaşlık",
-        "el": "Δημόσιος βίος"
+        "el": "Δημόσιος βίος",
+        "zh": "公共生活"
       },
       "blurb": {
-        "en": "Local government, courts, and how public decisions actually get made."
+        "en": "Local government, courts, and how public decisions actually get made.",
+        "de": "Kommunalpolitik, Gerichte und wie öffentliche Entscheidungen tatsächlich zustande kommen.",
+        "fr": "Collectivités locales, tribunaux et processus de décision publique.",
+        "nl": "Lokaal bestuur, rechtbanken en hoe publieke besluiten werkelijk tot stand komen."
       },
       "icon": "🗳️",
       "accounts": [
@@ -1697,10 +1747,14 @@
         "ko": "시민 생활",
         "uk": "Громадське життя",
         "tr": "Yurttaşlık",
-        "el": "Δημόσιος βίος"
+        "el": "Δημόσιος βίος",
+        "zh": "公共生活"
       },
       "blurb": {
-        "en": "Local government, courts, and how public decisions actually get made."
+        "en": "Local government, courts, and how public decisions actually get made.",
+        "de": "Kommunalpolitik, Gerichte und wie öffentliche Entscheidungen tatsächlich zustande kommen.",
+        "fr": "Collectivités locales, tribunaux et processus de décision publique.",
+        "nl": "Lokaal bestuur, rechtbanken en hoe publieke besluiten werkelijk tot stand komen."
       },
       "icon": "🗳️",
       "accounts": [
@@ -1790,10 +1844,14 @@
         "ko": "시민 생활",
         "uk": "Громадське життя",
         "tr": "Yurttaşlık",
-        "el": "Δημόσιος βίος"
+        "el": "Δημόσιος βίος",
+        "zh": "公共生活"
       },
       "blurb": {
-        "en": "Local government, courts, and how public decisions actually get made."
+        "en": "Local government, courts, and how public decisions actually get made.",
+        "de": "Kommunalpolitik, Gerichte und wie öffentliche Entscheidungen tatsächlich zustande kommen.",
+        "fr": "Collectivités locales, tribunaux et processus de décision publique.",
+        "nl": "Lokaal bestuur, rechtbanken en hoe publieke besluiten werkelijk tot stand komen."
       },
       "icon": "🗳️",
       "accounts": [
@@ -1872,10 +1930,13 @@
         "ko": "기후와 환경",
         "uk": "Клімат і довкілля",
         "tr": "İklim ve çevre",
-        "el": "Κλίμα και περιβάλλον"
+        "el": "Κλίμα και περιβάλλον",
+        "zh": "气候与环境"
       },
       "blurb": {
-        "en": "Climate scientists, energy analysts, and environmental reporting."
+        "en": "Climate scientists, energy analysts, and environmental reporting.",
+        "de": "Klimaforscher, Energieanalysten und Berichte über die Umwelt.",
+        "nl": "Klimaatwetenschappers, energieanalisten en berichtgeving over het milieu."
       },
       "icon": "🌍",
       "accounts": [
@@ -1965,10 +2026,13 @@
         "ko": "기후와 환경",
         "uk": "Клімат і довкілля",
         "tr": "İklim ve çevre",
-        "el": "Κλίμα και περιβάλλον"
+        "el": "Κλίμα και περιβάλλον",
+        "zh": "气候与环境"
       },
       "blurb": {
-        "en": "Climate scientists, energy analysts, and environmental reporting."
+        "en": "Climate scientists, energy analysts, and environmental reporting.",
+        "de": "Klimaforscher, Energieanalysten und Berichte über die Umwelt.",
+        "nl": "Klimaatwetenschappers, energieanalisten en berichtgeving over het milieu."
       },
       "icon": "🌍",
       "accounts": [
@@ -2124,10 +2188,13 @@
         "ko": "기후와 환경",
         "uk": "Клімат і довкілля",
         "tr": "İklim ve çevre",
-        "el": "Κλίμα και περιβάλλον"
+        "el": "Κλίμα και περιβάλλον",
+        "zh": "气候与环境"
       },
       "blurb": {
-        "en": "Climate scientists, energy analysts, and environmental reporting."
+        "en": "Climate scientists, energy analysts, and environmental reporting.",
+        "de": "Klimaforscher, Energieanalysten und Berichte über die Umwelt.",
+        "nl": "Klimaatwetenschappers, energieanalisten en berichtgeving over het milieu."
       },
       "icon": "🌍",
       "accounts": [
@@ -2206,10 +2273,12 @@
         "ko": "만화",
         "uk": "Комікси",
         "tr": "Çizgi roman",
-        "el": "Κόμικς"
+        "el": "Κόμικς",
+        "zh": "漫画"
       },
       "blurb": {
-        "en": "Cartoonists and webcomic artists posting their strips."
+        "en": "Cartoonists and webcomic artists posting their strips.",
+        "es": "Dibujantes y artistas de webcómics que publican sus tiras."
       },
       "icon": "💥",
       "accounts": [
@@ -2343,10 +2412,12 @@
         "ko": "만화",
         "uk": "Комікси",
         "tr": "Çizgi roman",
-        "el": "Κόμικς"
+        "el": "Κόμικς",
+        "zh": "漫画"
       },
       "blurb": {
-        "en": "Cartoonists and webcomic artists posting their strips."
+        "en": "Cartoonists and webcomic artists posting their strips.",
+        "es": "Dibujantes y artistas de webcómics que publican sus tiras."
       },
       "icon": "💥",
       "accounts": [
@@ -2425,10 +2496,12 @@
         "ko": "공예와 제작",
         "uk": "Ремесла та створення",
         "tr": "El sanatları ve üretim",
-        "el": "Χειροτεχνία και κατασκευές"
+        "el": "Χειροτεχνία και κατασκευές",
+        "zh": "手工与制作"
       },
       "blurb": {
-        "en": "Knitters, woodworkers, and makers of physical things."
+        "en": "Knitters, woodworkers, and makers of physical things.",
+        "fr": "Tricot, travail du bois et création d’objets de toutes sortes."
       },
       "icon": "🧵",
       "accounts": [
@@ -2584,10 +2657,12 @@
         "ko": "공예와 제작",
         "uk": "Ремесла та створення",
         "tr": "El sanatları ve üretim",
-        "el": "Χειροτεχνία και κατασκευές"
+        "el": "Χειροτεχνία και κατασκευές",
+        "zh": "手工与制作"
       },
       "blurb": {
-        "en": "Knitters, woodworkers, and makers of physical things."
+        "en": "Knitters, woodworkers, and makers of physical things.",
+        "fr": "Tricot, travail du bois et création d’objets de toutes sortes."
       },
       "icon": "🧵",
       "accounts": [
@@ -2666,10 +2741,12 @@
         "ko": "영화와 TV",
         "uk": "Кіно і телебачення",
         "tr": "Film ve televizyon",
-        "el": "Κινηματογράφος και τηλεόραση"
+        "el": "Κινηματογράφος και τηλεόραση",
+        "zh": "电影与电视"
       },
       "blurb": {
-        "en": "Critics, filmmakers, and people with opinions about what to watch."
+        "en": "Critics, filmmakers, and people with opinions about what to watch.",
+        "it": "Critici, registi e persone con consigli su cosa guardare."
       },
       "icon": "🎬",
       "accounts": [
@@ -2825,10 +2902,12 @@
         "ko": "영화와 TV",
         "uk": "Кіно і телебачення",
         "tr": "Film ve televizyon",
-        "el": "Κινηματογράφος και τηλεόραση"
+        "el": "Κινηματογράφος και τηλεόραση",
+        "zh": "电影与电视"
       },
       "blurb": {
-        "en": "Critics, filmmakers, and people with opinions about what to watch."
+        "en": "Critics, filmmakers, and people with opinions about what to watch.",
+        "it": "Critici, registi e persone con consigli su cosa guardare."
       },
       "icon": "🎬",
       "accounts": [
@@ -2907,7 +2986,8 @@
         "ko": "음식과 요리",
         "uk": "Їжа та кулінарія",
         "tr": "Yemek ve mutfak",
-        "el": "Φαγητό και μαγειρική"
+        "el": "Φαγητό και μαγειρική",
+        "zh": "美食与烹饪"
       },
       "blurb": {
         "en": "Cooks, bakers, and people photographing dinner."
@@ -3055,10 +3135,14 @@
         "ko": "게임",
         "uk": "Ігри",
         "tr": "Oyunlar",
-        "el": "Παιχνίδια"
+        "el": "Παιχνίδια",
+        "zh": "游戏"
       },
       "blurb": {
-        "en": "Video games, tabletop, and the people who make and play them."
+        "en": "Video games, tabletop, and the people who make and play them.",
+        "es": "Videojuegos, juegos de mesa y quienes los crean y disfrutan.",
+        "pl": "Gry wideo, gry planszowe oraz ludzie, którzy je tworzą i w nie grają.",
+        "zh": "电子游戏、桌面游戏，以及制作和玩这些游戏的人。"
       },
       "icon": "🎮",
       "accounts": [
@@ -3214,10 +3298,14 @@
         "ko": "게임",
         "uk": "Ігри",
         "tr": "Oyunlar",
-        "el": "Παιχνίδια"
+        "el": "Παιχνίδια",
+        "zh": "游戏"
       },
       "blurb": {
-        "en": "Video games, tabletop, and the people who make and play them."
+        "en": "Video games, tabletop, and the people who make and play them.",
+        "es": "Videojuegos, juegos de mesa y quienes los crean y disfrutan.",
+        "pl": "Gry wideo, gry planszowe oraz ludzie, którzy je tworzą i w nie grają.",
+        "zh": "电子游戏、桌面游戏，以及制作和玩这些游戏的人。"
       },
       "icon": "🎮",
       "accounts": [
@@ -3373,10 +3461,14 @@
         "ko": "게임",
         "uk": "Ігри",
         "tr": "Oyunlar",
-        "el": "Παιχνίδια"
+        "el": "Παιχνίδια",
+        "zh": "游戏"
       },
       "blurb": {
-        "en": "Video games, tabletop, and the people who make and play them."
+        "en": "Video games, tabletop, and the people who make and play them.",
+        "es": "Videojuegos, juegos de mesa y quienes los crean y disfrutan.",
+        "pl": "Gry wideo, gry planszowe oraz ludzie, którzy je tworzą i w nie grają.",
+        "zh": "电子游戏、桌面游戏，以及制作和玩这些游戏的人。"
       },
       "icon": "🎮",
       "accounts": [
@@ -3455,10 +3547,14 @@
         "ko": "게임",
         "uk": "Ігри",
         "tr": "Oyunlar",
-        "el": "Παιχνίδια"
+        "el": "Παιχνίδια",
+        "zh": "游戏"
       },
       "blurb": {
-        "en": "Video games, tabletop, and the people who make and play them."
+        "en": "Video games, tabletop, and the people who make and play them.",
+        "es": "Videojuegos, juegos de mesa y quienes los crean y disfrutan.",
+        "pl": "Gry wideo, gry planszowe oraz ludzie, którzy je tworzą i w nie grają.",
+        "zh": "电子游戏、桌面游戏，以及制作和玩这些游戏的人。"
       },
       "icon": "🎮",
       "accounts": [
@@ -3537,7 +3633,8 @@
         "ko": "정원 가꾸기",
         "uk": "Садівництво",
         "tr": "Bahçecilik",
-        "el": "Κηπουρική"
+        "el": "Κηπουρική",
+        "zh": "园艺"
       },
       "blurb": {
         "en": "Growers of vegetables, houseplants, and everything in between."
@@ -3652,7 +3749,8 @@
         "ko": "역사",
         "uk": "Історія",
         "tr": "Tarih",
-        "el": "Ιστορία"
+        "el": "Ιστορία",
+        "zh": "历史"
       },
       "blurb": {
         "en": "Historians and archivists on how things came to be this way."
@@ -3778,10 +3876,15 @@
         "ko": "음악",
         "uk": "Музика",
         "tr": "Müzik",
-        "el": "Μουσική"
+        "el": "Μουσική",
+        "zh": "音乐"
       },
       "blurb": {
-        "en": "Musicians, DJs, and listeners sharing what they play and love."
+        "en": "Musicians, DJs, and listeners sharing what they play and love.",
+        "de": "Musiker, DJs und Musikfans teilen, was sie spielen und lieben.",
+        "fr": "Musiciens, DJ et mélomanes partagent ce qu’ils jouent et aiment.",
+        "nl": "Muzikanten, dj’s en luisteraars delen wat ze spelen en waar ze van houden.",
+        "sv": "Musiker, DJ:ar och lyssnare delar det de spelar och älskar."
       },
       "icon": "🎵",
       "accounts": [
@@ -3915,10 +4018,15 @@
         "ko": "음악",
         "uk": "Музика",
         "tr": "Müzik",
-        "el": "Μουσική"
+        "el": "Μουσική",
+        "zh": "音乐"
       },
       "blurb": {
-        "en": "Musicians, DJs, and listeners sharing what they play and love."
+        "en": "Musicians, DJs, and listeners sharing what they play and love.",
+        "de": "Musiker, DJs und Musikfans teilen, was sie spielen und lieben.",
+        "fr": "Musiciens, DJ et mélomanes partagent ce qu’ils jouent et aiment.",
+        "nl": "Muzikanten, dj’s en luisteraars delen wat ze spelen en waar ze van houden.",
+        "sv": "Musiker, DJ:ar och lyssnare delar det de spelar och älskar."
       },
       "icon": "🎵",
       "accounts": [
@@ -4074,10 +4182,15 @@
         "ko": "음악",
         "uk": "Музика",
         "tr": "Müzik",
-        "el": "Μουσική"
+        "el": "Μουσική",
+        "zh": "音乐"
       },
       "blurb": {
-        "en": "Musicians, DJs, and listeners sharing what they play and love."
+        "en": "Musicians, DJs, and listeners sharing what they play and love.",
+        "de": "Musiker, DJs und Musikfans teilen, was sie spielen und lieben.",
+        "fr": "Musiciens, DJ et mélomanes partagent ce qu’ils jouent et aiment.",
+        "nl": "Muzikanten, dj’s en luisteraars delen wat ze spelen en waar ze van houden.",
+        "sv": "Musiker, DJ:ar och lyssnare delar det de spelar och älskar."
       },
       "icon": "🎵",
       "accounts": [
@@ -4167,10 +4280,15 @@
         "ko": "음악",
         "uk": "Музика",
         "tr": "Müzik",
-        "el": "Μουσική"
+        "el": "Μουσική",
+        "zh": "音乐"
       },
       "blurb": {
-        "en": "Musicians, DJs, and listeners sharing what they play and love."
+        "en": "Musicians, DJs, and listeners sharing what they play and love.",
+        "de": "Musiker, DJs und Musikfans teilen, was sie spielen und lieben.",
+        "fr": "Musiciens, DJ et mélomanes partagent ce qu’ils jouent et aiment.",
+        "nl": "Muzikanten, dj’s en luisteraars delen wat ze spelen en waar ze van houden.",
+        "sv": "Musiker, DJ:ar och lyssnare delar det de spelar och älskar."
       },
       "icon": "🎵",
       "accounts": [
@@ -4260,10 +4378,15 @@
         "ko": "음악",
         "uk": "Музика",
         "tr": "Müzik",
-        "el": "Μουσική"
+        "el": "Μουσική",
+        "zh": "音乐"
       },
       "blurb": {
-        "en": "Musicians, DJs, and listeners sharing what they play and love."
+        "en": "Musicians, DJs, and listeners sharing what they play and love.",
+        "de": "Musiker, DJs und Musikfans teilen, was sie spielen und lieben.",
+        "fr": "Musiciens, DJ et mélomanes partagent ce qu’ils jouent et aiment.",
+        "nl": "Muzikanten, dj’s en luisteraars delen wat ze spelen en waar ze van houden.",
+        "sv": "Musiker, DJ:ar och lyssnare delar det de spelar och älskar."
       },
       "icon": "🎵",
       "accounts": [
@@ -4342,10 +4465,12 @@
         "ko": "자연과 야생",
         "uk": "Природа і дика природа",
         "tr": "Doğa ve yaban hayatı",
-        "el": "Φύση και άγρια ζωή"
+        "el": "Φύση και άγρια ζωή",
+        "zh": "自然与野生动物"
       },
       "blurb": {
-        "en": "Birders, naturalists, and anyone who posts what they saw outside."
+        "en": "Birders, naturalists, and anyone who posts what they saw outside.",
+        "de": "Vogelbeobachter, Naturkundler und Menschen, die ihre Entdeckungen draußen teilen."
       },
       "icon": "🦋",
       "accounts": [
@@ -4457,10 +4582,12 @@
         "ko": "자연과 야생",
         "uk": "Природа і дика природа",
         "tr": "Doğa ve yaban hayatı",
-        "el": "Φύση και άγρια ζωή"
+        "el": "Φύση και άγρια ζωή",
+        "zh": "自然与野生动物"
       },
       "blurb": {
-        "en": "Birders, naturalists, and anyone who posts what they saw outside."
+        "en": "Birders, naturalists, and anyone who posts what they saw outside.",
+        "de": "Vogelbeobachter, Naturkundler und Menschen, die ihre Entdeckungen draußen teilen."
       },
       "icon": "🦋",
       "accounts": [
@@ -4616,10 +4743,17 @@
         "ko": "뉴스와 저널리즘",
         "uk": "Новини та журналістика",
         "tr": "Haber ve gazetecilik",
-        "el": "Ειδήσεις και δημοσιογραφία"
+        "el": "Ειδήσεις και δημοσιογραφία",
+        "zh": "新闻与新闻报道"
       },
       "blurb": {
-        "en": "Reporters, editors, and outlets covering the events of the day."
+        "en": "Reporters, editors, and outlets covering the events of the day.",
+        "de": "Reporter, Redakteure und Medien berichten über das Tagesgeschehen.",
+        "fr": "Journalistes, rédacteurs et médias qui couvrent l’actualité.",
+        "it": "Reporter, redattori e testate che raccontano gli eventi del giorno.",
+        "nl": "Verslaggevers, redacteuren en media die het nieuws van de dag volgen.",
+        "pt": "Repórteres, editores e veículos de comunicação que cobrem os acontecimentos do dia.",
+        "sv": "Reportrar, redaktörer och medier som bevakar dagens händelser."
       },
       "icon": "📰",
       "accounts": [
@@ -4775,10 +4909,17 @@
         "ko": "뉴스와 저널리즘",
         "uk": "Новини та журналістика",
         "tr": "Haber ve gazetecilik",
-        "el": "Ειδήσεις και δημοσιογραφία"
+        "el": "Ειδήσεις και δημοσιογραφία",
+        "zh": "新闻与新闻报道"
       },
       "blurb": {
-        "en": "Reporters, editors, and outlets covering the events of the day."
+        "en": "Reporters, editors, and outlets covering the events of the day.",
+        "de": "Reporter, Redakteure und Medien berichten über das Tagesgeschehen.",
+        "fr": "Journalistes, rédacteurs et médias qui couvrent l’actualité.",
+        "it": "Reporter, redattori e testate che raccontano gli eventi del giorno.",
+        "nl": "Verslaggevers, redacteuren en media die het nieuws van de dag volgen.",
+        "pt": "Repórteres, editores e veículos de comunicação que cobrem os acontecimentos do dia.",
+        "sv": "Reportrar, redaktörer och medier som bevakar dagens händelser."
       },
       "icon": "📰",
       "accounts": [
@@ -4934,10 +5075,17 @@
         "ko": "뉴스와 저널리즘",
         "uk": "Новини та журналістика",
         "tr": "Haber ve gazetecilik",
-        "el": "Ειδήσεις και δημοσιογραφία"
+        "el": "Ειδήσεις και δημοσιογραφία",
+        "zh": "新闻与新闻报道"
       },
       "blurb": {
-        "en": "Reporters, editors, and outlets covering the events of the day."
+        "en": "Reporters, editors, and outlets covering the events of the day.",
+        "de": "Reporter, Redakteure und Medien berichten über das Tagesgeschehen.",
+        "fr": "Journalistes, rédacteurs et médias qui couvrent l’actualité.",
+        "it": "Reporter, redattori e testate che raccontano gli eventi del giorno.",
+        "nl": "Verslaggevers, redacteuren en media die het nieuws van de dag volgen.",
+        "pt": "Repórteres, editores e veículos de comunicação que cobrem os acontecimentos do dia.",
+        "sv": "Reportrar, redaktörer och medier som bevakar dagens händelser."
       },
       "icon": "📰",
       "accounts": [
@@ -5093,10 +5241,17 @@
         "ko": "뉴스와 저널리즘",
         "uk": "Новини та журналістика",
         "tr": "Haber ve gazetecilik",
-        "el": "Ειδήσεις και δημοσιογραφία"
+        "el": "Ειδήσεις και δημοσιογραφία",
+        "zh": "新闻与新闻报道"
       },
       "blurb": {
-        "en": "Reporters, editors, and outlets covering the events of the day."
+        "en": "Reporters, editors, and outlets covering the events of the day.",
+        "de": "Reporter, Redakteure und Medien berichten über das Tagesgeschehen.",
+        "fr": "Journalistes, rédacteurs et médias qui couvrent l’actualité.",
+        "it": "Reporter, redattori e testate che raccontano gli eventi del giorno.",
+        "nl": "Verslaggevers, redacteuren en media die het nieuws van de dag volgen.",
+        "pt": "Repórteres, editores e veículos de comunicação que cobrem os acontecimentos do dia.",
+        "sv": "Reportrar, redaktörer och medier som bevakar dagens händelser."
       },
       "icon": "📰",
       "accounts": [
@@ -5230,10 +5385,17 @@
         "ko": "뉴스와 저널리즘",
         "uk": "Новини та журналістика",
         "tr": "Haber ve gazetecilik",
-        "el": "Ειδήσεις και δημοσιογραφία"
+        "el": "Ειδήσεις και δημοσιογραφία",
+        "zh": "新闻与新闻报道"
       },
       "blurb": {
-        "en": "Reporters, editors, and outlets covering the events of the day."
+        "en": "Reporters, editors, and outlets covering the events of the day.",
+        "de": "Reporter, Redakteure und Medien berichten über das Tagesgeschehen.",
+        "fr": "Journalistes, rédacteurs et médias qui couvrent l’actualité.",
+        "it": "Reporter, redattori e testate che raccontano gli eventi del giorno.",
+        "nl": "Verslaggevers, redacteuren en media die het nieuws van de dag volgen.",
+        "pt": "Repórteres, editores e veículos de comunicação que cobrem os acontecimentos do dia.",
+        "sv": "Reportrar, redaktörer och medier som bevakar dagens händelser."
       },
       "icon": "📰",
       "accounts": [
@@ -5389,10 +5551,17 @@
         "ko": "뉴스와 저널리즘",
         "uk": "Новини та журналістика",
         "tr": "Haber ve gazetecilik",
-        "el": "Ειδήσεις και δημοσιογραφία"
+        "el": "Ειδήσεις και δημοσιογραφία",
+        "zh": "新闻与新闻报道"
       },
       "blurb": {
-        "en": "Reporters, editors, and outlets covering the events of the day."
+        "en": "Reporters, editors, and outlets covering the events of the day.",
+        "de": "Reporter, Redakteure und Medien berichten über das Tagesgeschehen.",
+        "fr": "Journalistes, rédacteurs et médias qui couvrent l’actualité.",
+        "it": "Reporter, redattori e testate che raccontano gli eventi del giorno.",
+        "nl": "Verslaggevers, redacteuren en media die het nieuws van de dag volgen.",
+        "pt": "Repórteres, editores e veículos de comunicação que cobrem os acontecimentos do dia.",
+        "sv": "Reportrar, redaktörer och medier som bevakar dagens händelser."
       },
       "icon": "📰",
       "accounts": [
@@ -5482,10 +5651,17 @@
         "ko": "뉴스와 저널리즘",
         "uk": "Новини та журналістика",
         "tr": "Haber ve gazetecilik",
-        "el": "Ειδήσεις και δημοσιογραφία"
+        "el": "Ειδήσεις και δημοσιογραφία",
+        "zh": "新闻与新闻报道"
       },
       "blurb": {
-        "en": "Reporters, editors, and outlets covering the events of the day."
+        "en": "Reporters, editors, and outlets covering the events of the day.",
+        "de": "Reporter, Redakteure und Medien berichten über das Tagesgeschehen.",
+        "fr": "Journalistes, rédacteurs et médias qui couvrent l’actualité.",
+        "it": "Reporter, redattori e testate che raccontano gli eventi del giorno.",
+        "nl": "Verslaggevers, redacteuren en media die het nieuws van de dag volgen.",
+        "pt": "Repórteres, editores e veículos de comunicação que cobrem os acontecimentos do dia.",
+        "sv": "Reportrar, redaktörer och medier som bevakar dagens händelser."
       },
       "icon": "📰",
       "accounts": [
@@ -5586,10 +5762,14 @@
         "ko": "사진",
         "uk": "Фотографія",
         "tr": "Fotoğrafçılık",
-        "el": "Φωτογραφία"
+        "el": "Φωτογραφία",
+        "zh": "摄影"
       },
       "blurb": {
-        "en": "Photographers of landscapes, streets, wildlife, and everything else."
+        "en": "Photographers of landscapes, streets, wildlife, and everything else.",
+        "de": "Fotografen zeigen Landschaften, Straßen, Tiere und vieles mehr.",
+        "it": "Fotografi di paesaggi, strade, animali selvatici e molto altro.",
+        "nl": "Fotografen van landschappen, straten, wilde dieren en alles daarbuiten."
       },
       "icon": "📷",
       "accounts": [
@@ -5745,10 +5925,14 @@
         "ko": "사진",
         "uk": "Фотографія",
         "tr": "Fotoğrafçılık",
-        "el": "Φωτογραφία"
+        "el": "Φωτογραφία",
+        "zh": "摄影"
       },
       "blurb": {
-        "en": "Photographers of landscapes, streets, wildlife, and everything else."
+        "en": "Photographers of landscapes, streets, wildlife, and everything else.",
+        "de": "Fotografen zeigen Landschaften, Straßen, Tiere und vieles mehr.",
+        "it": "Fotografi di paesaggi, strade, animali selvatici e molto altro.",
+        "nl": "Fotografen van landschappen, straten, wilde dieren en alles daarbuiten."
       },
       "icon": "📷",
       "accounts": [
@@ -5904,10 +6088,14 @@
         "ko": "사진",
         "uk": "Фотографія",
         "tr": "Fotoğrafçılık",
-        "el": "Φωτογραφία"
+        "el": "Φωτογραφία",
+        "zh": "摄影"
       },
       "blurb": {
-        "en": "Photographers of landscapes, streets, wildlife, and everything else."
+        "en": "Photographers of landscapes, streets, wildlife, and everything else.",
+        "de": "Fotografen zeigen Landschaften, Straßen, Tiere und vieles mehr.",
+        "it": "Fotografi di paesaggi, strade, animali selvatici e molto altro.",
+        "nl": "Fotografen van landschappen, straten, wilde dieren en alles daarbuiten."
       },
       "icon": "📷",
       "accounts": [
@@ -6008,10 +6196,14 @@
         "ko": "사진",
         "uk": "Фотографія",
         "tr": "Fotoğrafçılık",
-        "el": "Φωτογραφία"
+        "el": "Φωτογραφία",
+        "zh": "摄影"
       },
       "blurb": {
-        "en": "Photographers of landscapes, streets, wildlife, and everything else."
+        "en": "Photographers of landscapes, streets, wildlife, and everything else.",
+        "de": "Fotografen zeigen Landschaften, Straßen, Tiere und vieles mehr.",
+        "it": "Fotografi di paesaggi, strade, animali selvatici e molto altro.",
+        "nl": "Fotografen van landschappen, straten, wilde dieren en alles daarbuiten."
       },
       "icon": "📷",
       "accounts": [
@@ -6134,7 +6326,8 @@
         "ko": "레트로 컴퓨팅",
         "uk": "Ретрокомп'ютери",
         "tr": "Retro bilgisayarlar",
-        "el": "Ρετρό υπολογιστές"
+        "el": "Ρετρό υπολογιστές",
+        "zh": "复古计算机"
       },
       "blurb": {
         "en": "Vintage hardware, preservation, and computing history."
@@ -6293,10 +6486,12 @@
         "ko": "과학",
         "uk": "Наука",
         "tr": "Bilim",
-        "el": "Επιστήμη"
+        "el": "Επιστήμη",
+        "zh": "科学"
       },
       "blurb": {
-        "en": "Researchers and science writers explaining how the world works."
+        "en": "Researchers and science writers explaining how the world works.",
+        "de": "Forscher und Wissenschaftsautoren erklären, wie die Welt funktioniert."
       },
       "icon": "🔬",
       "accounts": [
@@ -6386,10 +6581,12 @@
         "ko": "과학",
         "uk": "Наука",
         "tr": "Bilim",
-        "el": "Επιστήμη"
+        "el": "Επιστήμη",
+        "zh": "科学"
       },
       "blurb": {
-        "en": "Researchers and science writers explaining how the world works."
+        "en": "Researchers and science writers explaining how the world works.",
+        "de": "Forscher und Wissenschaftsautoren erklären, wie die Welt funktioniert."
       },
       "icon": "🔬",
       "accounts": [
@@ -6545,7 +6742,8 @@
         "ko": "SF와 판타지",
         "uk": "Фантастика і фентезі",
         "tr": "Bilim kurgu ve fantastik",
-        "el": "Επιστημονική φαντασία"
+        "el": "Επιστημονική φαντασία",
+        "zh": "科幻与奇幻"
       },
       "blurb": {
         "en": "Genre authors, editors, and fans of imagined worlds."
@@ -6704,10 +6902,13 @@
         "ko": "보안과 프라이버시",
         "uk": "Безпека та приватність",
         "tr": "Güvenlik ve gizlilik",
-        "el": "Ασφάλεια και ιδιωτικότητα"
+        "el": "Ασφάλεια και ιδιωτικότητα",
+        "zh": "安全与隐私"
       },
       "blurb": {
-        "en": "Security researchers and privacy advocates worth listening to."
+        "en": "Security researchers and privacy advocates worth listening to.",
+        "it": "Ricercatori di sicurezza e sostenitori della privacy che vale la pena seguire.",
+        "nl": "Beveiligingsonderzoekers en privacyvoorvechters die het volgen waard zijn."
       },
       "icon": "🔐",
       "accounts": [
@@ -6863,10 +7064,13 @@
         "ko": "보안과 프라이버시",
         "uk": "Безпека та приватність",
         "tr": "Güvenlik ve gizlilik",
-        "el": "Ασφάλεια και ιδιωτικότητα"
+        "el": "Ασφάλεια και ιδιωτικότητα",
+        "zh": "安全与隐私"
       },
       "blurb": {
-        "en": "Security researchers and privacy advocates worth listening to."
+        "en": "Security researchers and privacy advocates worth listening to.",
+        "it": "Ricercatori di sicurezza e sostenitori della privacy che vale la pena seguire.",
+        "nl": "Beveiligingsonderzoekers en privacyvoorvechters die het volgen waard zijn."
       },
       "icon": "🔐",
       "accounts": [
@@ -6978,10 +7182,13 @@
         "ko": "보안과 프라이버시",
         "uk": "Безпека та приватність",
         "tr": "Güvenlik ve gizlilik",
-        "el": "Ασφάλεια και ιδιωτικότητα"
+        "el": "Ασφάλεια και ιδιωτικότητα",
+        "zh": "安全与隐私"
       },
       "blurb": {
-        "en": "Security researchers and privacy advocates worth listening to."
+        "en": "Security researchers and privacy advocates worth listening to.",
+        "it": "Ricercatori di sicurezza e sostenitori della privacy che vale la pena seguire.",
+        "nl": "Beveiligingsonderzoekers en privacyvoorvechters die het volgen waard zijn."
       },
       "icon": "🔐",
       "accounts": [
@@ -7082,7 +7289,8 @@
         "ko": "우주와 천문학",
         "uk": "Космос та астрономія",
         "tr": "Uzay ve astronomi",
-        "el": "Διάστημα και αστρονομία"
+        "el": "Διάστημα και αστρονομία",
+        "zh": "太空与天文学"
       },
       "blurb": {
         "en": "Astronomers, mission watchers, and astrophotographers."
@@ -7230,10 +7438,13 @@
         "ko": "스포츠",
         "uk": "Спорт",
         "tr": "Spor",
-        "el": "Αθλητισμός"
+        "el": "Αθλητισμός",
+        "zh": "体育"
       },
       "blurb": {
-        "en": "Fans, athletes, and writers covering the games they follow."
+        "en": "Fans, athletes, and writers covering the games they follow.",
+        "de": "Fans, Sportler und Autoren berichten über ihren Sport.",
+        "it": "Tifosi, atleti e autori che raccontano gli sport che seguono."
       },
       "icon": "⚽",
       "accounts": [
@@ -7312,10 +7523,13 @@
         "ko": "스포츠",
         "uk": "Спорт",
         "tr": "Spor",
-        "el": "Αθλητισμός"
+        "el": "Αθλητισμός",
+        "zh": "体育"
       },
       "blurb": {
-        "en": "Fans, athletes, and writers covering the games they follow."
+        "en": "Fans, athletes, and writers covering the games they follow.",
+        "de": "Fans, Sportler und Autoren berichten über ihren Sport.",
+        "it": "Tifosi, atleti e autori che raccontano gli sport che seguono."
       },
       "icon": "⚽",
       "accounts": [
@@ -7471,10 +7685,13 @@
         "ko": "스포츠",
         "uk": "Спорт",
         "tr": "Spor",
-        "el": "Αθλητισμός"
+        "el": "Αθλητισμός",
+        "zh": "体育"
       },
       "blurb": {
-        "en": "Fans, athletes, and writers covering the games they follow."
+        "en": "Fans, athletes, and writers covering the games they follow.",
+        "de": "Fans, Sportler und Autoren berichten über ihren Sport.",
+        "it": "Tifosi, atleti e autori che raccontano gli sport che seguono."
       },
       "icon": "⚽",
       "accounts": [
@@ -7575,10 +7792,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -7734,10 +7963,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -7893,10 +8134,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -8052,10 +8305,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -8178,10 +8443,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -8304,10 +8581,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -8408,10 +8697,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -8523,10 +8824,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -8682,10 +8995,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -8808,10 +9133,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -8934,10 +9271,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -9016,10 +9365,22 @@
         "ko": "기술",
         "uk": "Технології",
         "tr": "Teknoloji",
-        "el": "Τεχνολογία"
+        "el": "Τεχνολογία",
+        "zh": "科技"
       },
       "blurb": {
-        "en": "Programmers, sysadmins, and the people who build the software you use."
+        "en": "Programmers, sysadmins, and the people who build the software you use.",
+        "de": "Programmierer, Systemadministratoren und Menschen, die die Software entwickeln, die du nutzt.",
+        "es": "Programadores, administradores de sistemas y quienes crean el software que usas.",
+        "fr": "Programmeurs, administrateurs système et personnes qui créent les logiciels que vous utilisez.",
+        "it": "Programmatori, amministratori di sistema e chi crea il software che usi.",
+        "ja": "プログラマー、システム管理者、そして皆さんが使うソフトウェアを作る人たち。",
+        "nl": "Programmeurs, systeembeheerders en de mensen die de software maken die je gebruikt.",
+        "pl": "Programiści, administratorzy systemów i ludzie tworzący oprogramowanie, z którego korzystasz.",
+        "pt": "Programadores, administradores de sistemas e quem cria o software que você usa.",
+        "ru": "Программисты, системные администраторы и люди, которые создают программы, которыми вы пользуетесь.",
+        "sv": "Programmerare, systemadministratörer och människorna som bygger programvaran du använder.",
+        "zh": "程序员、系统管理员，以及为你开发软件的人。"
       },
       "icon": "💻",
       "accounts": [
@@ -9131,7 +9492,8 @@
         "ko": "여행",
         "uk": "Подорожі",
         "tr": "Seyahat",
-        "el": "Ταξίδια"
+        "el": "Ταξίδια",
+        "zh": "旅行"
       },
       "blurb": {
         "en": "Trains, trails, and people writing about where they have been."

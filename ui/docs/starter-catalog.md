@@ -32,6 +32,27 @@ The catalogue date appears in People to follow. “My languages” uses the exis
 browser, UI and explicit known-language signals. A separate browsing selector offers
 every catalogue language and “All languages”; it never writes language preferences.
 Legacy sets have no declared content language and remain visible under every filter.
-Catalogue titles use UI-locale maps with English fallback. Search prioritizes kits
-in known languages. Kit routes include language and slug, so a refresh preserves
-links; removed kits show an unavailable message.
+Each catalogue pack displays its title and description in its own content language,
+including on mixed-language lists and in search. Selecting Russian changes the
+starter-pack browser's controls to Russian; opening a Russian pack uses Russian
+controls even through a direct link. The surrounding app keeps its interface language.
+Mixed-language views use the app language for shared controls and each pack's language
+on its card. Legacy unlabelled sets and curator-authored titles retain their own copy.
+Kit routes include language and slug, so a refresh preserves links; removed kits show
+an unavailable message in the language encoded in the link.
+
+## Translation ownership
+
+- **Pack names and descriptions:** edit locale maps in
+  `mawkingbird_starters/data/taxonomy.json`. This is hand-maintained source data;
+  `starters.packs.write_catalog` copies it into the regenerated pack files. Do not
+  translate `catalog/packs/` or `starter-catalog.generated.json` by hand.
+- **Pack controls:** `src/app/starter-pack-ui.json` is a small, hand-maintained
+  dictionary shared by every pack. It is independent of global UI dictionaries and
+  is never rewritten by catalogue refreshes. `StarterPackTextPipe` reads it without
+  switching Transloco's active language, fetching dictionaries, or changing preferences.
+- Current pack languages have complete title, description and control coverage.
+  Missing future translations fall back to English; the catalogue coverage test
+  identifies the language/key that needs a one-time addition. Membership refreshes
+  require no translation work. Existing translations are reused across all packs
+  in the same category or language.

@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { StarterPackTextPipe } from '../../starter-pack-text';
 import { firstValueFrom } from 'rxjs';
 import { Api } from '../../api';
 import { Auth } from '../../auth';
@@ -29,7 +29,7 @@ import { UiLocale } from '../../i18n/locale';
 // i18n starterCollection.browse: Browse starter kits
 @Component({
   selector: 'app-starter-collection',
-  imports: [RouterLink, TranslocoPipe],
+  imports: [RouterLink, StarterPackTextPipe],
   templateUrl: './starter-collection.html',
   styleUrl: './starter-collection.css',
 })
@@ -41,6 +41,9 @@ export class StarterCollection implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   protected kit = starterKit(this.route.snapshot.paramMap.get('slug') ?? 'starter');
+  protected copyLanguage =
+    this.kit?.lang ??
+    /^catalog-([a-z]{2,3})-/.exec(this.route.snapshot.paramMap.get('slug') ?? '')?.[1];
   protected accounts = this.kit?.accounts ?? [];
   private locale = inject(UiLocale);
   protected text = computed(() =>

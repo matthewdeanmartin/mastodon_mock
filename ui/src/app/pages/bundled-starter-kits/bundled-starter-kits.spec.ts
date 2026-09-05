@@ -8,6 +8,8 @@ import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 import { BundledStarterKits } from './bundled-starter-kits';
 import { KnownLanguages } from '../../trend-language-filter';
 import { ClientPrefs } from '../../client-prefs';
+import { starterPackText } from '../../starter-pack-text';
+import { UiLocale } from '../../i18n/locale';
 
 /**
  * The page a first-run visitor is sent to. It used to be one of two — our
@@ -63,7 +65,11 @@ describe('BundledStarterKits', () => {
         kit.slug === 'starter' ? '/collections/starter' : `/collections/starter/${kit.slug}`;
       const row = rows.find((r) => r.getAttribute('href') === href);
       expect(row, `no row for ${kit.title}`).toBeDefined();
-      expect(row!.textContent).toContain(`${kit.accounts.length} accounts`);
+      expect(row!.textContent).toContain(
+        starterPackText('bundledStarterKits.account.other', kit.lang ?? 'en', {
+          count: kit.accounts.length,
+        }),
+      );
       expect(row!.getAttribute('href')).toBe(
         kit.slug === 'starter' ? '/collections/starter' : `/collections/starter/${kit.slug}`,
       );
@@ -92,6 +98,27 @@ describe('BundledStarterKits', () => {
     expect(links).not.toContain('/collections/starter/catalog-en-technology');
     expect(links).toContain('/collections/starter');
     expect(prefs.knownLanguages()).toEqual(before);
+  });
+
+  it('uses Russian pack copy and controls while the app remains English', () => {
+    const locale = TestBed.inject(UiLocale);
+    expect(locale.active()).toBe('en');
+    const select = el().querySelector('select')!;
+    select.value = 'ru';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(el().querySelector('section')?.getAttribute('lang')).toBe('ru');
+    expect(el().querySelector('.page-head')?.textContent).toContain('Кого читать');
+    const row = el().querySelector('a[href="/collections/starter/catalog-ru-technology"]')!;
+    expect(row.textContent).toContain('Технологии');
+    expect(row.textContent).toContain('Программисты');
+    expect(row.textContent).toContain('открыть');
+    expect(row.getAttribute('lang')).toBe('ru');
+    expect(locale.active()).toBe('en');
+    select.value = 'known';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(el().querySelector('.page-head')?.textContent).toContain('People to follow');
   });
 
   it('uses all known languages by default and reacts to preference changes', () => {

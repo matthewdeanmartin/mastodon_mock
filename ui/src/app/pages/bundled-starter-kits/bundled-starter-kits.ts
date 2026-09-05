@@ -1,11 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { StarterPackTextPipe } from '../../starter-pack-text';
 import { RouterLink } from '@angular/router';
 import { STARTER_KITS, STARTER_CATALOG_UPDATED_AT, starterKitText } from '../../starter-collection';
 import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 import { KnownLanguages } from '../../trend-language-filter';
 import { UiLocale } from '../../i18n/locale';
-import { LANG_NAMES, LangCode } from '../../language-detect';
 
 // i18n bundledStarterKits.languages: Pack languages
 // i18n bundledStarterKits.myLanguages: My languages
@@ -71,7 +70,7 @@ interface DiscoverySet {
  */
 @Component({
   selector: 'app-bundled-starter-kits',
-  imports: [RouterLink, TranslocoPipe],
+  imports: [RouterLink, StarterPackTextPipe],
   templateUrl: './bundled-starter-kits.html',
   styleUrl: './bundled-starter-kits.css',
 })
@@ -79,11 +78,17 @@ export class BundledStarterKits {
   private readonly known = inject(KnownLanguages);
   private readonly locale = inject(UiLocale);
   protected readonly language = signal('known');
+  protected readonly copyLanguage = computed(() =>
+    ['known', 'all'].includes(this.language()) ? undefined : this.language(),
+  );
   protected readonly updated = STARTER_CATALOG_UPDATED_AT.slice(0, 10);
   protected readonly languages = [
     ...new Set(STARTER_KITS.flatMap((kit) => (kit.lang ? [kit.lang] : []))),
   ]
-    .map((code) => ({ code, name: LANG_NAMES[code as LangCode] ?? code }))
+    .map((code) => ({
+      code,
+      name: new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code,
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
   /** Free-text narrowing, because the merged list is longer than either was. */
   protected readonly filter = signal('');

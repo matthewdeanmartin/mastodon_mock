@@ -56,6 +56,8 @@ describe('STARTER_COLLECTION', () => {
     }
     const german = starterKit('catalog-de-technology')!;
     expect(starterKitText(german, 'de-DE').title).toBe('Technologie');
-    expect(starterKitText(german, 'xx').title).toBe('Technology');
+    expect(starterKitText(german, 'en').title).toBe('Technologie');
+    expect(starterKitText(german, 'en').blurb).toContain('Programmierer');
+    expect(starterKitText({ ...german, lang: undefined }, 'xx').title).toBe('Technology');
   });
 });

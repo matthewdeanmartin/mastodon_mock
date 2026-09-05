@@ -7,6 +7,7 @@ import { Auth } from '../../auth';
 import { StarterCollection } from './starter-collection';
 import { ImportFollows } from '../../import-follows';
 import { starterKit } from '../../starter-collection';
+import { UiLocale } from '../../i18n/locale';
 
 describe('StarterCollection', () => {
   let httpMock: HttpTestingController;
@@ -103,8 +104,24 @@ describe('StarterCollection', () => {
     });
     const fixture = TestBed.createComponent(StarterCollection);
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('no longer available');
+    expect(fixture.nativeElement.textContent).toContain('nicht mehr verfügbar');
     expect(fixture.nativeElement.querySelector('button')).toBeNull();
     expect(TestBed.inject(ImportFollows).rows()).toEqual([]);
+  });
+
+  it('opens and follows a Russian pack in Russian without switching the app language', async () => {
+    routeStub.snapshot.paramMap = convertToParamMap({ slug: 'catalog-ru-technology' });
+    const fixture = TestBed.createComponent(StarterCollection);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('section')?.getAttribute('lang')).toBe('ru');
+    expect(el.textContent).toContain('Технологии');
+    expect(el.textContent).toContain('Программисты');
+    expect(el.querySelector('.intro button')?.textContent).toContain('Подписаться на всех');
+    await TestBed.inject(ImportFollows).start();
+    fixture.detectChanges();
+    expect(el.querySelector('.intro button')?.textContent).toContain('Оформлено подписок');
+    expect(el.textContent).toContain('Вы подписаны');
+    expect(TestBed.inject(UiLocale).active()).toBe('en');
   });
 });
