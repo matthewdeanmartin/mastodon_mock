@@ -24,6 +24,7 @@
  * translations. See sprint/ui-i18n-0-overview.md.
  */
 
+import { DOCUMENT } from '@angular/common';
 import { computed, effect, inject, Injectable, Signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { ClientPrefs } from '../client-prefs';
@@ -37,7 +38,7 @@ import { isCanaryBuild, isTestBuild } from '../build-flavor';
  * the settings control all read from this list.
  */
 export const PRODUCTION_LOCALES = ['en'] as const;
-export const IN_PROGRESS_LOCALES = ['de', 'fr', 'id', 'ja'] as const;
+export const IN_PROGRESS_LOCALES = ['de', 'fr', 'id', 'ja', 'zh-Hant', 'uk'] as const;
 
 export type SupportedLocale =
   | (typeof PRODUCTION_LOCALES)[number]
@@ -83,11 +84,24 @@ export const LOCALE_ENDONYMS: Record<string, string> = {
   is: 'Íslenska',
   ru: 'Русский',
   ja: '日本語（作業中）',
+  'zh-Hant': '繁體中文（台灣，翻譯中）',
+  uk: 'Українська (у процесі)',
 };
 
-/** Normalize a possibly-regioned tag ("en-US", "pt_BR") to a bare code. */
-function bare(code: string): string {
-  return code.toLowerCase().split(/[-_]/)[0];
+/** Preserve an explicit script; infer Traditional Chinese only from its regions. */
+function localeCandidate(code: string): string | null {
+  try {
+    const locale = new Intl.Locale(code.replaceAll('_', '-'));
+    if (locale.language === 'zh') {
+      if (locale.script) {
+        return locale.script === 'Hant' ? 'zh-Hant' : null;
+      }
+      return ['TW', 'HK', 'MO'].includes(locale.region ?? '') ? 'zh-Hant' : null;
+    }
+    return locale.language === 'no' ? 'nb' : locale.language;
+  } catch {
+    return null;
+  }
 }
 
 function isSupported(code: string): code is SupportedLocale {
@@ -97,18 +111,22 @@ function isSupported(code: string): code is SupportedLocale {
 /**
  * Best supported locale for a browser locale chain.
  *
- * Matches on the bare tag, so `de-AT` and `de-CH` both resolve to `de`: shipping
+ * Matches regional variants, so `de-AT` and `de-CH` both resolve to `de`: shipping
  * regional variants is not on the table at 60 languages, and an Austrian reader
  * is far better served by German than by English. Order is the browser's own
  * preference order, so the first match wins.
  *
  * Exported for tests and for the picker's "Automatic" label.
  */
-export function negotiateLocale(chain: readonly string[]): SupportedLocale {
+export function negotiateLocale(
+  chain: readonly string[],
+  available: readonly SupportedLocale[] = SUPPORTED_LOCALES,
+): SupportedLocale {
   for (const entry of chain) {
-    const code = bare(entry);
-    if (isSupported(code)) {
-      return code;
+    const code = localeCandidate(entry);
+    const match = available.find((locale) => locale === code);
+    if (match) {
+      return match;
     }
   }
   return FALLBACK_LOCALE;
@@ -212,10 +230,12 @@ export class UiLocale {
 export class TranslocoLocaleSync {
   private locale = inject(UiLocale);
   private transloco = inject(TranslocoService);
+  private document = inject(DOCUMENT);
 
   constructor() {
     effect(() => {
       const active = this.locale.active();
+      this.document.documentElement.lang = active;
       if (this.transloco.getActiveLang() !== active) {
         this.transloco.setActiveLang(active);
       }

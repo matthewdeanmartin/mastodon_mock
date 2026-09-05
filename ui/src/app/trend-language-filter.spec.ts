@@ -81,9 +81,10 @@ describe('TrendLanguageFilter', () => {
   it('hides a confidently-foreign-script tag when the language is unknown', () => {
     prefs.setKnownLanguages(['en']);
     prefs.setExcludeUnknownLangTrends(true);
-    // 안녕 (Korean) and مصر (Arabic) are not known; Eurovision (Latin) is kept.
+    // The shared Arabic/Persian place name is ambiguous, so it stays visible.
     const kept = filter.apply([tag('안녕'), tag('Eurovision'), tag('مصر')]);
-    expect(kept.map((t) => t.name)).toEqual(['Eurovision']);
+    expect(kept.map((t) => t.name)).toEqual(['Eurovision', 'مصر']);
+    expect(filter.apply([tag('هذا_عربي')])).toEqual([]);
   });
 
   it('keeps a foreign-script tag when its language IS known', () => {

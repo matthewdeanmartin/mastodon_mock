@@ -40,6 +40,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { trackedLocale } from './i18n-ledger.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const I18N_DIR = join(ROOT, 'public', 'i18n');
@@ -56,6 +57,12 @@ if (!lang) {
 }
 if (lang === 'en') {
   console.error('English is the source language — there is nothing to translate.');
+  process.exit(2);
+}
+if (trackedLocale(lang)) {
+  console.error(
+    'Use make i18n-batch L=zh-Hant N=300 ARGS=--snapshot=tmp_source.json; use ARGS=--review for unreviewed work. Legacy todo stamps are not acceptance.',
+  );
   process.exit(2);
 }
 // Reject anything that is not a plain locale code. Without this, a stray

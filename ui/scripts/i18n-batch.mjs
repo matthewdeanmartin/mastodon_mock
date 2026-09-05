@@ -27,6 +27,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readLedger, sourceHash, stateFor, trackedLocale, writeLedger } from './i18n-ledger.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const I18N_DIR = join(ROOT, 'public', 'i18n');
@@ -66,9 +67,19 @@ function flatten(node, prefix = '', out = {}) {
 const english = flatten(readJson(join(I18N_DIR, 'en.json')));
 const done = flatten(readJson(join(I18N_DIR, `${lang}.json`), {}));
 const context = readJson(CONTEXT, {});
+const ledger = trackedLocale(lang)
+  ? readLedger(join(ROOT, 'i18n-context', `ledger-${lang}.json`))
+  : {};
+const review = args.includes('--review');
 
 const missing = Object.keys(english).filter(
-  (key) => !(key in done) && context[key]?.translate !== false,
+  (key) =>
+    context[key]?.translate !== false &&
+    (trackedLocale(lang)
+      ? review
+        ? stateFor(key, english, done, context, ledger) === 'unreviewed'
+        : ['missing', 'stale'].includes(stateFor(key, english, done, context, ledger))
+      : !(key in done)),
 );
 
 if (AREAS_ONLY) {
@@ -95,6 +106,13 @@ const selected = missing
   .sort((a, b) => sizes[areaOf(b)] - sizes[areaOf(a)] || a.localeCompare(b));
 
 const batch = limit ? selected.slice(0, limit) : selected;
+const snapshotPath = args.find((arg) => arg.startsWith('--snapshot='))?.slice('--snapshot='.length);
+if (snapshotPath) {
+  writeLedger(snapshotPath, {
+    locale: lang,
+    keys: Object.fromEntries(batch.map((key) => [key, sourceHash(english[key], context[key])])),
+  });
+}
 
 for (const key of batch) {
   const c = context[key];
@@ -111,9 +129,16 @@ for (const key of batch) {
         .filter(Boolean)
         .join(' | ')
     : '';
-  console.log(`${key}\t${english[key]}\t${hints}`);
+  console.log(`${key}\t${english[key]}\t${hints}${review ? `\t${done[key]}` : ''}`);
 }
 
 console.error(
-  `-- ${batch.length} of ${selected.length} matching (${missing.length} missing overall in ${lang})`,
+  `-- ${batch.length} of ${selected.length} matching (${missing.length} ${review ? 'unreviewed' : 'missing/stale'} overall in ${lang})`,
 );
+if (trackedLocale(lang)) {
+  const totals = { missing: 0, stale: 0, unreviewed: 0, reviewed: 0 };
+  for (const key of Object.keys(english)) {
+    if (context[key]?.translate !== false) totals[stateFor(key, english, done, context, ledger)]++;
+  }
+  console.error(`-- ${lang} ledger: ${JSON.stringify(totals)}`);
+}

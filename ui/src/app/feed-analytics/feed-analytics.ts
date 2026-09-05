@@ -61,6 +61,9 @@ import { Terminology } from '../terminology';
 // i18n feedAnalytics.hashtags.mostly: — mostly @{{account}}
 // i18n feedAnalytics.hashtags.author.one: author
 // i18n feedAnalytics.hashtags.author.other: authors
+// Legacy noun fragments above remain declared for deferred locale dictionaries.
+// i18n feedAnalytics.hashtags.authorCount.one: {{count}} author
+// i18n feedAnalytics.hashtags.authorCount.other: {{count}} authors
 // i18n feedAnalytics.hashtags.travelTogether: Tags that travel together
 // i18n feedAnalytics.links.title: Links and domains
 // i18n feedAnalytics.links.empty: No external links in the sample.

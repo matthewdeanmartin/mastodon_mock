@@ -1,5 +1,5 @@
 {
-  "testCount": 6065,
+  "testCount": 6069,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -1471,6 +1471,7 @@
     "src/app/pages/bundled-starter-kits/bundled-starter-kits.spec.ts :: BundledStarterKits narrows the list to what the reader typed",
     "src/app/pages/bundled-starter-kits/bundled-starter-kits.spec.ts :: BundledStarterKits offers German independently of browser and saved languages",
     "src/app/pages/bundled-starter-kits/bundled-starter-kits.spec.ts :: BundledStarterKits says so rather than going blank when nothing matches",
+    "src/app/pages/bundled-starter-kits/bundled-starter-kits.spec.ts :: BundledStarterKits uses Russian pack copy and controls while the app remains English",
     "src/app/pages/bundled-starter-kits/bundled-starter-kits.spec.ts :: BundledStarterKits uses all known languages by default and reacts to preference changes",
     "src/app/pages/collection/collection.spec.ts :: CollectionPage a featured non-owner finds myItem and revokeSelf POSTs .../revoke",
     "src/app/pages/collection/collection.spec.ts :: CollectionPage a per-member statuses error contributes [] without killing the feed",
@@ -2999,6 +3000,7 @@
     "src/app/pages/starter-collection/starter-collection.spec.ts :: StarterCollection follows a catalogue kit anonymously using its home-instance snapshots",
     "src/app/pages/starter-collection/starter-collection.spec.ts :: StarterCollection loads the themed kit selected by the route",
     "src/app/pages/starter-collection/starter-collection.spec.ts :: StarterCollection opens a clicked member from the built-in Anonymous account snapshot",
+    "src/app/pages/starter-collection/starter-collection.spec.ts :: StarterCollection opens and follows a Russian pack in Russian without switching the app language",
     "src/app/pages/starter-collection/starter-collection.spec.ts :: StarterCollection resolves catalogue handles for signed-in follow-all instead of using foreign IDs",
     "src/app/pages/storage-diagnostics/storage-diagnostics-reachability.spec.ts :: Storage Diagnostics reachability has a route declared, with a page title",
     "src/app/pages/storage-diagnostics/storage-diagnostics-reachability.spec.ts :: Storage Diagnostics reachability is directly navigable, so a bookmark or typed URL resolves",
@@ -5734,6 +5736,8 @@
     "src/app/starter-kit-post/starter-kit-post.spec.ts :: StarterKitPost resolves a signed-in profile through the active server before opening it",
     "src/app/starter-kit-post/starter-kit-post.spec.ts :: StarterKitPost shows every member and keeps the canonical collection as a secondary link",
     "src/app/starter-kits.spec.ts :: SHIPPED_STARTER_KITS ships every curated collection with all members hover-ready",
+    "src/app/starter-pack-text.spec.ts :: starter-pack translations covers the current catalogue languages and preserves every interpolation",
+    "src/app/starter-pack-text.spec.ts :: starter-pack translations normalizes language tags and interpolates progress without an app dictionary",
     "src/app/status-card/status-card.spec.ts :: StatusCard Anonymous actions answer the tap never dresses a bare count as something tappable",
     "src/app/status-card/status-card.spec.ts :: StatusCard Anonymous actions answer the tap offers a way in when an anonymous reader taps like",
     "src/app/status-card/status-card.spec.ts :: StatusCard Anonymous actions answer the tap sends an anonymous reader from the comment count to the thread",

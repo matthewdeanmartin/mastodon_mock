@@ -95,6 +95,8 @@ textarea {
 
 .preview {
   margin-top: 8px;
+  max-height: 16rem;
+  overflow-y: auto;
 }
 
 .preview-label {

@@ -61,6 +61,23 @@ function proseOnly(value) {
 }
 
 export const LOCALE_RULES = {
+  'zh-Hant': {
+    name: 'Traditional Chinese (Taiwan)',
+    register: 'neutral, concise Taiwan UI prose; omit pronouns or consistently use 您',
+    rules: [],
+    traps: {
+      '服务器|软件|设置|账号|关注|转发|静音|屏蔽':
+        'Simplified script or mainland terminology: consult glossary-zh-Hant.md',
+      '服務器|軟件|設置|賬號|關注|轉發': 'Taiwan terminology: 伺服器、軟體、設定、帳號、跟隨、轉嘟',
+      '助推|增幅|提升訊號': 'Boost means 轉嘟, not amplification or promotion',
+      '把手|手柄': 'Account handle means 帳號代稱, not a physical handle',
+      '飼料|餵食': 'Feed is a stream of posts, not food',
+      '螺紋|縫紉': 'Thread means 討論串',
+      活期帳戶: 'Current account means 目前使用的帳號',
+      失敗的鯨魚: 'Fail whale is an error-page joke; do not translate literally',
+      你: 'Address form review: 您 or omitted pronoun; inspect quotes before changing a hit',
+    },
+  },
   fr: {
     name: 'French',
     register: 'informal `tu` throughout — never `vous`',

@@ -5,6 +5,64 @@ description: Move one directory's hardcoded interface text into translation keys
 
 # Migrate one directory to translation keys
 
+When replacing a fragment key with a complete parameterized sentence, retain its
+obsolete English declaration while deferred dictionaries still reference it;
+otherwise the global orphan-key gate breaks those untouched locales. Track the
+legacy key explicitly for later cleanup. Taiwan's compose.threadSummary replaced
+rendered threadOf concatenation without editing deferred dictionaries.
+
+Ukrainian review found English nouns in a TypeScript collection map injected into
+an otherwise translated adoption-dialog title. Use whole title keys per collection
+and complete parameterized count messages for its summary/buttons/hints. Literal
+English TS maps can leak through a template-only scan. Keep numeric-only emphasis
+inside Angular-sanitized translated markup when needed; do not interpolate user
+HTML. This bounded repair added eight keys without invalidating existing sources.
+
+## Current expansion policy (2026-09-05)
+
+Stop boundary reached: Ukrainian and Taiwan Traditional Chinese are complete.
+All translation workers have stopped. The proposed speedup plan is
+`sprint/ui-i18n-speedup-plan.md`; no benchmark or new language is authorized yet.
+Record wall-clock stage times and available token metrics as described in
+translate-ui. The current Sol review trial applies to the Taiwan finish too.
+
+Read `sprint/ui-i18n-9-thirty-languages.md` for the UI-only expansion.
+Astra (`gpt-6-astra`) owns complex templating and shared infrastructure; Luna
+(`gpt-5.6-luna`) translates new-locale dictionaries. The latest Ukrainian trial
+uses Sol (`gpt-5.6-sol`) for routine final-file reviews; Astra handles concrete
+complex template defects and finishes its already assigned review. See translate-ui
+for the single-pass limit and required correction counts; no full Astra re-review
+after Sol.
+Latest user direction fills three worker slots with disjoint assignments
+and serialized shared merges. Use fresh contexts after one or two batches.
+Translation/review batches contain at least 300 keys for Taiwan, 500 for the
+next languages, except final smaller remainders and correction passes.
+Existing in-progress `de`, `fr`, `id`, `ja`
+are deferred. Update this skill immediately when a reusable migration lesson
+is learned, before handing work to the next agent.
+
+Taiwan foundation discoveries (2026-09-05):
+- `HumanTimePipe` is impure and reads `UiLocale.active()` on each transform;
+  Intl relative/calendar formatting follows live UI changes. Tests constructing
+  it directly must now use an injection context. It does not inject Transloco.
+- Chinese cardinal categories contain only `other`; translating both existing
+  complete `.one/.other` values identically is safe for this locale. It does not
+  fix binary selection for other languages or establish an ICU compiler.
+- Source/context changes invalidate `zh-Hant` ledger revisions automatically.
+  Never regenerate a draft snapshot simply to silence a stale-source rejection.
+  See translate-ui for the accepted-source and independent-review commands.
+- Concrete remaining fragment examples: `pages.login.seed.hint.a/b`,
+  `settings.accountList.domain.hint.before/after`, and
+  `settings.writing.miniComposer.hint.a/b`. Inspect the interactive call sites
+  before combining them; do not interpolate user content into unsafe HTML.
+
+The historical `.one/.other` example below is transitional, not a finished
+multilingual solution. Astra must replace English binary selection with a
+tested locale-aware mechanism before scaling translation. Do not assume ICU
+is wired in. Keep complete sentences translatable as a unit, even around links
+or emphasis: splitting into `.hint.a` / `.hint.b` fixes English word order and
+is not acceptable for this expansion. Preserve safe interpolation of user text.
+
 You are making **one directory** translatable. Not the app — one directory. Finish
 it completely and leave `npm run check` green.
 

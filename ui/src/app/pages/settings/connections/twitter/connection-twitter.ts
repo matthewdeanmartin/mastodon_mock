@@ -100,6 +100,7 @@ import { Terminology } from '../../../../terminology';
 // i18n settings.connections.twitter.follows.confirm: Is this the right account?
 // i18n settings.connections.twitter.follows.followHandle: Follow &#64;
 // i18n settings.connections.twitter.follows.followers: followers ·
+// i18n settings.connections.twitter.follows.accountSummary: {{followers}} followers · {{posts}} {{postsWord}}
 // i18n settings.connections.twitter.follows.handleLabel: Twitter handle
 // i18n settings.connections.twitter.follows.intro.a: Following stores the handle in this browser so their posts show up on your Feeds page. It is not a follow on Twitter — nobody is notified. Up to
 // i18n settings.connections.twitter.follows.intro.b: accounts.

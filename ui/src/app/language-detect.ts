@@ -1,22 +1,13 @@
 /**
- * A deliberately cheap, synchronous, dependency-free language detector.
+ * Dependency-free, bounded language identification for social prose.
+ * Script evidence narrows the candidates first. Shared scripts need lexical
+ * clues; Latin text needs several distinct clues with a clear winning margin.
+ * Repeated words, shared accents and identifiers cannot manufacture confidence.
  *
- * Real language ID (CLD3, fastText, franc's full model) means shipping a model
- * and running n-gram scoring. This does not: it decides by *script* first
- * (Unicode ranges are free and settle most of the world's languages outright),
- * then by *diacritic fingerprint* for Latin text, then by a compact *stop-word*
- * table for plain Latin scripts that share the same alphabet. It is meant to be
- * called pervasively — over every post in a sample, inline in a list — so the
- * budget is "a few string scans", not "load a classifier".
- *
- * It will be wrong sometimes; that's the accepted trade, in the same spirit as
- * the rage lexicon in `sentiment.ts`. Output is always a *distribution* so a
- * caller can say "70% English, 30% German, 1% unknown" honestly, rather than
- * pretending to a single confident verdict.
- *
- * The first consumer is the analytics page. Because it is a pure function over
- * text, it can later back search filters, per-post language badges, translation
- * prompts, etc. — keep the contract stable.
+ * Unresolved text is attributed to und. Shares describe attributed prose, not
+ * calibrated probabilities. Warnings and filters use confidentLanguage(); an
+ * account's mix aggregates these shares across posts. No model, API or network.
+ * The Python port and shared adversarial corpus live in mawkingbird_starters.
  */
 
 /** ISO 639-1 codes this module can name. `und` = undetermined. */
@@ -45,6 +36,15 @@ export type LangCode =
   | 'hi'
   | 'th'
   | 'eo'
+  | 'cs'
+  | 'ca'
+  | 'id'
+  | 'vi'
+  | 'bn'
+  | 'ta'
+  | 'te'
+  | 'fa'
+  | 'ro'
   // Nameable and selectable, but with no lexical rules below: the detector has never
   // claimed to identify it, and adding the name does not change that. An Icelandic post
   // therefore stays "undetermined" unless it declares `is` — which is the safe way
@@ -85,6 +85,15 @@ export const LANG_NAMES: Record<LangCode, string> = {
   hi: 'Hindi',
   th: 'Thai',
   eo: 'Esperanto',
+  cs: 'Czech',
+  ca: 'Catalan',
+  id: 'Indonesian',
+  vi: 'Vietnamese',
+  bn: 'Bengali',
+  ta: 'Tamil',
+  te: 'Telugu',
+  fa: 'Persian',
+  ro: 'Romanian',
   is: 'Icelandic',
   und: 'Unknown',
 };
@@ -100,21 +109,24 @@ export const POSTING_LANGUAGE_OPTIONS = (Object.entries(LANG_NAMES) as [LangCode
 // ---------------------------------------------------------------------------
 
 /**
- * Non-Latin scripts that map cleanly (or near enough) to one language for our
- * purposes. Han is special-cased below because Japanese mixes kanji with kana.
+ * Unicode script buckets. Their labels are internal hints, not language
+ * verdicts: refineScript resolves shared alphabets or returns und.
  */
 const SCRIPT_RANGES: { lang: LangCode; re: RegExp }[] = [
   { lang: 'ja', re: /[぀-ゟ゠-ヿ]/ }, // Hiragana + Katakana ⇒ Japanese
-  { lang: 'ko', re: /[가-힯ᄀ-ᇿ]/ }, // Hangul
+  { lang: 'ko', re: /[가-힯ᄀ-ᇿ㄰-㆏]/ }, // Hangul
   { lang: 'el', re: /[Ͱ-Ͽ]/ }, // Greek
   { lang: 'ru', re: /[Ѐ-ӿ]/ }, // Cyrillic (defaults to Russian; uk refined below)
   { lang: 'ar', re: /[؀-ۿ]/ }, // Arabic
   { lang: 'he', re: /[֐-׿]/ }, // Hebrew
   { lang: 'hi', re: /[ऀ-ॿ]/ }, // Devanagari ⇒ Hindi
+  { lang: 'bn', re: /[ঀ-৿]/ },
+  { lang: 'ta', re: /[஀-௿]/ },
+  { lang: 'te', re: /[ఀ-౿]/ },
   { lang: 'th', re: /[฀-๿]/ }, // Thai
 ];
 
-const HAN_RE = /[一-鿿]/; // CJK Unified Ideographs
+const HAN_RE = /\p{Script=Han}/u; // CJK Unified Ideographs
 const KANA_RE = /[぀-ゟ゠-ヿ]/;
 /** Cyrillic letters unique to Ukrainian (ї, і, є, ґ) disambiguate ru vs uk. */
 const UKRAINIAN_RE = /[іїєґ]/i;
@@ -124,12 +136,12 @@ const UKRAINIAN_RE = /[іїєґ]/i;
  * character is Latin/ASCII/punctuation (handled by the Latin path instead).
  */
 function scriptFor(ch: string): LangCode | null {
+  if (!/\p{L}/u.test(ch)) return null;
   if (KANA_RE.test(ch)) {
     return 'ja';
   }
   if (HAN_RE.test(ch)) {
-    // Han without kana is ambiguous; treat as Chinese. (A doc that also has
-    // kana is caught by the kana rule and attributed to Japanese overall.)
+    // The Han bucket is resolved with context by refineScript.
     return 'zh';
   }
   for (const { lang, re } of SCRIPT_RANGES) {
@@ -143,30 +155,6 @@ function scriptFor(ch: string): LangCode | null {
 // ---------------------------------------------------------------------------
 // Tier 2: diacritic fingerprints (Latin scripts)
 // ---------------------------------------------------------------------------
-
-/**
- * Characters that strongly bias a Latin-script guess toward one language.
- * These are hints layered on top of the stop-word vote, not verdicts — plenty
- * of languages share `é`/`ü`, so only distinctive marks carry weight.
- */
-const DIACRITIC_HINTS: { lang: LangCode; re: RegExp; weight: number }[] = [
-  { lang: 'de', re: /[äöüß]/i, weight: 2 }, // ß is nearly unique to German
-  { lang: 'sv', re: /[åä]/i, weight: 1 },
-  { lang: 'da', re: /[æø]/i, weight: 2 },
-  { lang: 'no', re: /[æø]/i, weight: 1 },
-  { lang: 'fi', re: /[äö]/i, weight: 1 },
-  { lang: 'es', re: /[ñ¿¡]/i, weight: 2 },
-  { lang: 'pt', re: /[ãõ]/i, weight: 2 },
-  { lang: 'fr', re: /[àâçèêëîïôùûœ]/i, weight: 1 },
-  { lang: 'pl', re: /[ąćęłńóśźż]/i, weight: 2 },
-  { lang: 'tr', re: /[ğışİ]/i, weight: 2 },
-  { lang: 'it', re: /[àèìòù]/i, weight: 1 },
-  // The six supersigned letters are Esperanto's alone among living languages.
-  // Weighted heavily: unlike é or ü, seeing one is close to proof, and without
-  // this an Esperanto post loses the stop-word vote to French (both use "la",
-  // "de", "en") despite carrying letters French does not have.
-  { lang: 'eo', re: /[ĉĝĥĵŝŭ]/i, weight: 4 },
-];
 
 // ---------------------------------------------------------------------------
 // Tier 3: stop-word tables (top function words per Latin-script language)
@@ -184,7 +172,74 @@ const DIACRITIC_HINTS: { lang: LangCode; re: RegExp; weight: number }[] = [
  * hand-pruned set that must be re-audited whenever a language is added.
  */
 const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
+  cs: 'je jsou jsem jsme není nebo protože který která také velmi dnes tento tato všechno ještě'.split(
+    ' ',
+  ),
+  ca: 'els les amb per una que aquest aquesta això però perquè també nosaltres vosaltres molt avui'.split(
+    ' ',
+  ),
+  id: 'yang dan untuk dengan adalah dari ini itu tidak saya kami kita mereka karena juga dalam akan sudah bisa'.split(
+    ' ',
+  ),
+  vi: 'và là của tôi bạn những một không được người trong có cho với này chúng đang tiếng rất'.split(
+    ' ',
+  ),
+  ro: 'și în este sunt pentru care că nu din cu această acesta aceasta avem foarte astăzi mai noi voi'.split(
+    ' ',
+  ),
+  fi: 'ja on ei että se hän mutta kun niin kuin myös tämä ovat minä sinä meidän kanssa koska tänään'.split(
+    ' ',
+  ),
+  no: 'og er det en et som på ikke jeg vi til med den har men også dette denne fordi fra eller noe noen mye gjøre etter'.split(
+    ' ',
+  ),
+  da: 'og er det en et som på ikke jeg vi til med den har men også dette denne fordi fra eller'.split(
+    ' ',
+  ),
+  tr: 'bir bu ve için ile değil çok daha ben sen biz olan olarak ama gibi bugün çünkü var'.split(
+    ' ',
+  ),
   en: [
+    'there',
+    'their',
+    'them',
+    'our',
+    'will',
+    'would',
+    'could',
+    'should',
+    'about',
+    'these',
+    'those',
+    'which',
+    'into',
+    'been',
+    'being',
+    'does',
+    'doing',
+    'did',
+    'some',
+    'any',
+    'only',
+    'each',
+    'other',
+    'than',
+    'then',
+    'here',
+    'where',
+    'how',
+    'why',
+    'who',
+    'had',
+    'more',
+    'most',
+    'while',
+    'cannot',
+    'another',
+    'never',
+    'after',
+    'before',
+    'because',
     'the',
     'of',
     'and',
@@ -217,6 +272,15 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
     'can',
   ],
   de: [
+    'ihm',
+    'doch',
+    'worden',
+    'einer',
+    'einem',
+    'einen',
+    'diese',
+    'dieser',
+    'wird',
     'der',
     'die',
     'und',
@@ -249,6 +313,10 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
     'nach',
   ],
   fr: [
+    'suis',
+    'sont',
+    'était',
+    'étaient',
     'le',
     'la',
     'les',
@@ -281,6 +349,12 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
     'son',
   ],
   es: [
+    'mucho',
+    'todo',
+    'esto',
+    'estoy',
+    'estamos',
+    'donde',
     'el',
     'la',
     'los',
@@ -313,6 +387,9 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
     'porque',
   ],
   pt: [
+    'tudo',
+    'isso',
+    'pouco',
     'de',
     'que',
     'não',
@@ -345,6 +422,11 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
     'pelo',
   ],
   it: [
+    'molto',
+    'mio',
+    'oggi',
+    'perché',
+    'siamo',
     'il',
     'di',
     'che',
@@ -433,6 +515,13 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
     'så',
     'kan',
     'man',
+    'care',
+    'ten',
+    'son',
+    'hat',
+    'van',
+    'door',
+    'den',
     'när',
     'vi',
     'nu',
@@ -478,6 +567,10 @@ const STOP_WORDS: Partial<Record<LangCode, string[]>> = {
   // no Romance language has — the -as/-is/-os verb endings of esti, the
   // ki-/ti-/ĉi- correlatives, and the accusative pronouns in -n.
   eo: [
+    'ĉu',
+    'saluton',
+    'hodiaŭ',
+    'hodiaux',
     'kaj',
     'estas',
     'estis',
@@ -628,35 +721,18 @@ const DISCRIMINATING_WORDS = (() => {
 // Tier 2b: language-exclusive letters (for short strings like hashtags)
 // ---------------------------------------------------------------------------
 
-/**
- * Letters used by **exactly one** language among the ones this module names, so
- * a single occurrence pins the language down without any lexical context. This
- * is intentionally far more conservative than {@link DIACRITIC_HINTS}: those are
- * *biases* that vote alongside stop-words (é, ü, à are shared by many
- * languages), whereas these are near-*proofs* usable on a lone word.
- *
- * The bar for inclusion: no other language in {@link LangCode} uses the letter
- * in normal orthography. That rules out the whole Scandinavian set (å/ä/ö/ø/æ
- * are shared across sv/da/no/fi) and most French/Italian accents (shared with
- * Portuguese/Spanish/…), so those languages get no exclusive-letter signal —
- * which is the correct, cautious outcome, not an omission.
- *
- * Kept letters and why they're safe:
- *  - de `ß`         — the eszett exists in no other language here.
- *  - es `ñ ¿ ¡`     — inverted marks are Spanish; ñ isn't used by any other
- *                     listed language (pt uses nh, not ñ).
- *  - pt `ã õ`       — nasal a/o tildes; Spanish uses ñ, not ã/õ.
- *  - pl `ł ż ź ą ę` — Polish-specific hooks/strokes; not in cz/sk (absent here).
- *  - tr `ı İ ğ`     — dotless i, dotted capital I, and soft g are Turkish.
- *
- * Ordering matters only if a string somehow carried two exclusive letters from
- * different languages (e.g. a joke tag "#ßółç"): first match wins, which is
- * acceptable for such pathological input.
+/** Distinctive spelling among supported languages, usable with context.
+ * Shared marks (é, ö, ã, õ) are deliberately absent. Portuguese needs ç plus
+ * its nasal ending because Vietnamese shares the tilde vowels. Conflicting
+ * spellings never use first-match-wins. Borrowed names still need prose clues.
  */
 const EXCLUSIVE_LETTERS: { lang: LangCode; re: RegExp }[] = [
   { lang: 'de', re: /ß/ },
   { lang: 'es', re: /[ñ¿¡]/i },
-  { lang: 'pt', re: /[ãõ]/i },
+  { lang: 'pt', re: /ç(?:ão|ões)/i },
+  { lang: 'cs', re: /[řů]/i },
+  { lang: 'ro', re: /[șț]/i },
+  { lang: 'vi', re: /[ắằẳẵặấầẩẫậếềểễệốồổỗộớờởỡợứừửữựỳỷỹỵạẹịọụảẻỉỏủ]/i },
   { lang: 'pl', re: /[łżźąę]/i },
   { lang: 'tr', re: /[ıİğĞ]/ }, // dotless ı, dotted İ, soft ğ/Ğ — all Turkish
   // Esperanto's circumflexed consonants and the breve ŭ. No other language
@@ -665,108 +741,13 @@ const EXCLUSIVE_LETTERS: { lang: LangCode; re: RegExp }[] = [
   { lang: 'eo', re: /[ĉĝĥĵŝŭ]/i },
 ];
 
-/**
- * A confident language from a single exclusive letter, or null if the text
- * contains none. Latin text without any exclusive letter stays undetermined.
+/** Esperanto transliteration requires a following vowel and grammar support.
+ * ux is excluded: Linux, jeux and animaux are not Esperanto evidence.
  */
-function exclusiveLetterLanguage(text: string): LangCode | null {
-  for (const { lang, re } of EXCLUSIVE_LETTERS) {
-    if (re.test(text)) {
-      return lang;
-    }
-  }
-  return null;
-}
+const X_SYSTEM_RE = /\b[a-z]*(?:cx|gx|hx|jx|sx)[aeiou][a-z]*\b/gi;
 
-// ---------------------------------------------------------------------------
-// Tier 2c: ASCII-transliterated Esperanto (x-system / h-system)
-// ---------------------------------------------------------------------------
-
-/**
- * Esperanto is routinely written without its diacritics, because keyboards
- * rarely have them. Two conventions dominate:
- *
- *  - **x-system**: `cx gx hx jx sx ux` for `ĉ ĝ ĥ ĵ ŝ ŭ`. Unambiguous in
- *    practice — `x` is not in the Esperanto alphabet at all, so these digraphs
- *    cannot occur by accident in a genuine Esperanto word.
- *  - **h-system**: `ch gh hh jh sh u` (Zamenhof's original). Far riskier to
- *    match: `ch` and `sh` are ordinary in English, German and French, so this
- *    is only counted when *other* Esperanto evidence is already present.
- *
- * Without this tier, "Mi sxatas gxin" is invisible to a detector that only
- * knows the accented forms, and posts written on a plain keyboard — the common
- * case — never register as Esperanto at all.
- */
-const X_SYSTEM_RE = /\b\w*(?:cx|gx|hx|jx|sx|ux)\w*\b/gi;
-
-/**
- * Endings that are Esperanto-*specific*, which is a much smaller set than
- * "Esperanto's endings".
- *
- * The tempting rule — nouns end -o, adjectives -a — is useless here: those are
- * precisely the Spanish, Italian and Portuguese endings too, and matching them
- * classified ordinary Spanish ("Mucho trabajo bueno pero poco dinero") as
- * Esperanto with 82% confidence. Only two families survive contact with
- * Romance:
- *
- *  - **verb tenses `-as -is -os -us`** on a stem of 3+ letters. Romance verbs
- *    do end in -as/-is (Spanish "hablas", "escribis"), so this is suggestive
- *    rather than decisive — it earns a small weight, never a verdict.
- *  - **the accusative/plural `-jn -ojn -ajn -on -an`**. The letter `j` as a
- *    plural marker, and `-n` as a case ending, exist in no Romance language.
- *    `-ojn`/`-ajn` in particular are unmistakable.
- *
- * Kept deliberately narrow. A detector that says "Esperanto" for Spanish is
- * worse than one that stays quiet: the accented and x-system tiers already
- * catch the overwhelming majority of real Esperanto posts, and this tier only
- * has to cover the diacritic-free remainder.
- */
+/** Plural/case endings only corroborate independent Esperanto word clues. */
 const EO_STRONG_ENDING_RE = /^[a-z]{2,}(?:ojn|ajn|oj|aj)$/;
-const EO_WEAK_ENDING_RE = /^[a-z]{3,}(?:as|is|os|us|on|an)$/;
-
-/**
- * Count the Esperanto morphology signal in already-tokenized words: the share
- * of tokens carrying a characteristic ending, plus x-system digraphs.
- *
- * Returns a vote weight, not a verdict. A stray "las" or "vitrolas" in another
- * language would match one ending; the threshold is a *proportion* of the text
- * so isolated coincidences never carry it.
- */
-function esperantoMorphologyVotes(text: string, tokens: string[]): number {
-  let votes = 0;
-
-  // x-system digraphs are near-proof on their own — x is not an Esperanto
-  // letter, so "sxatas"/"gxi" is someone typing Esperanto on an ASCII keyboard.
-  const xMatches = text.match(X_SYSTEM_RE);
-  if (xMatches) {
-    votes += 3 * xMatches.length;
-  }
-
-  if (tokens.length >= 4) {
-    const strong = tokens.filter((t) => EO_STRONG_ENDING_RE.test(t)).length;
-    const weak = tokens.filter((t) => EO_WEAK_ENDING_RE.test(t)).length;
-
-    // -oj/-ajn have no Romance counterpart: even one is meaningful, and they
-    // scale directly.
-    votes += strong * 3;
-
-    // Verb tenses only count as a *pattern*. Spanish will land one or two
-    // ("hablas", "escribis"); a third of the text ending this way is Esperanto
-    // grammar, not coincidence. Requiring both the share and an absolute floor
-    // keeps a four-word fragment from tripping it.
-    if (weak >= 2 && weak / tokens.length >= 0.3) {
-      votes += weak;
-    }
-  }
-  return votes;
-}
-
-// ---------------------------------------------------------------------------
-// Core detection
-// ---------------------------------------------------------------------------
-
-/** Weight of a single Mastodon-declared language code as a prior. */
-const METADATA_PRIOR_WEIGHT = 3;
 
 /** Normalize a possibly-regioned ISO code ("en-US", "pt_BR") to a bare code. */
 function normalizeIso(code: string | null | undefined): LangCode | null {
@@ -774,121 +755,183 @@ function normalizeIso(code: string | null | undefined): LangCode | null {
     return null;
   }
   const base = code.toLowerCase().split(/[-_]/)[0];
-  return base in LANG_NAMES ? (base as LangCode) : null;
+  return Object.hasOwn(LANG_NAMES, base) ? (base as LangCode) : null;
+}
+
+/** A share measures supported text, never a probability of being correct. */
+export const CONFIDENT_LANGUAGE_SHARE = 0.85;
+const MIN_DISTINCT_WORDS = 3;
+
+/** Bound work, normalize composed/compatibility letters, and remove non-prose. */
+function detectionText(text: string): string {
+  return text
+    .slice(0, 12000)
+    .normalize('NFKC')
+    .replace(/\x60\x60\x60[\s\S]*?(?:\x60\x60\x60|$)|\x60[^\x60\n]*\x60/g, ' ')
+    .replace(/https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|@[\p{L}\p{N}_.@-]+/giu, ' ')
+    .replace(/:[a-z0-9_+-]+:/gi, ' ')
+    .replace(/<[^>]*>/g, ' ');
+}
+
+function words(text: string): string[] {
+  return text.toLowerCase().match(/[\p{L}\p{M}]+/gu) ?? [];
+}
+
+/** Only corroborated evidence names a Latin language. Repetition adds nothing. */
+function latinLanguage(text: string): LangCode | null {
+  const unique = new Set(words(text));
+  const evidence = new Map<LangCode, Set<string>>();
+  const add = (lang: LangCode, word: string) => {
+    const hits = evidence.get(lang) ?? new Set<string>();
+    hits.add(word);
+    evidence.set(lang, hits);
+  };
+  for (const token of unique) {
+    const lang = DISCRIMINATING_WORDS.get(token);
+    if (lang) add(lang, token);
+  }
+  // Morphology corroborates Esperanto grammar. It cannot establish a language
+  // from an identifier or coincidental English/Romance word endings.
+  if ((evidence.get('eo')?.size ?? 0) >= 1) {
+    for (const token of unique) {
+      X_SYSTEM_RE.lastIndex = 0;
+      if (X_SYSTEM_RE.test(token) || EO_STRONG_ENDING_RE.test(token)) add('eo', token);
+    }
+  }
+  X_SYSTEM_RE.lastIndex = 0;
+  const ranked = [...evidence].sort((a, b) => b[1].size - a[1].size);
+  const [leader, runner] = ranked;
+  const best = leader?.[1].size ?? 0;
+  const total = ranked.reduce((sum, [, hits]) => sum + hits.size, 0);
+  if (
+    leader &&
+    best >= MIN_DISTINCT_WORDS &&
+    best >= 3 * (runner?.[1].size ?? 0) &&
+    best / total >= 0.75 &&
+    best / Math.max(1, unique.size) >= 0.15
+  )
+    return leader[0];
+
+  // A borrowed name does not establish the language of a whole sentence.
+  const marked = new Map<LangCode, number>();
+  for (const token of unique) {
+    for (const { lang, re } of EXCLUSIVE_LETTERS) {
+      if (re.test(token)) marked.set(lang, (marked.get(lang) ?? 0) + 1);
+    }
+  }
+  if (marked.size === 1) {
+    const [lang, count] = [...marked][0];
+    const hits = evidence.get(lang)?.size ?? 0;
+    const other = ranked
+      .filter(([candidate]) => candidate !== lang)
+      .reduce((sum, [, set]) => sum + set.size, 0);
+    if (
+      other === 0 &&
+      ((unique.size <= 2 && count >= 1) ||
+        (hits >= 2 && count >= 1) ||
+        (count >= 2 && count / unique.size >= 0.3))
+    )
+      return lang;
+  }
+  return null;
+}
+
+/** Shared alphabets still need language clues. */
+function refineScript(script: LangCode, text: string, meta: LangCode | null): LangCode {
+  const lower = script === 'ar' ? text.toLowerCase().replace(/\p{M}/gu, '') : text.toLowerCase();
+  const tokens = new Set(words(lower));
+  const hits = (list: string) => list.split(' ').filter((word) => tokens.has(word)).length;
+  if (script === 'el' && !/[Ͱ-Ͽ]{3}/.test(lower)) return 'und';
+  if (script === 'zh') {
+    // Common grammatical sequences, Traditional and Simplified alike.
+    const chinese =
+      /(這是|这是|我們|我们|他們|他们|這個|这个|沒有|没有|因為|因为|什麼|什么|謝謝|谢谢|中文|漢語|汉语)/.test(
+        text,
+      );
+    if (KANA_RE.test(text)) return chinese ? 'und' : 'ja';
+    if (/[가-힯ᄀ-ᇿ㄰-㆏]/.test(text)) return chinese ? 'und' : 'ko';
+    if (chinese) return 'zh';
+    return meta === 'zh' || meta === 'ja' || meta === 'ko' ? meta : 'und';
+  }
+  if (script === 'ru') {
+    if (/[ўјљњћђџқңүұөҳҷ]/u.test(lower)) return 'und';
+    const ukrainian =
+      /[їєґ]/.test(lower) ||
+      (UKRAINIAN_RE.test(lower) &&
+        hits('це як світ привіт для що та український українською') >= 1);
+    const russianHits = hits(
+      'это этот что как сегодня привет русском русский языке мы вы его она есть',
+    );
+    const russian = russianHits >= 2 || (russianHits >= 1 && /[ыэё]/.test(lower));
+    if (ukrainian && russian) return 'und';
+    if (ukrainian) return 'uk';
+    if (russian) return 'ru';
+    return meta === 'ru' || meta === 'uk' ? meta : 'und';
+  }
+  if (script === 'ar') {
+    if (/[ٹڈڑںھہے]/.test(lower)) return 'und';
+    const persian = hits('این است برای که را از یک') >= 2;
+    const arabic = hits(
+      'هذا هذه ذلك تلك الذي التي الذين نحن أن إن على إلى في مع عربي العربية مرحبا',
+    );
+    const arabicEvidence = arabic >= 2 || (arabic >= 1 && /ال/.test(lower));
+    if (persian && arabicEvidence) return 'und';
+    if (persian) return 'fa';
+    if (/[پچژگ]/.test(lower)) return meta === 'fa' ? 'fa' : 'und';
+    if (arabicEvidence) return 'ar';
+    return meta === 'ar' || meta === 'fa' ? meta : 'und';
+  }
+  if (script === 'bn' && /[ৰৱ]/.test(lower)) return 'und';
+  if (script === 'hi' && hits('आहे आणि नाही आम्ही छ छन्') > 0) return 'und';
+  return script;
 }
 
 /**
- * Detect the language distribution of a single plain-text snippet.
- *
- * `metaHint` is an authoritative-when-present prior (a Mastodon `status.language`
- * or `account.source.language`). It seeds the vote but does not veto the text:
- * a post declared `en` that is visibly all Cyrillic should still read as Russian.
+ * Attribute supported prose to languages; ambiguous text stays undetermined.
+ * Metadata is a fallback, not a competing vote or a way around script evidence.
  */
 export function detectLanguage(text: string, metaHint?: string | null): LangShare[] {
-  const votes = new Map<LangCode, number>();
-  const add = (lang: LangCode, n: number) => votes.set(lang, (votes.get(lang) ?? 0) + n);
-
-  // Tier 1: script. Count characters by script; non-Latin scripts vote per char
-  // (weighted down so a stop-word-rich Latin doc isn't drowned by a few kanji).
-  let latinLetters = 0;
-  let ukrainianSeen = false;
-  /** Set when the text carries spelling only Esperanto uses. */
-  let eoProven = false;
-  for (const ch of text) {
-    if (UKRAINIAN_RE.test(ch)) {
-      ukrainianSeen = true;
-    }
-    const script = scriptFor(ch);
-    if (script) {
-      add(script, 1);
-    } else if (/[a-zA-Z]/.test(ch)) {
-      latinLetters += 1;
-    }
-  }
-  // Refine Cyrillic to Ukrainian when its unique letters appear.
-  if (ukrainianSeen && votes.has('ru')) {
-    add('uk', (votes.get('ru') ?? 0) + 2);
-  }
-
-  const lower = text.toLowerCase();
-
-  // Tier 2: diacritic fingerprints (only meaningful for Latin text).
-  if (latinLetters > 0) {
-    for (const { lang, re, weight } of DIACRITIC_HINTS) {
-      if (re.test(lower)) {
-        add(lang, weight);
-      }
-    }
-
-    // Tier 3: stop-word vote.
-    // The character class is the *word* alphabet: anything missing here is
-    // treated as a word boundary, so an omitted letter silently splits words in
-    // that language and destroys its stop-word vote. Esperanto's ĉĝĥĵŝŭ were
-    // missing, which turned "ĝi estas ĝusta" into fragments and handed the vote
-    // to whoever else matched ("la", "de", "en" → French).
-    const tokens = lower.split(/[^a-zàâäçèéêëîïôöùûüßñãõœąćęłńóśźżğışĉĝĥĵŝŭ]+/i).filter(Boolean);
-    // Only words belonging to exactly one language vote; see DISCRIMINATING_WORDS.
-    for (const tok of tokens) {
-      const lang = DISCRIMINATING_WORDS.get(tok);
-      if (lang) {
-        add(lang, 1);
-      }
-    }
-
-    // Tier 3b: Esperanto morphology and ASCII transliteration. Runs after the
-    // stop-word vote because it is designed to *outweigh* the Romance
-    // false-positives that vote on shared function words ("la", "de", "en").
-    const eoVotes = esperantoMorphologyVotes(lower, tokens);
-    if (eoVotes) {
-      add('eo', eoVotes);
-    }
-    // Either kind of Esperanto-exclusive spelling counts as proof: the accented
-    // letters, or the x-system digraphs that stand in for them.
-    eoProven = /[ĉĝĥĵŝŭ]/i.test(lower) || X_SYSTEM_RE.test(lower);
-    X_SYSTEM_RE.lastIndex = 0; // /g regex: .test() advances state, so reset it.
-
-    // If Latin text produced no lexical signal at all, record it as latin-unknown
-    // so the share math still accounts for the words (avoids false "100% en").
-    const gotLatinVote = [...votes].some(([l]) => l !== 'ja' && l !== 'zh');
-    if (!gotLatinVote) {
-      add('und', Math.max(1, Math.round(latinLetters / 5)));
-    }
-  }
-
-  // Esperanto-exclusive spelling is proof, and it changes what the *other*
-  // votes mean. Esperanto shares "la", "de", "en",
-  // "mi", "por" with the Romance languages, so every Esperanto sentence hands
-  // free votes to French, Spanish and Italian — enough to drag eo's share under
-  // a confidence bar even while it wins the vote. Once a letter no Romance
-  // language possesses is on the page, those votes are known to be spurious and
-  // are discounted rather than left to dilute the answer.
-  //
-  // Only the Romance block is touched: a genuinely mixed post (Esperanto quoted
-  // inside German, say) should still report both, and German never voted on
-  // "la" to begin with.
-  if (eoProven && votes.has('eo')) {
-    for (const romance of ['fr', 'es', 'it', 'pt'] as const) {
-      const n = votes.get(romance);
-      if (n) {
-        votes.set(romance, n / 4);
-      }
-    }
-  }
-
-  // Tier 4: metadata prior — a nudge, applied last, never a veto.
+  const clean = detectionText(text);
   const meta = normalizeIso(metaHint);
-  if (meta) {
-    add(meta, METADATA_PRIOR_WEIGHT);
+  const totals = new Map<LangCode, number>();
+  const add = (lang: LangCode, n: number) => totals.set(lang, (totals.get(lang) ?? 0) + n);
+  for (const line of clean.split(/\n+/)) {
+    const scripts = new Map<LangCode, number>();
+    let latin = '';
+    let latinCount = 0;
+    for (const ch of line) {
+      if (!/\p{L}/u.test(ch)) {
+        latin += ch;
+        continue;
+      }
+      const script = scriptFor(ch);
+      if (script) {
+        scripts.set(script, (scripts.get(script) ?? 0) + 1);
+        latin += ' ';
+      } else if (/\p{Script=Latin}/u.test(ch)) {
+        latin += ch;
+        latinCount++;
+      } else {
+        add('und', 1);
+        latin += ' ';
+      }
+    }
+    for (const [script, count] of scripts) add(refineScript(script, line, meta), count);
+    if (latinCount) {
+      add(latinLanguage(latin) ?? (!scripts.size ? meta : null) ?? 'und', latinCount);
+    }
   }
+  const total = [...totals.values()].reduce((a, b) => a + b, 0);
+  if (!total) return [{ lang: 'und', share: 1 }];
+  return [...totals]
+    .map(([lang, count]) => ({ lang, share: count / total }))
+    .sort((a, b) => b.share - a.share || a.lang.localeCompare(b.lang));
+}
 
-  if (!votes.size) {
-    return [{ lang: 'und', share: 1 }];
-  }
-
-  const total = [...votes.values()].reduce((a, b) => a + b, 0);
-  return [...votes.entries()]
-    .map(([lang, n]) => ({ lang, share: n / total }))
-    .sort((a, b) => b.share - a.share);
+/** For warnings and filters, supported evidence must dominate actual prose. */
+export function confidentLanguage(text: string): LangCode | null {
+  const [top] = detectLanguage(text);
+  return top.lang !== 'und' && top.share >= CONFIDENT_LANGUAGE_SHARE ? top.lang : null;
 }
 
 /**
@@ -939,33 +982,7 @@ export function sharePct(share: number): number {
   return Math.max(1, Math.round(share * 100));
 }
 
-/**
- * A *confident* single-language guess for a very short string (a hashtag, a
- * display name), based on **script and exclusive letters only** — no stop-word
- * voting, because one word is far too thin for the lexical tier and would
- * misfire wildly.
- *
- * Two tiers, both designed to commit only when practically certain:
- *  1. **Script** — kana → ja, hangul → ko, Cyrillic → ru/uk,
- *     Greek/Arabic/Hebrew/Thai/Devanagari.
- *  2. **Exclusive letters** ({@link EXCLUSIVE_LETTERS}) — a Latin string carrying
- *     a letter used by exactly one language commits to it: "#Straße" → de,
- *     "#mañana" → es, "#São" → pt, "#Łódź" → pl, "#Diyarbakır" → tr.
- *
- * Anything else Latin returns `null` ("undetermined"): "#Berlin" could be
- * German, English or anything using the plain Latin alphabet, and no single
- * exclusive letter is present, so we never claim to know.
- *
- * **Bare Han (kanji/hanzi with no kana) is deliberately treated as undetermined
- * too.** "東京" is a Japanese place name written in the same characters Chinese
- * uses — committing to `zh` would wrongly hide it from a Japanese reader. Under
- * the filter's "only hide what we're sure about" rule, ambiguous Han is kept.
- * Kana anywhere still resolves the whole string to Japanese.
- *
- * This is the basis for the trending-tag language filter, whose product rule is
- * "hide only what we're sure is a language you don't know" — `null` here means
- * "keep it".
- */
+/** A short-string verdict only when script/spelling leaves one supported language. */
 export function detectScriptLanguage(text: string): LangCode | null {
   const candidates = detectScriptCandidates(text);
   // A single candidate is a committed guess. Multiple candidates (only bare Han,
@@ -974,64 +991,26 @@ export function detectScriptLanguage(text: string): LangCode | null {
   return candidates.length === 1 ? candidates[0] : null;
 }
 
-/**
- * The **set of languages** a short string's script/letters could be, most
- * likely first. Unlike {@link detectScriptLanguage} (which returns null when
- * uncertain), this exposes genuine ambiguity so callers can reason about it:
- *
- *  - kana → `['ja']`; hangul → `['ko']`; Cyrillic → `['ru']` or `['uk']`;
- *    Greek/Arabic/Hebrew/Thai/Devanagari → their single language.
- *  - **bare Han (no kana) → `['zh', 'ja']`** — the honest answer. It is one of
- *    those two, we just can't say which from characters alone. A reader who
- *    knows *neither* still can't read it (the trending filter uses exactly
- *    that); a reader who knows *either* might, so it's kept for them.
- *  - Latin with an exclusive letter → that one language; plain Latin → `[]`.
- *  - nothing scriptable (digits/punctuation) → `[]` (undetermined).
- */
+/** Script/spelling candidates; ambiguous Han and mixed scripts stay explicit. */
 export function detectScriptCandidates(text: string): LangCode[] {
-  const counts = new Map<LangCode, number>();
-  let ukrainian = false;
-  let hasKana = false;
-  let hasHan = false;
-  for (const ch of text) {
-    if (UKRAINIAN_RE.test(ch)) {
-      ukrainian = true;
-    }
-    if (KANA_RE.test(ch)) {
-      hasKana = true;
-    }
-    if (HAN_RE.test(ch)) {
-      hasHan = true;
-    }
-    const lang = scriptFor(ch);
-    if (lang) {
-      counts.set(lang, (counts.get(lang) ?? 0) + 1);
-    }
+  const clean = detectionText(text);
+  const scripts = new Set<LangCode>();
+  for (const ch of clean) {
+    const script = scriptFor(ch);
+    if (script) scripts.add(script);
   }
-  // Kana anywhere makes the whole thing unambiguously Japanese, even amid kanji.
-  if (hasKana) {
-    return ['ja'];
+  if (!scripts.size) {
+    const matches = EXCLUSIVE_LETTERS.filter(({ re }) => re.test(clean));
+    return matches.length === 1 ? [matches[0].lang] : [];
   }
-  // Bare Han (no kana): genuinely ambiguous between Chinese and Japanese.
-  counts.delete('zh');
-  if (hasHan && !counts.size) {
-    return ['zh', 'ja'];
+  const candidates = new Set<LangCode>();
+  for (const script of scripts) {
+    const lang = refineScript(script, clean, null);
+    if (lang !== 'und') candidates.add(lang);
+    else if (script === 'zh') {
+      candidates.add('zh');
+      candidates.add('ja');
+    } else return [];
   }
-  if (!counts.size) {
-    // No non-Latin script — try the Latin exclusive-letter test.
-    const latin = exclusiveLetterLanguage(text);
-    return latin ? [latin] : [];
-  }
-  let best: LangCode | null = null;
-  let bestN = 0;
-  for (const [lang, n] of counts) {
-    if (n > bestN) {
-      best = lang;
-      bestN = n;
-    }
-  }
-  if (best === 'ru' && ukrainian) {
-    return ['uk'];
-  }
-  return best ? [best] : [];
+  return [...candidates];
 }

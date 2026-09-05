@@ -7,6 +7,17 @@ import { AnalyticsTracker, sanitizePath } from './analytics-tracker';
 import { ClientPrefs } from './client-prefs';
 
 describe('sanitizePath', () => {
+  it('removes profile handles and provider URI suffixes', () => {
+    expect(sanitizePath('/accounts/1198201/@publicvoit@graz.social')).toBe('/accounts/:id');
+    expect(sanitizePath('/test/accounts/47341/@nolan@toot.cafe')).toBe('/test/accounts/:id');
+    expect(
+      sanitizePath('/test/statuses/bsky:at:%2F%2Fdid:plc:abc%2Fapp.bsky.feed.post%2F123'),
+    ).toBe('/test/statuses/:id');
+    expect(sanitizePath('/statuses/bsky:at://did:plc:abc/app.bsky.feed.post/123')).toBe(
+      '/statuses/:id',
+    );
+    expect(sanitizePath('/read/112469071892317602')).toBe('/read/:id');
+  });
   it('collapses account ids', () => {
     expect(sanitizePath('/accounts/111422974327710290')).toBe('/accounts/:id');
   });
@@ -80,9 +91,20 @@ describe('AnalyticsTracker opt-out', () => {
   }
 
   afterEach(() => {
+    document.head.querySelector('base[data-analytics-test]')?.remove();
     injectedScript()?.remove();
     delete (window as { goatcounter?: unknown }).goatcounter;
     localStorage.clear();
+  });
+
+  it.each(['test', 'canary'])('never loads analytics on the %s deployment', (deployment) => {
+    const base = document.createElement('base');
+    base.href = `https://mawkingbird.com/${deployment}/`;
+    base.setAttribute('data-analytics-test', '');
+    document.head.prepend(base);
+    setUp(true);
+    navigate();
+    expect(injectedScript()).toBeNull();
   });
 
   it('injects nothing at all when analytics are off', () => {

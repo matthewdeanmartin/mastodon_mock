@@ -39,6 +39,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { placeholdersMatch } from './i18n-optional-terminology.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP_DIR = join(ROOT, 'src', 'app');
@@ -551,7 +552,7 @@ for (const code of localeCodes) {
     }
     const wanted = placeholders(en[key]).join(', ');
     const got = placeholders(value).join(', ');
-    if (wanted !== got) {
+    if (!placeholdersMatch(key, en[key], value)) {
       problems.push(
         `${code}.json "${key}" placeholder mismatch: en has [${wanted}], ${code} has [${got}]`,
       );

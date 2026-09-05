@@ -264,6 +264,22 @@ describe('Search', () => {
    * so the summary carries a count of what is still narrowing the results.
    */
   describe('refinement summary', () => {
+    it('keeps Mastodon account filters open after results arrive', () => {
+      const fixture = setUp();
+      internals(fixture).type.set('accounts');
+      internals(fixture).accountItems.set([
+        { account: makeAccount({ acct: 'alice@example.social' }), matchingPosts: [] },
+        { account: makeAccount({ acct: 'bob@example.com', bot: true }), matchingPosts: [] },
+      ]);
+      fixture.detectChanges();
+      const panel = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>(
+        'details.search-form-box',
+      );
+      expect(panel?.open).toBe(true);
+      expect(panel?.querySelector('.refine-filter')).not.toBeNull();
+      expect(panel?.querySelector('.refine-facets')).not.toBeNull();
+    });
+
     it('counts nothing on an untouched page', () => {
       const fixture = setUp();
 

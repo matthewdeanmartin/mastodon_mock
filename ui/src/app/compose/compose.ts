@@ -48,7 +48,7 @@ import { longUrls, postLength } from './post-length';
 import { renderStatusText } from './status-text';
 import { FeatureFlags } from '../feature-flags';
 import { KnownLanguages } from '../trend-language-filter';
-import { LANG_NAMES, LangCode, detectLanguage } from '../language-detect';
+import { LANG_NAMES, LangCode, confidentLanguage } from '../language-detect';
 import { stripHtml } from '../sentiment';
 import { MataroaApi } from '../providers/mataroa/mataroa-api';
 import { MataroaSettings } from '../providers/mataroa/mataroa-settings';
@@ -412,13 +412,18 @@ function dragHasFiles(event: DragEvent): boolean {
 // i18n compose.pasteService: Paste service
 // i18n compose.postingIn: Posting in
 // i18n compose.previewEmpty: Nothing here yet…
-// i18n compose.previewHeading: Preview — as it will appear in the feed
+// i18n compose.previewHeading: Preview
 // i18n compose.publishAt: Publish at
 // i18n compose.publishNow: Publish now
 // i18n compose.remove: Remove
 // i18n compose.removeChoice: Remove choice
 // i18n compose.showDrafts: Show drafts
 // i18n compose.syntaxLanguage: Syntax language
+// i18n compose.threadSummary: Will post as a thread of {{count}}.
+// Complete thread hint: count is the number of composer segments. Keep punctuation
+// and count placement in the translation; plain interpolation escapes all text.
+// Retain the old declaration until deferred locale dictionaries retire their
+// fragment keys. Rendering uses threadSummary, with English fallback as needed.
 // i18n compose.threadOf: Will post as a thread of
 // i18n compose.titlePrefix: Title:
 // i18n compose.togglePreview: Toggle preview
@@ -794,6 +799,7 @@ export class Compose implements OnDestroy {
         return;
       }
       this.seededKey = key;
+      this.previewSeed.set(/^\s*(?:@\S+\s*)+$/.test(initialText) ? initialText.trim() : '');
       this.text.set(initialText);
       // No caller opinion means a top-level compose: open on the account's own
       // posting default rather than assuming `public`.
@@ -985,9 +991,17 @@ export class Compose implements OnDestroy {
   // Appears as soon as there's a character to render, gone when empty.
   // Compact composers start with it off; the 👁 toolbar button toggles it.
   protected previewOn = signal(true);
-  protected previewVisible = computed(
-    () => this.previewOn() && this.segments().some((s) => s.trim() !== ''),
-  );
+  private readonly previewSeed = signal('');
+  protected previewVisible = computed(() => {
+    const seed = this.previewSeed();
+    return (
+      this.previewOn() &&
+      this.segments().some((segment, index) => {
+        const content = segment.trim();
+        return content !== '' && !(index === 0 && seed && seed.startsWith(content));
+      })
+    );
+  });
   /** Compact mode hides the drafts picker behind a 📝 toolbar toggle. */
   protected draftsOpen = signal(false);
   protected previewHtml = computed(() =>
@@ -1537,11 +1551,7 @@ export class Compose implements OnDestroy {
     if (text.length < 20) {
       return null;
     }
-    const [top] = detectLanguage(text);
-    if (!top || top.lang === 'und' || top.share < 0.6) {
-      return null;
-    }
-    return top.lang;
+    return confidentLanguage(text);
   }
 
   /**

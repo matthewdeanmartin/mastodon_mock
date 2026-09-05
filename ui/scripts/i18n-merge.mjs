@@ -47,6 +47,15 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rulesFor } from './i18n-locale-rules.mjs';
+import { placeholdersMatch } from './i18n-optional-terminology.mjs';
+import {
+  acceptBatch,
+  readLedger,
+  reviewBatch,
+  trackedLocale,
+  validateSnapshot,
+  writeLedger,
+} from './i18n-ledger.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const I18N_DIR = join(ROOT, 'public', 'i18n');
@@ -96,6 +105,31 @@ const target = join(I18N_DIR, `${lang}.json`);
 const existing = readJson(target, {});
 const batch = readJson(batchPath);
 const locale = rulesFor(lang);
+const ledgerPath = join(ROOT, 'i18n-context', `ledger-${lang}.json`);
+const REVIEW = args.includes('--reviewed');
+let nextLedger;
+if (trackedLocale(lang)) {
+  const ledger = readLedger(ledgerPath);
+  try {
+    const snapshotPath = args.find((arg) => arg.startsWith('--source='))?.slice('--source='.length);
+    validateSnapshot(
+      Object.keys(batch),
+      snapshotPath ? readJson(snapshotPath) : null,
+      lang,
+      english,
+      context,
+    );
+    nextLedger = REVIEW
+      ? reviewBatch(batch, english, flatten(existing), context, ledger)
+      : acceptBatch(batch, english, context, ledger);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+} else if (REVIEW) {
+  console.error('Review ledger is not enabled for this locale.');
+  process.exit(2);
+}
 
 /** Placeholder *names*, sorted — order may legitimately change, the set may not. */
 const placeholders = (text) =>
@@ -125,7 +159,7 @@ for (const [key, value] of Object.entries(batch)) {
     note(key, 'EMPTY', 'omit the key instead — a missing key falls back to English');
     continue;
   }
-  if (placeholders(source) !== placeholders(value)) {
+  if (!placeholdersMatch(key, source, value)) {
     note(key, 'PLACEHOLDER', `en {${placeholders(source)}} vs ${lang} {${placeholders(value)}}`);
   }
   if (markup(source) !== markup(value)) {
@@ -164,6 +198,11 @@ if (DRY) {
   );
   process.exit(0);
 }
+if (REVIEW) {
+  writeLedger(ledgerPath, nextLedger);
+  console.log(`reviewed ${Object.keys(batch).length} keys in ${lang}`);
+  process.exit(0);
+}
 
 // Write nested, matching en.json's shape, with each group's keys sorted so
 // diffs stay reviewable and two agents merging different batches do not
@@ -183,6 +222,7 @@ for (const group of Object.keys(existing)) {
   }
 }
 writeFileSync(target, `${JSON.stringify(existing, null, 2)}\n`, 'utf8');
+if (nextLedger) writeLedger(ledgerPath, nextLedger);
 
 const total = Object.keys(flatten(existing)).length;
 const denominator = Object.keys(english).filter((k) => context[k]?.translate !== false).length;

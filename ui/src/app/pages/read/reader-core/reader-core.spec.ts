@@ -499,6 +499,15 @@ describe('ReaderCore paging a post chain', () => {
     expect(
       (fixture.nativeElement as HTMLElement).querySelector('.reader-article-body'),
     ).not.toBeNull();
+    const element = fixture.nativeElement as HTMLElement;
+    const body = element.querySelector('.reader-article-body');
+    expect(element.querySelectorAll('.reader-article-body')).toHaveLength(1);
+    expect(element.querySelector('.reader-posts')).toBeNull();
+    expect(element.querySelector('.reader-expand')).toBeNull();
+    core().nextPage();
+    fixture.detectChanges();
+    expect(element.querySelector('.reader-article-body')).toBe(body);
+    expect(element.querySelectorAll('.reader-article-body')).toHaveLength(1);
   });
 
   it('remeasures when a retained core receives another library document', () => {

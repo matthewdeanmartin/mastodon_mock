@@ -22,6 +22,7 @@ import type { AdoptableCollection } from '../../../../providers/account/collecti
  * The consequence is stated in the copy, not buried: on a merge, anything held
  * in both places keeps the account's version.
  */
+// Legacy fragment declarations are retained while deferred locales still reference them.
 // i18n settings.plus.adoption.title: You have {{noun}} here and on your account
 // i18n settings.plus.adoption.summaryLead: You're switching this on for the first time, so there are two sets to combine: the
 // i18n settings.plus.adoption.cancel: Cancel
@@ -38,6 +39,14 @@ import type { AdoptableCollection } from '../../../../providers/account/collecti
 // i18n settings.plus.adoption.leaveOff: Leave it off for now
 // i18n settings.plus.adoption.noReplace: There's no option to replace your account's copy with this browser's — that would delete things from your other devices, and working out which change came first isn't something this app tries to guess.
 // i18n settings.plus.adoption.reassure: Nothing has gone wrong, and you can't lose anything by picking either one — this only decides what this browser shows from now on.
+// i18n settings.plus.adoption.titleTrust: You have trusted accounts here and on your account
+// i18n settings.plus.adoption.titleFeeds: You have feed subscriptions here and on your account
+// i18n settings.plus.adoption.titleLists: You have lists here and on your account
+// i18n settings.plus.adoption.summaryCounts: You're switching this on for the first time, so there are two sets to combine: the <strong>{{localCount}}</strong> already in this browser, and the <strong>{{remoteCount}}</strong> saved to your Mawkingbird account by another device.
+// i18n settings.plus.adoption.keepAllCount: Keep all {{count}}
+// i18n settings.plus.adoption.justTheCount: Just the {{count}} from my account
+// i18n settings.plus.adoption.justTheHintCount: This browser's {{count}} are dropped and it matches your other devices exactly.
+// i18n settings.plus.adoption.leaveOffHintCount: Keeps this browser's {{count}} exactly as they are and changes nothing on your account. You can switch this on again whenever you like, and you'll be asked this same question.
 
 @Component({
   selector: 'app-adoption-dialog',
@@ -57,7 +66,7 @@ export class AdoptionDialog {
 
   protected readonly busy = signal(false);
 
-  protected readonly noun = computed(() => NOUNS[this.collection()]);
+  protected readonly titleKey = computed(() => TITLE_KEYS[this.collection()]);
 
   /**
    * How many of this browser's items a merge would actually add.
@@ -77,8 +86,8 @@ export class AdoptionDialog {
   }
 }
 
-const NOUNS: Record<AdoptableCollection, string> = {
-  trust: 'trusted accounts',
-  feeds: 'feed subscriptions',
-  lists: 'lists',
+const TITLE_KEYS: Record<AdoptableCollection, string> = {
+  trust: 'settings.plus.adoption.titleTrust',
+  feeds: 'settings.plus.adoption.titleFeeds',
+  lists: 'settings.plus.adoption.titleLists',
 };

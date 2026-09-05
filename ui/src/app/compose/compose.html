@@ -801,7 +801,7 @@
     </div>
   } @else if (thread().length) {
     <div class="thread-hint muted">
-      {{ 'compose.threadOf' | transloco }} {{ segments().length }}.
+      {{ 'compose.threadSummary' | transloco: { count: segments().length } }}
     </div>
   }
 

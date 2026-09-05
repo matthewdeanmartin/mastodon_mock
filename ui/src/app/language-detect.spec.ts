@@ -174,8 +174,11 @@ describe('detectLanguageMix', () => {
 describe('detectScriptLanguage (short strings / hashtags)', () => {
   it('commits on unambiguous non-Latin scripts', () => {
     expect(detectScriptLanguage('안녕')).toBe('ko');
-    expect(detectScriptLanguage('Москва')).toBe('ru');
-    expect(detectScriptLanguage('مصر')).toBe('ar');
+    // A place name can appear in several Cyrillic languages; require prose clues.
+    expect(detectScriptLanguage('Москва')).toBeNull();
+    expect(detectScriptLanguage('это русский текст')).toBe('ru');
+    expect(detectScriptLanguage('مصر')).toBeNull(); // shared Arabic/Persian place name
+    expect(detectScriptLanguage('هذا عربي')).toBe('ar');
     expect(detectScriptLanguage('Αθήνα')).toBe('el');
     expect(detectScriptLanguage('กรุงเทพ')).toBe('th');
   });
@@ -183,7 +186,8 @@ describe('detectScriptLanguage (short strings / hashtags)', () => {
   it('treats bare Han as undetermined (東京 could be ja or zh)', () => {
     // No kana to disambiguate: don't commit, so nothing is wrongly hidden.
     expect(detectScriptLanguage('東京')).toBeNull();
-    expect(detectScriptLanguage('中文')).toBeNull();
+    expect(detectScriptLanguage('中')).toBeNull();
+    expect(detectScriptLanguage('中文')).toBe('zh');
   });
 
   it('refines Cyrillic to Ukrainian on its unique letters', () => {
@@ -202,7 +206,7 @@ describe('detectScriptLanguage (short strings / hashtags)', () => {
     expect(detectScriptLanguage('Straße')).toBe('de'); // ß
     expect(detectScriptLanguage('mañana')).toBe('es'); // ñ
     expect(detectScriptLanguage('¿Qué?')).toBe('es'); // inverted question mark
-    expect(detectScriptLanguage('São')).toBe('pt'); // ã
+    expect(detectScriptLanguage('São')).toBeNull(); // ã also occurs in Vietnamese
     expect(detectScriptLanguage('promoção')).toBe('pt'); // ã
     expect(detectScriptLanguage('Łódź')).toBe('pl'); // ł, ż/ź
     expect(detectScriptLanguage('Wrocław')).toBe('pl'); // ł
@@ -243,7 +247,7 @@ describe('detectScriptCandidates (exposes zh/ja ambiguity)', () => {
   it('returns a single language for unambiguous scripts', () => {
     expect(detectScriptCandidates('안녕')).toEqual(['ko']);
     expect(detectScriptCandidates('Київ')).toEqual(['uk']);
-    expect(detectScriptCandidates('مصر')).toEqual(['ar']);
+    expect(detectScriptCandidates('هذا عربي')).toEqual(['ar']);
   });
 
   it('returns [] for plain Latin and non-scriptable input', () => {

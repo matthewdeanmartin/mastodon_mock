@@ -408,19 +408,10 @@
       <!--
         A `<details>` rather than a signal-driven block, and open by default.
 
-        The refinement column is long — query controls, the type select, numeric
-        facets, the refine bar, the facet list and the budget note. Beside the
-        results at desktop width that is fine. Stacked on a phone it is a wall
-        the reader must scroll past every time, so once a search has run it
-        collapses there and names what is active, which is the only honest way
-        to hide a control that is doing something.
-
-        Native `<details>` because it needs to be *open on desktop and closed on
-        a phone at the same time*, with no JS and no resize listener: the CSS
-        opens it unconditionally above 800px, so the `open` attribute below only
-        ever governs the narrow case. A signal would have to pick one.
+        The controls start visible at every width. Readers can collapse them
+        using the summary; on phones the results come first after a search.
       -->
-      <details class="search-form-box" [open]="!twoBox">
+      <details class="search-form-box" open>
         <summary class="refine-summary">
           <span>{{ 'pages.search.refine.summary' | transloco }}</span>
           @if (activeRefinementCount(); as active) {

@@ -379,9 +379,15 @@
             <strong>{{ lookupResult()!.display_name }}</strong>
             <span class="muted">&#64;{{ lookupResult()!.username }}</span>
             <span class="muted small">
-              {{ lookupResult()!.followers_count | number }}
-              {{ 'settings.connections.twitter.follows.followers' | transloco }}
-              {{ lookupResult()!.statuses_count | number }} {{ words().posts }}
+              {{
+                'settings.connections.twitter.follows.accountSummary'
+                  | transloco
+                    : {
+                        followers: (lookupResult()!.followers_count | number),
+                        posts: (lookupResult()!.statuses_count | number),
+                        postsWord: words().posts,
+                      }
+              }}
             </span>
             <a [href]="lookupResult()!.url" target="_blank" rel="noopener noreferrer" class="small">
               {{ 'settings.connections.twitter.follows.viewOnTwitter' | transloco }}

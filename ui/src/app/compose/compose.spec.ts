@@ -2,6 +2,7 @@ import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal } from '@angular/core';
+import { TranslocoService } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../client-prefs';
 import { Drafts } from '../drafts';
@@ -27,6 +28,7 @@ function storedEditKeys(): Record<string, string> {
 /** Expose the protected internals for white-box testing. */
 interface ComposeInternals {
   text: WritableSignal<string>;
+  previewVisible: Signal<boolean>;
   submitting: WritableSignal<boolean>;
   uploading: WritableSignal<boolean>;
   visibility: WritableSignal<string>;
@@ -735,6 +737,27 @@ describe('Compose', () => {
   });
 
   // ---------------------------------------------------------------- thread boxes
+
+  it('renders the complete thread hint with a live count and translation-owned order', () => {
+    const f = setUp();
+    internals(f).text.set('first');
+    internals(f).thread.set(['second']);
+    f.detectChanges();
+    const hint = (): HTMLElement => f.nativeElement.querySelector('.thread-hint.muted');
+    expect(hint().textContent?.trim()).toBe('Will post as a thread of 2.');
+
+    const transloco = TestBed.inject(TranslocoService);
+    const original = transloco.getTranslation('en');
+    try {
+      transloco.setTranslation({ 'compose.threadSummary': '{{count}} <b>items</b>!' }, 'en');
+      internals(f).thread.set(['second', 'third']);
+      f.detectChanges();
+      expect(hint().textContent?.trim()).toBe('3 <b>items</b>!');
+      expect(hint().querySelector('b')).toBeNull();
+    } finally {
+      transloco.setTranslation(original, 'en', { merge: false });
+    }
+  });
 
   it('thread boxes post as a chained self-reply thread', () => {
     const f = setUp();
@@ -2000,6 +2023,33 @@ describe('Compose', () => {
   });
 
   // ------------------------------------------------------- reply mention seeding
+
+  it('previews user content but never the automatic reply mention alone', () => {
+    const f = setUp();
+    f.componentRef.setInput('inReplyToId', 's1');
+    f.componentRef.setInput('replyToHandle', 'alice@dmv.community');
+    f.detectChanges();
+    expect(internals(f).previewVisible()).toBe(false);
+
+    internals(f).text.update((text) => text + 'H');
+    expect(internals(f).previewVisible()).toBe(true);
+    internals(f).text.set('@alice@dmv.community ');
+    expect(internals(f).previewVisible()).toBe(false);
+    internals(f).text.set('');
+    expect(internals(f).previewVisible()).toBe(false);
+    internals(f).text.set('H');
+    expect(internals(f).previewVisible()).toBe(true);
+  });
+
+  it('does not preview an initial group of reply mentions', () => {
+    const f = setUp();
+    f.componentRef.setInput('inReplyToId', 's1');
+    f.componentRef.setInput('initialText', '@alice@dmv.community @bob@example.com ');
+    f.detectChanges();
+    expect(internals(f).previewVisible()).toBe(false);
+    internals(f).text.update((text) => text + 'Hello');
+    expect(internals(f).previewVisible()).toBe(true);
+  });
 
   it('seeds the parent author @handle for a reply so it notifies them', () => {
     const f = setUp();

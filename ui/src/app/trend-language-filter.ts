@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, Signal } from '@angular/core';
 import { ClientPrefs } from './client-prefs';
-import { detectLanguage, detectScriptCandidates } from './language-detect';
+import { confidentLanguage, detectScriptCandidates } from './language-detect';
 import { Status, Tag } from './models';
 import { UiLocale } from './i18n/locale';
 import { stripHtml } from './sentiment';
@@ -118,11 +118,6 @@ export class TrendLanguageFilter {
  * entirely to its declared language.
  */
 const MIN_TEXT_FOR_DETECTION = 20;
-/**
- * Minimum share the top detected language must hold for detection to count as
- * *confident*. Mixed or ambiguous text stays undetermined and is never hidden.
- */
-const CONFIDENT_SHARE = 0.6;
 
 /** Why a post was hidden (for diagnostics / tests). */
 export type HideReason = 'foreign' | 'misrepresented';
@@ -141,7 +136,7 @@ export type HideReason = 'foreign' | 'misrepresented';
  *   - No declared language and text too short/ambiguous to detect → keep.
  *   - Declared language the user knows → keep (we don't police honesty upward).
  *   - Confident detection only counts when the text is long enough and one
- *     language clearly dominates ({@link CONFIDENT_SHARE}).
+ *     language clearly dominates ({@link confidentLanguage}).
  */
 @Injectable({ providedIn: 'root' })
 export class FeedLanguageFilter {
@@ -203,11 +198,7 @@ export class FeedLanguageFilter {
     if (text.length < MIN_TEXT_FOR_DETECTION) {
       return null;
     }
-    const [top] = detectLanguage(text);
-    if (!top || top.lang === 'und' || top.share < CONFIDENT_SHARE) {
-      return null;
-    }
-    return top.lang;
+    return confidentLanguage(text);
   }
 
   /**

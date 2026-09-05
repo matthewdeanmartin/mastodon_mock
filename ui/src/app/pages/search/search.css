@@ -42,15 +42,10 @@
   overflow-y: auto;
 }
 
-/* The column is a `<details>` so a phone can collapse it. At this width it is
-   never collapsed: forcing `display` past the closed state is what lets the same
-   element be open here and shut on a phone with no JS and no resize listener. */
+/* Keep refinement visible by default, with an accessible toggle at every width.
+   Closed details content cannot reliably be reopened with child display rules. */
 .search-form-box > summary {
-  display: none;
-}
-
-.search-form-box > *:not(summary) {
-  display: revert;
+  display: flex;
 }
 
 .refine-summary {

@@ -282,34 +282,28 @@
 }
 
 .reader-touch-nav {
-  display: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: 14px var(--app-font-family);
 }
 
-@media (pointer: coarse), (hover: none) {
-  .reader-touch-nav {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px max(8px, env(safe-area-inset-bottom));
-    border-top: 1px solid var(--border);
-    background: var(--bg);
-    color: var(--text);
-    font: 14px var(--app-font-family);
-  }
+.reader-touch-nav button {
+  flex: 1;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  color: inherit;
+  font: inherit;
+}
 
-  .reader-touch-nav button {
-    flex: 1;
-    min-height: 48px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-subtle);
-    color: inherit;
-    font: inherit;
-  }
-
-  .reader-touch-nav button:disabled {
-    opacity: 0.4;
-  }
+.reader-touch-nav button:disabled {
+  opacity: 0.4;
 }
 
 :host.reader-paged .reader {

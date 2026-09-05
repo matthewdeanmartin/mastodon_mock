@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
-import { isCanaryBuild } from './build-flavor';
+import { isCanaryBuild, isTestBuild } from './build-flavor';
 import { ClientPrefs } from './client-prefs';
 
 /** Our own vendored copy of count.js — see scripts/vendor-analytics.mjs. */
@@ -48,7 +48,7 @@ export class AnalyticsTracker {
   start(): void {
     // Canary is a testing deployment (normally just me), so don't pollute the
     // stats with it — only production counts.
-    if (isCanaryBuild()) {
+    if (isCanaryBuild() || isTestBuild()) {
       return;
     }
     this.router.events
@@ -111,7 +111,19 @@ export function sanitizePath(path: string): string {
 
   // Collection prefixes whose next segment is a per-item identifier we must
   // not record. tags/:tag is included: a tag name is a lookup someone made.
-  const idParents = new Set(['accounts', 'statuses', 'lists', 'collections', 'filters', 'tags']);
+  const idParents = new Set([
+    'accounts',
+    'statuses',
+    'read',
+    'message',
+    'lists',
+    'collections',
+    'filters',
+    'tags',
+    'feeds',
+    'endorsed',
+    'tag-bundles',
+  ]);
 
   // Static child routes that share a collection prefix but are NOT identifiers
   // (e.g. /settings/filters/new, /collections/starter). Leave these readable.
@@ -122,6 +134,9 @@ export function sanitizePath(path: string): string {
     const child = segments[i + 1];
     if (idParents.has(segments[i]) && child !== '' && !staticChildren.has(child)) {
       segments[i + 1] = ':id';
+      // An account handle or a provider URI may occupy the remaining segments.
+      // None of that suffix is useful aggregate page-view information.
+      return segments.slice(0, i + 2).join('/');
     }
   }
   return segments.join('/');

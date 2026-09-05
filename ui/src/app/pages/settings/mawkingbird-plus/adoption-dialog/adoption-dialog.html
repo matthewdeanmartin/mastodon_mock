@@ -16,13 +16,15 @@
     being asked. A reader who cannot tell whether they are looking at a problem
     or a routine choice assumes the worst and cancels.
   -->
-  <h2 id="ad-title">{{ 'settings.plus.adoption.title' | transloco: { noun: noun() } }}</h2>
+  <h2 id="ad-title">{{ titleKey() | transloco }}</h2>
 
-  <p class="ad-summary">
-    {{ 'settings.plus.adoption.summaryLead' | transloco }}
-    <strong>{{ localCount() }}</strong> {{ 'settings.plus.adoption.counts.a' | transloco }}
-    <strong>{{ remoteCount() }}</strong> {{ 'settings.plus.adoption.counts.b' | transloco }}
-  </p>
+  <p
+    class="ad-summary"
+    [innerHTML]="
+      'settings.plus.adoption.summaryCounts'
+        | transloco: { localCount: localCount(), remoteCount: remoteCount() }
+    "
+  ></p>
   <!-- Says plainly that nothing is wrong. This dialog appears at a moment the
        user chose, doing something ordinary, and should not read like an alert. -->
   <p class="ad-summary muted small">
@@ -32,7 +34,9 @@
   <div class="ad-choices">
     <div class="ad-choice">
       <button class="btn" type="button" [disabled]="busy()" (click)="choose('merge')">
-        {{ 'settings.plus.adoption.keepAll' | transloco }} {{ localCount() + remoteCount() }}
+        {{
+          'settings.plus.adoption.keepAllCount' | transloco: { count: localCount() + remoteCount() }
+        }}
       </button>
       <p class="ad-detail">
         {{ 'settings.plus.adoption.keepAll.hint' | transloco }}
@@ -41,12 +45,10 @@
 
     <div class="ad-choice">
       <button class="btn btn-outline" type="button" [disabled]="busy()" (click)="choose('replace')">
-        {{ 'settings.plus.adoption.justThe.a' | transloco }} {{ remoteCount() }}
-        {{ 'settings.plus.adoption.justThe.b' | transloco }}
+        {{ 'settings.plus.adoption.justTheCount' | transloco: { count: remoteCount() } }}
       </button>
       <p class="ad-detail">
-        {{ 'settings.plus.adoption.justThe.hint.a' | transloco }} {{ localCount() }}
-        {{ 'settings.plus.adoption.justThe.hint.b' | transloco }}
+        {{ 'settings.plus.adoption.justTheHintCount' | transloco: { count: localCount() } }}
       </p>
     </div>
   </div>
@@ -69,8 +71,7 @@
       {{ 'settings.plus.adoption.leaveOff' | transloco }}
     </button>
     <p class="muted small">
-      {{ 'settings.plus.adoption.leaveOff.hint.a' | transloco }} {{ localCount() }}
-      {{ 'settings.plus.adoption.leaveOff.hint.b' | transloco }}
+      {{ 'settings.plus.adoption.leaveOffHintCount' | transloco: { count: localCount() } }}
     </p>
   </div>
 </section>

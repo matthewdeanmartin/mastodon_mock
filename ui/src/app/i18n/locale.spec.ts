@@ -1,13 +1,43 @@
+import { DOCUMENT } from '@angular/common';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { TranslocoService } from '@jsverse/transloco';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../client-prefs';
 import {
   FALLBACK_LOCALE,
   negotiateLocale,
   SUPPORTED_LOCALES,
   supportedLocales,
+  SupportedLocale,
+  TranslocoLocaleSync,
   UiLocale,
 } from './locale';
+
+describe('TranslocoLocaleSync', () => {
+  it('updates the document language on bootstrap and on live locale changes', () => {
+    const active = signal<SupportedLocale>('zh-Hant');
+    const page = document.implementation.createHTMLDocument();
+    page.documentElement.lang = 'en';
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: DOCUMENT, useValue: page },
+        { provide: UiLocale, useValue: { active } },
+      ],
+    });
+    const transloco = TestBed.inject(TranslocoService);
+    vi.spyOn(transloco, 'getActiveLang').mockReturnValue('zh-Hant');
+    const setActiveLang = vi.spyOn(transloco, 'setActiveLang').mockReturnValue(transloco);
+    TestBed.inject(TranslocoLocaleSync);
+    TestBed.tick();
+    expect(page.documentElement.lang).toBe('zh-Hant');
+    expect(setActiveLang).not.toHaveBeenCalled();
+    active.set('en');
+    TestBed.tick();
+    expect(page.documentElement.lang).toBe('en');
+    expect(setActiveLang).toHaveBeenCalledWith('en');
+  });
+});
 
 describe('supportedLocales', () => {
   it('keeps in-progress locales off the production root', () => {
@@ -15,7 +45,7 @@ describe('supportedLocales', () => {
   });
 
   it('offers in-progress locales on test and canary deployments', () => {
-    const expected = ['en', 'de', 'fr', 'id', 'ja'];
+    const expected = ['en', 'de', 'fr', 'id', 'ja', 'zh-Hant', 'uk'];
     expect(supportedLocales('https://mawkingbird.com/test/')).toEqual(expected);
     expect(supportedLocales('https://mawkingbird.com/canary/')).toEqual(expected);
     expect(supportedLocales('https://example.github.io/mawkingbird/canary/')).toEqual(expected);
@@ -37,6 +67,25 @@ function setBrowserLanguages(languages: string[]): void {
 }
 
 describe('negotiateLocale', () => {
+  const reviewLocales = supportedLocales('https://mawkingbird.com/test/');
+
+  it.each(['zh-Hant', 'zh-TW', 'zh-HK', 'zh-MO', 'zh_Hant_TW', 'ZH-tw', 'zh-Hant-CN'])(
+    'negotiates Traditional Chinese for %s on review builds',
+    (tag) => expect(negotiateLocale([tag], reviewLocales)).toBe('zh-Hant'),
+  );
+
+  it.each(['zh', 'zh-CN', 'zh-SG', 'zh-Hans', 'zh-Hans-TW', 'zh-Latn-TW', '???'])(
+    'does not coerce %s into Traditional Chinese',
+    (tag) => expect(negotiateLocale([tag], reviewLocales)).toBe('en'),
+  );
+
+  it('honours browser order and deployment availability for Chinese', () => {
+    expect(negotiateLocale(['zh-TW'])).toBe('en');
+    expect(negotiateLocale(['zh-Hans', 'fr-FR', 'zh-TW'], reviewLocales)).toBe('fr');
+    expect(negotiateLocale(['zh-Hans', 'zh-TW'], reviewLocales)).toBe('zh-Hant');
+    expect(negotiateLocale(['en', 'zh-TW'], reviewLocales)).toBe('en');
+  });
+
   it('falls back to English when the browser wants nothing we ship', () => {
     expect(negotiateLocale(['fr-FR', 'fr'])).toBe(FALLBACK_LOCALE);
   });

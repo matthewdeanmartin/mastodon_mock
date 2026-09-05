@@ -368,11 +368,12 @@
                 <span class="share-bar" [style.width.%]="pct(row.share)"></span>
               </span>
               <span class="share-value muted">
-                {{ row.count }} · {{ row.authors }}
+                {{ row.count }} ·
                 {{
-                  row.authors === 1
-                    ? ('feedAnalytics.hashtags.author.one' | transloco)
-                    : ('feedAnalytics.hashtags.author.other' | transloco)
+                  (row.authors === 1
+                    ? 'feedAnalytics.hashtags.authorCount.one'
+                    : 'feedAnalytics.hashtags.authorCount.other'
+                  ) | transloco: { count: row.authors }
                 }}
               </span>
             </a>
@@ -429,11 +430,12 @@
                 <span class="share-bar" [style.width.%]="pct(row.share)"></span>
               </span>
               <span class="share-value muted">
-                {{ row.count }} · {{ row.authors }}
+                {{ row.count }} ·
                 {{
-                  row.authors === 1
-                    ? ('feedAnalytics.hashtags.author.one' | transloco)
-                    : ('feedAnalytics.hashtags.author.other' | transloco)
+                  (row.authors === 1
+                    ? 'feedAnalytics.hashtags.authorCount.one'
+                    : 'feedAnalytics.hashtags.authorCount.other'
+                  ) | transloco: { count: row.authors }
                 }}
               </span>
             </div>

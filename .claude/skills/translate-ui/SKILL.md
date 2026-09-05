@@ -1,9 +1,331 @@
 ---
 name: translate-ui
-description: Translate Mockingbird's interface into another language, or add a new UI language end to end. Use when filling in public/i18n/<lang>.json, working an i18n-context/todo-<lang>.md work order, adding a locale to IN_PROGRESS_LOCALES, or reviewing a locale someone else translated.
+description: Translate Mockingbird's interface into another language, or add a new UI language end to end. Use when filling in UI locale dictionaries, working an i18n-context translation work order, adding a locale to IN_PROGRESS_LOCALES, or reviewing a locale someone else translated.
 ---
 
 # Translating Mockingbird's interface
+
+## Required translation method — no external machine translation
+
+**Luna directly authors every translation from English, context, glossary and
+actual UI usage. Do not use Google Translate, DeepL, other translation APIs,
+or external machine-translation scripts.** Tools may extract work, validate
+structure, and merge authored translations; they must not replace Luna's
+translation work. Do not use bulk dictionary substitutions, positional newline
+mapping of translated text, or copies of English prose to pretend placeholders
+are complete. If a source structure blocks translation, report it to Astra.
+
+This is explicit user direction following the rejected 2026-09-05 Taiwan draft.
+
+**No filler generation:** an agent subsequently replaced unhandled English words
+with repeated `相關內容` and passed structural dry-runs. This is not translation.
+Do not generate batches with token maps, catch-all replacements or generic filler.
+Passing JSON/placeholder/markup checks never authorizes such output. Do not claim
+a completed translation batch while knowing it needs wholesale linguistic work.
+The coordinator must reject obvious filler before merge; Astra may directly repair
+it in the single bounded review-and-fix pass, never an infinite resubmission loop.
+
+## Current execution policy (2026-09-05)
+
+**Current status: STOPPED.** Ukrainian and Taiwan Traditional Chinese each have
+5,866 accepted/reviewed keys; both final audits passed and all workers stopped.
+The user requested a speedup plan, saved at `sprint/ui-i18n-speedup-plan.md`.
+No pilot, new language or plan implementation is authorized by that document.
+Resume only on new user direction. The historical execution updates below are
+lessons, not instructions to restart completed work.
+
+**Latest model change:** The user authorized trying Sol or Terra after Luna's
+repeated partial returns and prohibited phrase mapping. Use Sol (`gpt-5.6-sol`)
+to finish remaining Taiwan authoring, and a separate Sol agent for one independent
+final-product review. This supersedes Luna-only authorship for this finish. Astra
+still owns concrete complex templates. Do not make the author review itself.
+Retain the stop-after-Ukrainian-and-Taiwan boundary and measure wall time.
+Set `reasoning_effort: "low"` explicitly for routine author/reviewer spawns.
+Checked rollout turn_context records showed Luna at medium, Sol at low and the
+Astra coordinator at low when the spawn omitted effort. Do not assume omission
+means the desired level; record the effective rollout value.
+Per-agent token counters ARE available in local Codex rollout `token_count`
+events, although collaboration tools omit them. Read only the relevant task's
+metadata/counters; record input, cached input, output and reasoning output.
+Cached input is a subset of input, and reasoning output is a subset of output:
+do not double-count them or equate raw token totals with billed cost. Capture
+coordinator snapshots/deltas separately from child totals; root cumulative usage
+covers earlier work too and is not this resume's token usage.
+
+Preserve genuinely authored partial work across forced continuations. Never
+restore rejected generated text over new authored values merely because the
+whole batch is incomplete. After the rejected Taiwan B draft and an unsuccessful
+Sol attempt, Terra completed a separate `terra-b.json` across two turns; a new
+output path prevented confusing rejected and accepted candidates. A partial
+return is resumable progress, not assignment completion. Validate exact key-set
+equality separately from merge dry-run counts before independent review.
+
+**Stop boundary and timing (latest user instruction):** Ukrainian is finished
+at 5,866 accepted/reviewed keys. Finish only the paused Taiwan Traditional Chinese
+locale next, then STOP all translation work. Do not start another language.
+The user wants to brainstorm a roughly 5× speedup before further expansion.
+Taiwan resume began at 2026-09-05 22:45:53 UTC. Record wall-clock dispatch and
+completion times for translation/review, coordinator integration and checks in
+`ui/i18n-context/timing-2026-09-05.json`. Separate elapsed critical-path time from
+summed concurrent worker durations. Report token usage only if actually exposed;
+otherwise mark it unavailable, never infer tokens from elapsed time. Track partial
+returns/resumes as overhead. Reuse saved work and avoid idle dispatch gaps.
+The resume inventory is `ui/i18n-context/zh-Hant-resume-plan.json`: one 699-key
+review of existing drafts plus targeted English-vocabulary repairs, and two
+disjoint direct-authoring batches of 500 and 565. This completes existing Taiwan
+work without repartitioning completed keys. Luna authors; Sol reviews final
+products once; Astra handles concrete complex template issues. Older Taiwan
+instructions requiring Astra for every routine review are superseded.
+
+Timing/reliability lesson from the Taiwan resume: the 565-key Luna worker again
+produced prohibited phrase-mapped text with untranslated English fragments. It
+was rejected without merge. Its reported 9.586-second interval covered only the
+end of the work, not the full authoring assignment. Record coordinator dispatch
+and receipt times as the authoritative task interval; worker clocks are useful
+substage measurements only when they cover the actual stage. Mark rejected work
+and partial returns explicitly, not as completed throughput. Root requested the
+user's preference before changing the original Luna-authoring requirement.
+
+**Latest review trial:** Luna still authors. Use Sol (`gpt-5.6-sol`) for the next
+routine Ukrainian reviews; Astra keeps complex template/source repairs and finishes
+any review already underway. This overrides the older Astra-for-every-batch rule
+below. Review the final authored file against English/context/glossary in a fresh
+context, not the translator's dialog. Read UI call sites only where meaning,
+fragments or parameters require them. Do not rewrite acceptable wording merely
+for stylistic preference. Keep the single independent review-and-fix pass cap;
+do not add an Astra review of Sol's whole review. Escalate only concrete complex
+template defects, with exact keys and call sites.
+
+Each reviewer reports assigned/reviewed key count, unique strings changed, and
+counts of meaning errors, placeholder/count/grammar defects, terminology fixes,
+and optional polish. State whether categories overlap or counts are estimates.
+Distinguish validation blockers/source repairs from wording changes. Compare the
+final file against the input mechanically; do not perform another semantic pass
+just to produce metrics. A correction percentage alone does not measure severity.
+
+Ukrainian is now the active language at the user's request; Taiwanese work is
+paused at its saved ledger. User increased parallelism: fill available worker
+slots (currently three subagents plus coordinator). Prefer fresh contexts for
+each one or two fixed batches; retire completed workers before replacing them.
+This supersedes the earlier two-worker limit below. All workers write disjoint
+artifacts; only the coordinator merges dictionaries and ledgers.
+Keep orchestration running when the user asks a status/workflow question: answer
+briefly and continue dispatch/review. Do not end the active translation turn just
+to answer a question while authorized work remains. Record a durable checkpoint
+before any user-requested language switch.
+
+Dispatching workers is not completion. Keep collecting outputs and replacing
+finished workers until the active language is accepted or a concrete blocker
+requires user input. A worker that returns a partial file must be resumed for
+the remaining assigned keys. A successful merge dry-run validates only supplied
+keys: compare the output key set with the fixed work order before declaring a
+batch complete. Batch 008 passed a 260-key dry-run despite its 500-key assignment.
+Batch 010 also stopped at 322 keys without a blocker. Resume such workers rather
+than treating a partial final message as task completion. Authoring 500 entries
+does not require one enormous response: read/write manageable internal chunks
+and continue tool calls until the fixed assignment is complete. “These keys need
+direct translation” is the task, not a blocker. Until completion is reliable,
+prefer one 500-key assignment per translator dispatch over paired assignments.
+Concurrency overlaps batches; it does not reduce their number. At 5,857 keys,
+500-key assignments mean 12 translation batches plus their independent reviews.
+Review metrics are saved in `ui/i18n-context/review-uk-2026-09-05.md`.
+
+Ukrainian uses `ui/i18n-context/glossary-uk.md` and accepted/reviewed source
+tracking in `ledger-uk.json`. Existing complete binary count messages may use
+grammatical labelled totals in both branches (`Дописи: {{count}}`), since English
+`count === 1` does not cover Ukrainian one/few/many/other. No ICU compiler exists.
+Report noun fragments with their call sites for a bounded Astra source fix;
+never silently regenerate frozen English snapshots to bypass a mismatch.
+When a bounded source fix adds complete count messages, preserve all assigned
+batch IDs/memberships and append new keys only to the undispatched final remainder.
+Verify every old source hash before this explicit reconciliation. Author-count
+repair added two messages; the later Twitter account-summary repair added one
+more. The final adoption-dialog repair added eight whole messages after the
+original batches were reviewed: current final inventory is 366 keys (5,866 total).
+That bounded repair used its own eight-key work order and original source snapshot,
+one Luna authoring pass and one Sol review. Existing assignments, source hashes
+and reviewed snapshots were preserved; the eight new keys were explicitly
+appended to the final common inventory. Never refresh old snapshots to hide drift.
+
+Verified English-only vocabulary arguments may be omitted in a translated whole
+message when listed by exact key+parameter in
+`ui/scripts/i18n-optional-terminology.mjs`. Astra verifies the call site before
+extending this map. This lets each language inflect its canonical noun directly;
+never omit actual counts, names or data merely because a parameter is named
+post/posts/noun. Merge and check-i18n share this policy. English custom vocabulary
+bindings remain unchanged; the map is a separately versioned validation dependency.
+
+**Scratch hygiene:** All temporary work orders, per-batch snapshots, drafts,
+review subsets and one-off helper scripts go in ignored
+`ui/.i18n-work/<locale>/`, never `ui/src/` or the `ui/` root. Do not stage or commit
+scratch files. Keep them until coordinator acceptance/cleanup so work can resume.
+Only dictionaries, glossaries, the durable review ledger, shared fixed inventory
+and reusable tooling belong in the change. Prefix `F=` and `--source=` paths with
+`.i18n-work/<locale>/` in the older examples below. Never run `git add` as part of
+translation; the coordinator manages reviewable changes.
+Do not use `git add -f` or otherwise force ignored scratch into Git. An ignored
+file is supposed to remain untracked. In worker prompts, say "write output files"
+rather than "stage output": one worker misread staging language and force-added
+a draft despite the explicit rule. Coordinator checks the index after handoffs
+and unstages only accidental scratch entries, preserving files and real changes.
+
+**Validation budget (latest user direction):** Do not launch a browser or run
+visual/overflow checks for this expansion; the user will handle those later.
+Run fast dictionary/source/placeholder/markup checks per batch. Do not run the
+full UI suite per batch or per language. It has already passed once for the Taiwan
+shared-code changes (6,209 tests); rerun only when subsequent code changes warrant
+it or the repository's final handoff gate requires it. Pure translation work
+does not justify repeated unrelated UI test runs. Upcoming languages all use
+the same fixed 500-key source batches, not per-agent ad hoc work selection.
+
+Fixed upcoming work inventory: `ui/i18n-context/fixed-batches.json` contains
+12 identical assignments for every new language (11 × 500 keys, final 355 at
+creation). From `ui/`, `node scripts/i18n-fixed-batches.mjs` checks the frozen
+inventory without writing. Emit an assigned work order and locale source snapshot
+with `node scripts/i18n-fixed-batches.mjs --batch=001 --locale=uk
+--source=tmp_uk_001.source.json`. The coordinator assigns the ID; agents do not
+survey, repartition or choose areas. Changed source/context fails explicitly;
+reconcile affected assignments instead of silently refreshing translation stamps.
+
+**Convergence rule (latest user direction):** Astra is trusted to fix wording,
+terminology and source templates directly, without escalation or sending minor
+corrections back to Luna. Each Luna batch gets ONE independent Astra review-and-fix
+pass. Allow at most ONE additional targeted correction pass for a concrete
+unresolved defect (maximum two edit passes total). Astra does not review its own
+fixes in another semantic review round. Run mechanical checks after edits, then
+accept the completed batch. If a blocker survives the cap, record it explicitly
+and keep the affected keys in progress; do not restart the loop or claim completion.
+This replaces older correction-round instructions in this skill and the plan.
+Luna remains the direct author of new translation batches; external MT is forbidden.
+Ukrainian (`uk`) is NEXT after Taiwanese Chinese, using the 500+ batch policy.
+
+Review lesson: read assembled templates for fragment keys, including inserted
+links/emphasis; individually plausible fragments can duplicate words or reverse
+the relationship. Distinguish blog articles from social posts, followed accounts
+from followers, and relational labels (branch "on") from action labels. A glossary
+replacement cannot decide those senses. Read source call sites for such keys.
+
+Additional contextual checks from Taiwanese review: "Search saved" is a
+confirmation, facets are broader than hashtags, model context means context-window
+capacity, oldest refresh targets the stalest account cache, and home server means
+the account's server. Inspect what numeric placeholders actually measure (e.g.
+warning threshold versus current usage) before phrasing a warning.
+
+Taiwan batch 11–12 review: Friends means followed accounts; weekday histograms
+include weekends; scanned counts are accounts; Paste submission publishes an
+item; reported statuses are social posts. Admin silence is moderation limitation,
+distinct from personal mute. Preserve the exclusion in counterexamples, not just
+their vocabulary. Counts need complete parameterized messages so Chinese measure
+words can follow the number; source fixes are Astra's responsibility.
+
+Taiwan 17–18: Credits on attribution pages means 致謝, a live Post button means
+enabled publishing, Local timeline means 本站 (not device-local storage), and a
+full bundle means 已滿. Inspect feature tables when prose contradicts behavior;
+record source ambiguity instead of confidently translating the contradiction.
+
+Use the available worker pool (currently **three concurrent workers**) and a
+fresh subagent context after **one or two complete batches**.
+Prefer Luna translation alongside Astra review of a different finished batch.
+Assign disjoint batch files; serialize writes to the shared dictionary, ledger,
+glossary and skills through the coordinator. A concurrent reviewer writes exact
+approved values/source snapshots and corrections for later serialized merge.
+Do not run two independent missing-key selectors that can claim the same keys;
+reserve explicit nonoverlapping work before dispatching concurrent translators.
+Workers retain their work orders, snapshots and output until the coordinator
+cleans them up after acceptance. Never delete shared fixed-batch inventories.
+
+User update: starting with the NEXT language after Taiwanese Chinese, use
+**500+ keys per translation and review batch**. This ongoing `zh-Hant` run
+retains its 300+ minimum. Final remainders and correction-only passes may be
+smaller. Read/write slices within a batch are permitted and do not reduce the
+batch size; accumulate the full batch before merge and review handoff.
+
+For the current UI-only expansion, follow
+`sprint/ui-i18n-9-thirty-languages.md`. Translate only languages with no progress
+at the start. Defer existing in-progress German, French, Indonesian and Japanese;
+do not review, repair or promote them in this run. English is the source.
+
+Luna (`gpt-5.6-luna`) translates; Astra (`gpt-6-astra`) independently reviews every
+batch and owns all complex templating and shared infrastructure. Use the worker
+pipeline and serialized shared writes described above.
+
+Use the current minimum (300 for this Taiwan run, 500 for subsequent languages).
+Give each fresh agent one or two batches. Combine small areas and pull flat slices
+for the tail. Only a final remainder or correction-only pass may be smaller.
+
+Update the applicable SKILL.md whenever a reusable lesson is learned, before
+the next batch or handoff; put specific vocabulary corrections in the locale
+glossary and reference it here. Do not wait until the end of a language.
+
+Verified repository lessons:
+- File-edit chunks of 50 entries are permitted within a 300+ key translation batch;
+  manage context by reading and authoring slices while completing the full merge.
+- Review sentences as they render across every fragment and emphasized/link
+  insertion. In Taiwan redo 01, `intro.a + before + intro.b` duplicated 之前
+  and put it before the action. Moving wording between linked fragments is
+  acceptable only after inspecting every call site; future source restructuring
+  remains Astra's responsibility. Do not summarize away examples or explanatory
+  consequences to make a long key easier to translate.
+- "Last year", "Top", "Open", "Control", and "Mutuals" require call-site
+  checks: they can mean a rolling 365-day filter, popularity ranking, approval-free
+  following, a comparison probe, and reciprocal following. The glossary records
+  the confirmed Taiwan meanings. Correct prose may still hide a wrong UI sense.
+- Luna must write contextual translations itself. Do not call external machine
+  translation services, concatenate batches for newline-position mapping, or
+  use dictionary/global substitutions as a replacement for translation. The
+  2026-09-05 Taiwan review found `translate_tmp.cjs` calling Google Translate
+  in ten-line chunks; six nominal 300-key batches had pervasive wrong senses,
+  translated brands/code, and English placeholder sentences left as "done".
+  Placeholder or markup failures must be fixed by translating the sentence
+  properly, never by copying its English wholesale to satisfy the merge gate.
+  A merge acceptance stamp records source provenance, not linguistic approval.
+  A source-only workfile can contain English; the submitted locale batch cannot
+  claim untranslated prose as translated. Preserve only justified literal syntax
+  and names. Record any unavoidable omission explicitly for Astra.
+- Count unique keys actually merged, not workfiles produced. Re-merging an
+  unchanged 300-key batch is zero translation progress. The locale ledger and
+  `i18n-batch` totals are authoritative, and duplicate source/key inventories
+  must not be dispatched or counted as new batches.
+- Windows PowerShell's default Make shell cannot run the `test -n` guards.
+  Add `'SHELL=C:/Program Files/Git/bin/bash.exe'` to the Make commands below
+  on this machine (verified). The bare `bash` on PATH is the WSL launcher,
+  so use the explicit Git Bash path.
+- Taiwan Traditional Chinese uses `ui/i18n-context/glossary-zh-Hant.md`.
+  Its source/review ledger is `ui/i18n-context/ledger-zh-Hant.json`, created on
+  first accepted merge. Legacy `stamps.json` is neither read nor changed for it.
+  From `ui/`, translate 300+ keys using
+  `make i18n-batch L=zh-Hant N=300 ARGS=--snapshot=tmp_source.json`, then
+  `make i18n-merge L=zh-Hant F=tmp_batch.json ARGS=--source=tmp_source.json`.
+  Keep both scratch files until Astra independently reviews that entire batch;
+  Astra records acceptance with
+  `make i18n-merge L=zh-Hant F=tmp_batch.json ARGS="--source=tmp_source.json --reviewed"`.
+  This refuses changed English/context or changed translation values. Do not
+  regenerate a snapshot to bypass a source-change rejection; reread the changed
+  source/context and retranslate first. Delete scratch files after acceptance.
+  Ordinary `i18n-batch` now selects missing AND stale keys for this locale;
+  `ARGS=--review` selects accepted but unreviewed keys and prints current text.
+  Both translation work and review work must reach zero. Other locales retain
+  legacy behavior; do not claim they gained reliable freshness tracking.
+  An Astra-rejected batch carries `reviewRejected` in this ledger and is offered
+  as stale work. A fresh contextual submission clears rejection; re-merging
+  unchanged bad text is not a correction. The review report names the exact
+  source inventories to redo, so do not discard their snapshots.
+- A completed Chinese `.one`/`.other` message pair can use identical Chinese
+  text for both values: current call sites still select the English branches.
+  This is not ICU support. Do not emit ICU; flag broken fragments for Astra.
+- `make i18n-batch L=xx N=300 ARGS=--areas` passes `--areas` to the script;
+  bare `make ... --areas` is not a Make option. For translation omit `ARGS`.
+- For legacy locales, `i18n-batch` selects missing keys only. `i18n-todo` writes source stamps when
+  work is offered, not accepted; merge does not stamp acceptance. A zero work
+  count is not proof of freshness. Astra must fix accounting before relying on
+  it for the new locales; never run todo as a read-only freshness audit.
+- Negotiation now preserves explicit Chinese scripts. Hant wins over region;
+  TW/HK/MO infer Hant only when script is absent. Hans/CN/SG and bare zh never
+  silently become Traditional Chinese. Availability still gates review locales.
+- Existing wiring does not establish ICU support. Astra must implement and
+  test the message/plural mechanism before translators emit ICU syntax.
+- The merge tool serializes/sorts the target dictionary. Use it as required,
+  but do not promise byte-preserving merges or manually reformat dictionaries.
 
 You are translating the **interface** of a Mastodon/fediverse client — buttons, labels,
 settings, error messages. Not post content, not documentation.
@@ -28,7 +350,7 @@ Run everything from `mastodon_mock/ui`. The Make variable is `L`, not `LANG` —
 shell already exports `LANG`, and `make i18n-todo` with no argument once silently produced a
 work order for a locale called `en_US.UTF-8`.
 
-Invoke the batch/merge scripts through their `make` targets (`make i18n-batch L=id N=250
+Invoke the batch/merge scripts through their `make` targets (`make i18n-batch L=id N=500
 P=area`, `make i18n-merge L=id F=file.json`), not by calling `node scripts/i18n-batch.mjs`
 directly with positional `N=`/`P=` arguments — the script does not parse those as flags on
 its own, only `make` wires them in as the variables the script expects.
@@ -69,8 +391,8 @@ gate with false positives gets worked around, which is worse than no gate.
 ### 3. Translate in batches, through the gate
 
 ```bash
-make i18n-batch L=id --areas          # what's left, biggest area first
-make i18n-batch L=id N=250 P=settings.connections
+make i18n-batch L=id ARGS=--areas     # what's left, biggest area first
+make i18n-batch L=id N=500 P=settings.connections
 ```
 
 `i18n-batch` prints only the keys still missing, as `key<TAB>English<TAB>context hints`.
@@ -107,7 +429,7 @@ this workflow — larger than anything about the translation itself.
 
 So default to the largest batch that still fits one attention span and one merge:
 
-- **`N=250`–`N=300`** per `i18n-batch` slice, not 110. The gate doesn't care about batch
+- **`N=500` or larger** after this Taiwan run (`N=300` minimum for Taiwan). The gate doesn't care about batch
   size; only your own ability to hold the slice in mind while translating it does.
 - **When several named areas are each small (under ~20 keys), translate many of them in one
   dispatch.** Don't spend a whole subagent invocation on an 8-key area — collect a dozen or
@@ -122,7 +444,7 @@ So default to the largest batch that still fits one attention span and one merge
   avoids one dispatch per singleton area.
 - If you are delegating to a subagent (a fork, or a fresh dispatch), **hand it the largest
   reasonable chunk of remaining work in one prompt** — many named areas, or "keep pulling
-  flat 250-key batches until 0 remain or you've done N rounds" — rather than one area per
+  flat batches of the current minimum for one or two rounds" — rather than one area per
   dispatch. Reserve a fresh dispatch per area only for the first few large, high-context
   areas early in a language, where extra care on one region (correct terminology carrying
   over, per-area trap review) is worth the overhead.
@@ -215,7 +537,9 @@ new word for "boost" when the locale's Mastodon users already have one.
 
 ## Rules
 
-1. **Preserve every `{{placeholder}}` exactly.** Same spelling, never translated. Reorder only
+1. **Preserve every real-data `{{placeholder}}` exactly.** Same spelling, never translated.
+   Only exact allowlisted English-only vocabulary parameters may be omitted so
+   the translated message supplies its inflected noun; see optional-terminology above. Reorder only
    if the target grammar demands it. A dropped `{{name}}` renders a blank where a username
    should be — the single most damaging error available. `i18n-merge` rejects it.
 2. **Keep inline markup intact** — tags, entities, `&amp;`-style escapes. Also gated.
@@ -279,8 +603,10 @@ Append what you learn here; the next fifty languages inherit it.
   therefore always masculine. Restructure instead (rule 7).
 
 ### Russian (`ru`)
-- **6 plural categories** (`one/few/many/other` + fractions). All required categories must be
-  supplied or `make i18n` fails.
+- Runtime `Intl.PluralRules('ru')` reports cardinal categories `one/few/many/other`.
+  Fractions are numbers to test, not extra category names. Derive categories from
+  the selected locale and cardinal/ordinal mode; do not assume the existing gate
+  checks plural completeness.
 - Past-tense verbs agree with subject gender. `{{name}} boosted` would force a gender guess —
   restructure to a gender-neutral form instead.
 

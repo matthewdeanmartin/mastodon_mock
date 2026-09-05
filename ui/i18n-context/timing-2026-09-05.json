@@ -1,0 +1,131 @@
+{
+  "scope": "Finish Taiwan Traditional Chinese after Ukrainian, then stop all translation work",
+  "startedAt": "2026-09-05T22:45:53Z",
+  "completedAt": "2026-09-05T23:14:22Z",
+  "wallSeconds": 1709,
+  "tokenUsage": { "snapshotFile": "usage-2026-09-05.json" },
+  "tokenUsageNote": "Counters were discovered in local Codex rollout token_count events. Snapshot separates input/cached input/output/reasoning output and coordinator resume delta. Cached input and reasoning output are subsets, not additional totals; counters are not billed cost.",
+  "dispatchWindow": {
+    "startedAt": "2026-09-05T22:47:50Z",
+    "allThreeWorkersObservedRunningAt": "2026-09-05T22:49:08Z"
+  },
+  "baseline": {
+    "eligibleKeys": 5866,
+    "reviewed": 4200,
+    "unreviewed": 301,
+    "missing": 1365
+  },
+  "workers": [
+    {
+      "agent": "zh_sol_review_existing",
+      "model": "gpt-5.6-sol",
+      "stage": "review-existing",
+      "keys": 699,
+      "changedStrings": 110,
+      "targetedVocabularyRepairs": 98,
+      "startedAt": "2026-09-05T22:48:35.5568201Z",
+      "completedAt": "2026-09-05T22:50:07.4838769Z",
+      "wallSeconds": 91.927,
+      "timingSource": "worker-reported clock measurements",
+      "partialReturns": 0
+    },
+    {
+      "agent": "zh_luna_translate_b",
+      "model": "gpt-5.6-luna",
+      "stage": "translate-b",
+      "keys": 565,
+      "status": "rejected",
+      "reason": "Worker disclosed prohibited phrase mapping and untranslated English fragments; no values merged.",
+      "workerReportedSeconds": 9.586,
+      "workerTimingAcceptedAsWholeStage": false,
+      "workerTimingNote": "Reported 22:52:29.634–22:52:39.220 covers only final work interval, not the full dispatched authoring task.",
+      "coordinatorObservedRejectedBy": "2026-09-05T22:54:26Z",
+      "wallSeconds": null
+    },
+    {
+      "agent": "zh_sol_author_finish",
+      "model": "gpt-5.6-sol",
+      "stage": "finish-a-and-author-b",
+      "startedAt": "2026-09-05T22:58:45.7489062Z",
+      "completedAt": "2026-09-05T23:01:19.4260124Z",
+      "wallSeconds": 153.677,
+      "status": "partial",
+      "authoredKeys": 2,
+      "note": "Completed A's final two keys, but did not produce B; restored rejected B artifact, which remained unmerged."
+    },
+    {
+      "agent": "zh_sol_review_a",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "low",
+      "stage": "review-a",
+      "keys": 500,
+      "changedStrings": 12,
+      "startedAt": "2026-09-05T23:01:04.7058318Z",
+      "completedAt": "2026-09-05T23:03:24.7126328Z",
+      "wallSeconds": 140.007,
+      "partialReturns": 0
+    },
+    {
+      "agent": "zh_terra_author_b",
+      "model": "gpt-5.6-terra",
+      "reasoningEffort": "low",
+      "stage": "author-b",
+      "keys": 565,
+      "startedAt": "2026-09-05T23:02:39.455Z",
+      "completedAt": "2026-09-05T23:09:25.183Z",
+      "wallSeconds": 405.728,
+      "timingSource": "rollout creation to final usage event",
+      "partialReturns": 1
+    },
+    {
+      "agent": "zh_sol_review_b",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "low",
+      "stage": "review-b",
+      "keys": 565,
+      "changedStrings": 4,
+      "startedAt": "2026-09-05T23:09:51.015Z",
+      "completedAt": "2026-09-05T23:12:50.943Z",
+      "wallSeconds": 179.928,
+      "timingSource": "rollout creation to final usage event",
+      "partialReturns": 0
+    }
+  ],
+  "integration": [
+    {
+      "batch": "review-existing",
+      "startedAt": "2026-09-05T22:50:45Z",
+      "completedAt": "2026-09-05T22:50:51Z",
+      "wallSeconds": 6,
+      "keysMergedAndReviewed": 699
+    },
+    {
+      "batch": "translate-a",
+      "startedAt": "2026-09-05T23:04:02Z",
+      "completedAt": "2026-09-05T23:04:06Z",
+      "wallSeconds": 4,
+      "keysMergedAndReviewed": 500
+    },
+    {
+      "batch": "translate-b",
+      "startedAt": "2026-09-05T23:13:27Z",
+      "completedAt": "2026-09-05T23:13:31Z",
+      "wallSeconds": 4,
+      "keysMergedAndReviewed": 565
+    }
+  ],
+  "validation": [
+    {
+      "startedAt": "2026-09-05T23:13:31Z",
+      "completedAt": "2026-09-05T23:14:22Z",
+      "wallSeconds": 51,
+      "scope": "Final i18n check, advisory trap judgments, both source/review ledger audits and optional-vocabulary audit",
+      "result": "passed; both locales have exactly 5866 reviewed keys and zero missing/stale/unreviewed or listed English-vocabulary leaks"
+    }
+  ],
+  "notes": [
+    "Initial checkpoint inspection and verified source-bound resume preparation preceded worker dispatch.",
+    "Wall time is the critical-path elapsed time; summed concurrent worker durations must be reported separately.",
+    "Ukrainian completed before timing began; its elapsed/token costs cannot be reconstructed reliably here."
+  ]
+}
