@@ -714,6 +714,14 @@
   @if (draftSaved()) {
     <div class="thread-hint muted">{{ 'compose.savedToDrafts' | transloco }}</div>
   }
+  @if (draftSaveFailed()) {
+    <div class="post-error" role="alert">
+      <span class="post-error-text">{{ 'compose.draftUnsaved' | transloco }}</span>
+      <button class="btn btn-outline btn-sm" type="button" (click)="downloadDraft()">
+        {{ 'compose.downloadDraft' | transloco }}
+      </button>
+    </div>
+  }
 
   <!-- Publish-then-offer, never delete-then-publish: the private copy only goes
        away once a real post exists. -->

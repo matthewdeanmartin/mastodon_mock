@@ -66,9 +66,10 @@ export interface StorageKeySpec {
    * How the real key relates to `base`:
    *
    * - `none`     — the key *is* the base.
-   * - `account`  — `base + accountScopeSuffix()`. An importer has to re-derive
-   *   the suffix for the account it is importing into: the suffix is a hash of
-   *   the access token, so it never survives a re-authentication.
+   * - `account`  — `base + accountScopeSuffix()`. Verified Mastodon scopes use
+   *   provider + server origin + server-local account id; Bluesky uses its DID,
+   *   and Anonymous has a fixed suffix. Importers still re-derive the suffix for
+   *   the destination identity rather than trusting a raw exported key.
    * - `instance` — `base + encodeURIComponent(host)`, one entry per instance.
    *
    * Use {@link matchesKey} rather than reimplementing this comparison; a key

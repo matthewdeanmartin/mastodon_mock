@@ -219,7 +219,7 @@ describe('WritePage', () => {
       sensitive: false,
       visibility: 'public',
       poll: null,
-    });
+    }).id;
   }
 
   // ------------------------------------------------------------------ loading
@@ -1320,7 +1320,7 @@ describe('WritePage', () => {
   describe('visibility', () => {
     /** Save a draft at `visibility` and return the row the page lists for it. */
     function savedAt(fixture: ComponentFixture<WritePage>, visibility: string): DraftItem {
-      const id = TestBed.inject(Drafts).save({
+      const { id } = TestBed.inject(Drafts).save({
         segments: ['a considered thought'],
         spoilerText: '',
         sensitive: false,

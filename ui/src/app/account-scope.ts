@@ -1,112 +1,179 @@
 import { blueskyIdentityDid } from './providers/bluesky/bluesky-identity-store';
+import { STORAGE_KEYS } from './storage-registry';
 
 const TOKEN_KEY = 'mastodon_mock_token';
+const SESSIONS_KEY = 'mastodon_mock_sessions';
+const SESSION_TOKENS_KEY = 'mastodon_mock_session_tokens';
 const ACCOUNT_MODE_KEY = 'mastodon_mock_account_mode';
+const adoptedScopes = new Set<string>();
+const MIGRATABLE_ACCOUNT_KEYS = STORAGE_KEYS.filter(
+  (spec) =>
+    spec.suffix === 'account' &&
+    spec.base !== 'mockingbird_drafts' &&
+    spec.base !== 'mockingbird_compose_autosave',
+);
 
-/**
- * A short, stable, non-secret suffix identifying the currently-active account,
- * for namespacing client-side (localStorage) settings *per account*.
- *
- * Settings like RSS subscriptions and the linked Bluesky account belong to the
- * account that set them up — seeing another account's feeds is confusing and
- * wrong. Since these are client-only (they must work against any instance, so
- * nothing is stored server-side), we scope their storage keys by the active
- * account here.
- *
- * Authenticated scopes derive from the active token — but a raw bearer token
- * must never appear in a storage key, so we fold it into a short non-reversible
- * hash. The one local Anonymous account uses a fixed `_anonymous` suffix. A
- * Bluesky-primary account uses `_bsky_` plus a hash of its DID. With no account
- * mode active there is no suffix.
- *
- * ## Do not "tidy" the existing branches
- *
- * The `_anonymous` and `_<hash(token)>` suffixes are load-bearing: every scoped
- * key in the app is derived from them, so changing one by a single character
- * silently repoints a user's RSS feeds, saved searches, lists and linked
- * accounts at a namespace that has never been written. There is no migration
- * and no error — the data simply appears to be gone. `account-scope.spec.ts`
- * pins both against hardcoded literals for exactly this reason.
- */
+interface StoredMastodonSession {
+  id?: unknown;
+  server?: unknown;
+  account?: { id?: unknown } | null;
+}
+
+export const ANONYMOUS_SCOPE_SUFFIX = '_anonymous';
+export const BLUESKY_SCOPE_PREFIX = '_bluesky_';
+export const MASTODON_SCOPE_PREFIX = '_mastodon_';
+
+/** Return the active account's stable browser-storage identity. */
 export function accountScopeSuffix(): string {
   try {
     const mode = localStorage.getItem(ACCOUNT_MODE_KEY);
-    if (mode === 'anonymous') {
-      return '_anonymous';
-    }
+    if (mode === 'anonymous') return ANONYMOUS_SCOPE_SUFFIX;
     if (mode === 'bluesky') {
       const did = blueskyIdentityDid();
-      // A `bluesky` mode with no identity behind it is a stale key, not an
-      // account. Falling through to the logged-out namespace matches what Auth
-      // does with the same inconsistency, so the two cannot disagree about
-      // which account is active.
-      return did ? scopeSuffixForDid(did) : '';
+      if (!did) return '';
+      const stable = scopeSuffixForDid(did);
+      migrateScope(legacyScopeSuffixForDid(did), stable);
+      return stable;
     }
   } catch {
-    // Fall through to the logged-out namespace when storage is unavailable.
+    return '';
   }
+
   let token: string | null;
   try {
     token = localStorage.getItem(TOKEN_KEY);
   } catch {
-    token = null;
-  }
-  if (!token) {
     return '';
   }
-  return scopeSuffixForToken(token);
+  if (!token) return '';
+
+  const identity = mastodonIdentityForToken(token);
+  if (!identity) return scopeSuffixForToken(token);
+  const stable = scopeSuffixForMastodonAccount(identity.accountId, identity.server);
+  migrateScope(scopeSuffixForToken(token), stable);
+  return stable;
 }
 
-/**
- * The suffix a *given* token's data is stored under, without making that token
- * active. Needed to find (and delete) the local data of an account other than
- * the one currently signed in — see the Signed-in accounts settings page.
- */
+/** Historical token suffix, retained for existing-data adoption and unverified logins. */
 export function scopeSuffixForToken(token: string): string {
   return token ? `_${hash(token)}` : '';
 }
 
-/**
- * The suffix a *given* Bluesky-primary account's data is stored under, without
- * making it active. The sibling of {@link scopeSuffixForToken}, and needed for
- * the same reason: to find (and delete) the local data of an account other than
- * the one currently signed in.
- *
- * The DID is hashed for consistency with the token branch and to keep the
- * suffix short — not for secrecy. A DID is public, and unlike a bearer token
- * there would be no harm in it appearing here.
- */
-export function scopeSuffixForDid(did: string): string {
-  return did ? `${BLUESKY_SCOPE_PREFIX}${hash(did)}` : '';
+/** Build a collision-free suffix from provider, server, and verified account id. */
+export function scopeSuffixForMastodonAccount(accountId: string, server: string): string {
+  const origin = normalizeServer(server);
+  return accountId && origin
+    ? `${MASTODON_SCOPE_PREFIX}${encodeIdentity(`mastodon\0${origin}\0${accountId}`)}`
+    : '';
 }
 
-/** The suffix the one browser-local Anonymous account stores its data under. */
-export const ANONYMOUS_SCOPE_SUFFIX = '_anonymous';
+/** Adopt non-draft values written before a Mastodon identity was verified. */
+export function adoptMastodonStorageScope(
+  accountId: string,
+  server: string,
+  legacyTokens: readonly string[],
+): string {
+  const stable = scopeSuffixForMastodonAccount(accountId, server);
+  for (const token of legacyTokens) migrateScope(scopeSuffixForToken(token), stable);
+  return stable;
+}
 
-/**
- * What every Bluesky-primary scope suffix starts with.
- *
- * Exported so callers enumerating storage can tell a Bluesky-primary namespace
- * apart from a Mastodon one, which is otherwise impossible: both are `_` plus
- * an opaque hash.
- */
-export const BLUESKY_SCOPE_PREFIX = '_bsky_';
+/** Build a collision-free suffix for a Bluesky-primary DID. */
+export function scopeSuffixForDid(did: string): string {
+  return did ? `${BLUESKY_SCOPE_PREFIX}${encodeIdentity(`bluesky\0${did}`)}` : '';
+}
 
-/** Build a per-account storage key from a base key. */
+/** The old Bluesky suffix, used only to adopt and delete existing data. */
+export function legacyScopeSuffixForDid(did: string): string {
+  return did ? `_bsky_${hash(did)}` : '';
+}
+
 export function scopedKey(baseKey: string): string {
   return `${baseKey}${accountScopeSuffix()}`;
 }
 
+function normalizeServer(server: string): string {
+  const value = server || (typeof location === 'undefined' ? '' : location.origin);
+  try {
+    return new URL(value).origin.toLowerCase();
+  } catch {
+    return value.replace(/\/$/, '').toLowerCase();
+  }
+}
+
+/** Collision-free UTF-8 encoding without putting the readable identity in the key. */
+function encodeIdentity(identity: string): string {
+  const bytes = new TextEncoder().encode(identity);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function mastodonIdentityForToken(token: string): { accountId: string; server: string } | null {
+  try {
+    const rows = JSON.parse(localStorage.getItem(SESSIONS_KEY) ?? '[]') as unknown;
+    const tokens = JSON.parse(localStorage.getItem(SESSION_TOKENS_KEY) ?? '{}') as unknown;
+    if (!Array.isArray(rows) || !tokens || typeof tokens !== 'object') return null;
+    const tokenMap = tokens as Record<string, unknown>;
+    const row = (rows as StoredMastodonSession[]).find(
+      (candidate) => typeof candidate?.id === 'string' && tokenMap[candidate.id] === token,
+    );
+    const accountId = row?.account?.id;
+    if (typeof accountId !== 'string' || !accountId) return null;
+    return { accountId, server: typeof row.server === 'string' ? row.server : '' };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * A tiny, fast, non-cryptographic string hash (FNV-1a, base36). Not for
- * security — only to turn a token into a compact, stable, opaque namespace tag
- * so the secret itself never lands in a storage key.
+ * Adopt old non-draft account data after the verified identity is known. Drafts
+ * and autosaves intentionally stay put; the owner confirmed there is no draft
+ * data to migrate.
  */
+function migrateScope(from: string, to: string): void {
+  if (!from || !to || from === to) return;
+  const adoption = `${from}\0${to}`;
+  if (adoptedScopes.has(adoption)) return;
+  try {
+    migrateStorage(localStorage, from, to);
+  } catch {
+    // Retry on the next lookup; a transient storage failure must not orphan data.
+    return;
+  }
+  try {
+    migrateStorage(sessionStorage, from, to);
+  } catch {
+    // sessionStorage may be unavailable while localStorage remains usable.
+  }
+  adoptedScopes.add(adoption);
+}
+
+function migrateStorage(storage: Storage, from: string, to: string): void {
+  const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+    .filter((key): key is string => key !== null && key.endsWith(from))
+    .filter((key) =>
+      MIGRATABLE_ACCOUNT_KEYS.some(
+        (spec) =>
+          spec.storage === (storage === localStorage ? 'local' : 'session') &&
+          key.startsWith(spec.base),
+      ),
+    );
+  for (const key of keys) {
+    const destination = `${key.slice(0, -from.length)}${to}`;
+    if (storage.getItem(destination) !== null) continue;
+    const value = storage.getItem(key);
+    if (value === null) continue;
+    storage.setItem(destination, value);
+    storage.removeItem(key);
+  }
+}
+
+/** Historical FNV-1a used only to locate pre-stable namespaces. */
 function hash(input: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
     h ^= input.charCodeAt(i);
-    // 32-bit FNV prime multiply, kept in range with Math.imul.
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(36);

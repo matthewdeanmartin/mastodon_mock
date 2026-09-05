@@ -5,6 +5,7 @@ import { Server } from './server';
 import { bskyIdentityStored, seedBskyIdentity, seedSessions } from './testing/seed-storage';
 import { saveBlueskyIdentity } from './providers/bluesky/bluesky-identity-store';
 import { BlueskyOAuth } from './providers/bluesky/bluesky-oauth';
+import { scopeSuffixForMastodonAccount, scopeSuffixForToken } from './account-scope';
 
 /**
  * Auth session/server linkage. The core account-switching bug was that a token's instance
@@ -57,6 +58,52 @@ describe('Auth + Server linkage', () => {
 
     const session = auth.sessions().find((s) => s.token === 'legacy');
     expect(session?.server).toBe('https://mastodon.social');
+  });
+
+  it('rotates credentials in place for the same verified account and server', () => {
+    server.setBaseUrl('https://mastodon.example');
+    auth.setToken('old-token');
+    localStorage.setItem(
+      `mockingbird_rss_feeds${scopeSuffixForToken('old-token')}`,
+      '["saved-feed"]',
+    );
+    auth.setAccount({ id: '42', username: 'alice', acct: 'alice' } as never);
+    const sessionId = auth.sessions()[0].id;
+    auth.setToken('new-token');
+
+    expect(
+      auth.adoptReauthorizedSession(
+        { id: '42', username: 'alice', acct: 'alice' } as never,
+        'new-token',
+        'https://mastodon.example',
+      ),
+    ).toBe(true);
+    expect(auth.sessions()).toHaveLength(1);
+    expect(auth.sessions()[0]).toMatchObject({ id: sessionId, token: 'new-token' });
+    expect(auth.token()).toBe('new-token');
+    expect(localStorage.getItem('mastodon_mock_session_tokens')).not.toContain('old-token');
+    expect(
+      localStorage.getItem(
+        `mockingbird_rss_feeds${scopeSuffixForMastodonAccount('42', 'https://mastodon.example')}`,
+      ),
+    ).toBe('["saved-feed"]');
+  });
+
+  it('does not merge equal numeric account ids from different servers', () => {
+    server.setBaseUrl('https://one.example');
+    auth.setToken('one-token');
+    auth.setAccount({ id: '42', username: 'alice', acct: 'alice' } as never);
+    server.setBaseUrl('https://two.example');
+    auth.setToken('two-token');
+
+    expect(
+      auth.adoptReauthorizedSession(
+        { id: '42', username: 'other', acct: 'other' } as never,
+        'two-token',
+        'https://two.example',
+      ),
+    ).toBe(false);
+    expect(auth.sessions()).toHaveLength(2);
   });
 
   it('enters Anonymous without removing authenticated sessions', () => {

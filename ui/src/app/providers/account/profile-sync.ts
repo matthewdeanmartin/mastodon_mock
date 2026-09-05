@@ -107,8 +107,8 @@ export type PushOutcome =
   | { kind: 'not-syncing' }
   /** Lapsed, so writes are refused. Reads and export still work. */
   | { kind: 'read-only'; message: string }
-  /** Someone else wrote first. The next pull surfaces the decision. */
-  | { kind: 'conflict' }
+  /** Someone else wrote first. Writes stop until this decision is resolved. */
+  | ({ kind: 'conflict' } & SyncDecision)
   /** Offline, refused, or unreadable. */
   | { kind: 'failed'; message: string };
 
@@ -130,14 +130,18 @@ export type PullOutcome =
    * answers 409. Carrying it here rather than re-reading it later is what keeps
    * "keep mine" from needing a second round trip to become legal.
    */
-  | {
-      kind: 'needs-decision';
-      remote: PortableConfig;
-      changes: ConfigChange[];
-      etag: string;
-      revision: number;
-    }
+  | ({ kind: 'needs-decision' } & SyncDecision)
   | { kind: 'failed'; message: string };
+
+/** A remote version held apart from the version incorporated by local data. */
+export interface SyncDecision {
+  remote: PortableConfig;
+  /** Local document that competed with `remote` when the decision arose. */
+  local: PortableConfig;
+  changes: ConfigChange[];
+  etag: string;
+  revision: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ProfileSync {
@@ -170,6 +174,15 @@ export class ProfileSync {
   /** This browser's view of the account-level switch. */
   readonly record = signal<ProfileSyncRecord>(readSyncRecord());
 
+  /** Increments for every local edit, independently of the persisted dirty bit. */
+  private localGeneration = 0;
+  /** Invalidates results that were requested for a previous signed-in account. */
+  private accountGeneration = 0;
+  /** One-at-a-time sync queue. The public operations may safely overlap. */
+  private operationQueue: Promise<void> = Promise.resolve();
+  /** A remote winner that local settings have not yet incorporated or rejected. */
+  private unresolvedConflict: SyncDecision | null = null;
+
   /**
    * Re-read the record when the signed-in account changes.
    *
@@ -187,6 +200,9 @@ export class ProfileSync {
     // application-level error — and the whole posture of this module is that
     // sync failing must never mean the app does not load.
     this.session.user?.();
+    this.accountGeneration += 1;
+    this.localGeneration += 1;
+    this.unresolvedConflict = null;
     this.cancelPush();
     this.record.set(readSyncRecord());
   });
@@ -335,12 +351,18 @@ export class ProfileSync {
    * drift: both have to make the same decision about a dirty browser, and a
    * second copy of it is a second place for that rule to be got wrong.
    */
-  private applyFetched(value: FetchedSettings, dirty: boolean): PullOutcome {
+  private applyFetched(value: FetchedSettings, account: number, local: number): PullOutcome {
+    if (account !== this.accountGeneration || !this.syncing()) {
+      return {
+        kind: 'failed',
+        message: 'The signed-in account changed while settings were loading.',
+      };
+    }
     const { document, etag } = value;
     const remote = this.toPortableConfig(document);
     const changes = configChanges(remote, localStorage);
 
-    if (dirty) {
+    if (this.record().dirty === true || local !== this.localGeneration) {
       // The one case that must ask. Deliberately does not apply anything
       // first: the user may choose to keep this browser's copy, and a partial
       // application would have already destroyed it.
@@ -348,7 +370,15 @@ export class ProfileSync {
         remoteRevision: document.revision,
         differing: changes.length,
       });
-      return { kind: 'needs-decision', remote, changes, etag, revision: document.revision };
+      const decision = {
+        remote,
+        local: exportPortableConfig(localStorage, false),
+        changes,
+        etag,
+        revision: document.revision,
+      };
+      this.unresolvedConflict = decision;
+      return { kind: 'needs-decision', ...decision };
     }
 
     importPortableConfig(remote, localStorage);
@@ -386,7 +416,15 @@ export class ProfileSync {
    * subscription, and pulls only when there is something to pull.
    */
   async start(): Promise<void> {
+    return this.serialize(() => this.startNow());
+  }
+
+  private async startNow(): Promise<void> {
+    const account = this.accountGeneration;
     const manifest = await this.client.manifest();
+    if (account !== this.accountGeneration) {
+      return;
+    }
     this.lastManifestAt = Date.now();
 
     if (manifest.kind === 'payment-required') {
@@ -435,7 +473,7 @@ export class ProfileSync {
       readOnly: manifest.value.readOnly,
     });
     if (remoteRevision !== undefined && remoteRevision > (current.revision ?? -1)) {
-      await this.pull();
+      await this.pullNow();
     }
   }
 
@@ -513,6 +551,7 @@ export class ProfileSync {
     if (!this.syncing()) {
       return;
     }
+    this.localGeneration += 1;
     this.setRecord(updateSyncRecord({ dirty: true }));
     this.schedulePush();
   }
@@ -529,10 +568,26 @@ export class ProfileSync {
    * - **Unchanged or absent** → nothing to do.
    */
   async pull(): Promise<PullOutcome> {
+    return this.serialize(() => this.pullNow());
+  }
+
+  private async pullNow(): Promise<PullOutcome> {
+    if (this.unresolvedConflict) {
+      return { kind: 'needs-decision', ...this.unresolvedConflict };
+    }
     const current = this.record();
+    const account = this.accountGeneration;
+    const local = this.localGeneration;
     this.busy.set(true);
     try {
       const fetched = await this.client.fetchSettings(current.etag);
+
+      if (account !== this.accountGeneration) {
+        return {
+          kind: 'failed',
+          message: 'The signed-in account changed while settings were loading.',
+        };
+      }
 
       if (fetched.kind === 'unchanged') {
         this.diagnostics.info('ProfileSync', 'pull:unchanged', { etag: current.etag ?? null });
@@ -568,8 +623,14 @@ export class ProfileSync {
         if (current.etag) {
           this.diagnostics.info('ProfileSync', 'pull:retry-without-etag', {});
           const retried = await this.client.fetchSettings();
+          if (account !== this.accountGeneration) {
+            return {
+              kind: 'failed',
+              message: 'The signed-in account changed while settings were loading.',
+            };
+          }
           if (retried.kind === 'ok') {
-            return this.applyFetched(retried.value, current.dirty === true);
+            return this.applyFetched(retried.value, account, local);
           }
           if (retried.kind === 'absent') {
             this.setRecord(updateSyncRecord({ etag: undefined }));
@@ -579,7 +640,7 @@ export class ProfileSync {
         return { kind: 'failed', message };
       }
 
-      return this.applyFetched(fetched.value, current.dirty === true);
+      return this.applyFetched(fetched.value, account, local);
     } finally {
       this.busy.set(false);
     }
@@ -594,8 +655,11 @@ export class ProfileSync {
    * the sidecar.
    */
   useRemote(remote: PortableConfig, etag: string, revision: number): ConfigChange[] {
+    this.cancelPush();
     const changes = configChanges(remote, localStorage);
     importPortableConfig(remote, localStorage);
+    this.localGeneration += 1;
+    this.unresolvedConflict = null;
     this.setRecord(
       updateSyncRecord({ etag, revision, dirty: false, lastSyncedAt: Date.now(), failures: 0 }),
     );
@@ -610,9 +674,12 @@ export class ProfileSync {
    * *position in the sequence* is respected.
    */
   async keepLocal(etag: string, remoteRevision: number): Promise<PushOutcome> {
-    this.setRecord(updateSyncRecord({ etag, revision: remoteRevision, dirty: true }));
-    // Interactive: the user picked this in a dialog, so a failure must say so.
-    return this.push(true);
+    return this.serialize(async () => {
+      this.unresolvedConflict = null;
+      this.setRecord(updateSyncRecord({ etag, revision: remoteRevision, dirty: true }));
+      // Interactive: the user picked this in a dialog, so a failure must say so.
+      return this.pushNow(true);
+    });
   }
 
   /**
@@ -630,6 +697,10 @@ export class ProfileSync {
    * flag exists to make impossible.
    */
   async push(interactive = false): Promise<PushOutcome> {
+    return this.serialize(() => this.pushNow(interactive));
+  }
+
+  private async pushNow(interactive = false): Promise<PushOutcome> {
     if (!this.syncing()) {
       this.diagnostics.info('ProfileSync', 'push:skipped', { reason: 'not-syncing' });
       return { kind: 'not-syncing' };
@@ -650,19 +721,31 @@ export class ProfileSync {
           'Settings are not being saved to your account, because storing them there is part of Mawkingbird Plus.',
       };
     }
+    if (this.unresolvedConflict) {
+      this.diagnostics.info('ProfileSync', 'push:blocked-by-conflict', {
+        remoteRevision: this.unresolvedConflict.revision,
+      });
+      return { kind: 'conflict', ...this.unresolvedConflict };
+    }
     this.cancelPush();
     this.busy.set(true);
     try {
       const current = this.record();
+      const account = this.accountGeneration;
+      const local = this.localGeneration;
       const document = this.buildDocument((current.revision ?? 0) + 1);
       const result = await this.client.putSettings(document, current.etag);
+
+      if (account !== this.accountGeneration) {
+        return { kind: 'not-syncing' };
+      }
 
       if (result.kind === 'ok') {
         this.setRecord(
           updateSyncRecord({
             etag: result.value.etag,
             revision: result.value.revision,
-            dirty: false,
+            dirty: local === this.localGeneration ? false : true,
             lastSyncedAt: Date.now(),
             failures: 0,
             warning: undefined,
@@ -686,16 +769,23 @@ export class ProfileSync {
       }
 
       if (result.kind === 'conflict') {
-        // Someone else wrote first. Adopt their ETag and revision so the retry
-        // is a legal update, and keep the dirty flag: this browser's edits are
-        // still unsaved. The next pull surfaces the decision.
-        this.setRecord(
-          updateSyncRecord({ etag: result.etag, revision: result.current.revision, dirty: true }),
-        );
+        // Keep the incorporated ETag/revision unchanged. The winner is merely
+        // observed until the user chooses; adopting it here would authorize a
+        // later automatic write to overwrite data this browser never merged.
+        const remote = this.toPortableConfig(result.current);
+        const decision = {
+          remote,
+          local: this.toPortableConfig(document),
+          changes: configChanges(remote, localStorage),
+          etag: result.etag,
+          revision: result.current.revision,
+        };
+        this.unresolvedConflict = decision;
+        this.setRecord(updateSyncRecord({ dirty: true }));
         this.diagnostics.info('ProfileSync', 'push:conflict', {
           remoteRevision: result.current.revision,
         });
-        return { kind: 'conflict' };
+        return { kind: 'conflict', ...decision };
       }
 
       if (result.kind === 'payment-required') {
@@ -713,12 +803,15 @@ export class ProfileSync {
             note: 'token said free while the account is entitled; re-minted',
           });
           const retry = await this.client.putSettings(document, current.etag);
+          if (account !== this.accountGeneration) {
+            return { kind: 'not-syncing' };
+          }
           if (retry.kind === 'ok') {
             this.setRecord(
               updateSyncRecord({
                 etag: retry.value.etag,
                 revision: retry.value.revision,
-                dirty: false,
+                dirty: local === this.localGeneration ? false : true,
                 lastSyncedAt: Date.now(),
                 failures: 0,
                 warning: undefined,
@@ -788,6 +881,16 @@ export class ProfileSync {
     // Debounced because Class A (write) operations are the expensive ones.
     // Toggling a setting five times should be one write, not five.
     this.pushTimer = setTimeout(() => void this.push(), PUSH_DEBOUNCE_MS);
+  }
+
+  /** Run network state transitions in request order, even when callers overlap. */
+  private serialize<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.operationQueue.then(operation, operation);
+    this.operationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   /**
@@ -883,6 +986,8 @@ export class ProfileSync {
   resetForTest(record: ProfileSyncRecord): void {
     writeSyncRecord(record);
     this.record.set(record);
+    this.localGeneration = 0;
+    this.unresolvedConflict = null;
   }
 }
 

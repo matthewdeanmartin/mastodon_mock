@@ -1,4 +1,10 @@
-import { ANONYMOUS_SCOPE_SUFFIX, scopeSuffixForDid, scopeSuffixForToken } from './account-scope';
+import {
+  ANONYMOUS_SCOPE_SUFFIX,
+  legacyScopeSuffixForDid,
+  scopeSuffixForDid,
+  scopeSuffixForMastodonAccount,
+  scopeSuffixForToken,
+} from './account-scope';
 import {
   formatBytes,
   inspectLocalStorage,
@@ -57,7 +63,7 @@ export function keyBelongsToScope(key: string, suffix: string): boolean {
 export type AccountDataRef =
   | string
   | null
-  | { kind: 'mastodon'; token: string }
+  | { kind: 'mastodon'; token: string; accountId?: string; server?: string }
   | { kind: 'bluesky'; did: string }
   | { kind: 'anonymous' };
 
@@ -67,15 +73,29 @@ export function scopeForAccount(account: AccountDataRef): string {
     return ANONYMOUS_SCOPE_SUFFIX;
   }
   if (typeof account === 'string') return scopeSuffixForToken(account);
-  return account.kind === 'bluesky'
-    ? scopeSuffixForDid(account.did)
+  if (account.kind === 'bluesky') return scopeSuffixForDid(account.did);
+  return account.accountId
+    ? scopeSuffixForMastodonAccount(account.accountId, account.server ?? '')
     : scopeSuffixForToken(account.token);
+}
+
+/** Current and historical scopes owned by an account, for complete cleanup. */
+function scopesForAccount(account: AccountDataRef): string[] {
+  const current = scopeForAccount(account);
+  if (typeof account !== 'object' || account === null || account.kind === 'anonymous') {
+    return [current];
+  }
+  const legacy =
+    account.kind === 'bluesky'
+      ? legacyScopeSuffixForDid(account.did)
+      : scopeSuffixForToken(account.token);
+  return [...new Set([current, legacy])].filter(Boolean);
 }
 
 /** Every localStorage entry belonging to one account, with sizes. */
 export function inspectAccountData(account: AccountDataRef): StorageReport {
-  const suffix = scopeForAccount(account);
-  return inspectLocalStorage((key) => keyBelongsToScope(key, suffix));
+  const suffixes = scopesForAccount(account);
+  return inspectLocalStorage((key) => suffixes.some((suffix) => keyBelongsToScope(key, suffix)));
 }
 
 /**

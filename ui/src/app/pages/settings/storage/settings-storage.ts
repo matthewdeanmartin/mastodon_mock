@@ -68,7 +68,12 @@ export class SettingsStorage {
         key: `mastodon:${session.id}`,
         label: account?.display_name || account?.username || 'Unverified account',
         detail: account?.acct ? `@${account.acct}` : host,
-        scope: { kind: 'mastodon', token: session.token },
+        scope: {
+          kind: 'mastodon',
+          token: session.token,
+          accountId: session.account?.id,
+          server: session.server,
+        },
         active: this.auth.mode() === 'mastodon' && session.token === activeToken,
       };
     });

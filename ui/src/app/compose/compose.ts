@@ -12,8 +12,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { firstValueFrom, switchMap } from 'rxjs';
+import { firstValueFrom, forkJoin, of, switchMap } from 'rxjs';
 import { Api } from '../api';
+import { Server } from '../server';
 import { PageDiagnostics } from '../page-diagnostics';
 import { Auth } from '../auth';
 import { ClientPrefs } from '../client-prefs';
@@ -143,6 +144,36 @@ export interface PostFailureDetail {
 export interface PostFailure {
   message: string;
   details: PostFailureDetail[];
+}
+
+interface PostedBskyPart {
+  ref: { uri: string; cid: string };
+  facets: BskyFacet[];
+}
+
+/** Retry state for one unchanged timeline publication. Kept only in this composer. */
+interface PostingOperation {
+  id: string;
+  fingerprint: string;
+  target: 'fedi' | 'bsky' | 'both';
+  parts: string[];
+  options: ComposeOptions;
+  scheduledFor: Date | null;
+  fedi: {
+    statuses: Status[];
+    complete: boolean;
+    inFlight: boolean;
+    failure: PostFailure | null;
+  };
+  bsky: {
+    parts: PostedBskyPart[];
+    createdAt: string[];
+    preparedFacets: (BskyFacet[] | undefined)[];
+    embed?: BskyImagesEmbed;
+    complete: boolean;
+    inFlight: boolean;
+    failedAt: number | null;
+  };
 }
 
 /** Fields we render as the headline or handle specially, not as detail rows. */
@@ -416,6 +447,8 @@ function dragHasFiles(event: DragEvent): boolean {
 // i18n compose.publishAnyway: Publish anyway
 // i18n compose.notPosted: Not posted
 // i18n compose.savedToDrafts: Saved to drafts.
+// i18n compose.draftUnsaved: This draft could not be saved in your browser. Your writing is still here.
+// i18n compose.downloadDraft: Download a copy
 // i18n compose.warn.threadsNoSchedule: Threads can't be scheduled — remove the extra posts.
 
 // i18n compose.postAs: Post as {{language}}
@@ -444,6 +477,7 @@ function dragHasFiles(event: DragEvent): boolean {
 })
 export class Compose implements OnDestroy {
   private api = inject(Api);
+  private server = inject(Server);
   private transloco = inject(TranslocoService);
   protected auth = inject(Auth);
   private prefs = inject(ClientPrefs);
@@ -816,7 +850,8 @@ export class Compose implements OnDestroy {
       }
       this.autosaveTimer = setTimeout(() => {
         this.autosaveTimer = null;
-        this.drafts.autosave(key, snapshot);
+        const outcome = this.drafts.autosave(key, snapshot);
+        this.draftSaveFailed.set(!outcome.durable);
       }, 500);
     });
   }
@@ -995,6 +1030,10 @@ export class Compose implements OnDestroy {
   protected targetIncludesBsky = computed(
     () => this.showTargetPicker() && (this.target() === 'bsky' || this.target() === 'both'),
   );
+  /** Replies/quotes always use Fedi; top-level Fedi and Both targets include it. */
+  protected targetIncludesFedi = computed(
+    () => !this.showTargetPicker() || this.target() === 'fedi' || this.target() === 'both',
+  );
   protected readonly bskyAudienceBlocked = computed(
     () => this.targetIncludesBsky() && this.visibility() !== 'public',
   );
@@ -1063,6 +1102,9 @@ export class Compose implements OnDestroy {
    * means nothing was published, so the text stays in the box for editing.
    */
   protected postError = signal<PostFailure | null>(null);
+
+  /** Completed legs of the current, byte-for-byte unchanged publication retry. */
+  private postingOperation: PostingOperation | null = null;
 
   protected dismissPostError(): void {
     this.postError.set(null);
@@ -1146,6 +1188,7 @@ export class Compose implements OnDestroy {
 
   /** "Saved to drafts" flash after an explicit save. */
   protected draftSaved = signal(false);
+  protected draftSaveFailed = signal(false);
   private draftSavedTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Attachments still lacking a description, by index. Shared rule, see alt-text.ts. */
@@ -1869,7 +1912,11 @@ export class Compose implements OnDestroy {
       return;
     }
     if (draftHasContent(this.snapshot())) {
-      this.drafts.save(this.snapshot());
+      const outcome = this.drafts.save(this.snapshot());
+      if (!outcome.durable) {
+        this.draftSaveFailed.set(true);
+        return;
+      }
     }
     this.drafts.remove(draft.id);
     this.applySnapshot(draft);
@@ -1881,13 +1928,30 @@ export class Compose implements OnDestroy {
     if (!draftHasContent(snapshot)) {
       return;
     }
-    this.drafts.save(snapshot);
+    const outcome = this.drafts.save(snapshot);
+    if (!outcome.durable) {
+      // This editor is now the only copy. Leave every field intact and make the
+      // non-durable state explicit instead of displaying the success flash.
+      this.draftSaved.set(false);
+      this.draftSaveFailed.set(true);
+      return;
+    }
+    this.draftSaveFailed.set(false);
     this.reset();
     this.draftSaved.set(true);
     if (this.draftSavedTimer) {
       clearTimeout(this.draftSavedTimer);
     }
     this.draftSavedTimer = setTimeout(() => this.draftSaved.set(false), 4000);
+  }
+
+  /** Download the current editor without depending on browser storage. */
+  downloadDraft(): void {
+    const payload = JSON.stringify(this.snapshot(), null, 2);
+    const anchor = document.createElement('a');
+    anchor.href = `data:application/json;charset=utf-8,${encodeURIComponent(payload)}`;
+    anchor.download = `mockingbird-draft-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    anchor.click();
   }
 
   private flushAutosave(): void {
@@ -2039,21 +2103,37 @@ export class Compose implements OnDestroy {
       return;
     }
 
-    if (this.targetIncludesBsky()) {
-      // Every non-empty box, so a thread crosses as a thread rather than being
-      // silently truncated to its first post.
-      const parts = this.segments()
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (this.target() === 'bsky') {
-        this.sendToBluesky(parts, true);
-        return;
-      }
-      // 'both': Fedi is primary (emits the posted status); the Bluesky leg is
-      // fired alongside and reports failure without retracting the Fedi post.
-      this.sendToBluesky(parts, false);
+    // Mastodon stores descriptions on the media object, separately from the
+    // status that attaches it. Status creation must therefore wait for every
+    // description write: a detached subscription here used to let immediate,
+    // scheduled, and cross-posted statuses race ahead without their alt text.
+    // Bluesky-only attachments are local objects and carry their description in
+    // the embed, so they do not have Mastodon metadata to persist.
+    const descriptions = this.targetIncludesFedi()
+      ? this.media().filter((item) => !isLocalMedia(item.media) && item.description.trim())
+      : [];
+    if (descriptions.length) {
+      forkJoin(
+        descriptions.map((item) => this.api.updateMedia(item.media.id, item.description.trim())),
+      ).subscribe({
+        next: () => this.sendTimeline(),
+        error: (error: unknown) => {
+          this.submitting.set(false);
+          const failure = describePostFailure(error);
+          this.postError.set({
+            ...failure,
+            message: `Couldn't save the attachment descriptions, so nothing was posted. Your post and attachments are still here — try again. ${failure.message}`,
+          });
+        },
+      });
+      return;
     }
 
+    this.sendTimeline();
+  }
+
+  /** Publish a timeline post after all required Mastodon media writes finish. */
+  private sendTimeline(): void {
     const options: ComposeOptions = {
       inReplyToId: this.inReplyToId(),
       quotedStatusId: this.quotedStatusId(),
@@ -2084,51 +2164,121 @@ export class Compose implements OnDestroy {
       }
     }
 
-    // Persist any alt-text the user typed before sending the status.
-    for (const m of this.media()) {
-      if (m.description.trim()) {
-        this.api.updateMedia(m.media.id, m.description.trim()).subscribe();
-      }
-    }
-
     if (this.scheduleActive()) {
-      // A far-enough scheduled_at returns a ScheduledStatus (has `params`);
-      // a near/past one publishes immediately and returns a plain Status —
-      // tell them apart so the feed and the flash message stay honest.
-      // canSubmit already ruled out threads/Bluesky.
-      const when = new Date(this.scheduleAt());
-      options.scheduledAt = when.toISOString();
-      this.api.postStatus(this.text().trim(), options).subscribe({
-        next: (result) => {
-          this.reset();
-          if ('params' in result) {
-            this.flashScheduled(`Scheduled for ${when.toLocaleString()} — see it under Drafts.`);
-          } else {
-            this.flashScheduled('That was under ~5 minutes away, so it was posted right away.');
-            this.offerSelfCleanup();
-            this.posted.emit(result);
-          }
-        },
-        error: (error: unknown) => {
-          this.submitting.set(false);
-          this.postError.set(describePostFailure(error));
-        },
-      });
-      return;
+      options.scheduledAt = new Date(this.scheduleAt()).toISOString();
     }
 
-    // Thread boxes post as a self-reply chain: media/poll/CW ride on the first
-    // status only, the rest inherit visibility and chain as replies.
     const posts = this.segments()
       .map((s) => s.trim())
       .filter((s, i) => i === 0 || s !== '');
-    this.api.postStatus(posts[0], options).subscribe({
-      next: (status) => this.postRest(status, status, posts.slice(1)),
-      error: (error: unknown) => {
-        this.submitting.set(false);
-        this.postError.set(describePostFailure(error));
+    const operation = this.operationFor(posts, options);
+
+    // Each destination owns its own progress. A retry starts only the missing
+    // leg/segment, while an edit changes the fingerprint and starts a fresh
+    // operation with fresh Mastodon idempotency keys.
+    if (operation.target !== 'fedi' && !operation.bsky.complete) {
+      this.sendToBluesky(operation);
+    }
+    if (operation.target !== 'bsky' && !operation.fedi.complete) {
+      this.postFediPart(operation);
+    }
+    this.settlePosting(operation);
+  }
+
+  private operationFor(parts: string[], options: ComposeOptions): PostingOperation {
+    const target: PostingOperation['target'] = this.targetIncludesBsky()
+      ? this.targetIncludesFedi()
+        ? 'both'
+        : 'bsky'
+      : 'fedi';
+    const fingerprint = this.postingFingerprint(target);
+    if (this.postingOperation?.fingerprint === fingerprint) {
+      return this.postingOperation;
+    }
+    const operation: PostingOperation = {
+      id: crypto.randomUUID(),
+      fingerprint,
+      target,
+      parts,
+      options: { ...options },
+      scheduledFor: options.scheduledAt ? new Date(options.scheduledAt) : null,
+      fedi: {
+        statuses: [],
+        complete: false,
+        inFlight: false,
+        failure: null,
       },
+      bsky: {
+        parts: [],
+        createdAt: [],
+        preparedFacets: [],
+        complete: false,
+        inFlight: false,
+        failedAt: null,
+      },
+    };
+    this.postingOperation = operation;
+    return operation;
+  }
+
+  private postingFingerprint(target: PostingOperation['target']): string {
+    const media = this.media().map((item) => ({
+      id: item.media.id,
+      description: item.description,
+      file: item.file
+        ? {
+            name: item.file.name,
+            size: item.file.size,
+            type: item.file.type,
+            lastModified: item.file.lastModified,
+          }
+        : null,
+    }));
+    return JSON.stringify({
+      target,
+      draft: this.snapshot(),
+      scheduleAt: this.scheduleActive() ? this.scheduleAt() : '',
+      media,
+      fediIdentity: {
+        server: this.server.baseUrl(),
+        accountId: this.auth.account()?.id ?? null,
+      },
+      bskyDid: this.bskySession.session()?.did ?? null,
     });
+  }
+
+  /** Publish the next missing Mastodon segment using its stable operation key. */
+  private postFediPart(operation: PostingOperation): void {
+    if (operation.fedi.inFlight || operation.fedi.complete) return;
+    const index = operation.fedi.statuses.length;
+    const previous = operation.fedi.statuses[index - 1];
+    const options: ComposeOptions =
+      index === 0
+        ? operation.options
+        : { inReplyToId: previous.id, visibility: operation.options.visibility };
+    operation.fedi.inFlight = true;
+    this.api
+      .postStatus(operation.parts[index], options, `${operation.id}:fedi:${index}`)
+      .subscribe({
+        next: (status) => {
+          operation.fedi.inFlight = false;
+          operation.fedi.failure = null;
+          operation.fedi.statuses.push(status);
+          if (operation.fedi.statuses.length < operation.parts.length) {
+            this.postFediPart(operation);
+            return;
+          }
+          operation.fedi.complete = true;
+          this.showPostingFailure(operation);
+          this.settlePosting(operation);
+        },
+        error: (error: unknown) => {
+          operation.fedi.inFlight = false;
+          operation.fedi.failure = describePostFailure(error);
+          this.showPostingFailure(operation);
+          this.settlePosting(operation);
+        },
+      });
   }
 
   private sendToPaste(): void {
@@ -2351,17 +2501,20 @@ export class Compose implements OnDestroy {
   /**
    * Publish `parts` (link/mention facets attached) to Bluesky — the first as a
    * top-level post, each subsequent one as a reply to the one before it, which
-   * is how Bluesky represents a thread. When `primary`, this IS the post: it
-   * resets the composer and emits a locally-built Status for the root;
-   * otherwise it's the secondary leg of "both" and only surfaces errors.
+   * is how Bluesky represents a thread. Completion is checkpointed here, but
+   * the shared operation coordinator alone decides when the editor may reset.
    *
    * Threads used to be refused outright here, and refused *silently* — the
    * composer's submit button simply went dead the moment a second box had text
    * in it, with nothing on screen to say why. Bluesky has always supported
    * threads; only this client didn't.
    */
-  private sendToBluesky(parts: string[], primary: boolean): void {
-    if (!parts.length) {
+  private sendToBluesky(operation: PostingOperation): void {
+    if (!operation.parts.length || operation.bsky.inFlight || operation.bsky.complete) return;
+    operation.bsky.inFlight = true;
+    // A resumed thread already has its first record and therefore its embed.
+    if (operation.bsky.parts.length) {
+      this.postBskyPart(operation);
       return;
     }
     // Images only, four at most — the protocol's cap. A "both" post can carry
@@ -2371,24 +2524,21 @@ export class Compose implements OnDestroy {
       .filter((m) => m.file && isBlueskyAttachable(m.file))
       .slice(0, BSKY_MAX_IMAGES);
     if (!images.length) {
-      this.postBskyPart(parts, 0, null, null, primary);
+      this.postBskyPart(operation);
       return;
     }
     // Blobs must exist in the repo before the record that references them, so
     // the uploads finish first and the post carries the finished embed.
     void this.uploadBskyImages(images).then((embed) => {
       if (embed === null) {
-        // Nothing was posted yet, so this is a clean failure the reader can
-        // retry — unlike a mid-thread error, where earlier posts are public.
-        this.submitting.set(false);
-        this.crossPostError.set(
-          primary
-            ? "Couldn't upload the image to Bluesky — nothing was posted, try again."
-            : 'Posted to Fedi, but the Bluesky image upload failed — post it there manually.',
-        );
+        operation.bsky.inFlight = false;
+        operation.bsky.failedAt = 0;
+        this.showPostingFailure(operation, true);
+        this.settlePosting(operation);
         return;
       }
-      this.postBskyPart(parts, 0, null, null, primary, embed);
+      operation.bsky.embed = embed;
+      this.postBskyPart(operation);
     });
   }
 
@@ -2434,103 +2584,137 @@ export class Compose implements OnDestroy {
    * threaded through unchanged: Bluesky wants every reply to name the thread
    * root as well as its immediate parent.
    */
-  private postBskyPart(
-    parts: string[],
-    index: number,
-    root: { uri: string; cid: string } | null,
-    parent: { uri: string; cid: string } | null,
-    primary: boolean,
-    /** Images, on the first post of the thread only — see below. */
-    embed?: BskyImagesEmbed,
-  ): void {
-    const text = parts[index];
+  private postBskyPart(operation: PostingOperation): void {
+    const index = operation.bsky.parts.length;
+    const text = operation.parts[index];
+    const root = operation.bsky.parts[0]?.ref ?? null;
+    const parent = operation.bsky.parts[index - 1]?.ref ?? null;
     let sentFacets: BskyFacet[] = [];
-    detectFacets(text, (handle) => this.bskyApi.resolveHandle(handle))
+    const prepared = operation.bsky.preparedFacets[index];
+    (prepared ? of(prepared) : detectFacets(text, (handle) => this.bskyApi.resolveHandle(handle)))
       .pipe(
         switchMap((facets) => {
           sentFacets = facets;
-          return this.bskyApi.post({
-            text,
-            facets: facets.length ? facets : undefined,
-            reply: root && parent ? { root, parent } : undefined,
-            // First post only. The composer's attachments belong to the post
-            // being written, and repeating them down a thread would publish the
-            // same photos several times — the Mastodon leg attaches them to its
-            // root for the same reason.
-            embed: index === 0 ? embed : undefined,
-          });
+          operation.bsky.preparedFacets[index] = facets;
+          const createdAt =
+            operation.bsky.createdAt[index] ??
+            (operation.bsky.createdAt[index] = new Date().toISOString());
+          return this.bskyApi.post(
+            {
+              text,
+              facets: facets.length ? facets : undefined,
+              reply: root && parent ? { root, parent } : undefined,
+              // First post only. Uploaded blob refs are retained on the
+              // operation so an ambiguous record retry is byte-equivalent.
+              embed: index === 0 ? operation.bsky.embed : undefined,
+            },
+            { rkey: `${operation.id}-${index}`, createdAt },
+          );
         }),
       )
       .subscribe({
         next: (created) => {
           const ref = { uri: created.uri, cid: created.cid };
-          const threadRoot = root ?? ref;
-          const last = index === parts.length - 1;
+          operation.bsky.parts.push({ ref, facets: sentFacets });
+          operation.bsky.failedAt = null;
+          const last = index === operation.parts.length - 1;
           if (!last) {
-            this.postBskyPart(parts, index + 1, threadRoot, ref, primary);
+            this.postBskyPart(operation);
             return;
           }
-          if (primary) {
-            this.reset();
-            this.posted.emit(
-              buildLocalBskyStatus(
-                this.bskySession.session()!,
-                threadRoot.uri,
-                threadRoot.cid,
-                parts[0],
-                index === 0 ? sentFacets : [],
-              ),
-            );
-          }
+          operation.bsky.inFlight = false;
+          operation.bsky.complete = true;
+          this.showPostingFailure(operation);
+          this.settlePosting(operation);
         },
         error: () => {
-          // Mid-thread, earlier posts are already public — so this is never a
-          // plain "try again": re-sending would duplicate what landed. Say how
-          // far it got, in both the primary and cross-post cases.
-          const posted = index;
-          const partial = posted
-            ? ` The first ${posted === 1 ? 'post' : `${posted} posts`} of the thread went out.`
-            : '';
-          if (primary) {
-            this.submitting.set(false);
-            this.crossPostError.set(`Couldn't post to Bluesky — try again.${partial}`);
-          } else {
-            this.crossPostError.set(
-              `Posted to Fedi, but the Bluesky copy failed — post it there manually.${partial}`,
-            );
-          }
+          operation.bsky.inFlight = false;
+          operation.bsky.failedAt = index;
+          this.showPostingFailure(operation);
+          this.settlePosting(operation);
         },
       });
   }
 
-  /** Post remaining thread posts sequentially, then emit the root status. */
-  private postRest(root: Status, previous: Status, rest: string[]): void {
-    if (!rest.length) {
-      this.reset();
-      this.offerSelfCleanup();
-      this.posted.emit(root);
+  private showPostingFailure(operation: PostingOperation, imageUpload = false): void {
+    if (operation.fedi.failure) {
+      const completed = operation.fedi.statuses.length;
+      const suffix = [
+        completed
+          ? ` The first ${completed === 1 ? 'post' : `${completed} posts`} of the Fedi thread were already published; retry will skip them.`
+          : '',
+        operation.bsky.complete
+          ? ' The Bluesky copy was already published; retry will only continue Fedi.'
+          : '',
+      ].join('');
+      this.postError.set({
+        ...operation.fedi.failure,
+        message: `${operation.fedi.failure.message}${suffix}`,
+      });
+    }
+    if (operation.bsky.failedAt !== null) {
+      const completed = operation.bsky.parts.length;
+      const partial = completed
+        ? ` The first ${completed === 1 ? 'post' : `${completed} posts`} of the Bluesky thread were already published; retry will skip them.`
+        : '';
+      const reason = imageUpload
+        ? "Couldn't upload the image to Bluesky; nothing was posted there."
+        : "Couldn't post to Bluesky.";
+      this.crossPostError.set(
+        operation.fedi.complete
+          ? `Posted to Fedi, but the Bluesky copy is incomplete. ${reason}${partial} Retry will only continue Bluesky.`
+          : `${reason}${partial} Retry will continue only the unfinished work.`,
+      );
+    }
+  }
+
+  /** The only place a timeline operation may clear the editor or emit its result. */
+  private settlePosting(operation: PostingOperation): void {
+    const fediDone = operation.target === 'bsky' || operation.fedi.complete;
+    const bskyDone = operation.target === 'fedi' || operation.bsky.complete;
+    const stillRunning = operation.fedi.inFlight || operation.bsky.inFlight;
+    if (!fediDone || !bskyDone) {
+      this.submitting.set(stillRunning);
       return;
     }
-    const options: ComposeOptions = {
-      inReplyToId: previous.id,
-      visibility: this.visibility(),
-    };
-    this.api.postStatus(rest[0], options).subscribe({
-      next: (status) => this.postRest(root, status, rest.slice(1)),
-      // Mid-thread: earlier posts are already public, so this is not a plain
-      // retry — say so, or the user re-sends the whole thread and duplicates it.
-      error: (error: unknown) => {
-        this.submitting.set(false);
-        const failure = describePostFailure(error);
-        this.postError.set({
-          ...failure,
-          message: `${failure.message} Earlier posts in this thread were already published.`,
-        });
-      },
-    });
+    if (
+      this.postingOperation !== operation ||
+      this.postingFingerprint(operation.target) !== operation.fingerprint
+    ) {
+      this.submitting.set(false);
+      return;
+    }
+
+    let result: Status | null = null;
+    if (operation.target === 'bsky') {
+      const root = operation.bsky.parts[0];
+      result = buildLocalBskyStatus(
+        this.bskySession.session()!,
+        root.ref.uri,
+        root.ref.cid,
+        operation.parts[0],
+        root.facets,
+      );
+    } else if (operation.scheduledFor) {
+      if ('params' in operation.fedi.statuses[0]) {
+        this.flashScheduled(
+          `Scheduled for ${operation.scheduledFor.toLocaleString()} — see it under Drafts.`,
+        );
+      } else {
+        this.flashScheduled('That was under ~5 minutes away, so it was posted right away.');
+        result = operation.fedi.statuses[0];
+        this.offerSelfCleanup();
+      }
+    } else {
+      result = operation.fedi.statuses[0];
+      this.offerSelfCleanup();
+    }
+    this.reset();
+    if (result) this.posted.emit(result);
   }
 
   private reset(): void {
+    this.postingOperation = null;
     this.text.set('');
     this.thread.set([]);
     this.submitting.set(false);

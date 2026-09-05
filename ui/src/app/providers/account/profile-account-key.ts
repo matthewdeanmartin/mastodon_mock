@@ -8,26 +8,14 @@ import { blueskyIdentityDid } from '../bluesky/bluesky-identity-store';
  *
  * ## Not `accountScopeSuffix()`, and this is the whole point
  *
- * `account-scope.ts` namespaces localStorage by a hash of the Mastodon **access
- * token**. That is right for browser-local data — it is short, opaque, and keeps
- * a bearer token out of a storage key — and it is exactly wrong here, for two
- * reasons:
+ * `account-scope.ts` also uses stable identity now, but encodes provider,
+ * instance origin, and the verified server-local id into an exact browser key.
+ * This boundary instead needs the constrained, human-readable account key the
+ * profile service already understands: instance host plus username, or DID.
  *
- * 1. **It changes on every re-login.** A new token means a new hash, so a
- *    server-side namespace derived from it would appear empty the next time the
- *    user signs in, with their data intact but unaddressable.
- * 2. **It differs per machine.** Two browsers signed into the same account hold
- *    different tokens, so they would disagree about which namespace to read —
- *    which defeats the entire purpose of storing collections on a server.
- *
- * So this computes a key from properties of the *account* rather than of the
- * session: the instance host and username, or a Bluesky DID. Both are stable
- * across re-authentication and identical on every machine.
- *
- * `accountScopeSuffix()` is deliberately left untouched — a spec pins its
- * literals, and changing it by one character silently repoints every scoped key
- * in the app. This is an additive concept used only at the profile-service
- * boundary.
+ * Keep these concepts separate: changing the browser key format needs local
+ * adoption/cleanup handling, while changing this key is a server-side data
+ * migration.
  *
  * ## Refuse rather than guess
  *

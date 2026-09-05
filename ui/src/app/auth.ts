@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
 import { ClientPrefs } from './client-prefs';
+import { adoptMastodonStorageScope } from './account-scope';
 import { Account } from './models';
 import { AnonymousAccount } from './providers/anonymous/anonymous-account';
 import {
@@ -495,8 +496,44 @@ export class Auth {
     this.prefs.setDefaultVisibility(account?.source?.privacy);
     const token = this.token();
     if (account && token) {
+      adoptMastodonStorageScope(account.id, this.server.baseUrl(), [token]);
       this.persistSessions(this.sessions().map((s) => (s.token === token ? { ...s, account } : s)));
     }
+  }
+
+  /**
+   * Replace a saved account's credential after reauthorization.
+   *
+   * The verified account id is paired with its issuing server; numeric ids from
+   * different instances are unrelated. Keeping the existing session id and
+   * account snapshot makes this a credential rotation, not a second identity.
+   */
+  adoptReauthorizedSession(account: Account, newToken: string, server: string): boolean {
+    const existing = this.sessions().find(
+      (session) =>
+        session.token !== newToken &&
+        session.account?.id === account.id &&
+        (session.server ?? '') === server,
+    );
+    if (!existing) return false;
+
+    adoptMastodonStorageScope(account.id, server, [existing.token, newToken]);
+
+    const next = this.sessions()
+      .filter((session) => session.token !== newToken)
+      .map((session) =>
+        session.id === existing.id ? { ...session, token: newToken, account, server } : session,
+      );
+    this.persistSessions(next);
+    localStorage.setItem(TOKEN_KEY, newToken);
+    localStorage.setItem(ACCOUNT_MODE_KEY, 'mastodon');
+    this.kind.set('mastodon');
+    this.token.set(newToken);
+    this.blueskyDid.set(null);
+    this.mastodonAccount.set(account);
+    this.account.set(account);
+    this.prefs.setDefaultVisibility(account.source?.privacy);
+    return true;
   }
 
   /**

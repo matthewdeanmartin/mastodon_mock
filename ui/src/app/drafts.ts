@@ -47,6 +47,17 @@ export interface Draft {
 
 export type DraftSnapshot = Omit<Draft, 'id' | 'updatedAt'>;
 
+/** Result of a local-storage mutation. Callers must not assume an attempted write was durable. */
+export type DraftStorageOutcome = { durable: true } | { durable: false; error: unknown };
+
+export type DraftSaveOutcome = DraftStorageOutcome & { id: string; updatedAt: string };
+export type DraftUpdateOutcome = DraftStorageOutcome & {
+  updated: boolean;
+  updatedAt?: string;
+  /** Another tab changed this row after this store loaded it. */
+  conflict?: boolean;
+};
+
 /** Media carried across one in-app publish handoff; never written to localStorage. */
 export interface DraftMedia {
   media: MediaAttachment;
@@ -117,6 +128,11 @@ export class AccountDrafts {
     this.draftsKey = `${DRAFTS_KEY}${namespace}`;
     this.autosaveKey = `${AUTOSAVE_KEY}${namespace}`;
     this.drafts = signal<Draft[]>(loadJson<Draft[]>(this.draftsKey) ?? []);
+    window.addEventListener('storage', (event) => {
+      if (event.storageArea === localStorage && event.key === this.draftsKey) {
+        this.drafts.set(loadJson<Draft[]>(this.draftsKey) ?? []);
+      }
+    });
   }
 
   get(id: string): Draft | undefined {
@@ -124,15 +140,21 @@ export class AccountDrafts {
   }
 
   /** Add a snapshot to the drafts list (newest first) and return its id. */
-  save(snapshot: DraftSnapshot): string {
+  save(snapshot: DraftSnapshot): DraftSaveOutcome {
     const draft: Draft = {
       ...snapshot,
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       updatedAt: new Date().toISOString(),
     };
-    this.drafts.update((list) => [draft, ...list]);
-    this.persist();
-    return draft.id;
+    // Re-read at mutation time. A store can live for hours while another tab
+    // adds rows; writing its cached signal would replace that tab's whole list.
+    const current = loadJson<Draft[]>(this.draftsKey) ?? this.drafts();
+    const next = [draft, ...current.filter((item) => item.id !== draft.id)];
+    const outcome = storeJson(this.draftsKey, next);
+    if (outcome.durable) {
+      this.drafts.set(next);
+    }
+    return { id: draft.id, updatedAt: draft.updatedAt, ...outcome };
   }
 
   /**
@@ -152,20 +174,44 @@ export class AccountDrafts {
    * `/drafts` while the workspace held it — so the caller can save a fresh copy
    * rather than silently discarding the user's edit.
    */
-  update(id: string, snapshot: DraftSnapshot): boolean {
-    if (!this.drafts().some((d) => d.id === id)) {
-      return false;
+  update(id: string, snapshot: DraftSnapshot, expectedUpdatedAt: string): DraftUpdateOutcome {
+    const current = loadJson<Draft[]>(this.draftsKey) ?? this.drafts();
+    const stored = current.find((draft) => draft.id === id);
+    if (!stored) {
+      return { durable: true, updated: false };
     }
-    this.drafts.update((list) =>
-      list.map((d) => (d.id === id ? { ...snapshot, id, updatedAt: new Date().toISOString() } : d)),
-    );
-    this.persist();
-    return true;
+    // Do not silently replace an edit made in another tab. The writing page
+    // responds by saving this editor as a second draft, retaining both copies.
+    if (expectedUpdatedAt !== stored.updatedAt) {
+      this.drafts.set(current);
+      return { durable: true, updated: false, conflict: true };
+    }
+    // Wall-clock resolution is only milliseconds. Two sequential tab writes in
+    // one tick must still have distinct versions or the later editor cannot
+    // detect that its baseline is stale.
+    const updatedAt = new Date(
+      Math.max(Date.now(), Date.parse(stored.updatedAt) + 1),
+    ).toISOString();
+    const next = current.map((draft) => (draft.id === id ? { ...snapshot, id, updatedAt } : draft));
+    const outcome = storeJson(this.draftsKey, next);
+    if (outcome.durable) {
+      this.drafts.set(next);
+    }
+    return {
+      updated: outcome.durable,
+      updatedAt: outcome.durable ? updatedAt : undefined,
+      ...outcome,
+    };
   }
 
-  remove(id: string): void {
-    this.drafts.update((list) => list.filter((d) => d.id !== id));
-    this.persist();
+  remove(id: string): DraftStorageOutcome {
+    const current = loadJson<Draft[]>(this.draftsKey) ?? this.drafts();
+    const next = current.filter((draft) => draft.id !== id);
+    const outcome = storeJson(this.draftsKey, next);
+    if (outcome.durable) {
+      this.drafts.set(next);
+    }
+    return outcome;
   }
 
   // --- composer handoff ---
@@ -209,14 +255,14 @@ export class AccountDrafts {
 
   // --- autosave slots ---
 
-  autosave(contextKey: string, snapshot: DraftSnapshot): void {
+  autosave(contextKey: string, snapshot: DraftSnapshot): DraftStorageOutcome {
     const slots = loadJson<Record<string, DraftSnapshot>>(this.autosaveKey) ?? {};
     if (draftHasContent(snapshot)) {
       slots[contextKey] = snapshot;
     } else {
       delete slots[contextKey];
     }
-    storeJson(this.autosaveKey, slots);
+    return storeJson(this.autosaveKey, slots);
   }
 
   loadAutosave(contextKey: string): DraftSnapshot | null {
@@ -224,16 +270,13 @@ export class AccountDrafts {
     return slots[contextKey] ?? null;
   }
 
-  clearAutosave(contextKey: string): void {
+  clearAutosave(contextKey: string): DraftStorageOutcome {
     const slots = loadJson<Record<string, DraftSnapshot>>(this.autosaveKey) ?? {};
     if (contextKey in slots) {
       delete slots[contextKey];
-      storeJson(this.autosaveKey, slots);
+      return storeJson(this.autosaveKey, slots);
     }
-  }
-
-  private persist(): void {
-    storeJson(this.draftsKey, this.drafts());
+    return { durable: true };
   }
 }
 
@@ -265,23 +308,23 @@ export class Drafts {
   get(id: string): Draft | undefined {
     return this.active().get(id);
   }
-  save(snapshot: DraftSnapshot): string {
+  save(snapshot: DraftSnapshot): DraftSaveOutcome {
     return this.active().save(snapshot);
   }
-  update(id: string, snapshot: DraftSnapshot): boolean {
-    return this.active().update(id, snapshot);
+  update(id: string, snapshot: DraftSnapshot, expectedUpdatedAt: string): DraftUpdateOutcome {
+    return this.active().update(id, snapshot, expectedUpdatedAt);
   }
-  remove(id: string): void {
-    this.active().remove(id);
+  remove(id: string): DraftStorageOutcome {
+    return this.active().remove(id);
   }
-  autosave(contextKey: string, snapshot: DraftSnapshot): void {
-    this.active().autosave(contextKey, snapshot);
+  autosave(contextKey: string, snapshot: DraftSnapshot): DraftStorageOutcome {
+    return this.active().autosave(contextKey, snapshot);
   }
   loadAutosave(contextKey: string): DraftSnapshot | null {
     return this.active().loadAutosave(contextKey);
   }
-  clearAutosave(contextKey: string): void {
-    this.active().clearAutosave(contextKey);
+  clearAutosave(contextKey: string): DraftStorageOutcome {
+    return this.active().clearAutosave(contextKey);
   }
   handoff(
     snapshot: DraftSnapshot,
@@ -304,10 +347,11 @@ function loadJson<T>(key: string): T | null {
   }
 }
 
-function storeJson(key: string, value: unknown): void {
+function storeJson(key: string, value: unknown): DraftStorageOutcome {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Storage full or unavailable — drafts degrade to session-only.
+    return { durable: true };
+  } catch (error: unknown) {
+    return { durable: false, error };
   }
 }

@@ -703,7 +703,7 @@ export class Home implements OnInit, OnDestroy {
     this.load();
     this.liveSub = this.streaming.open({ stream: 'user' }).subscribe(({ event, payload }) => {
       if (event === 'update') {
-        this.statuses.update((list) => [payload as Status, ...list]);
+        this.mergeStatuses([payload as Status], 'newer');
       } else if (event === 'delete') {
         const id = payload as string;
         this.statuses.update((list) => list.filter((s) => s.id !== id));
@@ -981,8 +981,8 @@ export class Home implements OnInit, OnDestroy {
   }
 
   /**
-   * Later source rounds can overlap by date, so keep the accumulated feed merged
-   * — and enforce `feedMax` on what is actually held.
+   * Apply one identity, ordering, and size policy to every accumulated-feed
+   * insertion: older pages, live updates, and locally created posts.
    *
    * `feedMax` used to be consulted only as "should I fetch another page?", which
    * a single oversized page walks straight past: one RSS feed returned 15,291
@@ -995,11 +995,16 @@ export class Home implements OnInit, OnDestroy {
    * Posts are sorted newest-first before the cut, so what survives is the newest
    * — and the tail that gets dropped is what the reader was least likely to reach.
    */
-  private mergeStatuses(more: Status[]): void {
+  private mergeStatuses(more: Status[], placement: 'newer' | 'older' = 'older'): void {
     this.statuses.update((statuses) => {
+      // Stable sorting makes placement meaningful for statuses with equal or
+      // unreadable timestamps: live/local arrivals go before the held feed,
+      // while an older page stays after it. All three insertion paths still
+      // share the exact same identity, ordering, and size rules below.
+      const candidates = placement === 'newer' ? [...more, ...statuses] : [...statuses, ...more];
       const merged = this.auth.isAnonymous
-        ? this.dedupeAnonymous([...statuses, ...more])
-        : this.dedupeExact([...statuses, ...more]).sort(byNewestFirst);
+        ? this.dedupeAnonymous(candidates)
+        : this.dedupeExact(candidates).sort(byNewestFirst);
       const max = this.prefs.feedMax();
       if (merged.length <= max) {
         return merged;
@@ -1240,12 +1245,12 @@ export class Home implements OnInit, OnDestroy {
     }
     const resumable = this.drafts.drafts().find((d) => !draftHasContent(d));
     const id =
-      resumable?.id ?? this.drafts.save(emptyDraftSnapshot(this.prefs.defaultVisibility()));
+      resumable?.id ?? this.drafts.save(emptyDraftSnapshot(this.prefs.defaultVisibility())).id;
     void this.router.navigate(['/write'], { queryParams: { draft: id } });
   }
 
   onPosted(status: Status): void {
-    this.statuses.update((s) => [status, ...s]);
+    this.mergeStatuses([status], 'newer');
     // Publishing ends the visit's reason for the box being open: it collapses
     // back to the buttons, so the next post is another deliberate choice.
     if (!this.prefs.autoShowMiniComposer()) {

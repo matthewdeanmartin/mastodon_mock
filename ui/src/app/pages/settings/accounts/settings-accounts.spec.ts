@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { scopeSuffixForDid, scopeSuffixForToken } from '../../../account-scope';
+import { scopeSuffixForDid, scopeSuffixForMastodonAccount } from '../../../account-scope';
 import { Auth } from '../../../auth';
 import { SettingsAccounts } from './settings-accounts';
 import { seedBskyIdentity, seedSessions } from '../../../testing/seed-storage';
@@ -49,8 +49,14 @@ describe('SettingsAccounts', () => {
     ] as never);
     localStorage.setItem('mastodon_mock_token', TOKEN_A);
     localStorage.setItem('mastodon_mock_account_mode', 'mastodon');
-    localStorage.setItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_A)}`, '["a"]');
-    localStorage.setItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_B)}`, '["b"]');
+    localStorage.setItem(
+      `mockingbird_rss_feeds${scopeSuffixForMastodonAccount('1', location.origin)}`,
+      '["a"]',
+    );
+    localStorage.setItem(
+      `mockingbird_rss_feeds${scopeSuffixForMastodonAccount('2', location.origin)}`,
+      '["b"]',
+    );
   }
 
   beforeEach(() => {
@@ -144,10 +150,16 @@ describe('SettingsAccounts', () => {
     internals(fixture).askDeleteData(other);
     internals(fixture).confirm();
 
-    expect(localStorage.getItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_B)}`)).toBeNull();
-    expect(localStorage.getItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_A)}`)).toBe(
-      '["a"]',
-    );
+    expect(
+      localStorage.getItem(
+        `mockingbird_rss_feeds${scopeSuffixForMastodonAccount('2', location.origin)}`,
+      ),
+    ).toBeNull();
+    expect(
+      localStorage.getItem(
+        `mockingbird_rss_feeds${scopeSuffixForMastodonAccount('1', location.origin)}`,
+      ),
+    ).toBe('["a"]');
     // "Delete data" keeps the saved login — that's what separates it from log out.
     expect(TestBed.inject(Auth).sessions()).toHaveLength(2);
     expect(internals(fixture).notice()).toContain('Deleted');
@@ -163,7 +175,11 @@ describe('SettingsAccounts', () => {
     internals(fixture).askDeleteDataAndLogout(other);
     internals(fixture).confirm();
 
-    expect(localStorage.getItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_B)}`)).toBeNull();
+    expect(
+      localStorage.getItem(
+        `mockingbird_rss_feeds${scopeSuffixForMastodonAccount('2', location.origin)}`,
+      ),
+    ).toBeNull();
     expect(
       TestBed.inject(Auth)
         .sessions()
@@ -182,9 +198,11 @@ describe('SettingsAccounts', () => {
     internals(fixture).cancel();
 
     expect(internals(fixture).pending()).toBeNull();
-    expect(localStorage.getItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_B)}`)).toBe(
-      '["b"]',
-    );
+    expect(
+      localStorage.getItem(
+        `mockingbird_rss_feeds${scopeSuffixForMastodonAccount('2', location.origin)}`,
+      ),
+    ).toBe('["b"]');
   });
 
   it('refuses to act on a blocked row even if confirm is reached', () => {
@@ -197,8 +215,10 @@ describe('SettingsAccounts', () => {
     internals(fixture).askDeleteData(active);
     internals(fixture).confirm();
 
-    expect(localStorage.getItem(`mockingbird_rss_feeds${scopeSuffixForToken(TOKEN_A)}`)).toBe(
-      '["a"]',
-    );
+    expect(
+      localStorage.getItem(
+        `mockingbird_rss_feeds${scopeSuffixForMastodonAccount('1', location.origin)}`,
+      ),
+    ).toBe('["a"]');
   });
 });

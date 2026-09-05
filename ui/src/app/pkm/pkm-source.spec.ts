@@ -66,7 +66,7 @@ describe('PkmSource', () => {
       sensitive: false,
       visibility: 'public',
       poll: null,
-    });
+    }).id;
   }
 
   // ---------------------------------------------------------------- predicates

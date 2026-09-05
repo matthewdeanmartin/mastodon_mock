@@ -438,17 +438,49 @@ export class BlueskyApi {
   }
 
   /** Publish a post record. */
-  post(record: {
-    text: string;
-    facets?: BskyFacet[];
-    reply?: { root: { uri: string; cid: string }; parent: { uri: string; cid: string } };
-    embed?: BskyImagesEmbed;
-  }): Observable<CreateRecordResponse> {
-    return this.createRecord('app.bsky.feed.post', {
+  post(
+    record: {
+      text: string;
+      facets?: BskyFacet[];
+      reply?: { root: { uri: string; cid: string }; parent: { uri: string; cid: string } };
+      embed?: BskyImagesEmbed;
+    },
+    identity?: { rkey: string; createdAt: string },
+  ): Observable<CreateRecordResponse> {
+    const value = {
       $type: 'app.bsky.feed.post',
-      createdAt: new Date().toISOString(),
+      createdAt: identity?.createdAt ?? new Date().toISOString(),
       ...record,
-    });
+    };
+    if (!identity) {
+      return this.createRecord('app.bsky.feed.post', value);
+    }
+    // A stable rkey makes createRecord address one record. If the PDS committed
+    // the first write but its response was lost, the retry reports that the
+    // record exists; reconcile that response by reading the same AT URI.
+    const did = this.session.session()?.did ?? '';
+    return this.request<CreateRecordResponse>('com.atproto.repo.createRecord', {
+      repo: did,
+      collection: 'app.bsky.feed.post',
+      rkey: identity.rkey,
+      record: value,
+    }).pipe(
+      catchError((error: unknown) => {
+        const body = error instanceof HttpErrorResponse ? error.error : null;
+        const code = body && typeof body === 'object' ? (body as { error?: string }).error : '';
+        const message =
+          body && typeof body === 'object' ? (body as { message?: string }).message : '';
+        const alreadyExists =
+          code === 'RecordAlreadyExists' ||
+          (code === 'InvalidRequest' && /already exists/i.test(message ?? ''));
+        if (!alreadyExists) return throwError(() => error);
+        const params = new HttpParams()
+          .set('repo', did)
+          .set('collection', 'app.bsky.feed.post')
+          .set('rkey', identity.rkey);
+        return this.get<CreateRecordResponse>('com.atproto.repo.getRecord', params);
+      }),
+    );
   }
 
   /**

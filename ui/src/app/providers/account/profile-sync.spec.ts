@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MawkingbirdSession } from './mawkingbird-session';
@@ -18,6 +19,7 @@ const ORIGIN = 'https://profile-test.mawkingbird.com';
 const PREFS = 'mockingbird_client_prefs';
 
 class FakeMawkingbirdSession {
+  user = signal<unknown>({ id: 'account-a' });
   token = vi.fn().mockResolvedValue('mawkingbird-token');
   /**
    * Present because `recheckEntitlement()` calls it. A double missing a method
@@ -67,6 +69,12 @@ function headerOf(init: RequestInit, name: string): string | null {
   return new Headers(init.headers).get(name);
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => (resolve = done));
+  return { promise, resolve };
+}
+
 describe('ProfileSync', () => {
   let sync: ProfileSync;
 
@@ -86,6 +94,9 @@ describe('ProfileSync', () => {
       ],
     });
     sync = TestBed.inject(ProfileSync);
+    // Settle the service's initial account watcher before a test deliberately
+    // holds a request; otherwise its first scheduled run looks like a sign-out.
+    TestBed.flushEffects();
   });
 
   afterEach(() => {
@@ -356,6 +367,43 @@ describe('ProfileSync', () => {
       expect(sync.record().revision).toBe(5);
     });
 
+    it('preserves an edit made while the remote document is in flight', async () => {
+      localStorage.setItem(PREFS, '{"theme":"light"}');
+      sync.resetForTest({ state: 'on', revision: 1, dirty: false });
+      const response = deferred<Response>();
+      fetchStub.mockReturnValue(response.promise);
+
+      const pulling = sync.pull();
+      await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledOnce());
+      localStorage.setItem(PREFS, '{"theme":"blue"}');
+      sync.noteLocalChange();
+      response.resolve(respond(200, storedDocument(), { ETag: '"remote"' }));
+
+      const outcome = await pulling;
+      expect(outcome.kind).toBe('needs-decision');
+      expect(localStorage.getItem(PREFS)).toBe('{"theme":"blue"}');
+      expect(sync.record().dirty).toBe(true);
+    });
+
+    it('does not apply a response requested for an account that signed out', async () => {
+      const session = TestBed.inject(MawkingbirdSession) as unknown as FakeMawkingbirdSession;
+      localStorage.setItem(PREFS, '{"theme":"light"}');
+      sync.resetForTest({ state: 'on', revision: 1, dirty: false });
+      const response = deferred<Response>();
+      fetchStub.mockReturnValue(response.promise);
+
+      const pulling = sync.pull();
+      await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledOnce());
+      localStorage.removeItem(PROFILE_SYNC_KEY);
+      session.user.set(null);
+      TestBed.flushEffects();
+      response.resolve(respond(200, storedDocument(), { ETag: '"remote"' }));
+
+      expect((await pulling).kind).toBe('failed');
+      expect(localStorage.getItem(PREFS)).toBe('{"theme":"light"}');
+      expect(sync.record().state).toBe('unasked');
+    });
+
     /**
      * Regression: a bad stored etag wedged sync permanently.
      *
@@ -515,6 +563,61 @@ describe('ProfileSync', () => {
       expect(sync.record().revision).toBe(4);
     });
 
+    it('keeps a later edit dirty when an older snapshot finishes saving', async () => {
+      localStorage.setItem(PREFS, '{"theme":"light"}');
+      sync.resetForTest({ state: 'on', etag: '"a"', revision: 3, dirty: true });
+      const response = deferred<Response>();
+      fetchStub.mockReturnValue(response.promise);
+
+      const pushing = sync.push();
+      await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledOnce());
+      localStorage.setItem(PREFS, '{"theme":"blue"}');
+      sync.noteLocalChange();
+      response.resolve(respond(200, { ok: true, etag: '"b"', revision: 4 }));
+
+      expect((await pushing).kind).toBe('saved');
+      expect(sync.record().etag).toBe('"b"');
+      expect(sync.record().revision).toBe(4);
+      expect(sync.record().dirty).toBe(true);
+    });
+
+    it('does not adopt a saved version after its account signs out', async () => {
+      const session = TestBed.inject(MawkingbirdSession) as unknown as FakeMawkingbirdSession;
+      sync.resetForTest({ state: 'on', etag: '"a"', revision: 3, dirty: true });
+      const response = deferred<Response>();
+      fetchStub.mockReturnValue(response.promise);
+
+      const pushing = sync.push();
+      await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledOnce());
+      localStorage.removeItem(PROFILE_SYNC_KEY);
+      session.user.set(null);
+      TestBed.flushEffects();
+      response.resolve(respond(200, { ok: true, etag: '"b"', revision: 4 }));
+
+      expect((await pushing).kind).toBe('not-syncing');
+      expect(sync.record().state).toBe('unasked');
+      expect(sync.record().etag).toBeUndefined();
+    });
+
+    it('serializes an overlapping pull and push', async () => {
+      sync.resetForTest({ state: 'on', etag: '"a"', revision: 3, dirty: false });
+      const response = deferred<Response>();
+      fetchStub
+        .mockReturnValueOnce(response.promise)
+        .mockResolvedValueOnce(respond(200, { ok: true, etag: '"c"', revision: 5 }));
+
+      const pulling = sync.pull();
+      const pushing = sync.push();
+      await vi.waitFor(() => expect(fetchStub).toHaveBeenCalledOnce());
+      expect(calls[0]!.init.method).toBe('GET');
+      response.resolve(respond(200, storedDocument({ revision: 4 }), { ETag: '"b"' }));
+
+      await pulling;
+      await pushing;
+      expect(calls.map((call) => call.init.method)).toEqual(['GET', 'PUT']);
+      expect(headerOf(calls[1]!.init, 'If-Match')).toBe('"b"');
+    });
+
     it('advances the revision, since an equal one is refused with 409', async () => {
       sync.resetForTest({ state: 'on', etag: '"a"', revision: 3, dirty: true });
       fetchStub.mockResolvedValue(respond(200, { ok: true, etag: '"b"', revision: 4 }));
@@ -526,7 +629,7 @@ describe('ProfileSync', () => {
       expect(body.revision).toBe(4);
     });
 
-    it('adopts the winner on a 412 and keeps the dirty flag', async () => {
+    it('holds the winner on a 412 without adopting it for automatic writes', async () => {
       sync.resetForTest({ state: 'on', etag: '"stale"', revision: 3, dirty: true });
       fetchStub.mockResolvedValue(
         respond(
@@ -541,10 +644,62 @@ describe('ProfileSync', () => {
       const outcome = await sync.push();
 
       expect(outcome.kind).toBe('conflict');
-      expect(sync.record().etag).toBe('"winner"');
-      expect(sync.record().revision).toBe(9);
+      expect(sync.record().etag).toBe('"stale"');
+      expect(sync.record().revision).toBe(3);
       // Still unsaved: this browser's edits have not been stored anywhere.
       expect(sync.record().dirty).toBe(true);
+
+      localStorage.setItem(PREFS, '{"theme":"blue"}');
+      sync.noteLocalChange();
+      const blocked = await sync.push();
+      expect(blocked.kind).toBe('conflict');
+      expect(fetchStub).toHaveBeenCalledOnce();
+
+      const presentedAgain = await sync.pull();
+      expect(presentedAgain.kind).toBe('needs-decision');
+      expect(fetchStub).toHaveBeenCalledOnce();
+    });
+
+    it('uses the held winner only after keep-local resolves the conflict', async () => {
+      localStorage.setItem(PREFS, '{"theme":"light"}');
+      sync.resetForTest({ state: 'on', etag: '"stale"', revision: 3, dirty: true });
+      fetchStub
+        .mockResolvedValueOnce(
+          respond(
+            412,
+            { code: 'conflict', current: storedDocument({ revision: 9 }) },
+            { ETag: '"winner"' },
+          ),
+        )
+        .mockResolvedValueOnce(respond(200, { ok: true, etag: '"mine"', revision: 10 }));
+
+      const conflict = await sync.push();
+      expect(conflict.kind).toBe('conflict');
+      if (conflict.kind !== 'conflict') return;
+      expect((await sync.keepLocal(conflict.etag, conflict.revision)).kind).toBe('saved');
+      expect(headerOf(calls[1]!.init, 'If-Match')).toBe('"winner"');
+    });
+
+    it('applies the held winner only after use-remote resolves the conflict', async () => {
+      localStorage.setItem(PREFS, '{"theme":"light"}');
+      sync.resetForTest({ state: 'on', etag: '"stale"', revision: 3, dirty: true });
+      fetchStub.mockResolvedValue(
+        respond(
+          412,
+          { code: 'conflict', current: storedDocument({ revision: 9 }) },
+          { ETag: '"winner"' },
+        ),
+      );
+
+      const conflict = await sync.push();
+      expect(conflict.kind).toBe('conflict');
+      if (conflict.kind !== 'conflict') return;
+      sync.useRemote(conflict.remote, conflict.etag, conflict.revision);
+
+      expect(localStorage.getItem(PREFS)).toBe('{"theme":"dark"}');
+      expect(sync.record().etag).toBe('"winner"');
+      expect(sync.record().revision).toBe(9);
+      expect(sync.record().dirty).toBeFalsy();
     });
 
     /**

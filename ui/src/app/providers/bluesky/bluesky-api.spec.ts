@@ -139,6 +139,37 @@ describe('BlueskyApi', () => {
     req.flush({ uri: 'at://did:plc:me/app.bsky.graph.follow/1', cid: 'c' });
   });
 
+  it('posts with a stable rkey and reconciles a committed write after a lost response', () => {
+    const api = TestBed.inject(BlueskyApi);
+    let result: unknown;
+    api
+      .post({ text: 'once' }, { rkey: 'operation-1-0', createdAt: '2026-09-05T12:00:00Z' })
+      .subscribe((value) => (result = value));
+
+    const create = httpMock.expectOne(`${SERVICE}/xrpc/com.atproto.repo.createRecord`);
+    expect(create.request.body).toMatchObject({
+      repo: 'did:plc:me',
+      collection: 'app.bsky.feed.post',
+      rkey: 'operation-1-0',
+      record: { text: 'once', createdAt: '2026-09-05T12:00:00Z' },
+    });
+    create.flush(
+      { error: 'RecordAlreadyExists', message: 'Record already exists' },
+      { status: 409, statusText: 'Conflict' },
+    );
+
+    const get = httpMock.expectOne(
+      (request) =>
+        request.url === `${SERVICE}/xrpc/com.atproto.repo.getRecord` &&
+        request.params.get('rkey') === 'operation-1-0',
+    );
+    get.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/operation-1-0', cid: 'c1' });
+    expect(result).toEqual({
+      uri: 'at://did:plc:me/app.bsky.feed.post/operation-1-0',
+      cid: 'c1',
+    });
+  });
+
   it('refreshes an expired token once and retries the call', () => {
     const api = TestBed.inject(BlueskyApi);
     let result: unknown;

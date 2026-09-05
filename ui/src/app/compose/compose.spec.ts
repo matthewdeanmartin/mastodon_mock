@@ -47,6 +47,8 @@ interface ComposeInternals {
   canAttachMedia: Signal<boolean>;
   canAddPoll: Signal<boolean>;
   countdown: Signal<number | null>;
+  scheduleOpen: WritableSignal<boolean>;
+  scheduleAt: WritableSignal<string>;
   thread: WritableSignal<string[]>;
   segments: Signal<string[]>;
   overLimit: Signal<boolean>;
@@ -66,9 +68,14 @@ interface ComposeInternals {
   cancelHugoEdit(): void;
   pendingSelfCleanup: WritableSignal<string | null>;
   selfCleanupError: WritableSignal<string | null>;
+  draftSaved: WritableSignal<boolean>;
+  draftSaveFailed: WritableSignal<boolean>;
+  saveDraft(): void;
+  downloadDraft(): void;
   deleteSelfDraftCopy(): void;
   showTargetPicker: Signal<boolean>;
   crossPostError: Signal<string | null>;
+  postError: Signal<{ message: string } | null>;
   toggleCw(): void;
   togglePoll(): void;
   addPollOption(): void;
@@ -587,6 +594,68 @@ describe('Compose', () => {
     req.flush({ id: '1' });
   });
 
+  it('waits for every media description before creating a status', () => {
+    const f = setUp();
+    internals(f).text.set('Photo post');
+    internals(f).media.set([
+      { media: { id: 'media-1' }, description: 'First image' },
+      { media: { id: 'media-2' }, description: 'Second image' },
+    ]);
+    internals(f).submit();
+
+    const first = httpMock.expectOne('/api/v1/media/media-1');
+    const second = httpMock.expectOne('/api/v1/media/media-2');
+    httpMock.expectNone('/api/v1/statuses');
+
+    first.flush({ id: 'media-1' });
+    httpMock.expectNone('/api/v1/statuses');
+    second.flush({ id: 'media-2' });
+
+    const post = httpMock.expectOne('/api/v1/statuses');
+    expect(post.request.body.media_ids).toEqual(['media-1', 'media-2']);
+    post.flush({ id: '1' });
+  });
+
+  it('keeps text, attachment, and description when a media description update fails', () => {
+    const f = setUp();
+    internals(f).text.set('A recoverable post');
+    internals(f).media.set([{ media: { id: 'media-1' }, description: 'A careful description' }]);
+    internals(f).submit();
+
+    httpMock
+      .expectOne('/api/v1/media/media-1')
+      .flush({ error: 'metadata unavailable' }, { status: 503, statusText: 'Unavailable' });
+
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).submitting()).toBe(false);
+    expect(internals(f).text()).toBe('A recoverable post');
+    expect(internals(f).media()).toHaveLength(1);
+    expect(internals(f).media()[0].media.id).toBe('media-1');
+    expect(internals(f).media()[0].description).toBe('A careful description');
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).textContent).toContain('nothing was posted');
+
+    internals(f).submit();
+    httpMock.expectOne('/api/v1/media/media-1').flush({ id: 'media-1' });
+    httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
+  });
+
+  it('waits for media descriptions before creating a scheduled status', () => {
+    const f = setUp();
+    internals(f).text.set('Later with alt text');
+    internals(f).media.set([{ media: { id: 'media-1' }, description: 'Sunset' }]);
+    internals(f).scheduleOpen.set(true);
+    internals(f).scheduleAt.set(new Date(Date.now() + 10 * 60_000).toISOString().slice(0, 16));
+    internals(f).submit();
+
+    const metadata = httpMock.expectOne('/api/v1/media/media-1');
+    httpMock.expectNone('/api/v1/statuses');
+    metadata.flush({ id: 'media-1' });
+    const post = httpMock.expectOne('/api/v1/statuses');
+    expect(post.request.body.scheduled_at).toBeDefined();
+    post.flush({ id: 'scheduled-1', params: {} });
+  });
+
   it('submit() includes poll params when poll is open and valid', () => {
     const f = setUp();
     internals(f).pollOpen.set(true);
@@ -826,6 +895,21 @@ describe('Compose', () => {
     internals(f).submit();
     httpMock.expectOne('/api/v1/statuses').flush({ id: '1' });
     httpMock.expectNone(CREATE_RECORD);
+  });
+
+  it('keeps replies Fedi-only even if a stale top-level target says Both', () => {
+    linkBsky();
+    const f = TestBed.createComponent(Compose);
+    f.componentRef.setInput('inReplyToId', 'parent-1');
+    f.detectChanges();
+    internals(f).target.set('both');
+    internals(f).text.set('reply stays here');
+    internals(f).submit();
+
+    httpMock.expectNone(CREATE_RECORD);
+    const request = httpMock.expectOne('/api/v1/statuses');
+    expect(request.request.body.in_reply_to_id).toBe('parent-1');
+    request.flush({ id: 'reply-1' });
   });
 
   it('defaults to Bluesky when Bluesky is the account', () => {
@@ -1408,7 +1492,7 @@ describe('Compose', () => {
     expect(internals(f).text()).toBe('pending post');
   });
 
-  it('a failed Bluesky leg on "both" surfaces an error without retracting the Fedi post', () => {
+  it('a failed Bluesky leg on "both" retains the Fedi result for a Bluesky-only retry', () => {
     linkBsky();
     const f = setUp();
     const posted: Status[] = [];
@@ -1418,11 +1502,117 @@ describe('Compose', () => {
     internals(f).text.set('half delivered');
     internals(f).submit();
 
-    httpMock.expectOne(CREATE_RECORD).flush({ error: 'boom' }, { status: 500, statusText: 'ISE' });
+    const failedBsky = httpMock.expectOne(CREATE_RECORD);
+    const bskyRkey = failedBsky.request.body.rkey;
+    failedBsky.flush({ error: 'boom' }, { status: 500, statusText: 'ISE' });
     httpMock.expectOne('/api/v1/statuses').flush({ id: 'm2' });
 
-    expect(posted.map((s) => s.id)).toEqual(['m2']);
+    expect(posted).toEqual([]);
+    expect(internals(f).text()).toBe('half delivered');
     expect(internals(f).crossPostError()).toContain('Bluesky');
+
+    internals(f).submit();
+    httpMock.expectNone('/api/v1/statuses');
+    const retriedBsky = httpMock.expectOne(CREATE_RECORD);
+    expect(retriedBsky.request.body.rkey).toBe(bskyRkey);
+    retriedBsky.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/retry', cid: 'cid-retry' });
+
+    expect(posted.map((s) => s.id)).toEqual(['m2']);
+    expect(internals(f).text()).toBe('');
+  });
+
+  it('reuses a Mastodon key after a committed write loses its response, but not after an edit', () => {
+    const f = setUp();
+    internals(f).text.set('send exactly once');
+    internals(f).submit();
+
+    const lost = httpMock.expectOne('/api/v1/statuses');
+    const firstKey = lost.request.headers.get('Idempotency-Key');
+    expect(firstKey).toBeTruthy();
+    lost.flush(null, { status: 0, statusText: 'Unknown Error' });
+
+    internals(f).submit();
+    const retry = httpMock.expectOne('/api/v1/statuses');
+    expect(retry.request.headers.get('Idempotency-Key')).toBe(firstKey);
+    retry.flush(null, { status: 0, statusText: 'Unknown Error' });
+
+    internals(f).text.set('edited before retry');
+    internals(f).submit();
+    const edited = httpMock.expectOne('/api/v1/statuses');
+    expect(edited.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
+    edited.flush({ id: 'edited-1' });
+  });
+
+  it('resumes a Fedi thread at the failed segment with its original key and parent', () => {
+    const f = setUp();
+    internals(f).text.set('one');
+    internals(f).addThreadBox();
+    internals(f).setThreadText(0, 'two');
+    internals(f).addThreadBox();
+    internals(f).setThreadText(1, 'three');
+    internals(f).submit();
+
+    const root = httpMock.expectOne('/api/v1/statuses');
+    const rootKey = root.request.headers.get('Idempotency-Key');
+    root.flush({ id: 'm1' });
+    const halfway = httpMock.expectOne('/api/v1/statuses');
+    const halfwayKey = halfway.request.headers.get('Idempotency-Key');
+    expect(halfwayKey).not.toBe(rootKey);
+    halfway.flush({ error: 'temporary' }, { status: 503, statusText: 'Unavailable' });
+
+    expect(internals(f).postError()?.message).toContain('retry will skip');
+    internals(f).submit();
+    const resumed = httpMock.expectOne('/api/v1/statuses');
+    expect(resumed.request.body).toMatchObject({ status: 'two', in_reply_to_id: 'm1' });
+    expect(resumed.request.headers.get('Idempotency-Key')).toBe(halfwayKey);
+    resumed.flush({ id: 'm2' });
+    const tail = httpMock.expectOne('/api/v1/statuses');
+    expect(tail.request.body).toMatchObject({ status: 'three', in_reply_to_id: 'm2' });
+    expect(tail.request.headers.get('Idempotency-Key')).not.toBe(halfwayKey);
+    tail.flush({ id: 'm3' });
+  });
+
+  it('skips a completed Bluesky leg when Fedi fails, regardless of response ordering', () => {
+    linkBsky();
+    const f = setUp();
+    const posted: Status[] = [];
+    f.componentInstance.posted.subscribe((status: Status) => posted.push(status));
+    internals(f).target.set('both');
+    internals(f).text.set('bsky landed first');
+    internals(f).submit();
+
+    httpMock
+      .expectOne(CREATE_RECORD)
+      .flush({ uri: 'at://did:plc:me/app.bsky.feed.post/first', cid: 'b1' });
+    httpMock
+      .expectOne('/api/v1/statuses')
+      .flush({ error: 'temporary' }, { status: 503, statusText: 'Unavailable' });
+    expect(posted).toEqual([]);
+    expect(internals(f).postError()?.message).toContain('Bluesky copy was already published');
+
+    internals(f).submit();
+    httpMock.expectNone(CREATE_RECORD);
+    httpMock.expectOne('/api/v1/statuses').flush({ id: 'm-after-bsky' });
+    expect(posted.map((status) => status.id)).toEqual(['m-after-bsky']);
+  });
+
+  it('waits for Mastodon media descriptions before starting either "both" destination', () => {
+    linkBsky();
+    const f = setUp();
+    internals(f).target.set('both');
+    internals(f).text.set('described everywhere');
+    internals(f).media.set([{ media: { id: 'media-1' }, description: 'A fox crossing the snow' }]);
+    internals(f).submit();
+
+    const metadata = httpMock.expectOne('/api/v1/media/media-1');
+    httpMock.expectNone(CREATE_RECORD);
+    httpMock.expectNone('/api/v1/statuses');
+
+    metadata.flush({ id: 'media-1' });
+    httpMock
+      .expectOne(CREATE_RECORD)
+      .flush({ uri: 'at://did:plc:me/app.bsky.feed.post/abc', cid: 'cid1' });
+    httpMock.expectOne('/api/v1/statuses').flush({ id: 'm1' });
   });
 
   it('blocks submit when a Bluesky-bound post exceeds 300 graphemes', () => {
@@ -1487,14 +1677,26 @@ describe('Compose', () => {
     internals(f).setThreadText(0, 'second');
     internals(f).submit();
 
-    httpMock
-      .expectOne(CREATE_RECORD)
-      .flush({ uri: 'at://did:plc:me/app.bsky.feed.post/one', cid: 'cid1' });
-    httpMock.expectOne(CREATE_RECORD).flush('nope', { status: 500, statusText: 'Server Error' });
+    const root = httpMock.expectOne(CREATE_RECORD);
+    const rootRkey = root.request.body.rkey;
+    root.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/one', cid: 'cid1' });
+    const failedReply = httpMock.expectOne(CREATE_RECORD);
+    const replyRkey = failedReply.request.body.rkey;
+    expect(replyRkey).not.toBe(rootRkey);
+    failedReply.flush('nope', { status: 500, statusText: 'Server Error' });
 
     // Re-sending would duplicate the post that landed, so the message has to
     // say what happened rather than offering a plain retry.
     expect(internals(f).crossPostError()).toContain('first post');
+
+    internals(f).submit();
+    const resumed = httpMock.expectOne(CREATE_RECORD);
+    expect(resumed.request.body.rkey).toBe(replyRkey);
+    expect(resumed.request.body.record.reply).toEqual({
+      root: { uri: 'at://did:plc:me/app.bsky.feed.post/one', cid: 'cid1' },
+      parent: { uri: 'at://did:plc:me/app.bsky.feed.post/one', cid: 'cid1' },
+    });
+    resumed.flush({ uri: 'at://did:plc:me/app.bsky.feed.post/two', cid: 'cid2' });
   });
 
   /**
@@ -1926,6 +2128,56 @@ describe('Compose', () => {
     expect(drafts.drafts()).toHaveLength(1);
     expect(drafts.drafts()[0].segments[0]).toBe('a thought worth sitting on');
     expect(internals(f).text()).toBe('');
+  });
+
+  it('keeps the editor and reports unsaved when an explicit draft write fails', () => {
+    const f = setUp();
+    internals(f).text.set('the only copy');
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+
+    internals(f).saveDraft();
+    f.detectChanges();
+
+    expect(internals(f).text()).toBe('the only copy');
+    expect(internals(f).draftSaved()).toBe(false);
+    expect(internals(f).draftSaveFailed()).toBe(true);
+    expect(f.nativeElement.textContent).toContain('could not be saved');
+    expect(TestBed.inject(Drafts).drafts()).toEqual([]);
+  });
+
+  it('reports a failed autosave without clearing the editor', () => {
+    vi.useFakeTimers();
+    const f = setUp();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+
+    internals(f).text.set('autosave must keep this');
+    f.detectChanges();
+    vi.advanceTimersByTime(500);
+    f.detectChanges();
+
+    expect(internals(f).text()).toBe('autosave must keep this');
+    expect(internals(f).draftSaveFailed()).toBe(true);
+    expect(f.nativeElement.textContent).toContain('could not be saved');
+  });
+
+  it('downloads the live editor as JSON without using localStorage', () => {
+    const f = setUp();
+    internals(f).text.set('portable copy');
+    const downloads: HTMLAnchorElement[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloads.push(this);
+    });
+
+    internals(f).downloadDraft();
+
+    expect(downloads[0].download).toMatch(/^mockingbird-draft-/);
+    expect(decodeURIComponent(downloads[0].href)).toContain('portable copy');
   });
 
   it('an opted-in composer still posts normally while the pref is off', () => {

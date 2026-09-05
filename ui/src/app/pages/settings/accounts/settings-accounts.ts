@@ -87,11 +87,21 @@ export class SettingsAccounts {
       key: `mastodon:${session.id}`,
       token: session.token,
       kind: 'mastodon' as const,
-      scope: { kind: 'mastodon' as const, token: session.token },
+      scope: {
+        kind: 'mastodon' as const,
+        token: session.token,
+        accountId: session.account?.id,
+        server: session.server,
+      },
       account: session.account,
       server: session.server ?? '',
       active: mode === 'mastodon' && session.token === activeToken,
-      ...this.sizeOf({ kind: 'mastodon', token: session.token }),
+      ...this.sizeOf({
+        kind: 'mastodon',
+        token: session.token,
+        accountId: session.account?.id,
+        server: session.server,
+      }),
     }));
     for (const identity of this.auth.blueskyAccounts()) {
       if (!identity.did) continue;

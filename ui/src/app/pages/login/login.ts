@@ -5,7 +5,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Api } from '../../api';
 import { MockApi } from '../../mock-api';
 import { Auth } from '../../auth';
-import { DevUser } from '../../models';
+import { Account, DevUser } from '../../models';
 import { Server, SERVER_PRESETS } from '../../server';
 import { MastodonServers, ServerSuggestion } from '../../mastodon-servers';
 import { normalizeHostUrl } from '../../host-url';
@@ -552,10 +552,10 @@ export class Login implements OnInit, OnDestroy {
 
   /**
    * If another saved session is the *same account on the same instance* as the
-   * one we just verified, discard the newly-minted token and switch back to the
-   * existing session. Returns true when an existing identity was adopted.
+   * one we just verified, replace its old credential with the newly-minted one
+   * instead of creating a duplicate identity. Returns true when adopted.
    */
-  private adoptExistingSession(acc: { id: string }, newToken: string): boolean {
+  private adoptExistingSession(acc: Account, newToken: string): boolean {
     const server = this.server.baseUrl();
     const existing = this.auth
       .sessions()
@@ -563,10 +563,7 @@ export class Login implements OnInit, OnDestroy {
     if (!existing) {
       return false;
     }
-    // Forget the duplicate token, then re-activate the account we already had.
-    this.auth.removeSession(newToken);
-    this.auth.switchTo(existing.token);
-    return true;
+    return this.auth.adoptReauthorizedSession(acc, newToken, server);
   }
 
   // ---------- Register (mock-server-only signup) ----------

@@ -3,8 +3,10 @@ import {
   BLUESKY_SCOPE_PREFIX,
   accountScopeSuffix,
   scopeSuffixForDid,
+  scopeSuffixForMastodonAccount,
   scopedKey,
 } from './account-scope';
+import { seedSessions } from './testing/seed-storage';
 import {
   saveBlueskyIdentity,
   setActiveBlueskyIdentity,
@@ -22,8 +24,14 @@ function seedBlueskyIdentity(did: string, handle = 'someone.bsky.social'): void 
 }
 
 describe('account-scope', () => {
-  beforeEach(() => localStorage.clear());
-  afterEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
 
   it('returns an empty suffix when logged out', () => {
     expect(accountScopeSuffix()).toBe('');
@@ -73,7 +81,7 @@ describe('account-scope', () => {
    * derived: a test that recomputes the expected value with the same function
    * under test would happily agree with a broken implementation.
    */
-  describe('existing suffixes are frozen', () => {
+  describe('legacy and fixed suffixes', () => {
     it('pins the Anonymous suffix to its exact historical value', () => {
       localStorage.setItem(MODE_KEY, 'anonymous');
       expect(accountScopeSuffix()).toBe('_anonymous');
@@ -101,12 +109,14 @@ describe('account-scope', () => {
   });
 
   describe('bluesky-primary scope', () => {
-    it('derives the suffix from the DID of the primary identity', () => {
+    it('derives a collision-free suffix from the DID of the primary identity', () => {
       localStorage.setItem(MODE_KEY, 'bluesky');
       seedBlueskyIdentity('did:plc:testidentity');
 
-      expect(accountScopeSuffix()).toBe('_bsky_1yuzhpz');
-      expect(scopedKey('mockingbird_rss_feeds')).toBe('mockingbird_rss_feeds_bsky_1yuzhpz');
+      expect(accountScopeSuffix()).toBe('_bluesky_Ymx1ZXNreQBkaWQ6cGxjOnRlc3RpZGVudGl0eQ');
+      expect(scopedKey('mockingbird_rss_feeds')).toBe(
+        'mockingbird_rss_feeds_bluesky_Ymx1ZXNreQBkaWQ6cGxjOnRlc3RpZGVudGl0eQ',
+      );
     });
 
     it('gives two Bluesky accounts different namespaces', () => {
@@ -138,13 +148,79 @@ describe('account-scope', () => {
       localStorage.setItem(TOKEN_KEY, 'token-abc');
       seedBlueskyIdentity('did:plc:testidentity');
 
-      expect(accountScopeSuffix()).toBe('_bsky_1yuzhpz');
+      expect(accountScopeSuffix()).toBe('_bluesky_Ymx1ZXNreQBkaWQ6cGxjOnRlc3RpZGVudGl0eQ');
     });
 
     it('never embeds the raw DID in the key', () => {
       localStorage.setItem(MODE_KEY, 'bluesky');
       seedBlueskyIdentity('did:plc:testidentity');
       expect(scopedKey('base')).not.toContain('did:plc:testidentity');
+    });
+  });
+
+  describe('verified Mastodon identity', () => {
+    it('keeps the same namespace when the credential changes', () => {
+      seedSessions([
+        {
+          token: 'token-one',
+          server: 'https://mastodon.example',
+          account: { id: '42', username: 'alice', acct: 'alice' },
+        },
+      ] as never);
+      localStorage.setItem(MODE_KEY, 'mastodon');
+      localStorage.setItem(TOKEN_KEY, 'token-one');
+      const first = accountScopeSuffix();
+
+      seedSessions([
+        {
+          token: 'token-two',
+          server: 'https://mastodon.example',
+          account: { id: '42', username: 'alice', acct: 'alice' },
+        },
+      ] as never);
+      localStorage.setItem(TOKEN_KEY, 'token-two');
+
+      expect(accountScopeSuffix()).toBe(first);
+      expect(first).toBe('_mastodon_bWFzdG9kb24AaHR0cHM6Ly9tYXN0b2Rvbi5leGFtcGxlADQy');
+    });
+
+    it('separates the same numeric id on different servers', () => {
+      expect(scopeSuffixForMastodonAccount('42', 'https://one.example')).not.toBe(
+        scopeSuffixForMastodonAccount('42', 'https://two.example'),
+      );
+    });
+
+    it('separates different ids on one server and exposes no raw identity fields', () => {
+      const first = scopeSuffixForMastodonAccount('42', 'https://one.example');
+      const second = scopeSuffixForMastodonAccount('84', 'https://one.example');
+      expect(first).not.toBe(second);
+      expect(first).not.toContain('one.example');
+      expect(first).not.toContain('42');
+    });
+
+    it('adopts legacy account data but does not invent a draft migration', () => {
+      localStorage.setItem('mockingbird_rss_feeds_6xtdsz', '["feed"]');
+      localStorage.setItem('mockingbird_drafts_https%3A%2F%2Fmastodon.example_6xtdsz', '["draft"]');
+      sessionStorage.setItem('mockingbird_blogger_token_6xtdsz', 'credential');
+      seedSessions([
+        {
+          token: 'token-abc',
+          server: 'https://mastodon.example',
+          account: { id: '42', username: 'alice', acct: 'alice' },
+        },
+      ] as never);
+      localStorage.setItem(MODE_KEY, 'mastodon');
+      localStorage.setItem(TOKEN_KEY, 'token-abc');
+
+      const stable = accountScopeSuffix();
+
+      expect(localStorage.getItem(`mockingbird_rss_feeds${stable}`)).toBe('["feed"]');
+      expect(localStorage.getItem('mockingbird_rss_feeds_6xtdsz')).toBeNull();
+      expect(sessionStorage.getItem(`mockingbird_blogger_token${stable}`)).toBe('credential');
+      expect(sessionStorage.getItem('mockingbird_blogger_token_6xtdsz')).toBeNull();
+      expect(localStorage.getItem('mockingbird_drafts_https%3A%2F%2Fmastodon.example_6xtdsz')).toBe(
+        '["draft"]',
+      );
     });
   });
 });

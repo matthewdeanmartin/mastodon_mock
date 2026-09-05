@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { SearchServer, searchServerRequest } from './search-server';
@@ -322,7 +322,11 @@ export class Api {
     return this.http.get<Context>(`/api/v1/statuses/${id}/context`);
   }
 
-  postStatus(status: string, options: ComposeOptions = {}): Observable<Status> {
+  postStatus(
+    status: string,
+    options: ComposeOptions = {},
+    idempotencyKey?: string,
+  ): Observable<Status> {
     // The backend accepts JSON for statuses, including a nested poll object and a
     // media_ids array, so a plain JSON body suffices (no `key[]` form encoding).
     const body: Record<string, unknown> = { status };
@@ -359,7 +363,10 @@ export class Api {
     if (options.language) {
       body['language'] = options.language;
     }
-    return this.http.post<Status>('/api/v1/statuses', body);
+    const headers = idempotencyKey
+      ? new HttpHeaders().set('Idempotency-Key', idempotencyKey)
+      : undefined;
+    return this.http.post<Status>('/api/v1/statuses', body, { headers });
   }
 
   // --- scheduled statuses ---

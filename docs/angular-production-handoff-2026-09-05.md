@@ -4,85 +4,24 @@
 
 This is a targeted source review of `ui/src/app`, including the Angular clients for the Cloudflare services. It is not a complete security audit, dependency audit, browser performance profile, or review of the Workers. The Python mock server was outside scope. Findings below follow production source paths; existing specs were not treated as proof of correctness.
 
-The accompanying changes address three requested findings:
+The accompanying changes address ten requested findings:
 
 - **Bluesky audience:** the composer requires public visibility for Bluesky and Both. Restricted drafts retain their audience when destinations change, show an explanation, and cannot submit. The check also runs at actual send time after the undo-send countdown.
 - **Credential propagation:** automatic Mastodon Authorization is limited to the selected instance's origin and API path. Static assets, lookalike hosts, different schemes/ports, and other destinations do not receive it. Explicit caller credentials and external/search exclusions remain supported. Translation requests also explicitly opt out.
 - **Draft ownership:** named drafts, autosaves, and in-memory handoffs are scoped by server and the existing account scope. Writing surfaces capture an owned store so late writes cannot switch owners; root readers follow account changes, including sign-in without a reload. Anonymous draft backup/deletion follows the same ownership rules. No draft migration or recovery UI is required: the owner confirmed there is no existing draft data to migrate.
+- **Durable draft persistence:** every draft-list, update, removal, and autosave mutation returns an explicit durable outcome. Explicit saves and autosaves report storage failures without clearing the editor or claiming success, and the composer offers a storage-independent JSON download. Mutations re-read and merge the latest stored list/slot map; named-draft edits carry their original version so a cross-tab conflict is retained as a second draft instead of overwriting either edit. Storage events refresh open draft lists.
+- **Settings sync request ordering:** profile pulls, pushes, and startup reconciliation are serialized and guarded by account and local-edit generations. A response for an old account is discarded, a pull rechecks current dirty state before import, and a completed push clears dirty only when it saved the latest local generation.
+- **Settings sync conflicts:** a failed conditional write now retains an explicit unresolved decision with both competing documents and the observed remote ETag/revision, without adopting that version into local bookkeeping. Automatic pulls and pushes remain blocked on the same decision until keep-local or use-remote resolves it, and the settings UI presents a write conflict immediately.
+- **Stable account storage identity:** verified Mastodon storage scopes now derive from provider, canonical server origin, and server-local account id rather than the bearer token. Reauthorization replaces the credential on the existing saved session, while same-numbered ids on different servers remain separate. Bluesky uses its DID and Anonymous retains its fixed namespace. Existing non-draft local/session values are adopted after verification; draft migration was intentionally not added. Account inspection/deletion recognizes stable and legacy keys, and portable configuration remains global-only.
+- **Media-description publishing order:** every required Mastodon media-description update now completes before immediate, scheduled, or cross-posted status creation begins. A failed metadata write publishes to neither destination and preserves the editor text, attachment, and description for a safe retry. Bluesky-only media continues to carry alt text directly in its embed without an inapplicable Mastodon update.
+- **Idempotent posting retries:** an unchanged timeline publication retains one operation identity plus independent per-segment Fedi and Bluesky checkpoints. Mastodon retries reuse a stable per-segment `Idempotency-Key`; Bluesky retries reuse a deterministic record key and frozen creation payload, reconciling an already-created record by reading it back. Editing content or publication context starts a new operation with new identities. Thread retries skip completed ancestors, and Both waits for both legs before resetting or emitting while retaining the successful leg across either failure ordering.
+- **Bounded live timeline insertion:** streaming updates, older pages, and locally created posts now use one provider-aware dedupe, newest-first ordering, and `feedMax` cap. Trimming removes the oldest tail, while Angular's stable id tracking retains existing rendered rows so native scroll anchoring can preserve a reader's position. No virtualization was added, and no frame-time or memory measurements are claimed.
 
-These changes do not resolve the global token-derived identity issue below, and are not a general redesign of live session transitions.
+These changes are not a general redesign of live session transitions.
 
-## Remaining findings, in priority order
+## Remaining findings
 
-### P1 — Settings sync applies stale assumptions about local edits
-
-**Source:** `ui/src/app/providers/account/profile-sync.ts`, `pull`, `applyFetched`, and `push`.
-
-`pull` reads the local record before awaiting `fetchSettings`, then uses that captured `dirty` value to decide whether to silently apply remote settings. An edit made while the request is in flight can therefore be overwritten. A successful `push` similarly clears `dirty` after saving an older snapshot, even if another edit has happened since.
-
-**Fix direction:** maintain a monotonically increasing local edit generation. Serialize sync operations. Clear dirty state only for the generation actually persisted, and check current state immediately before applying a remote document. Handle sign-out/account changes while requests are outstanding too.
-
-**Acceptance:** hold a GET response, edit locally, then release it: the edit survives and a conflict decision is required. Hold a PUT response, edit again, then release it: the later edit remains pending until its own write succeeds. Exercise overlapping pull/push and sign-out.
-
-### P1 — A conflict ETag is adopted before conflict resolution
-
-**Source:** `profile-sync.ts`, the `result.kind === 'conflict'` branch of `push`.
-
-The handler adopts the remote ETag/revision and leaves local data dirty. A later local edit schedules another push using that adopted ETag, which can overwrite the remote changes without a decision. A subsequent conditional pull can also return unchanged because it uses the conflicting remote ETag, preventing the promised conflict presentation.
-
-**Fix direction:** retain an explicit unresolved conflict containing the competing documents and their versions. Stop automatic writes until the user chooses or a merge succeeds. Distinguish “observed remote version” from “version our local document incorporates.”
-
-**Acceptance:** browser A saves a change; browser B conflicts, then makes another edit. B must neither overwrite A nor lose the conflict prompt. Test both keep-local and keep-remote paths.
-
-### P2 — Account storage identity changes when credentials change
-
-**Source:** `ui/src/app/account-scope.ts`, `scopeSuffixForToken` and `hash`; consumers use `scopedKey` or the same suffix.
-
-Mastodon scopes derive from a 32-bit hash of the access token. Reauthorizing the same account with a different token selects a different namespace. Existing feeds, settings, connectors, and now scoped drafts can appear absent. Hash collisions are also possible; this hash must not be considered an isolation guarantee against deliberately selected inputs.
-
-**Fix direction:** use a stable provider + server + verified account identity, keeping credentials separate. Plan this across consumers and account deletion/export together. The owner explicitly does not need draft migration today; do not build speculative draft migration machinery.
-
-**Acceptance:** reauthorize with a different token and retain the same data; two accounts with the same numeric ID on different servers remain separate; test Bluesky and anonymous identities too.
-
-### P2 — Draft persistence failure is reported as success
-
-**Source:** `ui/src/app/drafts.ts`, `storeJson`; `ui/src/app/compose/compose.ts`, `saveDraft`.
-
-Storage exceptions are swallowed. The composer then resets and displays saved status, although the only remaining copy may be in memory. Reloading loses it. Draft scoping does not fix this behavior.
-
-**Fix direction:** return an explicit persistence outcome. Preserve editor text on failure, explain that it is unsaved, and offer a local download. Consider autosave failure and multiple tabs overwriting the same stored list.
-
-**Acceptance:** make `localStorage.setItem` throw a quota error. Neither explicit save nor autosave may report durable success or discard the only copy. Test a second tab editing the same draft/list.
-
-### P2 — Publishing races media-description updates
-
-**Source:** `ui/src/app/compose/compose.ts`, `send`.
-
-Media description updates start with independent subscriptions, and status creation starts immediately afterward. Slow or failed updates can leave the published attachment without the entered alt text.
-
-**Fix direction:** await all required media metadata updates before creating the post. Keep a recoverable editor state on failure. Audit scheduled and cross-posted media behavior at the same time.
-
-**Acceptance:** delay or reject a media update. No Mastodon status is created before required metadata succeeds; a retry preserves the text, attachment, and description.
-
-### P2 — Live timeline insertion bypasses bounds and deduplication
-
-**Source:** `ui/src/app/pages/home/home.ts`, `syncLive` versus `mergeStatuses`.
-
-Streaming updates prepend directly to the list; pagination uses a bounded merge. An active timeline can grow indefinitely despite `feedMax`, and duplicate streaming updates can produce repeated IDs.
-
-**Fix direction:** one insertion policy for streaming, paging, and locally created posts. Preserve reading position when trimming. Measure long-running heap and rendering behavior before deciding whether virtualization is necessary.
-
-**Acceptance:** inject many more updates than the cap, including duplicates. Stored/rendered rows remain bounded, IDs remain unique, and reading position remains usable. This review did not measure current frame time or memory usage.
-
-### P2 — Ambiguous-success posting retries can duplicate posts
-
-**Source:** `ui/src/app/api.ts`, `postStatus`; `compose.ts`, `postRest`, `postBskyPart`, and the parallel Both path.
-
-Mastodon status creation sends no idempotency key. A committed post with a lost response appears failed; retrying can duplicate it. Thread and multi-destination operations also need independent completion tracking rather than retrying the whole composition.
-
-**Fix direction:** assign an operation identity, retain per-segment/per-destination results, and reuse the same idempotency key for a retry of unchanged content. Do not reuse it for a newly edited post. Mastodon documents `Idempotency-Key` at https://docs.joinmastodon.org/methods/statuses/.
-
-**Acceptance:** simulate a committed write with a lost response, a failure halfway through a thread, and each ordering of success/failure across Fedi and Bluesky. Retry must not duplicate completed work or falsely claim success on the other destination.
+None from this Angular review.
 
 ## Maintenance and next review
 
@@ -96,10 +35,17 @@ Also inspect credential ownership across queued requests and account switches: t
 
 ## Validation
 
+- Stable identity regressions: **95/95 targeted tests passed** across scope derivation/adoption, credential rotation, account inspection/deletion, login, and account/storage settings. A second targeted consumer/export run passed **319/319 tests** across client preferences, drafts, RSS stores, Bluesky identity/session handling, storage classification, and portable-config exclusion.
+- Profile-sync request-ordering regressions: held GET and PUT responses, overlapping pull/push, and sign-out during both request types passed in `profile-sync.spec.ts` (**54/54 focused tests passed**; this suite count also includes the conflict coverage recorded below).
+- Profile-sync conflict regressions: the remote ETag remains only observed after a 412, later edits cannot trigger another write, the decision survives another pull, and both keep-local and use-remote paths passed. The profile-sync and settings-config suites passed together (**58/58 tests**) to cover immediate UI presentation too.
+- Media-description ordering regressions: delayed multi-attachment updates block status creation until all complete; a rejected update publishes nothing and preserves retry state; scheduled and Both paths use the same barrier. The targeted composer suite passed (**139/139 tests**).
+- Timeline insertion regressions: more live updates than `feedMax`, repeated retained and trimmed ids, cap-level local post insertion, and retained-row DOM identity while the oldest tail is trimmed passed. The targeted Home area passed (**63/63 tests** across `home.spec.ts` and `home-feed-perf.spec.ts`). This was not a browser heap, frame-time, or memory measurement.
+- Posting-retry regressions: a committed Mastodon write with a lost response reused the same header; an edited retry received a new key; Fedi and Bluesky threads resumed at the failed segment with the original segment identity and correct parent; deterministic Bluesky record creation reconciled `RecordAlreadyExists`; and Both retained/skipped the successful destination across both success/failure orderings. The final targeted API, Bluesky API, and composer run passed **180/180 tests**. Full Angular lint and `git diff --check` passed. These checkpoints are intentionally same-composer memory, not crash/reload recovery. The Angular client also supplies its stable key to scheduled status creation, but the Python mock's scheduled-status branch does not persist an idempotent replay result, so no mock-server lost-response integration claim is made for scheduling.
+- Draft-persistence regressions: quota failures for explicit save and autosave preserve the live editor and show the download path; storage outcomes do not mutate the in-memory saved list on failure; stale tabs merge independent named drafts and autosave contexts; and two tabs editing one named draft preserve both versions even after a storage-event refresh. The final affected consumer run passed **330/330 tests** across drafts, composer, writing workspace, Home, and PKM sources. `npm run lint`, `npm run check:i18n`, and `git diff --check` also passed after this change.
 - Focused regression suite: **174 passed** across auth interception, composing, drafts, and session teardown.
-- Required `make test`: **6,015 passed, zero failed, zero pending**; source integrity and runtime manifest checks passed. No tests were skipped or weakened.
+- Full UI test gate: **6,048 passed, zero failed, zero pending**; source integrity passed and the runtime manifest was regenerated from that green run (**6,048 present, zero added or missing**). No tests were skipped or weakened. The environment did not expose `make`, so the two commands behind `make test` (`test:source-integrity` and `test:ci`) were run directly.
 - Full `npm run lint`, storage registry check, i18n check, changed-source formatting, and `git diff --check`: passed.
-- `npm run build:mockingbird`: passed, including the post-build mock-server leakage check. The build reports CommonJS optimization warnings (including `@mozilla/readability`); these are not resolved by this change.
-- No deployment, real posting, or browser interaction test was performed. Browser privacy/audience behavior is covered by Angular component and HTTP regression tests; the remaining acceptance scenarios above are future work.
+- `npm run build` and `npm run build:mockingbird`: passed, including the post-build mock-server leakage check. The builds report existing bundle/CSS budget and CommonJS optimization warnings (including `@mozilla/readability`); these are not resolved by this change.
+- No deployment, real posting, or browser interaction test was performed. Browser privacy/audience and retry behavior is covered by Angular component and HTTP regression tests.
 
 Local ignored logs: `ui/.test-results/review-full-gate.log`, `review-focused.log`, `review-lint.log`, `review-i18n.log`, and `review-build.log`.

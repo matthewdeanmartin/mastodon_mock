@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DraftSnapshot, Drafts, draftHasContent } from './drafts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AccountDrafts, DraftSnapshot, Drafts, draftHasContent } from './drafts';
 import { Auth } from './auth';
 
 function snapshot(overrides: Partial<DraftSnapshot> = {}): DraftSnapshot {
@@ -21,13 +21,14 @@ describe('Drafts', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     localStorage.clear();
   });
 
   it('saves a draft and lists it newest-first', () => {
     const drafts = TestBed.inject(Drafts);
     drafts.save(snapshot({ segments: ['older'] }));
-    const id = drafts.save(snapshot({ segments: ['newer'] }));
+    const { id } = drafts.save(snapshot({ segments: ['newer'] }));
 
     expect(drafts.drafts()).toHaveLength(2);
     expect(drafts.drafts()[0].id).toBe(id);
@@ -61,7 +62,7 @@ describe('Drafts', () => {
       return TestBed.inject(Drafts);
     };
     const alice = open('alice-token', 'https://one.example');
-    const id = alice.save(snapshot({ segments: ['Alice private draft'] }));
+    const { id } = alice.save(snapshot({ segments: ['Alice private draft'] }));
     alice.autosave('reply:9', snapshot());
 
     const bob = open('bob-token', 'https://one.example');
@@ -110,7 +111,7 @@ describe('Drafts', () => {
 
   it('persists drafts across service instances (localStorage)', () => {
     const first = TestBed.inject(Drafts);
-    const id = first.save(snapshot());
+    const { id } = first.save(snapshot());
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
@@ -118,9 +119,71 @@ describe('Drafts', () => {
     expect(second.get(id)?.segments).toEqual(['hello']);
   });
 
+  it('reports a quota failure and does not pretend the failed draft is saved', () => {
+    const drafts = TestBed.inject(Drafts);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+
+    const outcome = drafts.save(snapshot({ segments: ['only copy'] }));
+
+    expect(outcome.durable).toBe(false);
+    expect(drafts.drafts()).toEqual([]);
+  });
+
+  it('merges named drafts and autosave contexts written from stale tabs', () => {
+    const firstTab = new AccountDrafts('_tabs');
+    const secondTab = new AccountDrafts('_tabs');
+
+    firstTab.save(snapshot({ segments: ['first tab'] }));
+    secondTab.save(snapshot({ segments: ['second tab'] }));
+    firstTab.autosave('new', snapshot({ segments: ['first autosave'] }));
+    secondTab.autosave('reply:9', snapshot({ segments: ['second autosave'] }));
+
+    const reopened = new AccountDrafts('_tabs');
+    expect(reopened.drafts().map((draft) => draft.segments[0])).toEqual([
+      'second tab',
+      'first tab',
+    ]);
+    expect(reopened.loadAutosave('new')?.segments[0]).toBe('first autosave');
+    expect(reopened.loadAutosave('reply:9')?.segments[0]).toBe('second autosave');
+  });
+
+  it('preserves both versions when stale tabs edit the same named draft', () => {
+    const firstTab = new AccountDrafts('_same-draft');
+    const { id } = firstTab.save(snapshot({ segments: ['original'] }));
+    const secondTab = new AccountDrafts('_same-draft');
+    const secondTabVersion = secondTab.get(id)!.updatedAt;
+
+    expect(
+      firstTab.update(id, snapshot({ segments: ['first edit'] }), firstTab.get(id)!.updatedAt)
+        .updated,
+    ).toBe(true);
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'mockingbird_drafts_same-draft',
+        storageArea: localStorage,
+      }),
+    );
+    expect(secondTab.get(id)?.segments[0]).toBe('first edit');
+    const conflict = secondTab.update(
+      id,
+      snapshot({ segments: ['second edit'] }),
+      secondTabVersion,
+    );
+    expect(conflict).toMatchObject({ durable: true, updated: false, conflict: true });
+    expect(secondTab.save(snapshot({ segments: ['second edit'] })).durable).toBe(true);
+
+    const reopened = new AccountDrafts('_same-draft');
+    expect(reopened.drafts().map((draft) => draft.segments[0])).toEqual([
+      'second edit',
+      'first edit',
+    ]);
+  });
+
   it('remove() deletes a draft', () => {
     const drafts = TestBed.inject(Drafts);
-    const id = drafts.save(snapshot());
+    const { id } = drafts.save(snapshot());
     drafts.remove(id);
     expect(drafts.drafts()).toEqual([]);
   });
@@ -153,9 +216,11 @@ describe('Drafts', () => {
 
   it('update() overwrites in place rather than appending a second copy', () => {
     const drafts = TestBed.inject(Drafts);
-    const id = drafts.save(snapshot({ segments: ['first'] }));
+    const { id } = drafts.save(snapshot({ segments: ['first'] }));
 
-    expect(drafts.update(id, snapshot({ segments: ['edited'] }))).toBe(true);
+    expect(
+      drafts.update(id, snapshot({ segments: ['edited'] }), drafts.get(id)!.updatedAt).updated,
+    ).toBe(true);
     expect(drafts.drafts()).toHaveLength(1);
     expect(drafts.get(id)?.segments).toEqual(['edited']);
   });
@@ -164,26 +229,26 @@ describe('Drafts', () => {
     // The row you just touched jumping out from under the cursor is worse than
     // it staying put, in a list you are working through.
     const drafts = TestBed.inject(Drafts);
-    const older = drafts.save(snapshot({ segments: ['older'] }));
-    const newer = drafts.save(snapshot({ segments: ['newer'] }));
+    const { id: older } = drafts.save(snapshot({ segments: ['older'] }));
+    const { id: newer } = drafts.save(snapshot({ segments: ['newer'] }));
 
-    drafts.update(older, snapshot({ segments: ['older, edited'] }));
+    drafts.update(older, snapshot({ segments: ['older, edited'] }), drafts.get(older)!.updatedAt);
     expect(drafts.drafts().map((d) => d.id)).toEqual([newer, older]);
   });
 
   it('update() advances updatedAt', () => {
     const drafts = TestBed.inject(Drafts);
-    const id = drafts.save(snapshot());
+    const { id } = drafts.save(snapshot());
     const before = drafts.get(id)!.updatedAt;
 
-    drafts.update(id, snapshot({ segments: ['edited'] }));
+    drafts.update(id, snapshot({ segments: ['edited'] }), drafts.get(id)!.updatedAt);
     expect(Date.parse(drafts.get(id)!.updatedAt)).toBeGreaterThanOrEqual(Date.parse(before));
   });
 
   it('update() persists, so the change survives a new service instance', () => {
     const first = TestBed.inject(Drafts);
-    const id = first.save(snapshot());
-    first.update(id, snapshot({ segments: ['edited'] }));
+    const { id } = first.save(snapshot());
+    first.update(id, snapshot({ segments: ['edited'] }), first.get(id)!.updatedAt);
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
@@ -194,7 +259,7 @@ describe('Drafts', () => {
     // Deleted in another tab or from /drafts. The caller saves a fresh copy
     // rather than silently discarding what was just written.
     const drafts = TestBed.inject(Drafts);
-    expect(drafts.update('never-existed', snapshot())).toBe(false);
+    expect(drafts.update('never-existed', snapshot(), '').updated).toBe(false);
     expect(drafts.drafts()).toHaveLength(0);
   });
 

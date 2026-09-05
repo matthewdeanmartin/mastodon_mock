@@ -606,9 +606,12 @@ export class SettingsConfig {
         this.syncError.set(outcome.message);
         return;
       case 'conflict':
-        this.syncMessage.set(
-          'Your settings changed on another device while saving. Sync again to see what differs.',
-        );
+        this.syncDecision.set({
+          remote: outcome.remote,
+          changes: outcome.changes,
+          etag: outcome.etag,
+          revision: outcome.revision,
+        });
         return;
     }
   }

@@ -5,7 +5,11 @@ import {
   keyBelongsToScope,
   scopeForAccount,
 } from './account-data';
-import { scopeSuffixForDid, scopeSuffixForToken } from './account-scope';
+import {
+  scopeSuffixForDid,
+  scopeSuffixForMastodonAccount,
+  scopeSuffixForToken,
+} from './account-scope';
 
 describe('account-data', () => {
   beforeEach(() => localStorage.clear());
@@ -92,6 +96,24 @@ describe('account-data', () => {
     // The saved-logins list and app-wide prefs must survive a per-account wipe.
     expect(localStorage.getItem('mockingbird_prefs')).toBe('{}');
     expect(localStorage.getItem('mastodon_mock_sessions')).toBe('[]');
+  });
+
+  it('deletes both stable data and intentionally unmigrated legacy data', () => {
+    const stable = scopeSuffixForMastodonAccount('42', 'https://one.example');
+    const legacy = scopeSuffixForToken('old-token');
+    localStorage.setItem(`mockingbird_rss_feeds${stable}`, '["feed"]');
+    localStorage.setItem(`mockingbird_drafts_server${legacy}`, '["draft"]');
+
+    const removed = deleteAccountData({
+      kind: 'mastodon',
+      token: 'old-token',
+      accountId: '42',
+      server: 'https://one.example',
+    });
+
+    expect(removed).toBe(2);
+    expect(localStorage.getItem(`mockingbird_rss_feeds${stable}`)).toBeNull();
+    expect(localStorage.getItem(`mockingbird_drafts_server${legacy}`)).toBeNull();
   });
 
   it('reports zero when an account has no local data', () => {

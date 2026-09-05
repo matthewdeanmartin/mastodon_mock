@@ -122,10 +122,10 @@ describe('Home', () => {
    * Home follows `autoRefreshTimeline` through an effect, so the switch has to
    * be flipped there and the effect flushed with `detectChanges`.
    */
-  function goLive(fixture: ComponentFixture<Home>): void {
+  function goLive(fixture: ComponentFixture<Home>, snapshot: Status[] = []): void {
     TestBed.inject(ClientPrefs).setAutoRefreshTimeline(true);
     fixture.detectChanges();
-    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(snapshot);
   }
 
   /** The inverse of {@link goLive}: no refetch happens on the way down. */
@@ -400,6 +400,65 @@ describe('Home', () => {
     ).toEqual(['99']);
   });
 
+  it('bounds and deduplicates a long-running live timeline', () => {
+    TestBed.inject(ClientPrefs).setFeedMax(50);
+    const fixture = setUp();
+    goLive(fixture);
+
+    for (let i = 0; i < 75; i += 1) {
+      fakeStreaming.emit({
+        event: 'update',
+        payload: {
+          ...makeStatus(`live-${i}`),
+          created_at: new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString(),
+        },
+      });
+    }
+    // Repeat ids from both the retained and trimmed parts of the stream.
+    fakeStreaming.emit({
+      event: 'update',
+      payload: {
+        ...makeStatus('live-70'),
+        created_at: new Date(Date.UTC(2026, 0, 1, 0, 70)).toISOString(),
+      },
+    });
+    fakeStreaming.emit({ event: 'update', payload: makeStatus('live-10') });
+    fixture.detectChanges();
+
+    const ids = internals(fixture)
+      .statuses()
+      .map((status) => status.id);
+    expect(ids).toHaveLength(50);
+    expect(new Set(ids).size).toBe(50);
+    expect(fixture.nativeElement.querySelectorAll('app-status-card')).toHaveLength(50);
+  });
+
+  it('keeps a retained reading row anchored while a live insert trims the tail', () => {
+    TestBed.inject(ClientPrefs).setFeedMax(50);
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page(50));
+    fixture.detectChanges();
+
+    goLive(fixture, page(50));
+    fixture.detectChanges();
+    const before = fixture.nativeElement.querySelectorAll('app-status-card');
+    const readingRow = before[10];
+
+    fakeStreaming.emit({
+      event: 'update',
+      payload: { ...makeStatus('fresh'), created_at: '2026-02-01T00:00:00Z' },
+    });
+    fixture.detectChanges();
+
+    const after = fixture.nativeElement.querySelectorAll('app-status-card');
+    expect(after).toHaveLength(50);
+    // Angular's id tracking retains this exact element, allowing the browser's
+    // native scroll anchoring to hold the reader's position as the tail drops.
+    expect(after[11]).toBe(readingRow);
+  });
+
   it('removes a status on an incoming "delete" event', () => {
     const fixture = setUp();
     goLive(fixture);
@@ -524,6 +583,26 @@ describe('Home', () => {
     httpMock.expectOne('/api/v1/bookmarks?limit=1').flush([]);
     expect(internals(fixture).capActive()).toBe(true);
     expect(internals(fixture).canLoadMore()).toBe(false);
+  });
+
+  it('applies the same dedupe and cap when a locally created post is inserted', () => {
+    TestBed.inject(ClientPrefs).setFeedMax(50);
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    httpMock.expectOne('/api/v1/timelines/home?limit=20').flush(page(50));
+
+    const created = { ...makeStatus('created'), created_at: '2026-02-01T00:00:00Z' };
+    internals(fixture).onPosted(created);
+    internals(fixture).onPosted({ ...created, content: '<p>same post returned twice</p>' });
+    fixture.detectChanges();
+
+    const ids = internals(fixture)
+      .statuses()
+      .map((status) => status.id);
+    expect(ids).toHaveLength(50);
+    expect(ids.filter((id) => id === 'created')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelectorAll('app-status-card')).toHaveLength(50);
   });
 
   /**
@@ -691,7 +770,7 @@ describe('Home', () => {
 
   it('resumes an empty draft rather than leaving blank ones behind', () => {
     const drafts = TestBed.inject(Drafts);
-    const existing = drafts.save(emptyDraftSnapshot('public'));
+    const { id: existing } = drafts.save(emptyDraftSnapshot('public'));
     const fixture = setUp();
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);

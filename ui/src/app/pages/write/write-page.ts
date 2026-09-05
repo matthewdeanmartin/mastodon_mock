@@ -557,7 +557,7 @@ export class WritePage implements OnInit, OnDestroy {
       return;
     }
     const kind = this.jotKind();
-    const id = this.drafts.save({
+    const outcome = this.drafts.save({
       segments: [withPkmTag(text, kind, this.prefs.pkmVocabulary())],
       spoilerText: '',
       sensitive: false,
@@ -565,6 +565,13 @@ export class WritePage implements OnInit, OnDestroy {
       poll: null,
       target: 'fedi',
     });
+    if (!outcome.durable) {
+      this.saveError.set(
+        'This note could not be saved in your browser. Your writing is still here.',
+      );
+      return;
+    }
+    const id = outcome.id;
     // A jot is one line. Opening it later under the `---` default would invite
     // a stray dash to split a two-word note into two posts.
     this.workspace.setSplitMode(`local:${id}`, 'demand');
@@ -1060,20 +1067,38 @@ export class WritePage implements OnInit, OnDestroy {
     this.saveError.set(null);
     const snapshot = this.snapshot();
     if (current.localId) {
-      if (this.drafts.update(current.localId, snapshot)) {
-        this.afterSave(current, current.localId, { key: 'pages.write.saved.plain' });
+      const updated = this.drafts.update(current.localId, snapshot, current.savedAt ?? '');
+      if (updated.updated) {
+        this.afterSave(current, current.localId, updated.updatedAt!, {
+          key: 'pages.write.saved.plain',
+        });
         return;
       }
       // Deleted underneath us — in another tab, or from /drafts. Saving a fresh
       // copy is the only outcome that doesn't throw away what was just written.
-      const id = this.drafts.save(snapshot);
-      this.afterSave(current, id, { key: 'pages.write.saved.replacedDeleted' });
+      const saved = this.drafts.save(snapshot);
+      if (!saved.durable) {
+        this.saveError.set(
+          'This draft could not be saved in your browser. Your writing is still here.',
+        );
+        return;
+      }
+      this.afterSave(current, saved.id, saved.updatedAt, {
+        key: 'pages.write.saved.replacedDeleted',
+      });
       return;
     }
-    const id = this.drafts.save(snapshot);
+    const saved = this.drafts.save(snapshot);
+    if (!saved.durable) {
+      this.saveError.set(
+        'This draft could not be saved in your browser. Your writing is still here.',
+      );
+      return;
+    }
     this.afterSave(
       current,
-      id,
+      saved.id,
+      saved.updatedAt,
       current.origin && current.origin !== 'local'
         ? {
             key: 'pages.write.saved.copiedFrom',
@@ -1083,7 +1108,7 @@ export class WritePage implements OnInit, OnDestroy {
     );
   }
 
-  private afterSave(current: Editing, localId: string, notice: Notice): void {
+  private afterSave(current: Editing, localId: string, updatedAt: string, notice: Notice): void {
     const key = `local:${localId}`;
     // Carry the split mode across, so a copy that has just become a real draft
     // keeps the mode it was written in.
@@ -1096,7 +1121,7 @@ export class WritePage implements OnInit, OnDestroy {
       key,
       localId,
       titleKey: 'pages.write.editing.localDraft',
-      savedAt: new Date().toISOString(),
+      savedAt: updatedAt,
     });
     this.dirty.set(false);
     // A whole extra key rather than gluing on a clause: "Saved." plus a bolted-on

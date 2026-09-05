@@ -51,6 +51,15 @@ describe('Api service (HTTP isolated)', () => {
     expect(created!.id).toBe('101');
   });
 
+  it('post: sends an explicit idempotency key as a header, never in the body', () => {
+    api.postStatus('retry me', {}, 'operation-1:fedi:0').subscribe();
+
+    const req = httpMock.expectOne('/api/v1/statuses');
+    expect(req.request.headers.get('Idempotency-Key')).toBe('operation-1:fedi:0');
+    expect(req.request.body).toEqual({ status: 'retry me' });
+    req.flush(statusStub());
+  });
+
   // ---------------------------------------------------------------- repost (reblog)
 
   it('repost: POSTs to /reblog with an empty body and returns the reblog wrapper', () => {
