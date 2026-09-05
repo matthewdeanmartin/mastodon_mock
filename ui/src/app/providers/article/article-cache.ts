@@ -10,11 +10,8 @@ import { ArticleResult } from './article-models';
  *
  * ## What is cached, and for how long
  *
- * Successes are kept for a week — an article does not change, and re-reading
- * one must not cost quota. Failures are kept only briefly, because most of them
- * are transient (a rate limit, a challenge page that lets you through the second
- * time) and caching one for a week would make a recovered site look permanently
- * broken.
+ * Results are retained for one hour. Reopening a recent article should not
+ * spend another request or reading allowance; live articles can change later.
  *
  * ## Why bounded
  *
@@ -27,8 +24,8 @@ const DB_NAME = 'mockingbird_articles';
 const DB_VERSION = 1;
 const STORE = 'articles';
 
-/** A week. Articles do not change; a stale copy is not a wrong copy. */
-export const ARTICLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** One hour, including when returning after navigation or a reload. */
+export const ARTICLE_TTL_MS = 60 * 60 * 1000;
 
 /** An hour. Long enough to stop a retry loop, short enough to recover. */
 export const FAILURE_TTL_MS = 60 * 60 * 1000;
@@ -62,7 +59,7 @@ export function normalizeArticleUrl(raw: string): string {
   url.hostname = url.hostname.toLowerCase();
   const drop: string[] = [];
   url.searchParams.forEach((_value, key) => {
-    if (/^(utm_|fbclid|gclid|mc_[ce]id|igshid|ref|ref_src|source)$/i.test(key)) {
+    if (/^(utm_.*|fbclid|gclid|mc_[ce]id|igshid|ref|ref_src|source)$/i.test(key)) {
       drop.push(key);
     }
   });
@@ -75,6 +72,8 @@ export function normalizeArticleUrl(raw: string): string {
 @Injectable({ providedIn: 'root' })
 export class ArticleCache {
   private db: Promise<IDBDatabase | null> | null = null;
+  /** Storage can be unavailable; navigation in the same tab should still be free. */
+  private readonly memory = new Map<string, CacheRecord>();
 
   private open(): Promise<IDBDatabase | null> {
     if (this.db) {
@@ -85,8 +84,7 @@ export class ArticleCache {
       try {
         request = indexedDB.open(DB_NAME, DB_VERSION);
       } catch {
-        // Private mode, or storage disabled. The feature still works, it just
-        // re-fetches — which is why every method here degrades to a miss.
+        // Private mode or disabled storage: the in-memory cache still works.
         resolve(null);
         return;
       }
@@ -105,11 +103,14 @@ export class ArticleCache {
 
   /** A cached result, or `null` when absent or expired. */
   async get(url: string): Promise<ArticleResult | null> {
+    const key = normalizeArticleUrl(url);
+    const recent = this.memory.get(key);
+    if (recent && this.fresh(recent)) return recent.result;
+    this.memory.delete(key);
     const db = await this.open();
     if (!db) {
       return null;
     }
-    const key = normalizeArticleUrl(url);
     const record = await new Promise<CacheRecord | null>((resolve) => {
       try {
         const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
@@ -122,27 +123,35 @@ export class ArticleCache {
     if (!record) {
       return null;
     }
-    const ttl =
-      record.result.diagnosis === 'ok' || record.result.diagnosis === 'partial'
-        ? ARTICLE_TTL_MS
-        : FAILURE_TTL_MS;
-    if (Date.now() - record.storedAt > ttl) {
-      return null;
-    }
+    if (!this.fresh(record)) return null;
+    this.remember(record);
     return record.result;
+  }
+
+  private fresh(record: CacheRecord): boolean {
+    const ttl = record.result.article ? ARTICLE_TTL_MS : FAILURE_TTL_MS;
+    const age = Date.now() - record.storedAt;
+    return age >= 0 && age < ttl;
+  }
+
+  private remember(record: CacheRecord): void {
+    this.memory.delete(record.url);
+    this.memory.set(record.url, record);
+    while (this.memory.size > MAX_CACHED_ARTICLES) {
+      this.memory.delete(this.memory.keys().next().value!);
+    }
   }
 
   /** Store a result, trimming the oldest entries if the cache is full. */
   async put(url: string, result: ArticleResult): Promise<void> {
-    const db = await this.open();
-    if (!db) {
-      return;
-    }
     const record: CacheRecord = {
       url: normalizeArticleUrl(url),
       result,
       storedAt: Date.now(),
     };
+    this.remember(record);
+    const db = await this.open();
+    if (!db) return;
     await new Promise<void>((resolve) => {
       try {
         const tx = db.transaction(STORE, 'readwrite');
@@ -196,6 +205,7 @@ export class ArticleCache {
 
   /** Forget one article, so "re-fetch" genuinely re-fetches. */
   async remove(url: string): Promise<void> {
+    this.memory.delete(normalizeArticleUrl(url));
     const db = await this.open();
     if (!db) {
       return;

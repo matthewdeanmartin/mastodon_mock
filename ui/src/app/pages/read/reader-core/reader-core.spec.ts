@@ -172,14 +172,16 @@ describe('ReaderCore position saving', () => {
     expect(record).toHaveBeenCalledTimes(1);
   });
 
-  it('marks a settled single-page document read without requiring a page turn', () => {
+  it('marks a settled single-page document read without requiring a page turn', async () => {
     fixture.componentInstance.chain.set([
       post('rss:feed::one', 80, { provider: 'rss' } as Partial<Status>),
     ]);
     fixture.detectChanges();
 
     expect(library.get('rss:feed::one')?.shelf).toBe('reading');
-    vi.runAllTimers();
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
 
     expect(library.get('rss:feed::one')?.shelf).toBe('read');
   });
@@ -584,5 +586,44 @@ describe('ReaderCore paging a post chain', () => {
     expect(element.querySelector('.reader-gauge')).toBeNull();
     expect(element.querySelectorAll('.reader-posts')).toHaveLength(1);
     expect(element.querySelector('.reader-posts')?.getAttribute('aria-hidden')).not.toBe('true');
+  });
+
+  it('turns pages for horizontal touch swipes but leaves taps, links and vertical gestures alone', () => {
+    fixture.componentInstance.chain.set(storm(3));
+    fixture.detectChanges();
+    const instance = core();
+    const internal = instance as unknown as {
+      columnText: { set(value: string[]): void };
+      onPagePointerDown(event: PointerEvent): void;
+      onPagePointerUp(event: PointerEvent): void;
+    };
+    internal.columnText.set(['one', 'two']);
+    const next = vi.spyOn(instance, 'nextPage').mockImplementation(() => undefined);
+    const prev = vi.spyOn(instance, 'prevPage').mockImplementation(() => undefined);
+    const body = fixture.nativeElement.querySelector('.reader-posts');
+    const event = (x: number, y: number, target = body): PointerEvent =>
+      ({
+        pointerType: 'touch',
+        isPrimary: true,
+        pointerId: 1,
+        clientX: x,
+        clientY: y,
+        target,
+      }) as PointerEvent;
+    internal.onPagePointerDown(event(250, 150));
+    internal.onPagePointerUp(event(80, 155));
+    expect(next).toHaveBeenCalledTimes(1);
+    internal.onPagePointerDown(event(80, 150));
+    internal.onPagePointerUp(event(250, 155));
+    expect(prev).toHaveBeenCalledTimes(1);
+    internal.onPagePointerDown(event(250, 150));
+    internal.onPagePointerUp(event(240, 150));
+    internal.onPagePointerDown(event(250, 150));
+    internal.onPagePointerUp(event(220, 280));
+    const link = document.createElement('a');
+    internal.onPagePointerDown(event(250, 150, link));
+    internal.onPagePointerUp(event(80, 150, link));
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(prev).toHaveBeenCalledTimes(1);
   });
 });

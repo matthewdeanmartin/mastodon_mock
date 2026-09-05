@@ -295,7 +295,7 @@ describe('RssPage', () => {
       expect(element.querySelectorAll('app-reader-core')).toHaveLength(0);
       const links = [...element.querySelectorAll<HTMLAnchorElement>('.read-in-reader')];
       expect(links).toHaveLength(2);
-      expect(links.every((link) => link.textContent?.includes('Read in Reader'))).toBe(true);
+      expect(links.every((link) => link.textContent?.includes('Long text reader'))).toBe(true);
       expect(decodeURIComponent(links[0].getAttribute('href') ?? '')).toContain('/read/rss:');
     });
 
@@ -311,7 +311,7 @@ describe('RssPage', () => {
 
       expect(element.querySelectorAll('app-status-card')).toHaveLength(1);
       expect(element.querySelector('app-reader-core')).toBeNull();
-      expect(element.querySelector('.read-in-reader')?.textContent).toContain('Read in Reader');
+      expect(element.querySelector('.read-in-reader')?.textContent).toContain('Long text reader');
     });
 
     it('mark-all-read covers only the selected folder', async () => {

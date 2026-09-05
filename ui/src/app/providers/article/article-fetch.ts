@@ -226,6 +226,12 @@ export class ArticleFetch {
     return this.proxy.available();
   }
 
+  /** Read locally without authorizing or making a network request. */
+  async cached(url: string): Promise<ArticleResult | null> {
+    const result = await this.cache.get(url);
+    return result ? { ...result, fromCache: true } : null;
+  }
+
   /**
    * Expand one URL.
    *
@@ -259,7 +265,7 @@ export class ArticleFetch {
     }
 
     if (!force) {
-      const cached = await this.cache.get(url);
+      const cached = await this.cached(url);
       if (cached) {
         this.diagnostics.info('Article', 'cache hit', { url, diagnosis: cached.diagnosis });
         return cached;

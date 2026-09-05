@@ -51,7 +51,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 // i18n pages.rss.saved: ★ Saved
 // i18n pages.rss.markUnread: Mark unread
 // i18n pages.rss.markRead: Mark read
-// i18n pages.rss.readInReader: Read in Reader
+// i18n pages.rss.readInReader: Long text reader
 // i18n pages.rss.nothingSaved: Nothing saved for later yet.
 // i18n pages.rss.nothingToRead: Nothing to read here.
 // i18n pages.rss.subscribeToRead: Subscribe to a feed to start reading.

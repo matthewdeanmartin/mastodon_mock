@@ -1,5 +1,6 @@
 .reader-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
@@ -25,6 +26,8 @@
 }
 
 .reader {
+  max-width: 72ch;
+  margin: 0 auto;
   padding: 24px 32px 48px;
   /* Article-only paper colour: --reader-bg/--reader-fg are set by ClientPrefs
      and absent on the "Match app" default, so the app theme shows through. */
@@ -37,6 +40,11 @@
   letter-spacing: var(--reader-letter-spacing, 0);
   word-spacing: var(--reader-word-spacing, 0);
   text-align: var(--reader-text-align, left);
+}
+
+.reader-comments-heading {
+  margin: 24px 16px 12px;
+  font-size: 18px;
 }
 
 /* When a paper colour is in force, the article's own muted text and rules must

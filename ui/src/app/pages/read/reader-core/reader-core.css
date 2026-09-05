@@ -260,7 +260,7 @@
 /* The toolbar owns its row. Columns receive exactly the remaining height. */
 :host.reader-paged {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: calc(var(--reader-viewport-height, 100dvh) - var(--reader-outer-chrome, 0px));
   min-height: 0;
 }
@@ -278,6 +278,38 @@
   height: 100%;
   overflow: hidden;
   overflow-anchor: none;
+  touch-action: pan-y pinch-zoom;
+}
+
+.reader-touch-nav {
+  display: none;
+}
+
+@media (pointer: coarse), (hover: none) {
+  .reader-touch-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font: 14px var(--app-font-family);
+  }
+
+  .reader-touch-nav button {
+    flex: 1;
+    min-height: 48px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-subtle);
+    color: inherit;
+    font: inherit;
+  }
+
+  .reader-touch-nav button:disabled {
+    opacity: 0.4;
+  }
 }
 
 :host.reader-paged .reader {

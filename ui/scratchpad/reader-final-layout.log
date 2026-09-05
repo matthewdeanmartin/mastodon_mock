@@ -1,0 +1,14 @@
+PASS 900x600: single long paragraph (4 pages)
+PASS 900x600: tweet storm with media-only post (3 pages)
+PASS 900x600: RSS HTML with line breaks and long list (35 pages)
+PASS 900x600: fetched article: heading, long paragraph, quote, list and code (13 pages)
+PASS 390x420: single long paragraph (38 pages)
+PASS 390x420: tweet storm with media-only post (9 pages)
+PASS 390x420: RSS HTML with line breaks and long list (117 pages)
+PASS 390x420: fetched article: heading, long paragraph, quote, list and code (116 pages)
+PASS 1280x720: single long paragraph (3 pages)
+PASS 1280x720: tweet storm with media-only post (3 pages)
+PASS 1280x720: RSS HTML with line breaks and long list (28 pages)
+PASS 1280x720: fetched article: heading, long paragraph, quote, list and code (10 pages)
+PASS resize preserves passage; note navigation locates a split paragraph
+PASS 379 real page turns; scroll mode; no browser runtime errors

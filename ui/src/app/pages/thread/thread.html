@@ -2,12 +2,12 @@
   <p class="muted center">{{ 'pages.thread.loading' | transloco }}</p>
 } @else if (status(); as s) {
   <div class="reader-bar">
-    <!-- Reader mode is its own page now (see sprint/kindle-0-overview.md), so
-         this is a link rather than a toggle: the typography, pagination and
-         library all belong to a surface that owns the whole screen. The count
-         stays, because "Reader (7 posts)" is what tells someone the thing in
-         front of them was written as one piece. -->
-    <a class="btn btn-outline" [routerLink]="['/read', currentId()]">
+    <a
+      class="btn btn-outline"
+      [class.active]="threadReader()"
+      [routerLink]="['/statuses', currentId()]"
+      [queryParams]="{ reader: 'thread' }"
+    >
       📖
       {{
         chain().length > 1
@@ -16,6 +16,18 @@
           : ('pages.thread.reader.reader' | transloco)
       }}
     </a>
+    <a class="btn btn-outline" [routerLink]="['/read', currentId()]">
+      📄 {{ 'reader.open.longText' | transloco }}
+    </a>
+    @if (threadReader()) {
+      <a
+        class="btn btn-outline"
+        [routerLink]="['/statuses', currentId()]"
+        [queryParams]="{ reader: '0' }"
+      >
+        {{ 'pages.thread.reader.conversation' | transloco }}
+      </a>
+    }
 
     @if (isRss()) {
       <a
@@ -69,24 +81,62 @@
       }
     </p>
   }
-  @for (a of ancestors(); track a.id) {
+  @if (threadReader()) {
+    <app-reader-toolbar />
+    <article class="reader classic-thread-reader" [attr.data-paper]="prefs.readerTheme()">
+      <header class="reader-head">
+        <img
+          class="reader-avatar"
+          [src]="chain()[0].account.avatar_static || chain()[0].account.avatar"
+          [alt]="chain()[0].account.username"
+        />
+        <div>
+          <div class="reader-author">
+            {{ chain()[0].account.display_name || chain()[0].account.username }}
+          </div>
+          <div class="muted">
+            &#64;{{ chain()[0].account.acct }} · {{ chain()[0].created_at | humanTime }}
+          </div>
+        </div>
+      </header>
+      @for (post of chain(); track post.id) {
+        @if (post.spoiler_text) {
+          <p class="reader-author">{{ post.spoiler_text }}</p>
+        }
+        <section class="reader-post" [innerHTML]="post.content"></section>
+        @for (media of post.media_attachments; track media.id) {
+          <img
+            class="reader-media"
+            [src]="media.preview_url || media.url"
+            [alt]="media.description || ''"
+            loading="lazy"
+          />
+        }
+      }
+    </article>
+    @if (comments().length) {
+      <h2 class="reader-comments-heading">{{ 'pages.thread.reader.comments' | transloco }}</h2>
+    }
+  } @else {
+    @for (a of ancestors(); track a.id) {
+      <app-status-card
+        [status]="a"
+        filterContext="thread"
+        [showSource]="true"
+        (changed)="onContextChanged($event)"
+        (deleted)="onContextDeleted($event)"
+        (replied)="onReply($event)"
+      />
+    }
     <app-status-card
-      [status]="a"
+      [status]="s"
       filterContext="thread"
       [showSource]="true"
-      (changed)="onContextChanged($event)"
-      (deleted)="onContextDeleted($event)"
+      (changed)="onChanged($event)"
+      (deleted)="onFocusedDeleted()"
       (replied)="onReply($event)"
     />
   }
-  <app-status-card
-    [status]="s"
-    filterContext="thread"
-    [showSource]="true"
-    (changed)="onChanged($event)"
-    (deleted)="onFocusedDeleted()"
-    (replied)="onReply($event)"
-  />
   @if (isBluesky(s)) {
     <app-bsky-reply [replyTo]="s" (posted)="onReply($event)" />
   } @else if (isLocal(s)) {
@@ -115,7 +165,7 @@
       (posted)="onReply($event)"
     />
   }
-  @for (d of descendants(); track d.id) {
+  @for (d of threadReader() ? comments() : descendants(); track d.id) {
     <app-status-card
       [status]="d"
       filterContext="thread"

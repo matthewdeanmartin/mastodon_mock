@@ -90,6 +90,7 @@ import { ReadingTools } from '../reading-tools';
 // i18n reader.core.resumedApproximately: Picking up roughly where you left off — this article has a different number of pages than last time.
 // i18n reader.core.readOn.twitterMirror: Read on {{host}}
 // i18n reader.core.readOn.originalSite: Read on the original site
+// i18n reader.core.pageNavigation: Page navigation
 
 /**
  * How long a page turn waits before the position is written.
@@ -265,6 +266,10 @@ export class ReaderCore {
   private columnLayout: ColumnPages = { text: [], starts: [], stride: 0 };
   private layoutReady = signal(false);
   private focusFetchedArticle = false;
+  protected readonly restoringArticle = signal(false);
+  private restoreVersion = 0;
+  private destroyed = false;
+  private swipe: { x: number; y: number; at: number; id: number } | null = null;
 
   protected readonly pages = computed<string[]>(() => this.columnText());
   protected readonly pageCount = computed(() => Math.max(1, this.pages().length));
@@ -361,12 +366,15 @@ export class ReaderCore {
     // ReaderCore now stays mounted while the library loads the next document.
     // Its per-document article state therefore has to be cleared explicitly
     // when the replacement lands; previously destruction did this by accident.
-    this.expansion.collapse();
+    this.expansion.reset();
+    this.restoreVersion++;
+    this.restoringArticle.set(false);
     this.pageIndex.set(0);
     this.approximateResume.set(false);
     if (!documentId) {
       return;
     }
+    void this.restoreArticle(documentId, this.articleUrl());
     const identity = this.identity();
     if (!identity) {
       return;
@@ -377,6 +385,23 @@ export class ReaderCore {
 
   /** The document the page index currently belongs to. */
   private lastDocumentId = '';
+
+  private async restoreArticle(documentId: string, url: string | null): Promise<void> {
+    const version = ++this.restoreVersion;
+    if (!url) return;
+    this.restoringArticle.set(true);
+    const result = await this.expansion.restore(url);
+    if (this.destroyed || version !== this.restoreVersion || documentId !== this.lastDocumentId)
+      return;
+    this.restoringArticle.set(false);
+    if (result?.article) {
+      const identity = this.identity();
+      if (identity) this.library.open(identity);
+      this.resumePending = this.layout() === 'page';
+      this.layoutReady.set(false);
+    }
+    this.scheduleSettledMeasure();
+  }
 
   /** True until the stored position has been applied to this document. */
   private resumePending = false;
@@ -421,7 +446,7 @@ export class ReaderCore {
    */
   private readonly restoreIfPending = effect(() => {
     const pages = this.pageCount();
-    if (!this.layoutReady() || !this.resumePending || pages < 1) {
+    if (this.restoringArticle() || !this.layoutReady() || !this.resumePending || pages < 1) {
       return;
     }
     const identity = this.identity();
@@ -450,7 +475,7 @@ export class ReaderCore {
    * surface that owns a position.
    */
   private savePosition(): void {
-    if (this.layout() === 'pane' || !this.layoutReady()) {
+    if (this.layout() === 'pane' || !this.layoutReady() || this.restoringArticle()) {
       return;
     }
     const identity = this.identity();
@@ -603,7 +628,12 @@ export class ReaderCore {
   private measureFrame: number | null = null;
 
   private scheduleSettledMeasure = (): void => {
-    if (typeof requestAnimationFrame === 'undefined' || this.measureFrame !== null) return;
+    if (
+      this.destroyed ||
+      typeof requestAnimationFrame === 'undefined' ||
+      this.measureFrame !== null
+    )
+      return;
     this.measureFrame = requestAnimationFrame(() => {
       this.measureFrame = null;
       this.measure();
@@ -650,6 +680,7 @@ export class ReaderCore {
     document.addEventListener('keyup', this.onSelectionKey);
     document.addEventListener('mouseup', this.onSelectionPointer);
     inject(DestroyRef).onDestroy(() => {
+      this.destroyed = true;
       document.removeEventListener('visibilitychange', this.onHide);
       window.removeEventListener('resize', this.scheduleSettledMeasure);
       window.visualViewport?.removeEventListener('resize', this.scheduleSettledMeasure);
@@ -658,6 +689,7 @@ export class ReaderCore {
       document.removeEventListener('keyup', this.onSelectionKey);
       document.removeEventListener('mouseup', this.onSelectionPointer);
       this.layoutObserver?.disconnect();
+      this.expansion.reset();
       if (this.measureFrame !== null) {
         cancelAnimationFrame(this.measureFrame);
       }
@@ -671,6 +703,30 @@ export class ReaderCore {
 
   nextPage(): void {
     this.turnTo(this.pageIndex() + 1);
+  }
+
+  protected onPagePointerDown(event: PointerEvent): void {
+    this.swipe = null;
+    if (event.pointerType !== 'touch' || !event.isPrimary || !this.paging()) return;
+    if ((event.target as Element).closest('a, button, input, textarea, select, [contenteditable]'))
+      return;
+    this.swipe = { x: event.clientX, y: event.clientY, at: Date.now(), id: event.pointerId };
+  }
+
+  protected onPagePointerCancel(): void {
+    this.swipe = null;
+  }
+
+  protected onPagePointerUp(event: PointerEvent): void {
+    const swipe = this.swipe;
+    this.swipe = null;
+    if (!swipe || swipe.id !== event.pointerId || Date.now() - swipe.at > 800) return;
+    if (window.getSelection()?.toString()) return;
+    const dx = event.clientX - swipe.x;
+    const dy = event.clientY - swipe.y;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0) this.nextPage();
+    else this.prevPage();
   }
 
   /** Jump to a page by 1-based number. Used by the keyboard bindings. */
@@ -820,6 +876,8 @@ export class ReaderCore {
   async expandArticle(force = false): Promise<void> {
     const result = await this.expansion.expand(this.articleUrl(), force);
     if (result?.article) {
+      const identity = this.identity();
+      if (identity) this.library.open(identity);
       this.resumePending = false;
       this.focusFetchedArticle = true;
       this.focusArticle();
@@ -888,9 +946,4 @@ export class ReaderCore {
       ? { url: post.url, label: this.transloco.translate('reader.core.readOn.originalSite') }
       : null;
   });
-
-  protected collapseArticle(): void {
-    this.expansion.collapse();
-    this.pageIndex.set(0);
-  }
 }

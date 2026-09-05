@@ -439,22 +439,36 @@
             }}</span></span
           >
         }
-        @if (!foreign && (display.replies_count > 0 || display.in_reply_to_id)) {
+        @if (
+          threadable &&
+          (display.replies_count > 0 ||
+            display.in_reply_to_id ||
+            display.provider === 'rss' ||
+            display.content.length > 600)
+        ) {
           <a
             class="action"
             [routerLink]="threadLink"
-            [queryParams]="{ reader: 1 }"
+            [queryParams]="{ reader: 'thread' }"
             (click)="$event.stopPropagation()"
-            [title]="'statusCard.readThreadAsArticle' | transloco"
-            [attr.aria-label]="'statusCard.readThreadAsArticle' | transloco"
+            [title]="'reader.open.thread' | transloco"
           >
-            <span aria-hidden="true">📖</span>
+            <span aria-hidden="true">📖</span> {{ 'reader.open.thread' | transloco }}
+          </a>
+          <a
+            class="action"
+            [routerLink]="longTextLink"
+            (click)="$event.stopPropagation()"
+            [title]="'reader.open.longText' | transloco"
+          >
+            <span aria-hidden="true">📄</span> {{ 'reader.open.longText' | transloco }}
           </a>
         }
         @if (display.provider === 'rss' && threadable) {
           <a
             class="action"
             [routerLink]="threadLink"
+            [queryParams]="{ reader: '0' }"
             (click)="$event.stopPropagation()"
             [title]="'statusCard.readArticleAndComments' | transloco"
           >

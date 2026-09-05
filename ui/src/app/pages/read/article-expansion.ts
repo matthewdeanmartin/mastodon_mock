@@ -102,6 +102,23 @@ export class ArticleExpansion {
 
   /** Forced retries spent on this document. */
   private retries = signal(0);
+  private generation = 0;
+
+  /** Clear the surface and invalidate completions belonging to the last document. */
+  reset(): void {
+    this.generation++;
+    this.result.set(null);
+    this.expanding.set(false);
+    this.retries.set(0);
+  }
+
+  async restore(url: string | null): Promise<ArticleResult | null> {
+    const generation = this.generation;
+    const cached = url ? await this.articles.cached(url) : null;
+    if (generation !== this.generation || this.expanding() || this.result()) return null;
+    if (cached?.article) this.result.set(cached);
+    return cached?.article ? cached : null;
+  }
 
   /** Whether another manual retry is allowed. */
   readonly retriesLeft = computed(() => MAX_MANUAL_RETRIES - this.retries());
@@ -257,9 +274,10 @@ export class ArticleExpansion {
    * position can do it without watching the signal.
    */
   async expand(url: string | null, force = false): Promise<ArticleResult | null> {
-    if (!url || this.expanding() || !this.quota.allowed()) {
+    if (!url || this.expanding()) {
       return null;
     }
+    if (this.result()?.article) return this.result();
     // A forced retry bypasses the cache, and therefore also the failure
     // cooldown that stops a permanently-refusing site being re-fetched forever.
     if (force && this.retries() >= MAX_MANUAL_RETRIES) {
@@ -267,7 +285,16 @@ export class ArticleExpansion {
     }
 
     this.expanding.set(true);
+    const generation = this.generation;
     try {
+      if (!force) {
+        const cached = await this.articles.cached(url);
+        if (generation !== this.generation) return null;
+        if (cached) {
+          this.result.set(cached);
+          return cached;
+        }
+      }
       // `isSupporter()` starts false on every reload because entitlement is
       // deliberately not persisted. Settle it before enforcing the local
       // counter; otherwise an exhausted subscriber is refused before the
@@ -275,19 +302,22 @@ export class ArticleExpansion {
       if (!(await this.quota.authorize())) {
         return null;
       }
+      if (generation !== this.generation) return null;
       if (force) {
         this.retries.update((n) => n + 1);
         await this.articles.forget(url);
       }
+      if (generation !== this.generation) return null;
       this.quota.recordFetch();
       const result = await this.articles.expand(url, force);
+      if (generation !== this.generation) return null;
       this.result.set(result);
       if (result.article) {
         this.retries.set(0);
         // Through the tally rather than the quota directly, so a supporter's
         // running total also reaches their account and is the same on their
         // phone. Only a rendered article counts.
-        this.tally.recordOne();
+        if (!result.fromCache) this.tally.recordOne();
       }
       // What this device has learned about the host, whichever way it went.
       // A success clears the record; only host-attributable failures count.
@@ -299,12 +329,7 @@ export class ArticleExpansion {
       });
       return result;
     } finally {
-      this.expanding.set(false);
+      if (generation === this.generation) this.expanding.set(false);
     }
-  }
-
-  /** Put the article away, keeping it cached for a second look. */
-  collapse(): void {
-    this.result.set(null);
   }
 }

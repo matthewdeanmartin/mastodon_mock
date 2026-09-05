@@ -1971,7 +1971,7 @@ describe('StatusCard', () => {
         a.textContent?.includes('View thread'),
       );
       expect(decodeURIComponent(view?.getAttribute('href') ?? '')).toBe(
-        '/statuses/rss:https://blog.example/feed::g1',
+        '/statuses/rss:https://blog.example/feed::g1?reader=0',
       );
     });
 

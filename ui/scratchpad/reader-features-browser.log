@@ -1,0 +1,3 @@
+PASS large phone controls and real touch swipe
+PASS IndexedDB restore after reload, no fetch/authorization, one article, removed controls
+PASS classic Thread reader and separate Long text reader link

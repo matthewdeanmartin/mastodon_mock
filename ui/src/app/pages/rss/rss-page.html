@@ -194,6 +194,13 @@
             <div class="expanded-item">
               <app-status-card [status]="s" filterContext="account" />
               <div class="item-tools">
+                <a
+                  class="link-btn"
+                  [routerLink]="['/statuses', s.id]"
+                  [queryParams]="{ reader: 'thread' }"
+                >
+                  📖 {{ 'reader.open.thread' | transloco }}
+                </a>
                 <a class="link-btn read-in-reader" [routerLink]="['/read', s.id]">
                   📖 {{ 'pages.rss.readInReader' | transloco }}
                 </a>
@@ -228,6 +235,13 @@
                     | transloco
                 }}
               </button>
+              <a
+                class="link-btn"
+                [routerLink]="['/statuses', s.id]"
+                [queryParams]="{ reader: 'thread' }"
+              >
+                📖 {{ 'reader.open.thread' | transloco }}
+              </a>
               <a class="link-btn read-in-reader" [routerLink]="['/read', s.id]">
                 📖 {{ 'pages.rss.readInReader' | transloco }}
               </a>

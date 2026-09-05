@@ -1349,6 +1349,11 @@ export class StatusCard {
     return ['/statuses', this.display.id];
   }
 
+  protected get longTextLink(): (string | number)[] | null {
+    const thread = this.threadLink;
+    return thread ? ['/read', thread[1]] : null;
+  }
+
   /**
    * The account link for this card's author, or null when there's no profile to
    * open. RSS feeds get a synthetic "feed = profile" page (`/accounts/rss:<url>`);

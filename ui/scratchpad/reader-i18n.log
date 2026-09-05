@@ -1,0 +1,28 @@
+npm notice run ui@0.0.0 check:i18n
+npm notice run node scripts/extract-i18n.mjs --check && node scripts/check-i18n.mjs
+en.json is up to date — 5849 keys.
+i18n OK — 5849 keys, 141 migrated directories.
+Coverage: de 96%  fr 96%  id 96%  ja 79%
+
+Advisory (not failures):
+  - de "accent.orange" is identical to English
+  - de "accent.rose" is identical to English
+  - de "common.errorPrefix" is identical to English
+  - de "compose.target.bluesky" is identical to English
+  - de "compose.target.mataroa" is identical to English
+  - de "flags.connectorBlogger.label" is identical to English
+  - de "flags.connectorBluesky.label" is identical to English
+  - de "flags.connectorDropbox.label" is identical to English
+  - de "flags.connectorGithub.label" is identical to English
+  - de "flags.connectorHugo.label" is identical to English
+  - de "flags.connectorMastodon.label" is identical to English
+  - de "flags.connectorMataroa.label" is identical to English
+  - de "flags.connectorOpenrouter.label" is identical to English
+  - de "flags.connectorRaindrop.label" is identical to English
+  - de "flags.connectorTwitter.label" is identical to English
+  - de "flags.links.label" is identical to English
+  - de "flags.mawkingbirdPlus.label" is identical to English
+  - de "flags.pastebin.label" is identical to English
+  - de "feedAnalytics.accounts.bots" is identical to English
+  - de "feedAnalytics.composition.rowTitle" is identical to English
+  ...and 828 more.

@@ -1,0 +1,122 @@
+npm notice run ui@0.0.0 test:subset
+npm notice run node scripts/run-test-subset.mjs src/app/pages/read src/app/pages/thread src/app/status-card src/app/pages/rss src/app/providers/article
+Using Vitest configuration file: C:\github\mimb\mastodon_mock\ui\vitest.config.ts
+> Building...
+√ Building...
+Initial chunk files                                           | Names                                                      |  Raw size
+chunk-I333VAF6.js                                             | -                                                          | 902.66 kB | 
+setup-test-setup.js                                           | setup-test-setup                                           | 420.62 kB | 
+spec-app-pages-rss-rss-page.js                                | spec-app-pages-rss-rss-page                                | 222.25 kB | 
+chunk-RPI5L7PS.js                                             | -                                                          | 201.87 kB | 
+chunk-J5AMYNWV.js                                             | -                                                          | 147.82 kB | 
+chunk-J7LZ5GQY.js                                             | -                                                          | 111.40 kB | 
+chunk-GVPWTJGK.js                                             | -                                                          |  93.11 kB | 
+spec-app-pages-thread-thread.js                               | spec-app-pages-thread-thread                               |  88.95 kB | 
+chunk-TDF6RPYV.js                                             | -                                                          |  88.56 kB | 
+spec-app-status-card-status-card.js                           | spec-app-status-card-status-card                           |  76.33 kB | 
+chunk-456HAG6L.js                                             | -                                                          |  75.48 kB | 
+chunk-YFNBEX5K.js                                             | -                                                          |  75.09 kB | 
+chunk-CULC5WQ4.js                                             | -                                                          |  61.71 kB | 
+chunk-A6THVXRW.js                                             | -                                                          |  59.70 kB | 
+chunk-6IB7P6P5.js                                             | -                                                          |  47.76 kB | 
+spec-app-pages-read-read-page.js                              | spec-app-pages-read-read-page                              |  40.25 kB | 
+chunk-5R4QSDWK.js                                             | -                                                          |  34.16 kB | 
+chunk-VIDWZ2FO.js                                             | -                                                          |  32.68 kB | 
+spec-app-pages-read-reader-core-reader-core.js                | spec-app-pages-read-reader-core-reader-core                |  19.80 kB | 
+chunk-NKSJLF2P.js                                             | -                                                          |  19.56 kB | 
+chunk-CAZTPIUY.js                                             | -                                                          |  16.49 kB | 
+chunk-G24GLVTW.js                                             | -                                                          |  15.58 kB | 
+styles.css                                                    | styles                                                     |  15.28 kB | 
+chunk-TSDNPVA4.js                                             | -                                                          |  14.83 kB | 
+chunk-L56GKS3K.js                                             | -                                                          |  13.17 kB | 
+chunk-3UB4SSDO.js                                             | -                                                          |  12.31 kB | 
+chunk-PKI3O2FA.js                                             | -                                                          |  11.99 kB | 
+chunk-T77NJTX2.js                                             | -                                                          |  10.81 kB | 
+chunk-6RKBVVQT.js                                             | -                                                          |  10.72 kB | 
+chunk-KT7FOAR2.js                                             | -                                                          |  10.28 kB | 
+chunk-ZUG5ZPKR.js                                             | -                                                          |  10.10 kB | 
+spec-app-pages-rss-add-feed-dialog-add-feed-dialog.js         | spec-app-pages-rss-add-feed-dialog-add-feed-dialog         |  10.00 kB | 
+chunk-6RSGCPW5.js                                             | -                                                          |   9.80 kB | 
+spec-app-pages-read-post-blocks.js                            | spec-app-pages-read-post-blocks                            |   9.55 kB | 
+chunk-ZNO3G4GT.js                                             | -                                                          |   9.13 kB | 
+chunk-WFSYWE7O.js                                             | -                                                          |   8.95 kB | 
+spec-app-providers-article-article-extract.js                 | spec-app-providers-article-article-extract                 |   8.61 kB | 
+chunk-EK5YAMR5.js                                             | -                                                          |   8.13 kB | 
+chunk-I6NLERFZ.js                                             | -                                                          |   8.12 kB | 
+chunk-5JSI5I3W.js                                             | -                                                          |   7.84 kB | 
+spec-app-pages-read-library-panel-library-panel.js            | spec-app-pages-read-library-panel-library-panel            |   7.45 kB | 
+chunk-AR2KOVVF.js                                             | -                                                          |   7.24 kB | 
+spec-app-pages-read-reader-document.js                        | spec-app-pages-read-reader-document                        |   7.00 kB | 
+spec-app-providers-article-article-fetch.js                   | spec-app-providers-article-article-fetch                   |   6.93 kB | 
+chunk-XLFX7JDE.js                                             | -                                                          |   6.86 kB | 
+spec-app-pages-read-reading-tools.js                          | spec-app-pages-read-reading-tools                          |   6.81 kB | 
+spec-app-providers-article-article-quota.js                   | spec-app-providers-article-article-quota                   |   6.55 kB | 
+spec-app-providers-article-observed-failures.js               | spec-app-providers-article-observed-failures               |   6.44 kB | 
+chunk-PLEWFVFA.js                                             | -                                                          |   5.98 kB | 
+chunk-COKQFCMD.js                                             | -                                                          |   5.61 kB | 
+spec-app-providers-article-article-metadata.js                | spec-app-providers-article-article-metadata                |   5.31 kB | 
+spec-app-pages-read-thread-loader.js                          | spec-app-pages-read-thread-loader                          |   5.29 kB | 
+chunk-HZXEPMDQ.js                                             | -                                                          |   5.27 kB | 
+chunk-DG45TNOW.js                                             | -                                                          |   4.93 kB | 
+spec-app-pages-rss-seen-when-scrolled.js                      | spec-app-pages-rss-seen-when-scrolled                      |   4.90 kB | 
+spec-app-pages-read-article-expansion.js                      | spec-app-pages-read-article-expansion                      |   4.80 kB | 
+spec-app-providers-article-article-reading-tally.js           | spec-app-providers-article-article-reading-tally           |   4.80 kB | 
+chunk-DQ63UWTW.js                                             | -                                                          |   4.68 kB | 
+chunk-II5NBLJL.js                                             | -                                                          |   4.62 kB | 
+chunk-JVTUG4GW.js                                             | -                                                          |   4.25 kB | 
+spec-app-pages-read-reader-anchor.js                          | spec-app-pages-read-reader-anchor                          |   3.55 kB | 
+spec-app-providers-article-markdown-render.js                 | spec-app-providers-article-markdown-render                 |   3.40 kB | 
+spec-app-pages-read-document-search.js                        | spec-app-pages-read-document-search                        |   3.34 kB | 
+spec-app-pages-read-mark-passages.js                          | spec-app-pages-read-mark-passages                          |   3.26 kB | 
+spec-app-pages-read-notes-rail-notes-rail.js                  | spec-app-pages-read-notes-rail-notes-rail                  |   3.08 kB | 
+spec-app-pages-read-document-search-document-search-dialog.js | spec-app-pages-read-document-search-document-search-dialog |   3.02 kB | 
+spec-app-pages-read-save-to-library-save-to-library.js        | spec-app-pages-read-save-to-library-save-to-library        |   3.01 kB | 
+spec-app-providers-article-article-target.js                  | spec-app-providers-article-article-target                  |   2.94 kB | 
+spec-app-pages-read-reader-route-id.js                        | spec-app-pages-read-reader-route-id                        |   2.87 kB | 
+chunk-NAO6NIFW.js                                             | -                                                          |   2.80 kB | 
+chunk-O7QG3BJ4.js                                             | -                                                          |   2.77 kB | 
+spec-app-providers-article-article-quality.js                 | spec-app-providers-article-article-quality                 |   2.57 kB | 
+chunk-QH3OMYTK.js                                             | -                                                          |   2.54 kB | 
+spec-app-pages-rss-article-pages.js                           | spec-app-pages-rss-article-pages                           |   2.48 kB | 
+spec-app-pages-read-column-pages.js                           | spec-app-pages-read-column-pages                           |   2.44 kB | 
+chunk-KGAGEWYW.js                                             | -                                                          |   2.43 kB | 
+spec-app-providers-article-article-cache.js                   | spec-app-providers-article-article-cache                   |   2.33 kB | 
+chunk-H3UF5KNN.js                                             | -                                                          |   2.28 kB | 
+chunk-BUTTGKR5.js                                             | -                                                          |   2.17 kB | 
+spec-app-pages-read-selection-tools-selection-tools.js        | spec-app-pages-read-selection-tools-selection-tools        |   2.14 kB | 
+chunk-WNU3F4E5.js                                             | -                                                          |   2.07 kB | 
+chunk-TQV3JGEV.js                                             | -                                                          |   1.60 kB | 
+chunk-U3ZECPHQ.js                                             | -                                                          |   1.54 kB | 
+chunk-ILAQD6RJ.js                                             | -                                                          |   1.53 kB | 
+chunk-5BE3YOUS.js                                             | -                                                          |   1.31 kB | 
+chunk-UIRMD3OK.js                                             | -                                                          |   1.26 kB | 
+init-testbed.js                                               | init-testbed                                               |   1.21 kB | 
+vitest-mock-patch.js                                          | vitest-mock-patch                                          | 974 bytes | 
+chunk-ZYOI7OJJ.js                                             | -                                                          | 673 bytes | 
+chunk-BHXE7ZEZ.js                                             | -                                                          | 320 bytes | 
+
+                                                              | Initial total                                              |   3.23 MB
+
+Lazy chunk files                                              | Names                                                      |  Raw size
+chunk-NXDLHGZS.js                                             | profile-sync                                               |  71.81 kB | 
+
+Application bundle generation complete. [18.281 seconds] - 2026-09-05T03:44:58.916Z
+
+
+ RUN  v4.1.10 C:/github/mimb/mastodon_mock/ui
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+
+ Test Files  33 passed (33)
+      Tests  564 passed (564)
+   Start at  23:44:59
+   Duration  6.56s (transform 3.11s, setup 2.47s, import 4.15s, tests 10.75s, environment 32.40s)
+

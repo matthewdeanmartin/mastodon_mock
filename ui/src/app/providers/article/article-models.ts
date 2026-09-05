@@ -107,6 +107,8 @@ export interface ArticleBody {
  * that refuse extraction. `article` is absent when the quality gate said no.
  */
 export interface ArticleResult {
+  /** A reused extraction must not consume another reading allowance. */
+  fromCache?: boolean;
   /** The URL the caller asked for. */
   requestedUrl: string;
   /**

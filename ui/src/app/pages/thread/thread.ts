@@ -26,16 +26,20 @@ import { AnonymousBookmarks } from '../../providers/anonymous/anonymous-bookmark
 import { ElizaService } from '../../eliza/eliza.service';
 import { LocalPostStore } from '../../eliza/local-post-store';
 import { LocalCompose } from '../../eliza/local-compose';
+import { ReaderToolbar } from '../../reader-toolbar/reader-toolbar';
 import { isElizaId } from '../../eliza/eliza-identity';
 
-import { PreviewCardComponent } from '../../preview-card/preview-card';
 import { PageDiagnostics } from '../../page-diagnostics';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 
 // i18n pages.thread.loading: Loading…
 // i18n pages.thread.reply.placeholder: Post your reply
-// i18n pages.thread.reader.withCount: Reader ({{count}} {{posts}})
-// i18n pages.thread.reader.reader: Reader
+// i18n pages.thread.reader.withCount: Thread reader ({{count}} {{posts}})
+// i18n pages.thread.reader.reader: Thread reader
+// i18n reader.open.thread: Thread reader
+// i18n reader.open.longText: Long text reader
+// i18n pages.thread.reader.conversation: Conversation
+// i18n pages.thread.reader.comments: Comments
 // i18n pages.thread.rss.return: ← Return to RSS reader
 // i18n pages.thread.chat.continueTitle: Continue this conversation in chat
 // i18n pages.thread.chat.open: Open in chat
@@ -60,7 +64,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
     HumanTimePipe,
     RouterLink,
     LocalCompose,
-    PreviewCardComponent,
+    ReaderToolbar,
     TranslocoPipe,
   ],
   templateUrl: './thread.html',
@@ -279,6 +283,7 @@ export class Thread implements OnInit {
 
   /** Latest route id and `?reader` value. `currentId` is read by the Reader link. */
   protected readonly currentId = signal('');
+  protected readonly threadReader = signal(false);
   private readerParam: string | null = null;
   /** True once a hand-off to the reader page is under way. See `applyReaderMode`. */
   private redirecting = false;
@@ -291,6 +296,7 @@ export class Thread implements OnInit {
     // means the hand-off happens before anything is paid for.
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.readerParam = params.get('reader');
+      this.threadReader.set(this.readerParam === 'thread');
       this.applyReaderMode();
     });
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
@@ -326,6 +332,7 @@ export class Thread implements OnInit {
    * the second stream while the first is still settling.
    */
   private applyReaderMode(): boolean {
+    if (this.readerParam === 'thread') return false;
     if (this.redirecting) {
       return true;
     }

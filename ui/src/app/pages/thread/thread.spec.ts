@@ -313,10 +313,15 @@ describe('Thread', () => {
 
     const el = fixture.nativeElement as HTMLElement;
     const link = [...el.querySelectorAll<HTMLAnchorElement>('a.btn')].find((a) =>
-      a.textContent?.includes('Reader'),
+      a.textContent?.includes('Thread reader'),
     );
     expect(link).toBeTruthy();
-    expect(link!.getAttribute('href')).toContain('/read/1');
+    expect(link!.getAttribute('href')).toContain('/statuses/1?reader=thread');
+    expect(
+      [...el.querySelectorAll<HTMLAnchorElement>('a.btn')]
+        .find((a) => a.textContent?.includes('Long text reader'))
+        ?.getAttribute('href'),
+    ).toContain('/read/1');
     // The count is what tells someone the thing in front of them was written
     // as one piece rather than as three separate posts.
     expect(link!.textContent).toContain('3');
@@ -329,6 +334,22 @@ describe('Thread', () => {
     // the stack, so Back from the reader bounces straight forward again and the
     // reader is trapped.
     expect(navigate).toHaveBeenCalledWith(['/read', '1'], { replaceUrl: true });
+  });
+
+  it('keeps the classic thread reader separate, with the author chain and comments', () => {
+    const { fixture, navigate } = setUpWatchingRouter('1', { reader: 'thread' });
+    httpMock.expectOne('/api/v1/statuses/1').flush(makeStatus('1'));
+    const comment = { ...makeStatusBy('comment', 'other', 'other'), in_reply_to_id: '1' };
+    httpMock
+      .expectOne('/api/v1/statuses/1/context')
+      .flush(makeContext([], [selfReply('2', '1'), selfReply('3', '2'), comment]));
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(navigate).not.toHaveBeenCalled();
+    expect(element.querySelectorAll('.classic-thread-reader .reader-post')).toHaveLength(3);
+    expect(element.querySelectorAll('app-status-card')).toHaveLength(1);
+    expect(element.querySelector('app-status-card')?.textContent).toContain('comment');
+    expect(element.querySelector('app-reader-core')).toBeNull();
   });
 
   it('redirects only once, though two route streams both ask', () => {
