@@ -4,6 +4,18 @@
   {{ 'bundledStarterKits.intro' | transloco }}
 </p>
 
+<label class="kit-filter">
+  <span>{{ 'bundledStarterKits.languages' | transloco }}</span>
+  <select [value]="language()" (change)="language.set($any($event.target).value)">
+    <option value="known">{{ 'bundledStarterKits.myLanguages' | transloco }}</option>
+    <option value="all">{{ 'bundledStarterKits.allLanguages' | transloco }}</option>
+    @for (lang of languages; track lang.code) {
+      <option [value]="lang.code">{{ lang.name }}</option>
+    }
+  </select>
+</label>
+<p class="muted small">{{ 'bundledStarterKits.languageNote' | transloco }}</p>
+
 <!-- The merged list is longer than either of the two it replaced, and this is
      the page a newcomer is sent to with no idea what is on it. One box, no
      modes: it narrows what is already visible rather than searching anything. -->
@@ -23,6 +35,9 @@
     <div class="kit-icon" aria-hidden="true">M</div>
     <div class="kit-body">
       <strong>{{ set.title }}</strong>
+      @if (set.lang) {
+        <span class="muted small"> · {{ set.lang }}</span>
+      }
       <p class="muted small">{{ set.blurb }}</p>
       <span class="muted small">
         {{
@@ -54,6 +69,7 @@
      has a timeline and wants more people, tags, imports or directories wants the
      hub; someone arriving here for the first time wants faces. -->
 <p class="kit-more muted small">
+  {{ 'bundledStarterKits.updated' | transloco: { date: updated } }} ·
   {{ 'bundledStarterKits.moreWays' | transloco }}
   <a routerLink="/find-friends">{{ 'bundledStarterKits.moreWaysLink' | transloco }}</a>
 </p>

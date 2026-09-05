@@ -47,6 +47,9 @@ export interface Draft {
 
 export type DraftSnapshot = Omit<Draft, 'id' | 'updatedAt'>;
 
+// i18n drafts.saveFailed: Could not save the draft in this browser. The original has been kept. Free some browser storage and try again.
+// i18n drafts.removeFailed: Could not remove the draft from this browser. Please try again.
+
 /** Result of a local-storage mutation. Callers must not assume an attempted write was durable. */
 export type DraftStorageOutcome = { durable: true } | { durable: false; error: unknown };
 

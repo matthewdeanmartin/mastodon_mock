@@ -4,9 +4,9 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "prebuild": "node scripts/vendor-analytics.mjs",
+    "prebuild": "node scripts/import-starter-catalog.mjs --check && node scripts/vendor-analytics.mjs",
     "build": "ng build",
-    "prebuild:mockingbird": "node scripts/vendor-analytics.mjs",
+    "prebuild:mockingbird": "node scripts/import-starter-catalog.mjs --check && node scripts/vendor-analytics.mjs",
     "build:mockingbird": "ng build --configuration mockingbird",
     "postbuild:mockingbird": "node scripts/check-mock-leakage.mjs",
     "vendor:analytics": "node scripts/vendor-analytics.mjs",
@@ -34,6 +34,8 @@
     "check": "npm run check:static && npm run lint && npm run test:ci",
     "gen:api-docs": "node scripts/gen-api-docs.mjs",
     "starter-kits:update": "node scripts/update-bundled-starter-kits.mjs",
+    "starter-catalog:update": "node scripts/import-starter-catalog.mjs",
+    "starter-catalog:check": "node scripts/import-starter-catalog.mjs --check",
     "starter-kits:check": "node scripts/update-bundled-starter-kits.mjs --check",
     "check:subpaths": "node scripts/check-subpath-deployments.mjs",
     "check:mock-leakage": "node scripts/check-mock-leakage.mjs"

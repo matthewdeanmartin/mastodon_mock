@@ -1238,14 +1238,23 @@ export class Home implements OnInit, OnDestroy {
    * decide a draft is worth saving — so a draft holding only a content warning
    * still counts as yours and is left alone.
    */
+  protected writingError = signal(false);
+
   protected startWriting(): void {
+    this.writingError.set(false);
     if (!this.hasWritePage()) {
       void this.router.navigate(['/drafts'], { queryParams: { write: 1 } });
       return;
     }
     const resumable = this.drafts.drafts().find((d) => !draftHasContent(d));
-    const id =
-      resumable?.id ?? this.drafts.save(emptyDraftSnapshot(this.prefs.defaultVisibility())).id;
+    const saved = resumable
+      ? null
+      : this.drafts.save(emptyDraftSnapshot(this.prefs.defaultVisibility()));
+    if (saved && !saved.durable) {
+      this.writingError.set(true);
+      return;
+    }
+    const id = resumable?.id ?? saved!.id;
     void this.router.navigate(['/write'], { queryParams: { draft: id } });
   }
 

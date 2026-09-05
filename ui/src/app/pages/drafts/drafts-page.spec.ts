@@ -456,6 +456,53 @@ describe('DraftsPage', () => {
     expect(internals(f).notice()).toContain('Unparked');
   });
 
+  it('keeps the server copy and permits retry when an unpark save exceeds storage quota', () => {
+    const f = withAllKinds();
+    const item = itemOfKind(f, 'scheduled');
+    internals(f).askUnpark(item);
+    const original = Storage.prototype.setItem;
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (key.startsWith('mockingbird_drafts'))
+        throw new DOMException('full', 'QuotaExceededError');
+      original.call(this, key, value);
+    });
+    try {
+      internals(f).confirmUnpark();
+      httpMock.expectNone({ url: `${SCHEDULED_URL}/p1`, method: 'DELETE' });
+      expect(TestBed.inject(Drafts).drafts()).toHaveLength(0);
+      expect(itemOfKind(f, 'scheduled').id).toBe(item.id);
+      expect(internals(f).pendingUnpark()).not.toBeNull();
+      expect(internals(f).actionError()).toContain('Could not save');
+      expect(internals(f).notice()).toBeNull();
+    } finally {
+      write.mockRestore();
+    }
+    internals(f).confirmUnpark();
+    expect(TestBed.inject(Drafts).drafts()).toHaveLength(1);
+    httpMock.expectOne({ url: `${SCHEDULED_URL}/p1`, method: 'DELETE' }).flush(null);
+    expect(internals(f).notice()).toContain('Unparked');
+  });
+
+  it('does not announce a local copy when saving it fails', () => {
+    const f = withAllKinds();
+    const store = TestBed.inject(Drafts).forCurrentAccount();
+    const save = vi
+      .spyOn(store, 'save')
+      .mockReturnValue({ durable: false, error: new Error('full'), id: 'unsaved', updatedAt: '' });
+    try {
+      internals(f).convertToLocal(itemOfKind(f, 'scheduled'));
+      expect(internals(f).notice()).toBeNull();
+      expect(internals(f).actionError()).toContain('Could not save');
+      expect(itemOfKind(f, 'scheduled')).toBeTruthy();
+    } finally {
+      save.mockRestore();
+    }
+  });
+
   /**
    * The ordering guarantee. Saving first means a failed cancellation still
    * leaves the user holding their writing; cancelling first would risk losing

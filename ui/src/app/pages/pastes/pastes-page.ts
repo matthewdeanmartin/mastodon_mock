@@ -302,7 +302,15 @@ export class PastesPage {
    * converted. Same rule, and same `toSnapshot`, as the /drafts page.
    */
   convertToDraft(record: PasteRecord): void {
-    this.drafts.save(toSnapshot({ kind: 'paste', record }, this.prefs.defaultVisibility()));
+    this.notice.set(null);
+    this.error.set(null);
+    if (
+      !this.drafts.save(toSnapshot({ kind: 'paste', record }, this.prefs.defaultVisibility()))
+        .durable
+    ) {
+      this.error.set(this.transloco.translate('drafts.saveFailed'));
+      return;
+    }
     this.notice.set(this.transloco.translate('pages.pastes.notice.copiedToDraft'));
   }
 

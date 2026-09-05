@@ -1,6 +1,14 @@
 .DEFAULT_GOAL := help
 MAKEFLAGS += --no-print-directory
 
+.PHONY: starter-catalog-update starter-catalog-check
+starter-catalog-update:
+	npm run starter-catalog:update $(if $(CATALOG),-- "$(CATALOG)",)
+
+starter-catalog-check:
+	npm run starter-catalog:check
+	node --test scripts/import-starter-catalog.test.mjs
+
 .PHONY: help install format format-check lint storage subpaths i18n i18n-extract i18n-todo i18n-batch i18n-merge i18n-traps test test-ci build build-admin build-mockingbird security check check-ci
 
 help:
@@ -20,6 +28,8 @@ help:
 	@echo "  make build              Production-build admin UI and Mockingbird"
 	@echo "  make build-admin        Build the packaged admin UI"
 	@echo "  make build-mockingbird  Build the standalone Mockingbird site"
+	@echo "  make starter-catalog-update  Bundle the sibling starter catalogue"
+	@echo "  make starter-catalog-check   Validate the bundle and importer offline"
 	@echo "  make security           Audit production dependencies"
 	@echo "  make check              Full read-only quality gate"
 
@@ -109,6 +119,6 @@ build-mockingbird:
 security:
 	npm audit --omit=dev --audit-level=high
 
-check: format-check lint storage subpaths i18n test build security
+check: format-check lint storage subpaths i18n starter-catalog-check test build security
 
 check-ci: check

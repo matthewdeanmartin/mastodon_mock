@@ -341,7 +341,11 @@ export class DraftsPage implements OnInit {
   /** Copy any kind into a browser-local draft. */
   protected convertToLocal(item: DraftItem): void {
     this.actionError.set(null);
-    this.drafts.save(toSnapshot(item.source, this.prefs.defaultVisibility()));
+    this.notice.set(null);
+    if (!this.drafts.save(toSnapshot(item.source, this.prefs.defaultVisibility())).durable) {
+      this.actionError.set(this.transloco.translate('drafts.saveFailed'));
+      return;
+    }
     this.flash(
       this.transloco.translate('pages.drafts.notice.copiedLocal', {
         kind: this.kindLabel(item.kind),
@@ -397,7 +401,12 @@ export class DraftsPage implements OnInit {
     const { item } = pending;
     this.busy.set(true);
     this.actionError.set(null);
-    this.drafts.save(toSnapshot(item.source, this.prefs.defaultVisibility()));
+    this.notice.set(null);
+    if (!this.drafts.save(toSnapshot(item.source, this.prefs.defaultVisibility())).durable) {
+      this.busy.set(false);
+      this.actionError.set(this.transloco.translate('drafts.saveFailed'));
+      return;
+    }
     this.api.cancelScheduledStatus(item.id).subscribe({
       next: () => {
         this.sources.forgetScheduled(item.id);
@@ -630,7 +639,9 @@ export class DraftsPage implements OnInit {
     const { item } = pending;
     switch (item.source.kind) {
       case 'local':
-        this.drafts.remove(item.id);
+        if (!this.drafts.remove(item.id).durable) {
+          this.removeError.set(this.transloco.translate('drafts.removeFailed'));
+        }
         return;
       case 'paste':
         // Only forgets the local record — the paste itself stays at its

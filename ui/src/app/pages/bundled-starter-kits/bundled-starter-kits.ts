@@ -1,8 +1,17 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
-import { STARTER_KITS } from '../../starter-collection';
+import { STARTER_KITS, STARTER_CATALOG_UPDATED_AT, starterKitText } from '../../starter-collection';
 import { SHIPPED_STARTER_KITS } from '../../starter-kits';
+import { KnownLanguages } from '../../trend-language-filter';
+import { UiLocale } from '../../i18n/locale';
+import { LANG_NAMES, LangCode } from '../../language-detect';
+
+// i18n bundledStarterKits.languages: Pack languages
+// i18n bundledStarterKits.myLanguages: My languages
+// i18n bundledStarterKits.allLanguages: All languages
+// i18n bundledStarterKits.updated: Catalogue updated {{date}}
+// i18n bundledStarterKits.languageNote: Browse any language here. This does not change the languages in your settings. Older sets with no language label are also shown.
 
 // i18n bundledStarterKits.title: People to follow
 // i18n bundledStarterKits.intro: Each of these is a ready-made set of accounts. Open one to see who is in it, sample what they post, and follow the whole set in one go — or pick through it.
@@ -26,6 +35,7 @@ interface DiscoverySet {
   link: string;
   /** Who assembled it: us, or the person whose collection this snapshots. */
   curator: string | null;
+  lang?: string;
 }
 
 /**
@@ -66,14 +76,23 @@ interface DiscoverySet {
   styleUrl: './bundled-starter-kits.css',
 })
 export class BundledStarterKits {
+  private readonly known = inject(KnownLanguages);
+  private readonly locale = inject(UiLocale);
+  protected readonly language = signal('known');
+  protected readonly updated = STARTER_CATALOG_UPDATED_AT.slice(0, 10);
+  protected readonly languages = [
+    ...new Set(STARTER_KITS.flatMap((kit) => (kit.lang ? [kit.lang] : []))),
+  ]
+    .map((code) => ({ code, name: LANG_NAMES[code as LangCode] ?? code }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   /** Free-text narrowing, because the merged list is longer than either was. */
   protected readonly filter = signal('');
 
-  private readonly all: readonly DiscoverySet[] = [
+  private readonly all = computed<readonly DiscoverySet[]>(() => [
     ...STARTER_KITS.map((kit) => ({
       key: `kit:${kit.slug}`,
-      title: kit.title,
-      blurb: kit.blurb,
+      ...starterKitText(kit, this.locale.active()),
+      lang: kit.lang,
       accountCount: kit.accounts.length,
       link: kit.slug === 'starter' ? '/collections/starter' : `/collections/starter/${kit.slug}`,
       curator: null,
@@ -86,7 +105,7 @@ export class BundledStarterKits {
       link: `/collections/${collection.id}`,
       curator: collection.curatorName || collection.curatorHandle,
     })),
-  ];
+  ]);
 
   /**
    * The sets to show, narrowed by the filter box.
@@ -97,10 +116,14 @@ export class BundledStarterKits {
    */
   protected readonly visible = computed<readonly DiscoverySet[]>(() => {
     const needle = this.filter().trim().toLowerCase();
-    if (!needle) {
-      return this.all;
-    }
-    return this.all.filter(
+    const language = this.language();
+    const sets = this.all().filter(
+      (set) =>
+        !set.lang ||
+        language === 'all' ||
+        (language === 'known' ? this.known.knows(set.lang) : set.lang === language),
+    );
+    return sets.filter(
       (set) =>
         set.title.toLowerCase().includes(needle) ||
         (set.blurb ?? '').toLowerCase().includes(needle),

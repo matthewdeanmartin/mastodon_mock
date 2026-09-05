@@ -449,6 +449,7 @@ function dragHasFiles(event: DragEvent): boolean {
 // i18n compose.savedToDrafts: Saved to drafts.
 // i18n compose.draftUnsaved: This draft could not be saved in your browser. Your writing is still here.
 // i18n compose.downloadDraft: Download a copy
+// i18n compose.changedBeforePublish: The post or account changed while attachments were being saved. Nothing new was published. Review your post and send it again.
 // i18n compose.warn.threadsNoSchedule: Threads can't be scheduled — remove the extra posts.
 
 // i18n compose.postAs: Post as {{language}}
@@ -501,8 +502,10 @@ export class Compose implements OnDestroy {
   private hugoPublish = inject(HugoPublish);
   protected hugoEdit = inject(HugoEditSession);
   protected deployWatch = inject(HugoDeployWatch);
+  private destroyed = false;
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.clearCountdown();
     this.flushAutosave();
     // A publish followed by navigating away must not leave a poller running.
@@ -819,7 +822,7 @@ export class Compose implements OnDestroy {
       }
       if (draft) {
         // The draft moves into the composer (and its autosave slot).
-        this.drafts.remove(draft.id);
+        this.moveDraftToAutosave(draft.id);
       }
       this.restored = true;
       if (handoff?.publishImmediately) {
@@ -1918,8 +1921,19 @@ export class Compose implements OnDestroy {
         return;
       }
     }
-    this.drafts.remove(draft.id);
     this.applySnapshot(draft);
+    this.moveDraftToAutosave(draft.id);
+  }
+
+  /** Keep the named copy until the opened editor has a durable autosave. */
+  private moveDraftToAutosave(id: string): void {
+    if (!this.drafts.autosave(this.contextKey(), this.snapshot()).durable) {
+      this.draftSaveFailed.set(true);
+      return;
+    }
+    if (!this.drafts.remove(id).durable) {
+      this.crossPostError.set(this.transloco.translate('drafts.removeFailed'));
+    }
   }
 
   /** Move the current composer state into the drafts list and clear the box. */
@@ -2109,6 +2123,19 @@ export class Compose implements OnDestroy {
     // scheduled, and cross-posted statuses race ahead without their alt text.
     // Bluesky-only attachments are local objects and carry their description in
     // the embed, so they do not have Mastodon metadata to persist.
+    const publication = this.postingFingerprint(this.timelineTarget());
+    const sendUnchanged = () => {
+      if (this.destroyed) return;
+      if (
+        this.bskyAudienceBlocked() ||
+        publication !== this.postingFingerprint(this.timelineTarget())
+      ) {
+        this.submitting.set(false);
+        this.crossPostError.set(this.transloco.translate('compose.changedBeforePublish'));
+        return;
+      }
+      this.sendTimeline();
+    };
     const descriptions = this.targetIncludesFedi()
       ? this.media().filter((item) => !isLocalMedia(item.media) && item.description.trim())
       : [];
@@ -2116,7 +2143,7 @@ export class Compose implements OnDestroy {
       forkJoin(
         descriptions.map((item) => this.api.updateMedia(item.media.id, item.description.trim())),
       ).subscribe({
-        next: () => this.sendTimeline(),
+        next: sendUnchanged,
         error: (error: unknown) => {
           this.submitting.set(false);
           const failure = describePostFailure(error);
@@ -2129,7 +2156,7 @@ export class Compose implements OnDestroy {
       return;
     }
 
-    this.sendTimeline();
+    sendUnchanged();
   }
 
   /** Publish a timeline post after all required Mastodon media writes finish. */
@@ -2185,12 +2212,12 @@ export class Compose implements OnDestroy {
     this.settlePosting(operation);
   }
 
+  private timelineTarget(): PostingOperation['target'] {
+    return this.targetIncludesBsky() ? (this.targetIncludesFedi() ? 'both' : 'bsky') : 'fedi';
+  }
+
   private operationFor(parts: string[], options: ComposeOptions): PostingOperation {
-    const target: PostingOperation['target'] = this.targetIncludesBsky()
-      ? this.targetIncludesFedi()
-        ? 'both'
-        : 'bsky'
-      : 'fedi';
+    const target = this.timelineTarget();
     const fingerprint = this.postingFingerprint(target);
     if (this.postingOperation?.fingerprint === fingerprint) {
       return this.postingOperation;

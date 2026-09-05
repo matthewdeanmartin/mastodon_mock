@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { STARTER_COLLECTION, STARTER_KITS } from '../../starter-collection';
 import { SHIPPED_STARTER_KITS } from '../../starter-kits';
 import { BundledStarterKits } from './bundled-starter-kits';
+import { KnownLanguages } from '../../trend-language-filter';
+import { ClientPrefs } from '../../client-prefs';
 
 /**
  * The page a first-run visitor is sent to. It used to be one of two — our
@@ -38,7 +40,10 @@ describe('BundledStarterKits', () => {
   it('lists both kinds of curated set together', () => {
     const rows = el().querySelectorAll('.kit-row');
 
-    expect(rows).toHaveLength(STARTER_KITS.length + SHIPPED_STARTER_KITS.length);
+    expect(rows).toHaveLength(
+      STARTER_KITS.filter((kit) => !kit.lang || TestBed.inject(KnownLanguages).knows(kit.lang))
+        .length + SHIPPED_STARTER_KITS.length,
+    );
   });
 
   /**
@@ -47,10 +52,16 @@ describe('BundledStarterKits', () => {
    * shows up here rather than as a thin timeline for whoever follows it.
    */
   it('links every starter kit with its validated member count', () => {
+    const select = el().querySelector('select')!;
+    select.value = 'all';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
     const rows = [...el().querySelectorAll<HTMLAnchorElement>('.kit-row')];
 
     for (const kit of STARTER_KITS) {
-      const row = rows.find((r) => r.textContent?.includes(kit.title));
+      const href =
+        kit.slug === 'starter' ? '/collections/starter' : `/collections/starter/${kit.slug}`;
+      const row = rows.find((r) => r.getAttribute('href') === href);
       expect(row, `no row for ${kit.title}`).toBeDefined();
       expect(row!.textContent).toContain(`${kit.accounts.length} accounts`);
       expect(row!.getAttribute('href')).toBe(
@@ -65,6 +76,33 @@ describe('BundledStarterKits', () => {
 
     expect(universal?.getAttribute('href')).toBe('/collections/starter');
     expect(universal?.textContent).toContain(`${STARTER_COLLECTION.length} accounts`);
+  });
+
+  it('offers German independently of browser and saved languages', () => {
+    const prefs = TestBed.inject(ClientPrefs);
+    const before = prefs.knownLanguages();
+    const select = el().querySelector('select')!;
+    select.value = 'de';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const links = [...el().querySelectorAll<HTMLAnchorElement>('.kit-row')].map((row) =>
+      row.getAttribute('href'),
+    );
+    expect(links).toContain('/collections/starter/catalog-de-technology');
+    expect(links).not.toContain('/collections/starter/catalog-en-technology');
+    expect(links).toContain('/collections/starter');
+    expect(prefs.knownLanguages()).toEqual(before);
+  });
+
+  it('uses all known languages by default and reacts to preference changes', () => {
+    TestBed.inject(ClientPrefs).knownLanguages.set(['de', 'ja']);
+    fixture.detectChanges();
+    const links = [...el().querySelectorAll<HTMLAnchorElement>('.kit-row')].map((row) =>
+      row.getAttribute('href'),
+    );
+    expect(links).toContain('/collections/starter/catalog-de-technology');
+    expect(links).toContain('/collections/starter/catalog-ja-technology');
+    expect(links).not.toContain('/collections/starter/catalog-ru-technology');
   });
 
   it('names who curated a snapshotted collection, and marks our own as ours', () => {

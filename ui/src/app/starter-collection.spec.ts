@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { STARTER_COLLECTION, STARTER_KITS } from './starter-collection';
+import { STARTER_COLLECTION, STARTER_KITS, starterKit, starterKitText } from './starter-collection';
+import catalog from './starter-catalog.generated.json';
 
 // The starter roster evolves — accounts come and go. These tests assert the
 // invariants that must always hold, not a frozen count or a specific line-up.
@@ -27,8 +28,9 @@ describe('STARTER_COLLECTION', () => {
   });
 
   it('ships ten themed kits whose account ids came from their home instances', () => {
-    expect(STARTER_KITS).toHaveLength(11);
-    for (const kit of STARTER_KITS.slice(1)) {
+    const legacy = STARTER_KITS.filter((kit) => !kit.lang);
+    expect(legacy).toHaveLength(11);
+    for (const kit of legacy.filter((kit) => kit.slug !== 'starter')) {
       expect(kit.accounts.length).toBeGreaterThanOrEqual(5);
       for (const item of kit.accounts) {
         expect(item.account.id).not.toBe('');
@@ -37,5 +39,23 @@ describe('STARTER_COLLECTION', () => {
         expect(item.account.noindex).not.toBe(true);
       }
     }
+  });
+
+  it('ships every language pack with stable links and the current profile membership', () => {
+    expect(STARTER_KITS.filter((kit) => kit.lang)).toHaveLength(catalog.packs.length);
+    expect(new Set(STARTER_KITS.map((kit) => kit.slug)).size).toBe(STARTER_KITS.length);
+    for (const pack of catalog.packs) {
+      const kit = starterKit(`catalog-${pack.lang}-${pack.slug}`)!;
+      expect(kit.lang).toBe(pack.lang);
+      expect(kit.accounts.map((item) => item.handle)).toEqual(
+        pack.accounts.map((item) => item.acct),
+      );
+      expect(kit.accounts.map((item) => item.account.id)).toEqual(
+        pack.accounts.map((item) => item.id),
+      );
+    }
+    const german = starterKit('catalog-de-technology')!;
+    expect(starterKitText(german, 'de-DE').title).toBe('Technologie');
+    expect(starterKitText(german, 'xx').title).toBe('Technology');
   });
 });

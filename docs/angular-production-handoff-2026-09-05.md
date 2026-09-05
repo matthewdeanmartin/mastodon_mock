@@ -21,7 +21,12 @@ These changes are not a general redesign of live session transitions.
 
 ## Remaining findings
 
-None from this Angular review.
+The follow-up review reproduced two blockers that the original regression tests missed. Both are addressed in the current follow-up:
+
+- **Publishing after metadata waits:** the composer captures the intended publication fingerprint before saving attachment descriptions and checks it again before creating any status. Changes to text, attachments, audience, destination, or identity abort that attempt, preserve the editor, and ask the user to review and send again. A destroyed composer does not resume publication. The Bluesky audience constraint is checked again at that boundary.
+- **Unpark after a failed local save:** server cancellation now requires a durable local save. A quota failure leaves the server copy and the confirmation available for retry. Other draft conversion and to-do actions report save failures instead of success; Home does not navigate to an unsaved draft id. Opening a named draft only removes its named copy after the editor has a durable autosave.
+
+This does not close the queued-request/account-switch credential concern or the Cloudflare audit listed below. Those remain outstanding; passing this Angular test suite is not a complete production security sign-off.
 
 ## Maintenance and next review
 
@@ -34,6 +39,9 @@ The Cloudflare review still needs to cover server-side authorization and cross-a
 Also inspect credential ownership across queued requests and account switches: the current interceptor chain performs rate-limit waiting before automatic token attachment, while account switching activates the new account before verification/reload. Destination checks alone do not prove that a delayed operation retains its initiating identity.
 
 ## Validation
+
+- Follow-up regression suite: **181/181 passed** across the composer and Drafts page. New cases cover publication changes during pending metadata writes, component destruction, adding Bluesky to a private Fedi post during the wait, quota-failed unparking followed by successful retry, and failed conversion success messages.
+- Follow-up final gate: **6,058 passed, zero failed, zero pending** via `make test`. The runtime manifest now protects the ten added regressions. Full lint, i18n, storage registration, changed-source formatting, and whitespace checks passed. The standalone production build and mock-leakage check passed, with existing CommonJS/budget warnings. No deployment or real posting was performed. Logs are in `ui/.test-results/fix-review-*.log`.
 
 - Stable identity regressions: **95/95 targeted tests passed** across scope derivation/adoption, credential rotation, account inspection/deletion, login, and account/storage settings. A second targeted consumer/export run passed **319/319 tests** across client preferences, drafts, RSS stores, Bluesky identity/session handling, storage classification, and portable-config exclusion.
 - Profile-sync request-ordering regressions: held GET and PUT responses, overlapping pull/push, and sign-out during both request types passed in `profile-sync.spec.ts` (**54/54 focused tests passed**; this suite count also includes the conflict coverage recorded below).

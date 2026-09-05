@@ -949,7 +949,7 @@ export class StatusCard {
     const handle = qualifiedHandle(this.display.account);
     const url = this.display.url || '';
     const body = withPkmTag(`Re: @${handle}${url ? ` ${url}` : ''}`, 'todo', vocab);
-    this.drafts.save({
+    const saved = this.drafts.save({
       segments: [body],
       spoilerText: '',
       sensitive: false,
@@ -958,7 +958,9 @@ export class StatusCard {
       quotedStatusId: this.display.id,
       target: 'fedi',
     });
-    this.actionNotice.set(this.transloco.translate('statusCard.todoSaved'));
+    this.actionNotice.set(
+      this.transloco.translate(saved.durable ? 'statusCard.todoSaved' : 'drafts.saveFailed'),
+    );
     setTimeout(() => this.actionNotice.set(null), 4000);
   }
 

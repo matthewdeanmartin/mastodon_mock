@@ -1,73 +1,83 @@
-<div class="page-head">{{ kit.title }}</div>
-
-<section class="intro">
-  <div>
-    <h1>{{ 'starterCollection.heading' | transloco }}</h1>
-    <p class="muted">{{ kit.blurb }}</p>
-  </div>
-  <button
-    class="btn"
-    [disabled]="importer.running() || completed() === accounts.length"
-    (click)="followAll()"
-  >
-    @if (importer.running()) {
-      {{
-        'starterCollection.followingProgress'
-          | transloco: { completed: completed(), total: accounts.length }
-      }}
-    } @else if (completed() === accounts.length) {
-      {{
-        (followed() === 1 ? 'starterCollection.followed.one' : 'starterCollection.followed.other')
-          | transloco: { count: followed() }
-      }}
-    } @else {
-      {{ 'starterCollection.followAll' | transloco: { count: accounts.length } }}
+@if (kit) {
+  <div class="page-head">
+    {{ text().title }}
+    @if (kit.lang) {
+      · {{ kit.lang }}
     }
-  </button>
-</section>
+  </div>
 
-<div
-  class="members"
-  [attr.aria-label]="'starterCollection.membersAria' | transloco: { title: kit.title }"
->
-  @for (item of accounts; track item.handle) {
-    <div class="member">
-      <button
-        type="button"
-        class="member-link"
-        [disabled]="opening() !== null"
-        (click)="openAccount(item)"
-      >
-        <strong>{{ item.name }}</strong>
-        <span class="muted">&#64;{{ item.handle }}</span>
-      </button>
-      @if (opening() === item.handle) {
-        <span class="muted small">{{ 'starterCollection.opening' | transloco }}</span>
+  <section class="intro">
+    <div>
+      <h1>{{ 'starterCollection.heading' | transloco }}</h1>
+      <p class="muted">{{ text().blurb }}</p>
+    </div>
+    <button
+      class="btn"
+      [disabled]="importer.running() || completed() === accounts.length"
+      (click)="followAll()"
+    >
+      @if (importer.running()) {
+        {{
+          'starterCollection.followingProgress'
+            | transloco: { completed: completed(), total: accounts.length }
+        }}
+      } @else if (completed() === accounts.length) {
+        {{
+          (followed() === 1 ? 'starterCollection.followed.one' : 'starterCollection.followed.other')
+            | transloco: { count: followed() }
+        }}
       } @else {
-        @switch (status(item.handle)) {
-          @case ('resolving') {
-            <span class="muted small">{{ 'starterCollection.lookingUp' | transloco }}</span>
-          }
-          @case ('following') {
-            <span class="muted small">{{ 'starterCollection.followingRow' | transloco }}</span>
-          }
-          @case ('followed') {
-            <span class="success small">{{ 'starterCollection.followingDone' | transloco }}</span>
-          }
-          @case ('not_found') {
-            <span class="muted small">{{ 'starterCollection.notFound' | transloco }}</span>
-          }
-          @case ('failed') {
-            <span class="muted small">{{ 'starterCollection.couldNotFollow' | transloco }}</span>
+        {{ 'starterCollection.followAll' | transloco: { count: accounts.length } }}
+      }
+    </button>
+  </section>
+
+  <div
+    class="members"
+    [attr.aria-label]="'starterCollection.membersAria' | transloco: { title: text().title }"
+  >
+    @for (item of accounts; track item.handle) {
+      <div class="member">
+        <button
+          type="button"
+          class="member-link"
+          [disabled]="opening() !== null"
+          (click)="openAccount(item)"
+        >
+          <strong>{{ item.name }}</strong>
+          <span class="muted">&#64;{{ item.handle }}</span>
+        </button>
+        @if (opening() === item.handle) {
+          <span class="muted small">{{ 'starterCollection.opening' | transloco }}</span>
+        } @else {
+          @switch (status(item.handle)) {
+            @case ('resolving') {
+              <span class="muted small">{{ 'starterCollection.lookingUp' | transloco }}</span>
+            }
+            @case ('following') {
+              <span class="muted small">{{ 'starterCollection.followingRow' | transloco }}</span>
+            }
+            @case ('followed') {
+              <span class="success small">{{ 'starterCollection.followingDone' | transloco }}</span>
+            }
+            @case ('not_found') {
+              <span class="muted small">{{ 'starterCollection.notFound' | transloco }}</span>
+            }
+            @case ('failed') {
+              <span class="muted small">{{ 'starterCollection.couldNotFollow' | transloco }}</span>
+            }
           }
         }
-      }
-    </div>
-  }
-</div>
+      </div>
+    }
+  </div>
 
-<p class="muted small note">
-  {{ 'starterCollection.note' | transloco }}
-  <a routerLink="/find-friends">{{ 'starterCollection.findFriends' | transloco }}</a
-  >.
-</p>
+  <p class="muted small note">
+    {{ 'starterCollection.note' | transloco }}
+    <a routerLink="/find-friends">{{ 'starterCollection.findFriends' | transloco }}</a
+    >.
+  </p>
+} @else {
+  <p>{{ 'starterCollection.unavailable' | transloco }}</p>
+  <a routerLink="/bundled-starter-kits">{{ 'starterCollection.browse' | transloco }}</a>
+}

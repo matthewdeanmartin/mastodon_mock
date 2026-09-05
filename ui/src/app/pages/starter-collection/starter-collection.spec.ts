@@ -5,12 +5,16 @@ import { ActivatedRoute, convertToParamMap, Router, provideRouter } from '@angul
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { StarterCollection } from './starter-collection';
+import { ImportFollows } from '../../import-follows';
+import { starterKit } from '../../starter-collection';
 
 describe('StarterCollection', () => {
   let httpMock: HttpTestingController;
+  let routeStub: { snapshot: { paramMap: ReturnType<typeof convertToParamMap> } };
 
   beforeEach(() => {
     localStorage.clear();
+    routeStub = { snapshot: { paramMap: convertToParamMap({ slug: 'infosec' }) } };
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -18,7 +22,7 @@ describe('StarterCollection', () => {
         provideRouter([]),
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: convertToParamMap({ slug: 'infosec' }) } },
+          useValue: routeStub,
         },
       ],
     });
@@ -58,5 +62,49 @@ describe('StarterCollection', () => {
 
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('InfoSec');
     expect(fixture.componentInstance['accounts']).toHaveLength(8);
+  });
+
+  it('follows a catalogue kit anonymously using its home-instance snapshots', async () => {
+    routeStub.snapshot.paramMap = convertToParamMap({
+      slug: 'catalog-de-technology',
+    });
+    const fixture = TestBed.createComponent(StarterCollection);
+    fixture.detectChanges();
+    const importer = TestBed.inject(ImportFollows);
+    const kit = starterKit('catalog-de-technology')!;
+    expect(importer.rows().map((row) => row.account?.id)).toEqual(
+      kit.accounts.map((item) => item.account.id),
+    );
+    await importer.start();
+    expect(importer.rows().every((row) => row.status === 'followed')).toBe(true);
+    httpMock.expectNone((request) => request.url.includes('/api/v2/search'));
+  });
+
+  it('resolves catalogue handles for signed-in follow-all instead of using foreign IDs', () => {
+    routeStub.snapshot.paramMap = convertToParamMap({
+      slug: 'catalog-de-technology',
+    });
+    vi.spyOn(TestBed.inject(Auth), 'isAnonymous', 'get').mockReturnValue(false);
+    const fixture = TestBed.createComponent(StarterCollection);
+    fixture.detectChanges();
+    const importer = TestBed.inject(ImportFollows);
+    expect(importer.rows().map((row) => row.handle)).toEqual(
+      starterKit('catalog-de-technology')!.accounts.map((item) => item.handle),
+    );
+    expect(importer.rows().every((row) => row.account === undefined)).toBe(true);
+    const start = vi.spyOn(importer, 'start').mockResolvedValue();
+    fixture.componentInstance.followAll();
+    expect(start).toHaveBeenCalledOnce();
+  });
+
+  it('does not substitute another kit for a removed catalogue link', () => {
+    routeStub.snapshot.paramMap = convertToParamMap({
+      slug: 'catalog-de-removed',
+    });
+    const fixture = TestBed.createComponent(StarterCollection);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('no longer available');
+    expect(fixture.nativeElement.querySelector('button')).toBeNull();
+    expect(TestBed.inject(ImportFollows).rows()).toEqual([]);
   });
 });

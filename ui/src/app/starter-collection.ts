@@ -1,5 +1,6 @@
 import { Account } from './models';
 import { BUNDLED_STARTER_KITS } from './bundled-starter-kits.generated';
+import catalog from './starter-catalog.generated.json';
 
 /** A code-shipped account snapshot used to make Anonymous follows instant and offline-first. */
 export interface StarterAccount {
@@ -14,6 +15,9 @@ export interface StarterKit {
   title: string;
   blurb: string;
   accounts: readonly StarterAccount[];
+  lang?: string;
+  titles?: Readonly<Record<string, string>>;
+  blurbs?: Readonly<Record<string, string>>;
 }
 
 function starter(name: string, handle: string, id: string): StarterAccount {
@@ -74,6 +78,29 @@ export const STARTER_COLLECTION: readonly StarterAccount[] = [
 ];
 
 export const STARTER_KITS: readonly StarterKit[] = [
+  ...catalog.packs.map(
+    (pack): StarterKit => ({
+      slug: `catalog-${pack.lang}-${pack.slug}`,
+      lang: pack.lang,
+      title: pack.title.en,
+      blurb: pack.blurb.en,
+      titles: pack.title,
+      blurbs: pack.blurb,
+      accounts: pack.accounts.map((profile) => ({
+        name: profile.displayName || profile.acct.split('@')[0],
+        handle: profile.acct,
+        account: {
+          ...starter(profile.displayName, profile.acct, profile.id).account,
+          note: profile.note,
+          url: profile.url,
+          avatar: profile.avatar,
+          avatar_static: profile.avatar,
+          followers_count: profile.followers,
+          bot: profile.bot,
+        },
+      })),
+    }),
+  ),
   {
     slug: 'starter',
     title: 'Universal starter kit',
@@ -92,6 +119,16 @@ export const STARTER_KITS: readonly StarterKit[] = [
     })),
   })),
 ];
+
+export const STARTER_CATALOG_UPDATED_AT = catalog.generatedAt;
+
+export function starterKitText(kit: StarterKit, locale: string): { title: string; blurb: string } {
+  const language = locale.toLowerCase().split(/[-_]/)[0];
+  return {
+    title: kit.titles?.[language] ?? kit.title,
+    blurb: kit.blurbs?.[language] ?? kit.blurb,
+  };
+}
 
 export function starterKit(slug: string): StarterKit | null {
   return STARTER_KITS.find((kit) => kit.slug === slug) ?? null;

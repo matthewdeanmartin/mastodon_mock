@@ -1,5 +1,5 @@
 import { SHIPPED_STARTER_KITS } from '../../starter-kits';
-import { STARTER_KITS } from '../../starter-collection';
+import { STARTER_KITS, starterKitText } from '../../starter-collection';
 
 /**
  * One curated set of accounts that matched a search, whichever kind it is.
@@ -40,18 +40,25 @@ export interface KitMatch {
  * items, the cost of a false positive is one extra row above the real results,
  * and the cost of a false negative is the feature not existing for that reader.
  */
-export function kitMatchesFor(query: string, limit = 3): KitMatch[] {
+export function kitMatchesFor(
+  query: string,
+  limit = 3,
+  languages?: ReadonlySet<string>,
+  locale = 'en',
+): KitMatch[] {
   const needle = query.trim().toLowerCase().replace(/^[#@]/, '');
   if (needle.length < 2) {
     return [];
   }
   const matches: KitMatch[] = [];
   for (const kit of STARTER_KITS) {
-    if (hits(needle, kit.title, kit.blurb)) {
+    if (kit.lang && languages && !languages.has(kit.lang)) continue;
+    const text = starterKitText(kit, locale);
+    if (hits(needle, text.title, text.blurb, kit.title, kit.blurb)) {
       matches.push({
         kind: 'kit',
-        title: kit.title,
-        blurb: kit.blurb,
+        title: kit.lang ? `${text.title} · ${kit.lang}` : text.title,
+        blurb: text.blurb,
         accountCount: kit.accounts.length,
         link: kit.slug === 'starter' ? '/collections/starter' : `/collections/starter/${kit.slug}`,
       });

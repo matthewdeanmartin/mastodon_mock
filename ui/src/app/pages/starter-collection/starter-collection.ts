@@ -8,7 +8,8 @@ import { ImportFollows } from '../../import-follows';
 import { Account } from '../../models';
 import { AnonymousPublicApi } from '../../providers/anonymous/anonymous-public-api';
 import { anonymousAccountRouteRef } from '../../providers/anonymous/anonymous-route-ref';
-import { starterKit, StarterAccount } from '../../starter-collection';
+import { starterKit, StarterAccount, starterKitText } from '../../starter-collection';
+import { UiLocale } from '../../i18n/locale';
 
 // i18n starterCollection.heading: A timeline in one click
 // i18n starterCollection.followingProgress: Following… {{completed}}/{{total}}
@@ -24,6 +25,8 @@ import { starterKit, StarterAccount } from '../../starter-collection';
 // i18n starterCollection.couldNotFollow: Could not follow
 // i18n starterCollection.note: Anonymous follows use the collection’s built-in account snapshot immediately. Signed-in follows are resolved by your server before the real follow request is sent.
 // i18n starterCollection.findFriends: Find friends another way
+// i18n starterCollection.unavailable: This starter kit is no longer available. Browse the current kits to find people to follow.
+// i18n starterCollection.browse: Browse starter kits
 @Component({
   selector: 'app-starter-collection',
   imports: [RouterLink, TranslocoPipe],
@@ -37,9 +40,12 @@ export class StarterCollection implements OnInit {
   private anonymousPublic = inject(AnonymousPublicApi);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  protected kit =
-    starterKit(this.route.snapshot.paramMap.get('slug') ?? 'starter') ?? starterKit('starter')!;
-  protected accounts = this.kit.accounts;
+  protected kit = starterKit(this.route.snapshot.paramMap.get('slug') ?? 'starter');
+  protected accounts = this.kit?.accounts ?? [];
+  private locale = inject(UiLocale);
+  protected text = computed(() =>
+    this.kit ? starterKitText(this.kit, this.locale.active()) : { title: '', blurb: '' },
+  );
   protected opening = signal<string | null>(null);
   protected completed = computed(
     () =>

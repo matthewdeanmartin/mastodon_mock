@@ -55,4 +55,17 @@ describe('kitMatchesFor', () => {
     // 'a' is excluded by length, so use a common word that will hit widely.
     expect(kitMatchesFor('the', 3).length).toBeLessThanOrEqual(3);
   });
+
+  it('matches translated titles in known languages and excludes foreign variants', () => {
+    const matches = kitMatchesFor('Technologie', 20, new Set(['de']), 'de');
+    expect(matches.map((match) => match.link)).toContain(
+      '/collections/starter/catalog-de-technology',
+    );
+    expect(matches.map((match) => match.link)).not.toContain(
+      '/collections/starter/catalog-fr-technology',
+    );
+    expect(matches.find((match) => match.link.endsWith('catalog-de-technology'))?.title).toBe(
+      'Technologie · de',
+    );
+  });
 });

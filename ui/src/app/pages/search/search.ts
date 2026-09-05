@@ -92,6 +92,8 @@ import { Chip, ExplainPanel, explainPostSearch, postChips } from './search-expla
 import { isBlueskySaved, isMastodonSaved, SavedSearches } from './saved-searches';
 import { RecentSearches, RecentSearch } from './recent-searches';
 import { kitMatchesFor } from './kit-matches';
+import { KnownLanguages } from '../../trend-language-filter';
+import { UiLocale } from '../../i18n/locale';
 import { BlueskyPostSearch } from '../../providers/bluesky/bluesky-post-search';
 import { decodeSearchFromParams, encodeSearchToParams } from './search-url';
 import { PageDiagnostics } from '../../page-diagnostics';
@@ -1592,8 +1594,12 @@ export class Search implements OnInit, OnDestroy {
    * Only on the accounts tab: that is the "who should I follow" search, which
    * is the question a kit answers. On a post search it would be an interruption.
    */
+  private readonly kitLanguages = inject(KnownLanguages);
+  private readonly kitLocale = inject(UiLocale);
   protected kitMatches = computed(() =>
-    this.type() === 'accounts' ? kitMatchesFor(this.ranQuery()) : [],
+    this.type() === 'accounts'
+      ? kitMatchesFor(this.ranQuery(), 3, this.kitLanguages.codes(), this.kitLocale.active())
+      : [],
   );
 
   /**

@@ -1,3 +1,7 @@
+@if (writingError()) {
+  <p role="alert">{{ 'drafts.saveFailed' | transloco }}</p>
+}
+
 @if (!auth.isAnonymous) {
   <app-announcements />
 }

@@ -7,6 +7,7 @@ import { ClientPrefs } from '../client-prefs';
 import { Drafts } from '../drafts';
 import { Status } from '../models';
 import { Auth } from '../auth';
+import { Server } from '../server';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
 import { CorsProxySettings } from '../providers/cors-proxy/cors-proxy-settings';
 import { ShortenerSettings } from '../providers/shortener/shortener-settings';
@@ -614,6 +615,67 @@ describe('Compose', () => {
     const post = httpMock.expectOne('/api/v1/statuses');
     expect(post.request.body.media_ids).toEqual(['media-1', 'media-2']);
     post.flush({ id: '1' });
+  });
+
+  it.each(['audience', 'destination', 'text', 'attachments', 'server', 'account', 'destroy'])(
+    'does not publish a changed %s after attachment metadata finishes',
+    (change) => {
+      linkBsky();
+      const f = setUp();
+      internals(f).onTargetChange('both');
+      internals(f).text.set('Pending writing');
+      internals(f).media.set([{ media: { id: 'media-1' }, description: 'Image' }]);
+      internals(f).submit();
+      const metadata = httpMock.expectOne('/api/v1/media/media-1');
+      switch (change) {
+        case 'audience':
+          internals(f).onVisibilityChange('private');
+          break;
+        case 'destination':
+          internals(f).onTargetChange('fedi');
+          break;
+        case 'text':
+          internals(f).text.set('Edited writing');
+          break;
+        case 'attachments':
+          internals(f).removeMedia(0);
+          break;
+        case 'server':
+          TestBed.inject(Server).setBaseUrl('https://other.example');
+          break;
+        case 'account':
+          TestBed.inject(Auth).account.set({ id: 'other' } as never);
+          break;
+        case 'destroy':
+          f.destroy();
+          break;
+      }
+      metadata.flush({ id: 'media-1' });
+      httpMock.expectNone(CREATE_RECORD);
+      httpMock.expectNone('/api/v1/statuses');
+      if (change !== 'destroy') {
+        expect(internals(f).submitting()).toBe(false);
+        expect(internals(f).text()).not.toBe('');
+        expect(internals(f).crossPostError()).toContain('Review your post');
+      }
+    },
+  );
+
+  it('does not add a public Bluesky leg to a private Fedi post during metadata saving', () => {
+    linkBsky();
+    const f = setUp();
+    internals(f).text.set('Private writing');
+    internals(f).onVisibilityChange('private');
+    internals(f).media.set([{ media: { id: 'media-1' }, description: 'Image' }]);
+    internals(f).submit();
+    const metadata = httpMock.expectOne('/api/v1/media/media-1');
+    internals(f).onTargetChange('both');
+    internals(f).removeMedia(0);
+    metadata.flush({ id: 'media-1' });
+    httpMock.expectNone(CREATE_RECORD);
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).visibility()).toBe('private');
+    expect(internals(f).text()).toBe('Private writing');
   });
 
   it('keeps text, attachment, and description when a media description update fails', () => {
