@@ -418,6 +418,10 @@
         </select>
       }
 
+      @if (targetIncludesBsky()) {
+        <p class="compose-warning" role="status">{{ 'compose.bskyAudience' | transloco }}</p>
+      }
+
       @if (!targetIncludesPaste() && !targetIncludesBlog() && !targetIncludesBsky()) {
         <select
           class="visibility-select"

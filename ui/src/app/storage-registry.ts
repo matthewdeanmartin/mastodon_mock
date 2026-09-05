@@ -517,16 +517,16 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
   {
     base: 'mockingbird_drafts',
     storage: 'local',
-    suffix: 'none',
+    suffix: 'account',
     sensitivity: 'content',
-    note: 'Unpublished post drafts.',
+    note: 'Unpublished drafts scoped by server and account. Unscoped keys are no longer loaded.',
   },
   {
     base: 'mockingbird_compose_autosave',
     storage: 'local',
-    suffix: 'none',
+    suffix: 'account',
     sensitivity: 'content',
-    note: 'In-progress composer text.',
+    note: 'In-progress composer text scoped by server and account. Unscoped keys are no longer loaded.',
   },
   {
     base: 'mockingbird_pastes',

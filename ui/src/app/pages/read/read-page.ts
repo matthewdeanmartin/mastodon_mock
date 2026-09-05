@@ -71,7 +71,7 @@ export class ReadPage implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
-  private drafts = inject(Drafts);
+  private drafts = inject(Drafts).forCurrentAccount();
   private readingZen = inject(ReadingZen);
 
   protected readonly prefs = inject(ClientPrefs);

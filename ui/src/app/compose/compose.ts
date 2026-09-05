@@ -392,6 +392,7 @@ function dragHasFiles(event: DragEvent): boolean {
 // i18n compose.titlePrefix: Title:
 // i18n compose.togglePreview: Toggle preview
 // i18n compose.visibility: Visibility
+// i18n compose.bskyAudience: Bluesky posts are public. Choose public visibility to publish to Bluesky, or select Fedi to keep a restricted audience.
 // i18n compose.visibilityFixed: Visibility is fixed here
 // i18n compose.warn.blogOneDoc: Blog posts accept one titled Markdown document here — remove media, polls, thread boxes, or scheduling.
 // i18n compose.warn.bskyNoPolls: Bluesky has no polls — remove the poll first.
@@ -449,7 +450,7 @@ export class Compose implements OnDestroy {
   private linkShortening = inject(LinkShortening);
   private bskyApi = inject(BlueskyApi);
   protected bskySession = inject(BlueskySession);
-  private drafts = inject(Drafts);
+  private drafts = inject(Drafts).forCurrentAccount();
   private customEmojis = inject(CustomEmojis);
   protected pasteProviders = inject(PasteProviderRegistry);
   private pasteHistory = inject(PasteHistory);
@@ -994,6 +995,9 @@ export class Compose implements OnDestroy {
   protected targetIncludesBsky = computed(
     () => this.showTargetPicker() && (this.target() === 'bsky' || this.target() === 'both'),
   );
+  protected readonly bskyAudienceBlocked = computed(
+    () => this.targetIncludesBsky() && this.visibility() !== 'public',
+  );
   protected targetIncludesPaste = computed(
     () =>
       this.showTargetPicker() && this.target() === 'paste' && this.featureFlags.enabled('pastebin'),
@@ -1210,7 +1214,7 @@ export class Compose implements OnDestroy {
       // Threads are supported (posted as a chain of replies) and so are images,
       // so the only text rule is that the first box has something in it;
       // per-box length is already covered by `overLimit` above.
-      if (!this.text().trim()) {
+      if (this.bskyAudienceBlocked() || !this.text().trim()) {
         return false;
       }
       // Polls remain the one thing a Bluesky leg cannot carry — the protocol has
@@ -1998,6 +2002,10 @@ export class Compose implements OnDestroy {
   }
 
   private send(): void {
+    // Recheck after the undo-send timer: the audience may have changed since submit.
+    if (this.bskyAudienceBlocked()) {
+      return;
+    }
     if (this.target() === 'paste' && !this.featureFlags.enabled('pastebin')) {
       this.crossPostError.set('Pastebin is disabled in Feature flags.');
       return;

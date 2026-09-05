@@ -97,4 +97,34 @@ describe('authInterceptor', () => {
     expect(req.request.headers.get('Authorization')).toBe('Bearer caller-supplied-token');
     req.flush([]);
   });
+
+  it('authenticates only the selected instance API, without relying on opt-out contexts', () => {
+    TestBed.inject(Server).setBaseUrl('https://social.example');
+    auth.setToken('instance-secret');
+    const urls = [
+      'https://social.example/api/v1/timelines/home',
+      'https://social.example.evil.test/api/v1/timelines/home',
+      'https://evil.test/api/v1/timelines/home',
+      'http://social.example/api/v1/timelines/home',
+      'https://social.example:444/api/v1/timelines/home',
+      'https://social.example/i18n/en.json',
+      new URL('i18n/en.json', document.baseURI).toString(),
+    ];
+    for (const url of urls) {
+      httpClient.get(url).subscribe();
+      const request = httpMock.expectOne(url);
+      expect(request.request.headers.get('Authorization')).toBe(
+        url === urls[0] ? 'Bearer instance-secret' : null,
+      );
+      request.flush({});
+    }
+  });
+
+  it('does not authenticate same-origin assets even with a same-origin instance', () => {
+    auth.setToken('instance-secret');
+    httpClient.get(new URL('i18n/en.json', document.baseURI).toString()).subscribe();
+    const request = httpMock.expectOne(new URL('i18n/en.json', document.baseURI).toString());
+    expect(request.request.headers.has('Authorization')).toBe(false);
+    request.flush({});
+  });
 });

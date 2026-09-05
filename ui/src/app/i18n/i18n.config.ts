@@ -30,6 +30,7 @@ import {
 } from '@jsverse/transloco';
 import { Observable } from 'rxjs';
 import { FALLBACK_LOCALE, SUPPORTED_LOCALES, TranslocoLocaleSync } from './locale';
+import { externalFetch } from '../providers/external-fetch';
 
 /**
  * Loads `i18n/{lang}.json` from the deployment's own base.
@@ -48,7 +49,7 @@ export class HttpTranslocoLoader implements TranslocoLoader {
 
   getTranslation(lang: string): Observable<Translation> {
     const url = new URL(`i18n/${lang}.json`, document.baseURI).toString();
-    return this.http.get<Translation>(url);
+    return this.http.get<Translation>(url, { context: externalFetch() });
   }
 }
 

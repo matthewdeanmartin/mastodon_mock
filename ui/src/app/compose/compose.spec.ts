@@ -1236,22 +1236,17 @@ describe('Compose', () => {
     // Reproduces the bug where selecting Rentry still posted to the previously
     // autosaved Pastepile: the seed effect re-ran, reloaded the old autosave,
     // and clobbered the live pick. Seed a stale pastepile autosave first.
-    localStorage.setItem(
-      'mockingbird_compose_autosave',
-      JSON.stringify({
-        new: {
-          segments: ['stale draft body'],
-          spoilerText: '',
-          sensitive: false,
-          visibility: 'unlisted',
-          poll: null,
-          target: 'paste',
-          pasteProviderId: 'pastepile',
-          pasteLanguage: 'plaintext',
-          pasteExpiry: '1w',
-        },
-      }),
-    );
+    TestBed.inject(Drafts).autosave('new', {
+      segments: ['stale draft body'],
+      spoilerText: '',
+      sensitive: false,
+      visibility: 'unlisted',
+      poll: null,
+      target: 'paste',
+      pasteProviderId: 'pastepile',
+      pasteLanguage: 'plaintext',
+      pasteExpiry: '1w',
+    });
 
     const f = setUp();
     // The stale autosave seeded pastepile…
@@ -1371,6 +1366,46 @@ describe('Compose', () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0].id).toBe('m1');
+  });
+
+  it('requires public visibility for Bluesky and Both without widening a private draft', () => {
+    linkBsky();
+    const f = setUp();
+    internals(f).text.set('restricted writing');
+    for (const target of ['bsky', 'both'] as const) {
+      for (const visibility of ['private', 'direct', 'unlisted']) {
+        internals(f).onVisibilityChange(visibility);
+        internals(f).onTargetChange(target);
+        f.detectChanges();
+        expect(internals(f).visibility()).toBe(visibility);
+        expect(internals(f).canSubmit()).toBe(false);
+        expect((f.nativeElement as HTMLElement).textContent).toContain('Bluesky posts are public');
+        internals(f).submit();
+        httpMock.expectNone(CREATE_RECORD);
+        httpMock.expectNone('/api/v1/statuses');
+      }
+    }
+    internals(f).onVisibilityChange('public');
+    expect(internals(f).canSubmit()).toBe(true);
+    internals(f).onTargetChange('fedi');
+    internals(f).onVisibilityChange('private');
+    expect(internals(f).canSubmit()).toBe(true);
+  });
+
+  it('rechecks the Bluesky audience when an undo-send countdown finishes', () => {
+    vi.useFakeTimers();
+    linkBsky();
+    TestBed.inject(ClientPrefs).setDelayedSend(true);
+    const f = setUp();
+    internals(f).onTargetChange('both');
+    internals(f).text.set('pending post');
+    internals(f).submit();
+    expect(internals(f).countdown()).toBe(30);
+    internals(f).onVisibilityChange('private');
+    vi.advanceTimersByTime(30_000);
+    httpMock.expectNone(CREATE_RECORD);
+    httpMock.expectNone('/api/v1/statuses');
+    expect(internals(f).text()).toBe('pending post');
   });
 
   it('a failed Bluesky leg on "both" surfaces an error without retracting the Fedi post', () => {

@@ -300,7 +300,7 @@ export class WritePage implements OnInit, OnDestroy {
   protected workspace = inject(WriteWorkspace);
   protected zen = inject(WritingZen);
   protected auth = inject(Auth);
-  private drafts = inject(Drafts);
+  private drafts = inject(Drafts).forCurrentAccount();
   protected prefs = inject(ClientPrefs);
   private api = inject(Api);
   private featureFlags = inject(FeatureFlags);

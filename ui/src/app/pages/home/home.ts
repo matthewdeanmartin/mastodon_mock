@@ -208,7 +208,7 @@ export class Home implements OnInit, OnDestroy {
   protected eliza = inject(ElizaService);
   protected localPosts = inject(LocalPostStore);
   private route = inject(ActivatedRoute);
-  private drafts = inject(Drafts);
+  private drafts = inject(Drafts).forCurrentAccount();
   private router = inject(Router);
   private flags = inject(FeatureFlags);
   private pasteFeeds = inject(PasteFeedSubscriptions);

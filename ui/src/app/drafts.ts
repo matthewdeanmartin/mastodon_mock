@@ -1,5 +1,8 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { MediaAttachment } from './models';
+import { accountScopeSuffix } from './account-scope';
+import { Auth } from './auth';
+import { Server } from './server';
 
 /** Poll state carried in a draft (mirrors the composer's poll builder). */
 export interface DraftPoll {
@@ -105,9 +108,16 @@ export function emptyDraftSnapshot(visibility: string): DraftSnapshot {
  * and a per-context autosave slot so a stray reload never eats a half-written
  * post. Context keys are 'new', 'reply:<id>' or 'quote:<id>'.
  */
-@Injectable({ providedIn: 'root' })
-export class Drafts {
-  readonly drafts = signal<Draft[]>(loadJson<Draft[]>(DRAFTS_KEY) ?? []);
+export class AccountDrafts {
+  private readonly draftsKey: string;
+  private readonly autosaveKey: string;
+  readonly drafts;
+
+  constructor(namespace: string) {
+    this.draftsKey = `${DRAFTS_KEY}${namespace}`;
+    this.autosaveKey = `${AUTOSAVE_KEY}${namespace}`;
+    this.drafts = signal<Draft[]>(loadJson<Draft[]>(this.draftsKey) ?? []);
+  }
 
   get(id: string): Draft | undefined {
     return this.drafts().find((d) => d.id === id);
@@ -200,30 +210,88 @@ export class Drafts {
   // --- autosave slots ---
 
   autosave(contextKey: string, snapshot: DraftSnapshot): void {
-    const slots = loadJson<Record<string, DraftSnapshot>>(AUTOSAVE_KEY) ?? {};
+    const slots = loadJson<Record<string, DraftSnapshot>>(this.autosaveKey) ?? {};
     if (draftHasContent(snapshot)) {
       slots[contextKey] = snapshot;
     } else {
       delete slots[contextKey];
     }
-    storeJson(AUTOSAVE_KEY, slots);
+    storeJson(this.autosaveKey, slots);
   }
 
   loadAutosave(contextKey: string): DraftSnapshot | null {
-    const slots = loadJson<Record<string, DraftSnapshot>>(AUTOSAVE_KEY) ?? {};
+    const slots = loadJson<Record<string, DraftSnapshot>>(this.autosaveKey) ?? {};
     return slots[contextKey] ?? null;
   }
 
   clearAutosave(contextKey: string): void {
-    const slots = loadJson<Record<string, DraftSnapshot>>(AUTOSAVE_KEY) ?? {};
+    const slots = loadJson<Record<string, DraftSnapshot>>(this.autosaveKey) ?? {};
     if (contextKey in slots) {
       delete slots[contextKey];
-      storeJson(AUTOSAVE_KEY, slots);
+      storeJson(this.autosaveKey, slots);
     }
   }
 
   private persist(): void {
-    storeJson(DRAFTS_KEY, this.drafts());
+    storeJson(this.draftsKey, this.drafts());
+  }
+}
+
+/** Root readers follow the active account; writing surfaces capture an owned store. */
+@Injectable({ providedIn: 'root' })
+export class Drafts {
+  private readonly auth = inject(Auth);
+  private readonly server = inject(Server);
+  private readonly stores = new Map<string, AccountDrafts>();
+  private readonly active = computed(() => {
+    this.auth.kind();
+    this.auth.token();
+    this.auth.account();
+    const server = encodeURIComponent(this.server.baseUrl() || location.origin);
+    const namespace = `_${server}${accountScopeSuffix() || '_signed_out'}`;
+    let store = this.stores.get(namespace);
+    if (!store) {
+      store = new AccountDrafts(namespace);
+      this.stores.set(namespace, store);
+    }
+    return store;
+  });
+  readonly drafts = computed(() => this.active().drafts());
+  readonly hasHandoff = computed(() => this.active().hasHandoff());
+
+  forCurrentAccount(): AccountDrafts {
+    return this.active();
+  }
+  get(id: string): Draft | undefined {
+    return this.active().get(id);
+  }
+  save(snapshot: DraftSnapshot): string {
+    return this.active().save(snapshot);
+  }
+  update(id: string, snapshot: DraftSnapshot): boolean {
+    return this.active().update(id, snapshot);
+  }
+  remove(id: string): void {
+    this.active().remove(id);
+  }
+  autosave(contextKey: string, snapshot: DraftSnapshot): void {
+    this.active().autosave(contextKey, snapshot);
+  }
+  loadAutosave(contextKey: string): DraftSnapshot | null {
+    return this.active().loadAutosave(contextKey);
+  }
+  clearAutosave(contextKey: string): void {
+    this.active().clearAutosave(contextKey);
+  }
+  handoff(
+    snapshot: DraftSnapshot,
+    selfStatusId?: string,
+    options: Omit<DraftHandoff, 'snapshot' | 'selfStatusId'> = {},
+  ): void {
+    this.active().handoff(snapshot, selfStatusId, options);
+  }
+  takeHandoff(): DraftHandoff | null {
+    return this.active().takeHandoff();
   }
 }
 

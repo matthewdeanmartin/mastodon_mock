@@ -132,7 +132,7 @@ export class ConnectionHugo implements OnInit {
   private readonly validate = inject(HugoValidate);
   private readonly github = inject(GitHubSession);
   private readonly hugoEdit = inject(HugoEditSession);
-  private readonly drafts = inject(Drafts);
+  private readonly drafts = inject(Drafts).forCurrentAccount();
   private readonly diagnostics = inject(PageDiagnostics);
   private readonly prefs = inject(ClientPrefs);
   private readonly router = inject(Router);

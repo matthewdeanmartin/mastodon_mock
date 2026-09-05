@@ -232,7 +232,7 @@ export class DraftsPage implements OnInit {
   protected sources = inject(DraftSources);
   private api = inject(Api);
   private router = inject(Router);
-  private drafts = inject(Drafts);
+  private drafts = inject(Drafts).forCurrentAccount();
   private pastes = inject(PasteHistory);
   protected auth = inject(Auth);
   protected featureFlags = inject(FeatureFlags);

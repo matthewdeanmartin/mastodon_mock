@@ -343,7 +343,7 @@ export class StatusCard {
   /** Resolves the "everyone I follow" trust levels; read for its revision. */
   private followTrust = inject(FollowTrust);
   /** For "Save as to-do", which parks a local draft rather than publishing. */
-  private drafts = inject(Drafts);
+  private drafts = inject(Drafts).forCurrentAccount();
   private actions = inject(StatusActions);
   private router = inject(Router);
   private mutedPosts = inject(MutedPosts);

@@ -96,7 +96,7 @@ export class PastesPage {
   private feeds = inject(PasteFeedSubscriptions);
   private feedFetch = inject(PasteFeedFetch);
   protected pastepileKey = inject(PastepileKey);
-  private drafts = inject(Drafts);
+  private drafts = inject(Drafts).forCurrentAccount();
   private prefs = inject(ClientPrefs);
   private router = inject(Router);
   private diagnostics = inject(PageDiagnostics);

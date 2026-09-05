@@ -14,6 +14,19 @@ describe('SessionTeardown', () => {
   });
 
   describe('clearAnonymousData', () => {
+    it('backs up and removes anonymous scoped drafts while retaining other owners and legacy data', () => {
+      const anonymous = 'mockingbird_drafts_https%3A%2F%2Fone.example_anonymous';
+      const signedIn = 'mockingbird_drafts_https%3A%2F%2Fone.example_abc';
+      localStorage.setItem(anonymous, '["anonymous writing"]');
+      localStorage.setItem(signedIn, '["signed in writing"]');
+      localStorage.setItem('mockingbird_drafts', '["unknown owner"]');
+      expect(teardown.backup('anonymous').values[anonymous]).toBe('["anonymous writing"]');
+      expect(teardown.backup('anonymous').values[signedIn]).toBeUndefined();
+      teardown.clearAnonymousData();
+      expect(localStorage.getItem(anonymous)).toBeNull();
+      expect(localStorage.getItem(signedIn)).not.toBeNull();
+      expect(localStorage.getItem('mockingbird_drafts')).not.toBeNull();
+    });
     it('removes the anonymous session and nothing else', () => {
       localStorage.setItem('mockingbird_anonymous_follows', '{"follows":[]}');
       localStorage.setItem('mockingbird_anonymous_lists', '{"lists":[]}');

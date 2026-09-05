@@ -28,6 +28,11 @@ import { STORAGE_KEYS, classifyStorageKey, matchesKey } from './storage-registry
 /** IndexedDB databases the app creates. Not in the key registry, which is localStorage-only. */
 const INDEXED_DB_NAMES = ['mockingbird_rss', 'mockingbird_twitter'] as const;
 
+function isAnonymousData(key: string): boolean {
+  const spec = classifyStorageKey(key);
+  return spec?.group === 'anonymous' || (spec?.suffix === 'account' && key.endsWith('_anonymous'));
+}
+
 export const BACKUP_KIND = 'mawkingbird-browser-backup';
 export const BACKUP_VERSION = 1;
 
@@ -50,7 +55,7 @@ export class SessionTeardown {
    * failure this guards against.
    */
   clearAnonymousData(storage: Storage = localStorage): number {
-    return this.removeMatching(storage, (key) => classifyStorageKey(key)?.group === 'anonymous');
+    return this.removeMatching(storage, isAnonymousData);
   }
 
   /**
@@ -116,7 +121,7 @@ export class SessionTeardown {
       if (!spec || spec.sensitivity === 'secret') {
         continue;
       }
-      if (scope === 'anonymous' && spec.group !== 'anonymous') {
+      if (scope === 'anonymous' && !isAnonymousData(key)) {
         continue;
       }
       const value = storage.getItem(key);
