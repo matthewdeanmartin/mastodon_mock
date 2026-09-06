@@ -87,22 +87,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Results first once the column collapses.
-     The grid puts the form box first, which is right at desktop width — the
-     controls sit beside the results and scroll with them. Stacked, that same
-     order buries the results under the whole refinement column: the query box,
-     the type select, the numeric facets, the refine bar and the facet list.
-     Submitting a search then appears to do nothing, because everything that
-     changed above the fold is a control. Ordering rather than scrolling on
-     completion, which would fight a reader who is mid-gesture. */
-  .two-box .search-results-box {
-    order: 1;
-  }
-
+  /* Keep filters discoverable above results on narrow screens. Bound their
+     height so neither a long facet list nor a long feed buries the other. */
   .two-box .search-form-box {
     position: static;
-    max-height: none;
-    order: 2;
+    max-height: 45vh;
   }
 
   /* Here the `<details>` behaves like one: the summary is the control, and the

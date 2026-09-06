@@ -5,7 +5,7 @@
 @let postSearchRan = !!results() && type() === 'statuses';
 @let postResults = (results()?.statuses?.length ?? 0) > 0 && type() === 'statuses';
 @let accountResultsRan = type() === 'accounts' && loadedAccountCount() > 0;
-@let twoBox = postSearchRan || accountResultsRan;
+@let twoBox = type() === 'statuses' || type() === 'accounts';
 
 <div class="search-shell">
   <div class="search-bar">
@@ -394,8 +394,7 @@
          with filters stacked across the top and a layout of its own — the
          filters were never in a column because there was no column. -->
     <app-bluesky-search-panel
-      class="search-page"
-      [class.two-box]="blueskyPanel()?.twoBox()"
+      class="search-page two-box"
       [query]="query()"
       [target]="blueskyTarget()"
       [advancedOpen]="advancedOpen()"
@@ -409,7 +408,7 @@
         A `<details>` rather than a signal-driven block, and open by default.
 
         The controls start visible at every width. Readers can collapse them
-        using the summary; on phones the results come first after a search.
+        using the summary; on phones the controls stay above the results.
       -->
       <details class="search-form-box" open>
         <summary class="refine-summary">
@@ -743,7 +742,7 @@
 
             @if (facets().length) {
               <details class="refine-facets" [open]="refineOpen()">
-                <summary (click)="refineOpen.set(!refineOpen())">
+                <summary (click)="$event.preventDefault(); refineOpen.set(!refineOpen())">
                   {{ 'pages.search.refine.loadedPosts' | transloco }}
                   <span class="muted small">{{
                     'pages.search.refine.basedOnPosts' | transloco: { count: loadedCount() }
@@ -1079,7 +1078,7 @@
 
           @if (accountFacets().length) {
             <details class="refine-facets" [open]="refineOpen()">
-              <summary (click)="refineOpen.set(!refineOpen())">
+              <summary (click)="$event.preventDefault(); refineOpen.set(!refineOpen())">
                 {{ 'pages.search.refine.loadedPeople' | transloco }}
                 <span class="muted small">{{
                   'pages.search.refine.basedOnAccounts' | transloco: { count: loadedAccountCount() }

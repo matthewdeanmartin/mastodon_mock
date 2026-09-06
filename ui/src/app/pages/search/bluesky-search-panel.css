@@ -53,7 +53,7 @@
 
   :host(.two-box) .search-form-box {
     position: static;
-    max-height: none;
+    max-height: 45vh;
   }
 }
 

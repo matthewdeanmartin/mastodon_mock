@@ -303,15 +303,6 @@ export class BlueskySearchPanel {
     });
   }
 
-  /**
-   * Whether the two-box grid should apply.
-   *
-   * Same rule as the Mastodon side: one column until a search has actually
-   * produced something to refine, because a lone form in a 360px column beside
-   * an empty box looks broken.
-   */
-  readonly twoBox = computed(() => this.ran() && !this.empty());
-
   /** The current criteria, for the page's save dialog. */
   requestSave(): void {
     this.saveRequested.emit(structuredClone(this.criteria()));

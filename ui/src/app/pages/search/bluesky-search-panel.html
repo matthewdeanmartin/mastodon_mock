@@ -354,12 +354,12 @@
       }
     </div>
 
-    @if (target() === 'statuses' && facets().length) {
+    @if (target() === 'statuses') {
       <!-- Checkbox facets with counts, matching the Mastodon panel. These used
            to be chip-buttons, which made the same idea look like a different
            feature depending on which network you were on. -->
       <details class="refine-facets" [open]="refineOpen()">
-        <summary (click)="refineOpen.set(!refineOpen())">
+        <summary (click)="$event.preventDefault(); refineOpen.set(!refineOpen())">
           {{ 'pages.search.bluesky.refineLoadedResults' | transloco }}
           <span class="muted small">
             {{
@@ -487,7 +487,7 @@
 
     @if (target() === 'accounts' && (accountFacets().length || canScanActivity())) {
       <details class="refine-facets" [open]="refineOpen()">
-        <summary (click)="refineOpen.set(!refineOpen())">
+        <summary (click)="$event.preventDefault(); refineOpen.set(!refineOpen())">
           {{ 'pages.search.bluesky.refineLoadedResults' | transloco }}
           <span class="muted small">
             {{

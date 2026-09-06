@@ -308,7 +308,7 @@ function activityBins(accounts: Account[], now: number): AccountFacetValue[] {
 /**
  * Categorical/bucketed facets derived *only* from the loaded accounts. Counts
  * mean "loaded accounts matching this value" — never total server counts. Facets
- * with a single value don't discriminate and are omitted (like `buildFacets`).
+ * with a single value remain visible, just like post facets.
  * The numeric min/max inputs are the precise tool; these buckets are the quick
  * clickable one.
  */
@@ -343,7 +343,7 @@ export function buildAccountFacets(accounts: Account[], now: number = Date.now()
       }
     }
     const values = [...counts.values()].sort((a, b) => b.count - a.count);
-    if (values.length > 1) {
+    if (values.length > 0) {
       facets.push({ kind, labelKey, values });
     }
   };
@@ -364,7 +364,7 @@ export function buildAccountFacets(accounts: Account[], now: number = Date.now()
       labelKey: b.labelKey,
       count: counts.get(b.key)!,
     }));
-    if (values.length > 1) {
+    if (values.length > 0) {
       facets.push({ kind, labelKey, values });
     }
   };
@@ -393,7 +393,7 @@ export function buildAccountFacets(accounts: Account[], now: number = Date.now()
   // Last activity keeps ladder order (recent → stale) rather than count order:
   // the rows are a timeline, and sorting them by popularity would scramble it.
   const activity = activityBins(accounts, now);
-  if (activity.length > 1) {
+  if (activity.length > 0) {
     facets.push({
       kind: 'activity',
       labelKey: 'pages.search.facet.lastActive',

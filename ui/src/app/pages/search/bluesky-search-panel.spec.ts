@@ -174,6 +174,34 @@ describe('BlueskySearchPanel', () => {
     });
   });
 
+  for (const target of ['accounts', 'statuses'] as const) {
+    it(`shows open facets for a single Bluesky ${target} result`, () => {
+      postPages = [{ statuses: [makeStatus('1')], cursor: null }];
+      accountPages = [
+        {
+          results: [{ account: makeAccount('alice.bsky.social'), relationship: null }],
+          cursor: null,
+        },
+      ];
+      const fixture = setUp(target);
+      internals(fixture).apiBudget.set(1);
+      internals(fixture).runQuery();
+      fixture.detectChanges();
+      const facets = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>(
+        '.search-form-box .refine-facets',
+      );
+      expect(facets?.open).toBe(true);
+      expect(facets!.querySelectorAll('.facet-value').length).toBeGreaterThan(0);
+      const summary = facets!.querySelector('summary')!;
+      summary.click();
+      fixture.detectChanges();
+      expect(facets?.open).toBe(false);
+      summary.click();
+      fixture.detectChanges();
+      expect(facets?.open).toBe(true);
+    });
+  }
+
   function setUp(target: 'statuses' | 'accounts' = 'statuses') {
     const fixture = TestBed.createComponent(BlueskySearchPanel);
     fixture.componentRef.setInput('target', target);

@@ -242,9 +242,8 @@ function bucketValues(
 /**
  * Facets over loaded Bluesky accounts.
  *
- * Facets with a single value are omitted throughout: they can't narrow
- * anything, and a row reading "bsky.social 25" next to a result count of 25 is
- * just noise. The activity facet additionally stays hidden until at least one
+ * Populated facets remain visible even when every result shares a value.
+ * The activity facet stays hidden until at least one
  * account has a known date, so it doesn't appear as a lone "Not checked" row
  * before the scan runs.
  */
@@ -263,7 +262,7 @@ export function buildBlueskyAccountFacets(
     values: AccountFacetValue[],
     extra: Partial<BlueskyAccountFacet> = {},
   ): void => {
-    if (values.length > 1) {
+    if (values.length > 0) {
       facets.push({ kind, labelKey, values, ...extra });
     }
   };
@@ -491,8 +490,8 @@ function bucketStatuses(
 
 /**
  * The Bluesky-only post facets, to be rendered *after* the shared ones from
- * `buildFacets` (language / author / media / type). Single-valued facets are
- * omitted, as everywhere else.
+ * `buildFacets` (language / author / media / type). Single-valued facets remain
+ * visible, as with the shared facets.
  */
 export function buildBlueskyPostFacets(statuses: readonly Status[]): BlueskyPostFacet[] {
   if (!statuses.length) {
@@ -506,7 +505,7 @@ export function buildBlueskyPostFacets(statuses: readonly Status[]): BlueskyPost
     values: AccountFacetValue[],
     hint?: string,
   ): void => {
-    if (values.length > 1) {
+    if (values.length > 0) {
       facets.push({ kind, labelKey, values, ...(hint ? { hint } : {}) });
     }
   };

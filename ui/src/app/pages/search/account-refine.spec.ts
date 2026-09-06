@@ -175,10 +175,22 @@ describe('buildAccountFacets', () => {
     expect(buildAccountFacets([])).toEqual([]);
   });
 
-  it('omits facets that do not discriminate', () => {
-    // All local, all human, all open, all in one follower bucket → no facets.
+  it('keeps populated facets for homogeneous accounts', () => {
+    // Even similar accounts retain filters with accurate loaded counts.
     const same = [makeAccount({ acct: 'a' }), makeAccount({ acct: 'b' })];
-    expect(buildAccountFacets(same)).toEqual([]);
+    const facets = buildAccountFacets(same);
+    expect(facets.map((f) => f.kind)).toEqual([
+      'domain',
+      'bot',
+      'locked',
+      'followers',
+      'statuses',
+      'activity',
+    ]);
+    for (const facet of facets) {
+      expect(facet.values).toHaveLength(1);
+      expect(facet.values[0].count).toBe(2);
+    }
   });
 
   it('builds a domain facet from mixed hosts', () => {
@@ -363,9 +375,11 @@ describe('last-activity facet', () => {
     expect(facet?.values[0]).toMatchObject({ value: 'd1', count: 1 });
   });
 
-  it('is omitted when every account falls in one bin', () => {
-    // A single value discriminates nothing, matching the other facets' rule.
-    expect(activityFacet([activeDaysAgo(1), activeDaysAgo(2)])).toBeUndefined();
+  it('retains the activity count when every account falls in one bin', () => {
+    // Keep the activity ladder available for narrow searches too.
+    expect(activityFacet([activeDaysAgo(1), activeDaysAgo(2)])?.values).toEqual([
+      expect.objectContaining({ count: 2 }),
+    ]);
   });
 
   it('asks the UI to show every row', () => {

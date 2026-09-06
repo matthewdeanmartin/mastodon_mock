@@ -264,6 +264,56 @@ describe('Search', () => {
    * so the summary carries a count of what is still narrowing the results.
    */
   describe('refinement summary', () => {
+    for (const type of ['accounts', 'statuses'] as const) {
+      it(`keeps the ${type} rail through idle, loading, empty and populated results`, () => {
+        const fixture = setUp();
+        const state = internals(fixture);
+        state.type.set(type);
+        const assertRail = () => {
+          fixture.detectChanges();
+          const rail = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>(
+            '.search-page.two-box > .search-form-box',
+          );
+          expect(rail?.open).toBe(true);
+        };
+        assertRail();
+        state.searching.set(true);
+        assertRail();
+        state.searching.set(false);
+        state.results.set(makeResults());
+        assertRail();
+        if (type === 'accounts') {
+          state.accountItems.set([{ account: makeAccount(), matchingPosts: [] }]);
+        } else {
+          state.results.set(makeResults([makeStatus('1')]));
+        }
+        assertRail();
+        const facets = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>(
+          '.search-form-box .refine-facets',
+        );
+        expect(facets?.open).toBe(true);
+        expect(facets!.querySelectorAll('.facet-value').length).toBeGreaterThan(0);
+        const summary = facets!.querySelector('summary')!;
+        summary.click();
+        fixture.detectChanges();
+        expect(facets?.open).toBe(false);
+        summary.click();
+        fixture.detectChanges();
+        expect(facets?.open).toBe(true);
+      });
+    }
+
+    it('gives Bluesky a rail before results arrive', () => {
+      const fixture = setUp();
+      internals(fixture).blueskyMode.set(true);
+      fixture.detectChanges();
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector(
+          'app-bluesky-search-panel.two-box > .search-form-box',
+        ),
+      ).not.toBeNull();
+    });
+
     it('keeps Mastodon account filters open after results arrive', () => {
       const fixture = setUp();
       internals(fixture).type.set('accounts');

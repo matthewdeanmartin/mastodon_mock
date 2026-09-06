@@ -115,8 +115,8 @@ function mediaKindLabel(kind: string): string {
 /**
  * §11: facets derived *only* from the loaded results. Counts mean "loaded
  * results matching this value" — never total server counts. Values are sorted
- * by descending count; facets with no useful variation (a single value) are
- * omitted. Callers apply the §11.2 "show at most 5" cap in the UI.
+ * by descending count; single-valued facets remain visible so even a narrow
+ * search has refinement controls. Callers apply the §11.2 "show at most 5" cap in the UI.
  */
 export function buildFacets(statuses: Status[]): Facet[] {
   if (!statuses.length) {
@@ -149,8 +149,8 @@ export function buildFacets(statuses: Status[]): Facet[] {
       }
     }
     const values = [...counts.values()].sort((a, b) => b.count - a.count);
-    // Omit facets that don't discriminate (§11.2).
-    if (values.length > 1) {
+    // Keep populated facets visible, including a single loaded value.
+    if (values.length > 0) {
       facets.push({ kind, labelKey, values });
     }
   };

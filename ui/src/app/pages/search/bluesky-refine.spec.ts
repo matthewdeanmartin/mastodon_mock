@@ -154,16 +154,16 @@ describe('buildBlueskyAccountFacets', () => {
     ]);
   });
 
-  it('omits facets that cannot discriminate', () => {
-    // All three share a domain, so the domain facet says nothing.
+  it('retains handle facets for accounts sharing a domain', () => {
+    // The shared domain remains visible with its loaded count.
     const same = [
       account({ acct: 'a.bsky.social' }),
       account({ acct: 'b.bsky.social' }),
       account({ acct: 'c.bsky.social' }),
     ];
     const kinds = buildBlueskyAccountFacets(same).map((f) => f.kind);
-    expect(kinds).not.toContain('handleType');
-    expect(kinds).not.toContain('handleDomain');
+    expect(kinds).toContain('handleType');
+    expect(kinds).toContain('handleDomain');
   });
 
   it('never offers bot or locked facets, which AT Protocol has no concept of', () => {
@@ -357,10 +357,15 @@ describe('buildBlueskyPostFacets', () => {
     expect(facet?.values.map((v) => v.value).sort()).toEqual(['no', 'yes']);
   });
 
-  it('omits single-valued facets and returns nothing when empty', () => {
+  it('keeps populated post facets and returns nothing when empty', () => {
     expect(buildBlueskyPostFacets([])).toEqual([]);
     // Two identical posts: every facet is single-valued.
-    expect(buildBlueskyPostFacets([status(), status()])).toEqual([]);
+    const facets = buildBlueskyPostFacets([status(), status()]);
+    expect(facets.length).toBeGreaterThan(0);
+    for (const facet of facets) {
+      expect(facet.values).toHaveLength(1);
+      expect(facet.values[0].count).toBe(2);
+    }
   });
 });
 

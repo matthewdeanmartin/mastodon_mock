@@ -111,10 +111,12 @@ describe('buildFacets', () => {
     ]);
   });
 
-  it('omits a facet with no useful variation', () => {
-    // All same language -> language facet should not appear.
+  it('keeps a facet when all loaded posts share one value', () => {
+    // A narrow result set still exposes its language and loaded count.
     const statuses = [makeStatus({ language: 'en' }), makeStatus({ language: 'en' })];
-    expect(buildFacets(statuses).find((f) => f.kind === 'language')).toBeUndefined();
+    expect(buildFacets(statuses).find((f) => f.kind === 'language')?.values).toEqual([
+      { value: 'en', labelKey: null, text: 'EN', count: 2 },
+    ]);
   });
 
   it('buckets media by first attachment type, else text-only', () => {

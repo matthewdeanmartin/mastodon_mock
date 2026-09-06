@@ -1,6 +1,11 @@
 # UI translation speedup plan
 
-Status: proposed only. Ukrainian and Taiwan Traditional Chinese are complete
+Status: skill cleanup and measurement design prepared; translation and benchmarks
+have not started. Korean (`ko`) is the next requested language. The coordinator
+skill is `.claude/skills/translate-ui/SKILL.md`; the isolated worker version is
+`.claude/skills/translate-ui-agent/SKILL.md`. Implementation readiness and precise
+measurement rules are in [the execution contract](ui-i18n-execution-contract.md).
+The targets below remain unproven. Ukrainian and Taiwan Traditional Chinese are complete
 (5,866 accepted/reviewed keys each). All translation agents are stopped. No new
 language, benchmark or implementation is started by this plan.
 
