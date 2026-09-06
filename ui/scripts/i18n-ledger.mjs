@@ -2,7 +2,8 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-export const trackedLocale = (lang) => ['zh-Hant', 'uk', 'ko'].includes(lang);
+export const trackedLocale = (lang) =>
+  ['zh-Hant', 'uk', 'ko', 'es', 'pt', 'it', 'nl', 'pl'].includes(lang);
 export const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const sourceHash = (source, context) => hash([source, context ?? null]);
 export const readLedger = (path) => {

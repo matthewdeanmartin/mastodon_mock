@@ -61,6 +61,77 @@ function proseOnly(value) {
 }
 
 export const LOCALE_RULES = {
+  pt: {
+    name: 'Portuguese',
+    register: 'neutral international Portuguese; `você` singular and `vocês` plural',
+    rules: [],
+    traps: {
+      impulsionar: 'Boost is a social-media re-share, not promotion',
+      alimento: 'Feed is a stream of posts, not food',
+      perseguir: 'Follow means seguir, not pursue',
+      'conta corrente': 'Current account is the active account, not a bank account',
+      'chamada telefônica': 'API call is not a telephone call',
+      'fio de costura': 'Thread is a conversation, not sewing thread',
+      alça: 'Handle is an account identifier, not a physical handle',
+    },
+  },
+  it: {
+    name: 'Italian',
+    register: 'neutral Italian; informal `tu` singular and `voi` plural',
+    rules: [],
+    traps: {
+      potenziare: 'Boost is a social-media re-share, not amplification',
+      inseguire: 'Follow means seguire, not pursue',
+      maniglia: 'Handle is an account identifier, not a physical handle',
+      'filo da cucito': 'Thread is a conversation, not sewing thread',
+      'conto corrente': 'Current account is the active account, not a bank account',
+      telefonata: 'API call is not a telephone call',
+    },
+  },
+  nl: {
+    name: 'Dutch',
+    register: 'Standard Dutch; informal `je` singular and `jullie` plural',
+    rules: [],
+    traps: {
+      versterken: 'Boost is a social-media re-share, not amplification',
+      achtervolgen: 'Follow means volgen, not pursue',
+      handvat: 'Handle is an account identifier, not a physical handle',
+      naaigaren: 'Thread is a conversation, not sewing thread',
+      betaalrekening: 'Current account is the active account, not a bank account',
+      telefoongesprek: 'API call is not a telephone call',
+      voedsel: 'Feed is a stream of posts, not food',
+    },
+  },
+  pl: {
+    name: 'Polish',
+    register: 'neutral concise Polish UI prose; avoid formal `Państwo` address',
+    rules: [],
+    traps: {
+      'wzmacniać sygnał': 'Boost is a social-media re-share, not signal amplification',
+      prześladować: 'Follow means obserwować, not stalk',
+      uchwyt: 'Handle is an account identifier, not a physical handle',
+      'nić do szycia': 'Thread is a conversation, not sewing thread',
+      'rachunek bieżący': 'Current account is the active account, not a bank account',
+      'rozmowa telefoniczna': 'API call is not a telephone call',
+      żywność: 'Feed is a stream of posts, not food',
+    },
+  },
+  es: {
+    name: 'Spanish',
+    register: 'neutral international Spanish; informal singular `tú`, plural `ustedes`',
+    rules: [],
+    traps: {
+      impulsar: 'Boost is a social-media re-share: use republicar, not promote/propel',
+      alimento: 'Feed is a stream of posts: use cronología/feed, not food',
+      mango: 'Handle is an account identifier: use usuario/identificador, not a physical handle',
+      perseguir: 'Follow an account means seguir, not pursue or stalk',
+      silenciar: 'Mute is silenciar; inspect hits only to keep it distinct from bloquear',
+      'hilo de coser': 'Thread is a conversation thread: use hilo, not sewing thread',
+      'cuenta corriente': 'Current account is the active account, not a bank account',
+      'llamada telefónica': 'API call is llamada/solicitud de API, not a telephone call',
+      ballena: 'Fail whale is an error-page joke; inspect literal translations in context',
+    },
+  },
   'zh-Hant': {
     name: 'Traditional Chinese (Taiwan)',
     register: 'neutral, concise Taiwan UI prose; omit pronouns or consistently use 您',

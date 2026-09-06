@@ -45,7 +45,21 @@ describe('supportedLocales', () => {
   });
 
   it('offers in-progress locales on test and canary deployments', () => {
-    const expected = ['en', 'de', 'fr', 'id', 'ja', 'zh-Hant', 'uk', 'ko'];
+    const expected = [
+      'en',
+      'de',
+      'fr',
+      'id',
+      'ja',
+      'zh-Hant',
+      'uk',
+      'ko',
+      'es',
+      'pt',
+      'it',
+      'nl',
+      'pl',
+    ];
     expect(supportedLocales('https://mawkingbird.com/test/')).toEqual(expected);
     expect(supportedLocales('https://mawkingbird.com/canary/')).toEqual(expected);
     expect(supportedLocales('https://example.github.io/mawkingbird/canary/')).toEqual(expected);
