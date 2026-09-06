@@ -391,6 +391,13 @@ export class StatusCard {
 
   /** post/boost vs tweet/retweet wording, per the Mockingbird Blue preference. */
   protected words = inject(Terminology).words;
+  protected countWords = computed(() => {
+    this.i18n.version();
+    const words = this.words();
+    if (this.transloco.getActiveLang() !== 'ko') return words;
+    const boost = this.transloco.translate('pages.profile.media.boost');
+    return { ...words, boosts: boost, BoostedBy: boost };
+  });
   /** Internal POSSE queue value; not interface text. */
   protected readonly repostKind: PosseKind = 'repost';
 
@@ -1796,10 +1803,20 @@ export class StatusCard {
     }
   }
 
-  private actionFailureMessage(verb: string): string {
+  private actionFailureMessage(
+    verb: 'delete this post' | 'like' | 'boost' | 'bookmark this post',
+  ): string {
+    const actionKeys = {
+      'delete this post': 'statusCard.delete',
+      like: 'pages.profile.media.like',
+      boost: 'pages.profile.media.boost',
+      'bookmark this post': 'statusCard.bookmark',
+    } as const;
+    const localizedVerb =
+      this.transloco.getActiveLang() === 'ko' ? this.transloco.translate(actionKeys[verb]) : verb;
     return this.display.provider === 'bluesky'
-      ? this.transloco.translate('statusCard.actionFailureBluesky', { verb })
-      : this.transloco.translate('statusCard.actionFailure', { verb });
+      ? this.transloco.translate('statusCard.actionFailureBluesky', { verb: localizedVerb })
+      : this.transloco.translate('statusCard.actionFailure', { verb: localizedVerb });
   }
 
   toggleBookmark(event: Event): void {

@@ -27,6 +27,7 @@ or source edits. Report broken fragments or vocabulary injection by ID/call site
 
 Author every assigned entry. Save checkpoints of 50–100 entries to the assigned
 scratch file without rereading earlier output or doing semantic self-review.
+Keep checkpoint JSON valid; with `apply_patch`, put each entry on its own line.
 Keep explicit IDs; never infer them from line position. Complete the same batch
 across checkpoints. Stay on the assigned entries; the coordinator measures time
 and manages budgets. Do not abandon work based on a predicted time limit. If

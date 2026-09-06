@@ -1,0 +1,357 @@
+{
+  "version": 1,
+  "runId": "ko-terra-four-2026-09-06",
+  "startedAt": "2026-09-06T00:48:55.112Z",
+  "scope": "Four250-entry Terra author requests; max3 concurrent workers; independent Terra reviews of completed500-key batches",
+  "author": "gpt-5.6-terra",
+  "reviewer": "gpt-5.6-terra",
+  "effort": "low",
+  "workerDeadlines": false,
+  "requestedParallel": 4,
+  "availableWorkerSlots": 3,
+  "status": "accepted-reviewed",
+  "workers": [
+    {
+      "batch": "004",
+      "half": "a",
+      "role": "author250",
+      "agent": "ko_terra_004a",
+      "output": "ui/.i18n-work/ko/004/a-candidate.json",
+      "status": "complete",
+      "sessionId": "01a07430-bb0e-72e0-855d-8b987a7a6bc7",
+      "effectiveModel": "gpt-5.6-terra",
+      "effectiveEffort": "low",
+      "startedAt": "2026-09-06T00:49:06.210Z",
+      "completedAt": "2026-09-06T00:53:09.186Z",
+      "wallSeconds": 242.976,
+      "usage": {
+        "input_tokens": 446529,
+        "cached_input_tokens": 418304,
+        "output_tokens": 12766,
+        "reasoning_output_tokens": 664
+      },
+      "uncached": 28225
+    },
+    {
+      "batch": "004",
+      "half": "b",
+      "role": "author250",
+      "agent": "ko_terra_004b",
+      "output": "ui/.i18n-work/ko/004/b-candidate.json",
+      "status": "complete",
+      "sessionId": "01a07430-f839-7d92-bb4a-562772a91536",
+      "effectiveModel": "gpt-5.6-terra",
+      "effectiveEffort": "low",
+      "startedAt": "2026-09-06T00:49:21.885Z",
+      "completedAt": "2026-09-06T00:51:30.681Z",
+      "wallSeconds": 128.796,
+      "usage": {
+        "input_tokens": 236082,
+        "cached_input_tokens": 216576,
+        "output_tokens": 6594,
+        "reasoning_output_tokens": 271
+      },
+      "uncached": 19506
+    },
+    {
+      "batch": "005",
+      "half": "a",
+      "role": "author250",
+      "agent": "ko_terra_005a",
+      "output": "ui/.i18n-work/ko/005/a-candidate.json",
+      "status": "complete",
+      "sessionId": "01a07431-2430-7321-9bc4-87f59f37cc7c",
+      "effectiveModel": "gpt-5.6-terra",
+      "effectiveEffort": "low",
+      "startedAt": "2026-09-06T00:49:33.128Z",
+      "completedAt": "2026-09-06T00:51:43.119Z",
+      "wallSeconds": 129.991,
+      "usage": {
+        "input_tokens": 195271,
+        "cached_input_tokens": 175872,
+        "output_tokens": 6727,
+        "reasoning_output_tokens": 196
+      },
+      "uncached": 19399
+    },
+    {
+      "batch": "005",
+      "half": "b",
+      "role": "author250",
+      "agent": "ko_terra_005b",
+      "output": "ui/.i18n-work/ko/005/b-candidate.json",
+      "status": "complete",
+      "sessionId": "01a07433-44cc-7fa3-9910-f7397b1dc2d7",
+      "effectiveModel": "gpt-5.6-terra",
+      "effectiveEffort": "low",
+      "startedAt": "2026-09-06T00:51:52.548Z",
+      "completedAt": "2026-09-06T00:54:09.472Z",
+      "wallSeconds": 136.924,
+      "usage": {
+        "input_tokens": 194742,
+        "cached_input_tokens": 176896,
+        "output_tokens": 6909,
+        "reasoning_output_tokens": 229
+      },
+      "uncached": 17846
+    },
+    {
+      "batch": "004",
+      "role": "review500",
+      "agent": "ko_terra_review_004",
+      "sessionId": "01a07435-314a-7792-8b10-6118ca410aec",
+      "output": "ui/.i18n-work/ko/004/review-patch.json",
+      "status": "complete",
+      "effectiveModel": "gpt-5.6-terra",
+      "effectiveEffort": "low",
+      "startedAt": "2026-09-06T00:53:58.625Z",
+      "completedAt": "2026-09-06T00:55:40.881Z",
+      "wallSeconds": 102.256,
+      "usage": {
+        "input_tokens": 612242,
+        "cached_input_tokens": 564480,
+        "output_tokens": 4437,
+        "reasoning_output_tokens": 2838
+      },
+      "uncached": 47762
+    },
+    {
+      "batch": "005",
+      "role": "review500",
+      "agent": "ko_terra_review_005",
+      "sessionId": "01a07437-df77-7b63-95ab-d21e98c8c4f9",
+      "output": "ui/.i18n-work/ko/005/review-patch.json",
+      "status": "complete",
+      "effectiveModel": "gpt-5.6-terra",
+      "effectiveEffort": "low",
+      "startedAt": "2026-09-06T00:56:54.297Z",
+      "completedAt": "2026-09-06T00:58:18.314Z",
+      "wallSeconds": 84.017,
+      "usage": {
+        "input_tokens": 418153,
+        "cached_input_tokens": 372736,
+        "output_tokens": 3802,
+        "reasoning_output_tokens": 1882
+      },
+      "uncached": 45417
+    }
+  ],
+  "events": [],
+  "lastSample": {
+    "atUtc": "2026-09-06T00:57:39.826Z",
+    "event": "sample",
+    "status": [
+      {
+        "batch": "004",
+        "role": "author250",
+        "agent": "ko_terra_004a",
+        "sessionId": "01a07430-bb0e-72e0-855d-8b987a7a6bc7",
+        "model": "gpt-5.6-terra",
+        "effort": "low",
+        "counterAtUtc": "2026-09-06T00:53:09.277Z",
+        "entries": 250,
+        "usage": {
+          "input_tokens": 446529,
+          "cached_input_tokens": 418304,
+          "output_tokens": 12766,
+          "reasoning_output_tokens": 664
+        },
+        "uncached": 28225
+      },
+      {
+        "batch": "004",
+        "role": "author250",
+        "agent": "ko_terra_004b",
+        "sessionId": "01a07430-f839-7d92-bb4a-562772a91536",
+        "model": "gpt-5.6-terra",
+        "effort": "low",
+        "counterAtUtc": "2026-09-06T00:51:30.755Z",
+        "entries": 250,
+        "usage": {
+          "input_tokens": 236082,
+          "cached_input_tokens": 216576,
+          "output_tokens": 6594,
+          "reasoning_output_tokens": 271
+        },
+        "uncached": 19506
+      },
+      {
+        "batch": "005",
+        "role": "author250",
+        "agent": "ko_terra_005a",
+        "sessionId": "01a07431-2430-7321-9bc4-87f59f37cc7c",
+        "model": "gpt-5.6-terra",
+        "effort": "low",
+        "counterAtUtc": "2026-09-06T00:51:43.207Z",
+        "entries": 250,
+        "usage": {
+          "input_tokens": 195271,
+          "cached_input_tokens": 175872,
+          "output_tokens": 6727,
+          "reasoning_output_tokens": 196
+        },
+        "uncached": 19399
+      },
+      {
+        "batch": "005",
+        "role": "author250",
+        "agent": "ko_terra_005b",
+        "sessionId": "01a07433-44cc-7fa3-9910-f7397b1dc2d7",
+        "model": "gpt-5.6-terra",
+        "effort": "low",
+        "counterAtUtc": "2026-09-06T00:54:09.566Z",
+        "entries": null,
+        "usage": {
+          "input_tokens": 194742,
+          "cached_input_tokens": 176896,
+          "output_tokens": 6909,
+          "reasoning_output_tokens": 229
+        },
+        "uncached": 17846
+      },
+      {
+        "batch": "004",
+        "role": "review500",
+        "agent": "ko_terra_review_004",
+        "sessionId": "01a07435-314a-7792-8b10-6118ca410aec",
+        "model": "gpt-5.6-terra",
+        "effort": "low",
+        "counterAtUtc": "2026-09-06T00:55:40.958Z",
+        "entries": 500,
+        "usage": {
+          "input_tokens": 612242,
+          "cached_input_tokens": 564480,
+          "output_tokens": 4437,
+          "reasoning_output_tokens": 2838
+        },
+        "uncached": 47762
+      }
+    ]
+  },
+  "interventions": [
+    {
+      "agent": "ko_terra_004a",
+      "reason": "Author started additional semantic/stylistic edits after writing250; supervisor instructed handoff without self-review."
+    },
+    {
+      "agent": "ko_terra_005b",
+      "reason": "Removed duplicated closing JSON brackets mechanically; restored no translated values."
+    },
+    {
+      "batch": "005",
+      "reason": "Missing required accountWord is localized runtime text, not an optional English vocabulary term. Forwarded concrete gate finding to single independent reviewer."
+    }
+  ],
+  "completedAt": "2026-09-06T01:00:13.452Z",
+  "wallSeconds": 678.34,
+  "acceptedAdditional": 1000,
+  "reviewedAdditional": 1000,
+  "corrections": {
+    "batch004": 15,
+    "batch005": 26,
+    "total": 41
+  },
+  "usageTotals": {
+    "input_tokens": 2103019,
+    "cached_input_tokens": 1924864,
+    "output_tokens": 41235,
+    "reasoning_output_tokens": 6080,
+    "uncached_input_tokens": 178155
+  },
+  "provenance": {
+    "evidence": [
+      {
+        "agent": "ko_terra_004a",
+        "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-49-05-01a07430-bb0e-72e0-855d-8b987a7a6bc7.jsonl",
+        "toolCalls": 9,
+        "toolNames": [
+          "exec"
+        ],
+        "externalCallsToInspect": []
+      },
+      {
+        "agent": "ko_terra_004b",
+        "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-49-21-01a07430-f839-7d92-bb4a-562772a91536.jsonl",
+        "toolCalls": 5,
+        "toolNames": [
+          "exec"
+        ],
+        "externalCallsToInspect": []
+      },
+      {
+        "agent": "ko_terra_005a",
+        "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-49-32-01a07431-2430-7321-9bc4-87f59f37cc7c.jsonl",
+        "toolCalls": 4,
+        "toolNames": [
+          "exec"
+        ],
+        "externalCallsToInspect": []
+      },
+      {
+        "agent": "ko_terra_005b",
+        "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-51-52-01a07433-44cc-7fa3-9910-f7397b1dc2d7.jsonl",
+        "toolCalls": 4,
+        "toolNames": [
+          "exec"
+        ],
+        "externalCallsToInspect": []
+      },
+      {
+        "agent": "ko_terra_review_004",
+        "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-53-58-01a07435-314a-7792-8b10-6118ca410aec.jsonl",
+        "toolCalls": 10,
+        "toolNames": [
+          "exec"
+        ],
+        "externalCallsToInspect": []
+      },
+      {
+        "agent": "ko_terra_review_005",
+        "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-56-54-01a07437-df77-7b63-95ab-d21e98c8c4f9.jsonl",
+        "toolCalls": 7,
+        "toolNames": [
+          "exec"
+        ],
+        "externalCallsToInspect": []
+      }
+    ],
+    "notes": "Inspected task-local tool activity; no external machine translation observed. Token/output statistics do not prove translation quality. All final entries independently reviewed."
+  },
+  "coordinatorUsage": {
+    "status": "available",
+    "counters": {
+      "input_tokens": 4338968,
+      "cached_input_tokens": 4277760,
+      "output_tokens": 10870,
+      "reasoning_output_tokens": 4060
+    },
+    "uncachedInputTokens": 61208,
+    "segments": [
+      {
+        "index": 0,
+        "reason": "initial",
+        "counters": {
+          "input_tokens": 4338968,
+          "cached_input_tokens": 4277760,
+          "output_tokens": 10870,
+          "reasoning_output_tokens": 4060
+        }
+      }
+    ]
+  },
+  "coordinatorUsageNote": "Includes user-requested official-documentation lookup about plan/concurrency during the experiment.",
+  "languageState": {
+    "reviewed": 2000,
+    "missing": 3866,
+    "eligible": 5866,
+    "astraReview": "Not started: reserved for completed whole locale"
+  },
+  "validation": {
+    "fixedInventory": "unchanged5866",
+    "exactAssignments": "four disjoint250-entry requests combined into two500-key batches",
+    "sourceContextPolicyHashes": "matched",
+    "finalMergeAndReviewLedger": "passed",
+    "i18nGate": "passed",
+    "fullUiGate": "Prior6216-test pass retained; dictionary-only changes in this round"
+  }
+}

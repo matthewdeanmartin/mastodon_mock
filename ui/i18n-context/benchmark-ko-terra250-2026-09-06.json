@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "runId": "ko-terra250-2026-09-06",
+  "startedAt": "2026-09-06T00:42:22.654Z",
+  "status": "accepted-reviewed",
+  "author": "gpt-5.6-terra",
+  "reviewer": "gpt-5.6-terra",
+  "effort": "low",
+  "workerDeadline": false,
+  "sourceBatch": "002",
+  "requestCount": 250,
+  "manifestHash": "c81875f8ca7be6f5ed1f84533af59175cd32e0b9e4f66e73436119b72cdc6e51",
+  "design": "Same250 entries that Luna failed; fresh Terra author, then independent Terra review of combined500. Existing Luna250 preserved. No worker deadline.",
+  "events": [],
+  "workers": [
+    {
+      "batch": "002b",
+      "role": "author250",
+      "agent": "ko_terra_250b",
+      "sessionId": "01a0742a-bcca-78e2-b889-c5020a6d4748",
+      "output": "ui/.i18n-work/ko/002-terra250/candidate.json"
+    }
+  ],
+  "payloadHash": "13bb2a59f1605d2a9a8dbf5221ae74186251bb7eab134f7d51b434f7c6b65a8b",
+  "sourcePayloadIdentical": true,
+  "coordinatorBaseline": {
+    "sessionId": "01a073f4-fb18-7870-abff-a822fdf58109",
+    "effectiveModel": "gpt-6-astra",
+    "effectiveEffort": "low",
+    "metadataAtUtc": "2026-09-06T00:42:06.930Z",
+    "counterAtUtc": "2026-09-06T00:38:30.710Z",
+    "observedAtUtc": "2026-09-06T00:43:51.180Z",
+    "counters": {
+      "input_tokens": 7483507,
+      "cached_input_tokens": 7329024,
+      "output_tokens": 48375,
+      "reasoning_output_tokens": 12306
+    },
+    "segments": [
+      {
+        "index": 0,
+        "startAtUtc": "2026-09-05T23:44:01.103Z",
+        "endAtUtc": "2026-09-06T00:38:30.710Z",
+        "reason": "initial",
+        "counters": {
+          "input_tokens": 7483507,
+          "cached_input_tokens": 7329024,
+          "output_tokens": 48375,
+          "reasoning_output_tokens": 12306
+        }
+      }
+    ],
+    "malformedRecords": 0
+  },
+  "lastSample": {
+    "atUtc": "2026-09-06T00:43:51.278Z",
+    "event": "sample",
+    "status": [
+      {
+        "batch": "002b",
+        "role": "author250",
+        "agent": "ko_terra_250b",
+        "sessionId": "01a0742a-bcca-78e2-b889-c5020a6d4748",
+        "model": "gpt-5.6-terra",
+        "effort": "low",
+        "counterAtUtc": "2026-09-06T00:42:42.161Z",
+        "entries": null,
+        "usage": {
+          "input_tokens": 29369,
+          "cached_input_tokens": 28416,
+          "output_tokens": 282,
+          "reasoning_output_tokens": 23
+        },
+        "uncached": 953
+      }
+    ]
+  },
+  "authorResult": {
+    "authored": 250,
+    "startedAt": "2026-09-06T00:42:33.456Z",
+    "completedAt": "2026-09-06T00:44:16.345Z",
+    "wallSeconds": 102.889,
+    "effectiveModel": "gpt-5.6-terra",
+    "effectiveEffort": "low",
+    "usage": {
+      "input_tokens": 110698,
+      "cached_input_tokens": 94464,
+      "output_tokens": 5379,
+      "reasoning_output_tokens": 194
+    },
+    "uncached": 16234,
+    "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-42-33-01a0742a-bcca-78e2-b889-c5020a6d4748.jsonl"
+  },
+  "provenance": {
+    "toolCalls": [
+      {
+        "at": "2026-09-06T00:42:40.526Z",
+        "name": "exec",
+        "inputStart": "const r = await Promise.all([\n  tools.exec_command({\"cmd\":\"Get-Content -Raw 'C:/github/mimb/mastodon_mock/.claude/skills/translate-ui-agent/SKILL.md'\",\"workdir\":\"C:\\\\github\\\\mimb\\\\mastodon_mock\",\"yield_time_ms\":10000,\"max_output_tokens\":30000}),\n  tools.exec_command({\"cmd\":\"Get-Content -Raw 'C:/github/mimb/mastodon_mock/ui/i18n-context/glossary-ko.md'\",\"workdir\":\"C:\\\\github\\\\mimb\\\\mastodon_mock\",\"yield_time_ms\":10000,\"max_output_tokens\":30000}),\n  tools.exec_command({\"cmd\":\"Get-Content -Raw 'C:/"
+      },
+      {
+        "at": "2026-09-06T00:44:11.864Z",
+        "name": "exec",
+        "inputStart": "const patch = \"*** Begin Patch\\n*** Add File: C:/github/mimb/mastodon_mock/ui/.i18n-work/ko/002-terra250/candidate.json\\n+{\\\"manifestHash\\\":\\\"c81875f8ca7be6f5ed1f84533af59175cd32e0b9e4f66e73436119b72cdc6e51\\\",\\\"entries\\\":[[\\\"b002-251\\\",\\\"타이밍\\\"],[\\\"b002-252\\\",\\\"시간\\\"],[\\\"b002-253\\\",\\\"다시 확인\\\"],[\\\"b002-254\\\",\\\"표본을 수집하는 중…\\\"],[\\\"b002-255\\\",\\\"피드를 읽는 중…\\\"],[\\\"b002-256\\\",\\\"피드 진단\\\"],[\\\"b002-257\\\",\\\"창 넓히기\\\"],[\\\"b002-258\\\",\\\"읽기 창에서 이전 게시물 {{count}}개가 숨겨졌습니다. 아래 내용은 창에서 통과한 항목을 설명합니다.\\\"],[\\\"b002-259\\\",\\\"읽기 "
+      }
+    ],
+    "externalMTObserved": false,
+    "note": "Tool-log inspection; direct explicit-ID authored Korean. No network isolation claimed."
+  },
+  "completedAt": "2026-09-06T00:47:28.153Z",
+  "wallSeconds": 305.499,
+  "reviewResult": {
+    "reviewed": 500,
+    "corrections": 14,
+    "correctionsOnLunaHalf": 5,
+    "correctionsOnTerraHalf": 9,
+    "blockers": [],
+    "startedAt": "2026-09-06T00:44:57.063Z",
+    "completedAt": "2026-09-06T00:46:01.010Z",
+    "wallSeconds": 63.947,
+    "usage": {
+      "input_tokens": 393895,
+      "cached_input_tokens": 362240,
+      "output_tokens": 2594,
+      "reasoning_output_tokens": 1088
+    },
+    "uncached": 31655,
+    "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-44-56-01a0742c-edcf-79f3-ad3b-3d25180e033e.jsonl"
+  },
+  "coordinatorUsage": {
+    "status": "available",
+    "counters": {
+      "input_tokens": 1259711,
+      "cached_input_tokens": 1242240,
+      "output_tokens": 5050,
+      "reasoning_output_tokens": 1787
+    },
+    "uncachedInputTokens": 17471,
+    "segments": [
+      {
+        "index": 0,
+        "reason": "initial",
+        "counters": {
+          "input_tokens": 1259711,
+          "cached_input_tokens": 1242240,
+          "output_tokens": 5050,
+          "reasoning_output_tokens": 1787
+        }
+      }
+    ]
+  },
+  "languageState": {
+    "reviewed": 1000,
+    "missing": 4866,
+    "eligible": 5866,
+    "astra": "pending whole-locale completion"
+  },
+  "comparisonLimits": [
+    "Translator input exactly matches the failed Luna250 request. Terra completed directly with no continuation.",
+    "Reviewer checked500 mixed-author strings, not just Terra250; stage durations and costs must be reported separately.",
+    "Correction counts for different source halves are not a controlled quality comparison.",
+    "Token counts are usage, not pricing or weekly allowance. No demonstrated fivefold speedup from this trial.",
+    "The measured round includes supervisor dispatch gaps and integration/reporting, which remain a substantial optimization target."
+  ],
+  "validation": {
+    "exactCoverage": 500,
+    "frozenSourceContextPolicy": "matched",
+    "finalStructuralGate": "passed",
+    "acceptedAndReviewedLedger": "stamped",
+    "fullUiGate": "Previous6216-test pass retained; no runtime/template changes in this experiment.",
+    "i18nGate": "npm run check:i18n passed"
+  },
+  "supervisorAndIntegrationSeconds": 138.663
+}

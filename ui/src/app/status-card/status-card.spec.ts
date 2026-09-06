@@ -1,6 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
+import korean from '../../../public/i18n/ko.json';
 import { FeatureFlags } from '../feature-flags';
 import { Signal, WritableSignal } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
@@ -663,6 +665,52 @@ describe('StatusCard', () => {
   });
 
   // ---------------------------------------------------------------- action errors
+
+  it('updates Korean boost counts when the dictionary changes and preserves English terminology', () => {
+    const f = setUp(makeStatus({ reblogs_count: 7 }));
+    const cmp = f.componentInstance as any;
+    const transloco = TestBed.inject(TranslocoService);
+    const availableLangs = transloco.getAvailableLangs();
+    expect(cmp.countWords().boosts).toBe(cmp.words().boosts);
+    transloco.setAvailableLangs(['en', 'ko']);
+    try {
+      transloco.setTranslation(korean, 'ko');
+      transloco.setActiveLang('ko');
+      f.detectChanges();
+      expect(cmp.countWords().boosts).toBe('부스트');
+      expect(cmp.countWords().BoostedBy).toBe('부스트');
+      expect((f.nativeElement as HTMLElement).textContent).toContain('부스트: 7');
+      transloco.setActiveLang('en');
+      expect(cmp.countWords().boosts).toBe(cmp.words().boosts);
+    } finally {
+      transloco.setActiveLang('en');
+      transloco.setAvailableLangs(availableLangs);
+    }
+  });
+
+  it('renders a Korean action failure without injecting an English verb', () => {
+    const f = setUp(makeStatus({ id: '5' }));
+    const transloco = TestBed.inject(TranslocoService);
+    const availableLangs = transloco.getAvailableLangs();
+    transloco.setAvailableLangs(['en', 'ko']);
+    try {
+      transloco.setTranslation(korean, 'ko');
+      transloco.setActiveLang('ko');
+      f.componentInstance.toggleFavourite(fakeEvent());
+      httpMock.expectOne('/api/v1/statuses/5/favourite').flush('failed', {
+        status: 500,
+        statusText: 'Server Error',
+      });
+      f.detectChanges();
+      expect(
+        (f.nativeElement as HTMLElement).querySelector('.action-error')?.textContent,
+      ).toContain('좋아요 작업을 완료할 수 없습니다');
+      transloco.setActiveLang('en');
+    } finally {
+      transloco.setActiveLang('en');
+      transloco.setAvailableLangs(availableLangs);
+    }
+  });
 
   it('a failed favourite surfaces an error instead of failing silently', () => {
     const bsky = makeStatus({

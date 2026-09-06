@@ -27,7 +27,7 @@ hand-edit it. Do not emit ICU until the runtime supports it.
 
 ## Dispatch
 
-Use Luna (`gpt-5.6-luna`, explicit low effort) for direct authorship and a
+Use Terra (`gpt-5.6-terra`, explicit low effort) for direct authorship and a
 separate Terra (`gpt-5.6-terra`, explicit low effort) for independent review. Astra
 handles concrete complex source/template defects. This skill permits delegation
 within the user's active translation or benchmark scope.
@@ -35,8 +35,9 @@ within the user's active translation or benchmark scope.
 Use `fork_turns: "none"`. Supply only the worker skill path, role, locale,
 glossary, immutable work order, output path and schema. Do not send deadlines,
 speed demands or token budgets to workers; the coordinator measures them. No parent
-history, old reports, whole dictionaries or author conversation. Initially one
-fixed batch per context; at most two if measurements justify it. Normally use
+history, old reports, whole dictionaries or author conversation. Supply the
+exact request selected by the current experiment (currently 250 entries per
+author); retain fixed 500-key batches for tracking and review. Normally use
 two author slots and one reviewer slot, within the session limit. Review only
 frozen completed candidates. Only the coordinator writes shared artifacts.
 

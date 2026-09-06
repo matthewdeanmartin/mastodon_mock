@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "runId": "ko-luna-continue-2026-09-06",
+  "startedAt": "2026-09-06T00:31:13.056Z",
+  "status": "partial-authorship-return",
+  "sourceBatch": "003",
+  "count": 500,
+  "agent": "ko_luna_003",
+  "sessionId": "01a0741c-47ea-71a2-8784-c383e6c3e2b3",
+  "model": "gpt-5.6-luna",
+  "effort": "low",
+  "workerDeadline": false,
+  "baseline": {
+    "input_tokens": 199949,
+    "cached_input_tokens": 178944,
+    "output_tokens": 1173,
+    "reasoning_output_tokens": 630
+  },
+  "design": "User suggested telling worker to keep going; one follow-up to the same zero-entry 500-string context. Runs alongside fresh250 trial; not identical source sets.",
+  "completedAt": "2026-09-06T00:33:50.520Z",
+  "authored": 91,
+  "blockers": [],
+  "continuationUsage": {
+    "input_tokens": 233421,
+    "cached_input_tokens": 226048,
+    "output_tokens": 4367,
+    "reasoning_output_tokens": 130
+  },
+  "next": "Preserve91 real authored values; supervisor supplies remaining250+159 to fresh Luna contexts."
+}

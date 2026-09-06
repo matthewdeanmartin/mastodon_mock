@@ -1,0 +1,36 @@
+{
+  "baseline": {
+    "keys": 1666,
+    "seconds": 1709,
+    "input_tokens": 17535061,
+    "cached_input_tokens": 17052160,
+    "output_tokens": 93902,
+    "reasoning_output_tokens": 20720,
+    "uncached": 482901
+  },
+  "latest": {
+    "keys": 1000,
+    "seconds": 678.34,
+    "input_tokens": 6441987,
+    "cached_input_tokens": 6202624,
+    "output_tokens": 52105,
+    "reasoning_output_tokens": 10140,
+    "uncached": 239363
+  },
+  "ratios": {
+    "throughput": 1.5122362298104959,
+    "outputPerKey": 0.9244417584290004,
+    "uncachedPerKey": 0.8257981615279322,
+    "cachedPerKey": 0.6059978081369163
+  },
+  "coordinatorShare": {
+    "output": 0.2086172152384608,
+    "input": 0.6735449792121593
+  },
+  "limits": "Different workloads: Taiwan resume included saved drafts/repairs; latest Terra round includes coordinator concurrency-documentation lookup. Raw token ratios cannot be converted to weekly allowance savings.",
+  "weeklyAllowanceObserved": {
+    "usedPercent": 60,
+    "remainingPercent": 40,
+    "observedAt": "2026-09-06T01:01:31.524Z"
+  }
+}

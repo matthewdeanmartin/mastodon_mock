@@ -1,0 +1,61 @@
+{
+  "checkedAt": "2026-09-06T01:39:29.043Z",
+  "eligible": 5866,
+  "acceptedReviewed": 5866,
+  "missing": 0,
+  "stale": 0,
+  "finalAstraReviewed": 5866,
+  "corrections": 212,
+  "dictionaryHash": "8c94f2e12cd46fd0c10329403da843f11168a4d24521eb1c1b347f7916d3d225",
+  "ledgerHash": "ad0442a97f268fd61a5b5ca4bbf4dac62b252d1caf6dc67839245b3c0905e734",
+  "packets": [
+    {
+      "batch": "final-01",
+      "reviewed": 1000,
+      "corrections": 58,
+      "manifestHash": "c2ea7383194116c87a371d675bf4730315f7728031e2686ead17f6151d7d1576",
+      "candidateHash": "f6fc06bd3b64bdf3a21b6d5cc9fedbe3e3e3176ed2f93de3d7ee3f78bc54f611",
+      "patchHash": "ff813ef69fb03aa54a6dad74279a16d59bb02fce276e18cb49bc4390b319901d"
+    },
+    {
+      "batch": "final-02",
+      "reviewed": 1000,
+      "corrections": 17,
+      "manifestHash": "f20a5acbbd1d80848f402c2d5539aa342d841e3a301d63b9479139c4ce935d7c",
+      "candidateHash": "7fd5c690229a16b8b93b7f5e5dd9e4bf0396d7773102cbf6c999a3800e8e384f",
+      "patchHash": "8ea29a2069b798be6fa9fe32ccf8b2be5e11cbe75cef88556ebde26fc2145628"
+    },
+    {
+      "batch": "final-03",
+      "reviewed": 1000,
+      "corrections": 22,
+      "manifestHash": "12bf9172b5cfb878564d77c77f02d2efdbdf423145ca64c04a5e698ed82f5c18",
+      "candidateHash": "f34bb552e4bce83015ce98142b971482684b192ee9d47d1abf9bb0f7fad0fa80",
+      "patchHash": "26c4cb3a55b9757c21d41fee1bc5b62de733777f1d000f2012468265578e760f"
+    },
+    {
+      "batch": "final-04",
+      "reviewed": 1000,
+      "corrections": 33,
+      "manifestHash": "8101ca08048b44c365ba61dff76ce17a952c72152483e0b01e1b98d152cc5ec9",
+      "candidateHash": "3ddff437441ccbc82de9c9b7361d858e64d8e2654a5c2603baece2fc54005815",
+      "patchHash": "94593faf2ff05309909ceb77dddb53511340d7e44e822c85dca7f5fee24afaed"
+    },
+    {
+      "batch": "final-05",
+      "reviewed": 1000,
+      "corrections": 45,
+      "manifestHash": "c4be1f314b3b6ace991ce545689cef4f22aa4f532047d3747f7aba720f160ddd",
+      "candidateHash": "11ef15b0b08340399846963496088b53b16b21d59f822381a7e1659ff2a5aefe",
+      "patchHash": "a3c652e4a12d552d75835484550f258c30ba7a2338c9461e5fca8b4943451ec6"
+    },
+    {
+      "batch": "final-06",
+      "reviewed": 866,
+      "corrections": 37,
+      "manifestHash": "1f086850de5f359bb1d017fc39e4f1b4647734d823fc355dad50c68ce593896b",
+      "candidateHash": "9bdd679bc49675cbb27dc8cba5f5f87f873abf6dd4e78853963ad98798401fcb",
+      "patchHash": "a721f88db84e482cdec358da892312b609539232af8556b828aae7ed2b2b8431"
+    }
+  ]
+}

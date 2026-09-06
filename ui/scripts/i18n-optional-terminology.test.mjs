@@ -16,8 +16,25 @@ test('verified vocabulary may be localized without losing data or allowing extra
 });
 
 test('non-vocabulary placeholder multiplicity stays strict', () => {
-  assert(placeholdersMatch('feedAnalytics.accounts.authors', '{{posts}} {{postsWord}}', 'Дописи: {{posts}}'));
+  assert(
+    placeholdersMatch(
+      'feedAnalytics.accounts.authors',
+      '{{posts}} {{postsWord}}',
+      'Дописи: {{posts}}',
+    ),
+  );
   assert(!placeholdersMatch('feedAnalytics.accounts.authors', '{{posts}} {{postsWord}}', 'Дописи'));
-  assert(!placeholdersMatch('accountAnalytics.barTitle', '{{count}} {{count}} {{posts}}', '{{count}}'));
+  assert(
+    !placeholdersMatch('accountAnalytics.barTitle', '{{count}} {{count}} {{posts}}', '{{count}}'),
+  );
   assert(placeholdersMatch('other.key', '{{name}} {{count}}', '{{count}} {{name}}'));
+});
+
+test('Korean vocabulary exceptions cannot remove action or count data', () => {
+  assert(
+    placeholdersMatch('shell.left.boostedByNetwork', '{{boosted}} by people', '사람들이 부스트함'),
+  );
+  assert(!placeholdersMatch('statusCard.countLabel', '{{count}} {{label}}', '{{count}}'));
+  assert(!placeholdersMatch('statusCard.countLabel', '{{count}} {{label}}', '{{label}}'));
+  assert(!placeholdersMatch('statusCard.actionFailure', "Couldn't {{verb}}", '실패했습니다'));
 });

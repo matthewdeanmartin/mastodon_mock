@@ -1,5 +1,5 @@
 /**
- * Version 9: verified English-only Terminology.words arguments from reviewed call sites.
+ * Version 10: verified English-only Terminology.words arguments from reviewed call sites.
  * Non-English whole messages may spell/inflect their canonical noun instead.
  * This map is a validation-policy dependency, deliberately outside source/context
  * hashes: English/custom vocabulary and fixed translation inventories are unchanged.
@@ -110,6 +110,12 @@ export const optionalTerminology = Object.freeze({
   'pages.search.bluesky.collapseRepeated': ['postType'],
   'pages.search.bluesky.collapseNote': ['postType'],
   'pages.search.bluesky.collapsedRepeats': ['postType'],
+  // left-rail.html and status-card.html bind these directly to Terminology.words.
+  // countLabel.label and actionFailure.verb remain mandatory localized inputs.
+  'shell.left.boostedByNetwork': ['boosted'],
+  'statusCard.deleteAndBoost': ['boost'],
+  'statusCard.followersOnly': ['post'],
+  'statusCard.moreActions': ['post'],
 });
 
 export const placeholderNames = (text) =>

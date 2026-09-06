@@ -1,11 +1,19 @@
 # Translation preparation and measurement contract
 
-User's latest direction: Luna-low authors without deadline pressure and a separate
+Korean completion (2026-09-06): all 5,866 strings are accepted, source-current and Terra-reviewed; the final Astra pass covered all 5,866 and applied 212 corrections. Full UI gate: 6,218 passed, no failures or skips. This continuation preserved 341 drafts and authored 3,525 new strings, adding 3,866 accepted entries. Translation plus Terra review took 23.3 minutes; final review, seven targeted runtime/vocabulary repairs and handoff checks are measured separately. One Terra file-patching failure was recovered without losing its 100 saved translations. See [completion benchmark](../ui/i18n-context/ko-completion-2026-09-06.json) and [final audit](../ui/i18n-context/ko-final-audit-2026-09-06.json). Earlier entries below are experiment history.
+
+User's latest experiment: Terra-low authors the exact 250 strings Luna failed, without deadline pressure, and a separate
 Terra-low agent reviews. The Terra author experiment was interrupted on request
-after 400 saved entries; Luna completes the remaining 100 in the same batch,
+after 400 saved entries; Luna completed the remaining 100 in the same batch,
 and Astra reviews the entire Korean locale only after all strings finish those
 stages. The first pilot uses Korean batch 001. No translation ran during the
 earlier skill cleanup; this run measures implementation preparation separately.
+That mixed batch passed review with 24 corrections. Two subsequent full 500-key
+Luna requests without deadlines failed (generic filler and zero output). The
+pipeline is stopped. The user then authorized 250-entry requests and a 'keep
+going' continuation: two of three 250-entry requests produced substantive drafts;
+one returned filler. The 500-entry continuation produced 91 before stopping.
+Valid partials are preserved and unreviewed, separate from accepted strings.
 
 ## Readiness before dispatch
 
@@ -20,9 +28,9 @@ earlier skill cleanup; this run measures implementation preparation separately.
   counters, reset-aware deltas and coordinator events. Four tests pass and an
   existing rollout was read successfully before launching the author.
 - Done: Korean glossary established with a Mastodon vocabulary anchor.
-- Pending before Korean rollout: registration and `ko` accepted/reviewed tracking.
-  Currently `trackedLocale` in
-  `ui/scripts/i18n-ledger.mjs` contains only `zh-Hant` and `uk`.
+- Done: Korean is registered for review builds and accepted/reviewed ledger
+  tracking is enabled. The first 500-key batch is accepted and Terra-reviewed;
+  Astra's whole-locale review remains pending until all 5,866 strings are done.
 
 ## Compact adapter contract
 
@@ -66,7 +74,7 @@ synthetic text, not translation agents, for implementation tests.
 
 ## Minimal dispatch
 
-Spawn author Luna-low or reviewer Terra-low with `fork_turns: "none"` and an
+Spawn author Terra-low or reviewer Terra-low with `fork_turns: "none"` and an
 explicit effort. Supply absolute paths and a short prompt:
 
 > Use translate-ui-agent at <path>. Role <author|reviewer>, locale <locale>.
@@ -74,8 +82,10 @@ explicit effort. Supply absolute paths and a short prompt:
 > Write <output> using the schema in the work order. Stay on the assigned entries.
 > Preserve checkpoints. Return path, count, status and exact blockers.
 
-One 500-key assignment per context initially. 50–100-entry checkpoints are file
-writes, not new dispatches or validation rounds. Coordinator reads summaries,
+Keep the fixed 500-key source assignment for tracking. The supervisor may supply
+an explicit subset as the experimental worker request; record its size and exact
+IDs. Workers never choose their own strings. Within-request checkpoints are file
+writes, not new assignments or semantic review rounds. Coordinator reads summaries,
 counts and failure IDs; it does not echo full payloads or translations into its
 own context. Reviewer corrects all final messages in one pass. No routine second linguistic audit per batch; the user requests one Astra review after all Korean strings pass Terra review. Mechanical checks run at completed-author
 and patched-final boundaries; later checks require a changed artifact or failure.
@@ -126,7 +136,7 @@ keys as successful throughput. Byte/character reductions are not token savings.
 
 ## Experiment gates
 
-Use the first fixed 500-key Korean batch, preserving valid authored work, Luna-low
+Use fixed 500-key Korean batches, preserving valid authored work, Terra-low
 author and independent Terra-low review. User corrected deadline pressure during
 the second pilot. Workers receive scope and focus instructions, not deadlines,
 speed demands or token ceilings. Coordinator samples progress and usage at least

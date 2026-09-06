@@ -1,9 +1,29 @@
 # UI translation speedup plan
 
-Status: user removed deadline pressure and switched authorship back to Luna-low.
-Terra authored 400 entries before the requested interruption; Luna completes the
-100 remaining entries. A separate Terra reviews the completed 500-key batch.
-The mixed authorship result must not be reported as a clean model comparison.
+Korean completion (2026-09-06): all 5,866 strings are accepted, source-current and Terra-reviewed; the final Astra pass covered all 5,866 and applied 212 corrections. Full UI gate: 6,218 passed, no failures or skips. This continuation preserved 341 drafts and authored 3,525 new strings, adding 3,866 accepted entries. Translation plus Terra review took 23.3 minutes; final review, seven targeted runtime/vocabulary repairs and handoff checks are measured separately. One Terra file-patching failure was recovered without losing its 100 saved translations. See [completion benchmark](../ui/i18n-context/ko-completion-2026-09-06.json) and [final audit](../ui/i18n-context/ko-final-audit-2026-09-06.json). Earlier entries below are experiment history.
+
+Latest result: Terra completed the exact 250-string set Luna failed in 1m 43s;
+independent Terra reviewed the combined 500 strings in 1m 04s with 14 corrections.
+Korean now has 1,000 accepted/reviewed strings. See
+`ui/i18n-context/benchmark-ko-terra250-2026-09-06.json`. The user requested four
+more parallel 250-entry Terra authors; all four completed through three worker
+slots. Independent reviews made 41 corrections across the two 500-key batches;
+Korean now has 2,000 accepted/reviewed entries. See
+`ui/i18n-context/benchmark-ko-terra-four-2026-09-06.json`. No worker deadlines.
+
+Status: 500 Korean strings accepted and Terra-reviewed (Terra authored 400, Luna
+authored the remaining 100 without a deadline; review corrected 24 strings).
+Two subsequent deadline-free 500-string Luna requests failed: one repeated a
+single Korean filler value 500 times; one returned zero entries. Neither merged.
+See `ui/i18n-context/benchmark-ko-pipeline-2026-09-06.json`. The pipeline stopped.
+Follow-up experiments: three supervisor-selected 250-entry requests produced two
+substantive 250-entry drafts and one rejected filler output. A 'keep going'
+continuation of the empty 500-entry worker produced 91 entries, then stopped
+again. These drafts await independent review. See
+`ui/i18n-context/benchmark-ko-250-2026-09-06.json` and
+`ui/i18n-context/benchmark-ko-continue-2026-09-06.json`. No further retries started.
+Neither deadline removal, size 250, nor a continuation guarantees completion.
+Keep fixed source IDs and separate actual authored/reviewed counts from claims.
 The first Korean 500-key benchmark failed: Luna returned
 500 exact English copies, zero Korean translations. Nothing was merged and no
 Terra/Astra linguistic review was dispatched. See
@@ -55,8 +75,8 @@ Evidence: `ui/i18n-context/timing-2026-09-05.json`, `usage-2026-09-05.json`, and
 
 ## Changes before another rollout
 
-1. **Use Luna-low to author and a separate Terra-low to review.** User selected
-   this pairing after removing deadline pressure. After the entire Korean
+1. **Use Terra-low to author and a separate Terra-low to review.** User selected
+   this pairing for the next 250-string experiment, without deadline pressure. After the entire Korean
    locale is translated and Terra-reviewed, Astra reviews all 5,866 eligible
    strings once. Do not run Astra linguistic reviews between batches. Set effort
    explicitly. No external machine translation or phrase mapping.

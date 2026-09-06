@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "runId": "ko-luna-250-2026-09-06",
+  "startedAt": "2026-09-06T00:30:14.345Z",
+  "status": "finished-mixed-results",
+  "sourceBatch": "002",
+  "assignmentKeys": 500,
+  "workerRequestKeys": 250,
+  "workerDeadlines": false,
+  "authorModel": "gpt-5.6-luna",
+  "reviewModel": "gpt-5.6-terra",
+  "effort": "low",
+  "design": "Supervisor supplies two exact disjoint 250-entry files. Author does no selection. One independent review of combined500.",
+  "events": [],
+  "workers": [
+    {
+      "batch": "002a",
+      "role": "author250",
+      "agent": "ko_luna_250a",
+      "sessionId": "01a0741f-a2df-7f00-bcf8-abce22a1e8d0",
+      "output": "ui/.i18n-work/ko/002-250/a-candidate.json"
+    },
+    {
+      "batch": "003",
+      "role": "continue500",
+      "agent": "ko_luna_003",
+      "sessionId": "01a0741c-47ea-71a2-8784-c383e6c3e2b3",
+      "output": "ui/.i18n-work/ko/003/candidate.json"
+    }
+  ],
+  "lastSample": {
+    "atUtc": "2026-09-06T00:35:46.581Z",
+    "event": "sample",
+    "status": [
+      {
+        "batch": "002a",
+        "role": "author250",
+        "agent": "ko_luna_250a",
+        "sessionId": "01a0741f-a2df-7f00-bcf8-abce22a1e8d0",
+        "model": "gpt-5.6-luna",
+        "effort": "low",
+        "counterAtUtc": "2026-09-06T00:32:01.357Z",
+        "entries": null,
+        "usage": {
+          "input_tokens": 106501,
+          "cached_input_tokens": 90368,
+          "output_tokens": 5038,
+          "reasoning_output_tokens": 165
+        },
+        "uncached": 16133
+      },
+      {
+        "batch": "003",
+        "role": "continue500",
+        "agent": "ko_luna_003",
+        "sessionId": "01a0741c-47ea-71a2-8784-c383e6c3e2b3",
+        "model": "gpt-5.6-luna",
+        "effort": "low",
+        "counterAtUtc": "2026-09-06T00:32:27.267Z",
+        "entries": 91,
+        "usage": {
+          "input_tokens": 433370,
+          "cached_input_tokens": 404992,
+          "output_tokens": 5540,
+          "reasoning_output_tokens": 760
+        },
+        "uncached": 28378
+      }
+    ]
+  },
+  "completedAt": "2026-09-06T00:37:15.159Z",
+  "results": [
+    {
+      "batch": "002a",
+      "assigned": 250,
+      "substantiveDraftEntries": 250,
+      "reviewed": 0,
+      "packagingRepair": "One leading patch marker removed outside JSON values"
+    },
+    {
+      "batch": "002b",
+      "assigned": 250,
+      "substantiveDraftEntries": 0,
+      "rejected": 250,
+      "continuations": 1,
+      "reason": "Returned zero, then repeated 한국어 번역 필요 250 times while claiming authored250"
+    },
+    {
+      "batch": "003a",
+      "assigned": 250,
+      "substantiveDraftEntries": 250,
+      "reviewed": 0
+    }
+  ],
+  "workerMeasurements": [
+    {
+      "sessionId": "01a0741f-a2df-7f00-bcf8-abce22a1e8d0",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "usage": {
+        "input_tokens": 106501,
+        "cached_input_tokens": 90368,
+        "output_tokens": 5038,
+        "reasoning_output_tokens": 165
+      },
+      "uncached": 16133,
+      "firstCounterAt": "2026-09-06T00:30:32.432Z",
+      "lastCounterAt": "2026-09-06T00:32:01.357Z",
+      "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-30-25-01a0741f-a2df-7f00-bcf8-abce22a1e8d0.jsonl"
+    },
+    {
+      "sessionId": "01a07422-1f0f-7962-b327-640683d0adc8",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "usage": {
+        "input_tokens": 257356,
+        "cached_input_tokens": 240896,
+        "output_tokens": 2126,
+        "reasoning_output_tokens": 1127
+      },
+      "uncached": 16460,
+      "firstCounterAt": "2026-09-06T00:33:15.077Z",
+      "lastCounterAt": "2026-09-06T00:34:41.843Z",
+      "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-33-08-01a07422-1f0f-7962-b327-640683d0adc8.jsonl"
+    },
+    {
+      "sessionId": "01a07423-9b05-7263-a2b4-fd927c144971",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "usage": {
+        "input_tokens": 106578,
+        "cached_input_tokens": 91392,
+        "output_tokens": 5011,
+        "reasoning_output_tokens": 146
+      },
+      "uncached": 15186,
+      "firstCounterAt": "2026-09-06T00:34:52.510Z",
+      "lastCounterAt": "2026-09-06T00:36:21.148Z",
+      "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-34-45-01a07423-9b05-7263-a2b4-fd927c144971.jsonl"
+    }
+  ],
+  "languageState": {
+    "acceptedReviewed": 500,
+    "preservedSubstantiveDrafts": 591,
+    "eligible": 5866,
+    "astraReview": "Not started; whole locale incomplete"
+  },
+  "conclusion": "Two250-entry requests produced substantive drafts, one failed and then returned filler. A keep-going follow-up on500 produced91 before another partial return. Neither size250 nor continuation is sufficient for reliable completion; no speedup claim.",
+  "validation": {
+    "lastFullUiGate": {
+      "command": "cd ui; make test",
+      "success": true,
+      "passed": 6216,
+      "failed": 0
+    },
+    "i18nGate": "npm run check:i18n passed",
+    "localeTargetedTests": 29,
+    "ledgerTests": 2,
+    "acceptedLedgerCounts": {
+      "reviewed": 500,
+      "missing": 5366
+    },
+    "draftsNotMerged": true
+  }
+}
