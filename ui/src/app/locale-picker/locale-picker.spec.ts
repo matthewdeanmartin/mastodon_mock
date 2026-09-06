@@ -53,6 +53,22 @@ describe('LocalePicker', () => {
     expect(choose).toHaveBeenCalledWith('de');
   });
 
+  it('wears the compact footer styling only in the footer', () => {
+    // The 12px muted type belongs to the footer's dense link row. On Settings →
+    // Internationalization the same control sits beside the full-size "Posting
+    // language" select, where that size read as a mistake. The styling hangs
+    // off a host class rather than `:host([footer])` because a signal input is
+    // never reflected to the DOM, so the attribute selector matched nothing.
+    const footer = TestBed.createComponent(LocalePicker);
+    footer.componentRef.setInput('footer', true);
+    footer.detectChanges();
+    expect((footer.nativeElement as HTMLElement).classList).toContain('in-footer');
+
+    const settings = TestBed.createComponent(LocalePicker);
+    settings.detectChanges();
+    expect((settings.nativeElement as HTMLElement).classList).not.toContain('in-footer');
+  });
+
   it('forcing a locale, then choosing Automatic, returns to negotiation', () => {
     // Without the Automatic option, forcing a language once would be
     // irreversible — the trap this guards against.

@@ -1,5 +1,5 @@
 {
-  "testCount": 6222,
+  "testCount": 6223,
   "tests": [
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles backwards from the first control to the last",
     "src/app/a11y/focus-trap.spec.ts :: FocusTrap cycles from the last control back to the first",
@@ -1425,6 +1425,7 @@
     "src/app/locale-picker/locale-picker.spec.ts :: LocalePicker lists the deployment’s available locales by their endonyms",
     "src/app/locale-picker/locale-picker.spec.ts :: LocalePicker names every shipped locale in its own language",
     "src/app/locale-picker/locale-picker.spec.ts :: LocalePicker renders the picker now that more than one locale ships",
+    "src/app/locale-picker/locale-picker.spec.ts :: LocalePicker wears the compact footer styling only in the footer",
     "src/app/markdown.spec.ts :: applyMinimalMarkdown anything weird turns markdown off entirely",
     "src/app/markdown.spec.ts :: applyMinimalMarkdown does not treat #hashtags as headers",
     "src/app/markdown.spec.ts :: applyMinimalMarkdown handles several constructs in one paragraph",

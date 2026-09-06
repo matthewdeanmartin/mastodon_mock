@@ -139,6 +139,51 @@
   white-space: nowrap;
 }
 
+/* Phones: the single line stops being worth defending.
+   There are five to eight items competing for ~300px, and the shrink priorities
+   above resolve that by ellipsizing nearly all of them at once — the reported
+   "J... J...9 min..Bsk.." — which is the one outcome where no item is readable.
+   Wrapping is strictly better: the two things that identify the post (name and
+   handle) get the full width of line one, and the metadata that was crowding
+   them out gets line two, at full length, where there is room for it.
+
+   `flex-wrap` alone would not do this, because the wrap point would fall
+   wherever the widths happened to land. The break is forced instead: everything
+   from the timestamp onward is pushed to a new line by a zero-width flex item
+   that is 100% wide, so the split is always name/handle | the rest. */
+@media (max-width: 720px) {
+  .meta {
+    flex-wrap: wrap;
+    row-gap: 0;
+    align-items: baseline;
+  }
+
+  /* The forced break. `::before` on the timestamp rather than a real element,
+     so the template stays a single flat row and nothing has to know about it. */
+  .meta > .post-time::before {
+    content: '';
+    display: block;
+    width: 100%;
+  }
+
+  /* The timestamp opens line two, so its leading "·" separator would dangle at
+     the start of a line instead of sitting between two things. */
+  .meta > .post-time > .sep {
+    display: none;
+  }
+
+  /* With a line to themselves, name and handle no longer need to fight: the
+     handle keeps its own line if it has to rather than ellipsizing to a stub. */
+  .meta > .hover-anchor {
+    flex-shrink: 0;
+    max-width: 100%;
+  }
+
+  .acct {
+    flex-shrink: 1;
+  }
+}
+
 .content-link,
 .content-link:hover {
   color: var(--text);
@@ -374,11 +419,23 @@
   font-style: italic;
 }
 
+/* The action row wraps on narrow cards, so the horizontal and vertical gaps
+   have to be set separately. One `gap: 14px` made the row-gap 14px as well, and
+   stacked under 40px-tall buttons that turned a two-line toolbar into ~94px of
+   mostly-empty space below a 13px line of text.
+
+   The rows still need *some* separation, because the buttons claim their
+   fingertip target with an 8px overhang (see `.action::after`) and at row-gap 0
+   the overhangs of two stacked rows would meet, letting the lower row steal
+   taps aimed at the upper one. 16px clears that with room to spare, and a
+   24px button on a 16px gap is still roughly half the height of the 40+14 it
+   replaces. */
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 8px;
+  row-gap: 16px;
+  column-gap: 14px;
+  margin-top: 4px;
   align-items: center;
 }
 
@@ -394,11 +451,31 @@
   cursor: pointer;
   /* 2px of padding around 13px text is a ~20px target, against the ~44px a
      fingertip actually needs — the other half of "no clues if you failed to
-     touch the tiny button". The row's own `gap` already reserves the space, so
-     claiming it costs no layout: the hit area grows, the ink does not. */
-  min-height: 40px;
+     touch the tiny button". The column gap already reserves the width, so the
+     hit area grows sideways for free.
+
+     Height is the expensive direction: every row of a wrapped toolbar pays it.
+     So the target is claimed with a transparent ::after that overhangs the
+     button instead of with min-height, which would have inflated the line box.
+     The ink is ~24px tall; the tappable box is ~40px and overlaps its
+     neighbours' padding harmlessly, because they are all siblings in the same
+     row and nothing sits between them. */
+  min-height: 24px;
   min-width: 32px;
   justify-content: center;
+  position: relative;
+}
+
+.action::after {
+  content: '';
+  position: absolute;
+  inset: -8px -2px;
+}
+
+/* A static count is not pressable, so it must not claim an overhanging target
+   that would swallow taps aimed at the real button beside it. */
+.action-static::after {
+  content: none;
 }
 
 /* A count with no button behind it should not reserve a fingertip's worth of
@@ -644,17 +721,65 @@
   display: none;
 }
 
+/* The panel hangs from the ••• button, which is `position: relative`. That is
+   only safe while the button is the last thing in the row and pinned right: put
+   it in the middle or the left and a 200px panel anchored `right: 0` reaches
+   back past the edge of the card, or off the screen entirely on a phone.
+
+   `right: auto; left: 0` would just move the problem to the other side, so the
+   panel is instead allowed to sit wherever it fits: it anchors right but clamps
+   its own width to the card, and translates back into view rather than
+   overflowing. On a phone it stops pretending to be anchored at all and becomes
+   a viewport sheet (below). */
 .danger-menu-panel {
   position: absolute;
   right: 0;
   bottom: 100%;
   z-index: 50;
   min-width: 200px;
+  max-width: min(280px, calc(100vw - 32px));
   padding: 5px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--col-bg);
   box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+}
+
+/* An open menu has to paint over the cards below it. `z-index` alone could not
+   do that: it is resolved inside the card's own stacking context, so a panel at
+   50 still lost to the next sibling card that happened to create one. Lifting
+   the whole card while its menu is open puts them in the right order. */
+.danger-menu[open] {
+  z-index: 60;
+}
+
+:host:has(.danger-menu[open]) {
+  position: relative;
+  z-index: 60;
+}
+
+/* Phones: stop hanging the panel off a button that may be anywhere in the row.
+   Fixed positioning takes the card out of the equation entirely — the sheet is
+   placed against the viewport, so it is always fully on screen no matter where
+   the ••• that opened it sits. */
+@media (max-width: 720px) {
+  .danger-menu-panel {
+    position: fixed;
+    right: 12px;
+    left: 12px;
+    bottom: auto;
+    top: auto;
+    max-width: none;
+    min-width: 0;
+    /* Anchored to the bottom of the viewport rather than to the button: a
+       thumb-reachable sheet, and one that cannot be pushed off the top of a
+       short screen by a tall menu. */
+    inset-block-end: 12px;
+    max-height: 60vh;
+    overflow-y: auto;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
+  }
 }
 
 /* Neutral "open original" links, distinct from the red destructive actions. */

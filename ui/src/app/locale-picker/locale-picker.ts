@@ -1,8 +1,10 @@
 /**
  * The interface-language control.
  *
- * Lives in the footer for now — the app's chrome is crowded and the footer is
- * the one place with room that appears on every route. It is deliberately a
+ * Rendered twice: in the footer, which is the one place with room on every
+ * route, and on Settings → Internationalization, where someone actually looking
+ * for it will go. The `footer` input carries the difference — the dot separator
+ * and the compact type belong to the footer's link row only. It is deliberately a
  * plain `<select>` rather than a styled menu: this is a control people use once
  * and then never again, and a native select is the version that works with
  * every screen reader, every mobile keyboard, and 60 options without scrolling
@@ -37,6 +39,9 @@ const AUTO = 'auto';
 @Component({
   selector: 'app-locale-picker',
   imports: [TranslocoPipe],
+  // A signal input is not reflected to the DOM, so `:host([footer])` would
+  // never match — this binds a real class the host selector can see.
+  host: { '[class.in-footer]': 'footer()' },
   template: `
     @if (locale.hasChoice) {
       <!-- The separator lives inside the guard so a hidden picker does not
@@ -68,15 +73,24 @@ const AUTO = 'auto';
     }
     .locale-picker select {
       font: inherit;
+      cursor: pointer;
+    }
+    /* Footer-only shrink. The footer is a dense row of muted links, so the
+       control matches that type; anywhere else — Settings →
+       Internationalization — it must match the page's own selects instead,
+       which .scontrol select in styles.css already sizes. Component styles
+       beat that rule on specificity, so scoping these to the footer is what
+       lets the settings instance inherit rather than render as a 12px oddity
+       beside the full-size "Posting language" control. */
+    :host(.in-footer) .locale-picker select {
       font-size: 12px;
       color: var(--muted);
       background: none;
       border: 1px solid var(--border);
       border-radius: 4px;
       padding: 1px 4px;
-      cursor: pointer;
     }
-    .locale-picker select:hover {
+    :host(.in-footer) .locale-picker select:hover {
       color: var(--accent);
     }
   `,

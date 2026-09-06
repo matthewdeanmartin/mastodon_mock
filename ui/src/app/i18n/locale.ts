@@ -61,7 +61,7 @@ export const PRODUCTION_LOCALES = [
  * language lands here first, gets reviewed on canary, then moves up to
  * {@link PRODUCTION_LOCALES}.
  */
-export const IN_PROGRESS_LOCALES = [] as const;
+export const IN_PROGRESS_LOCALES = ['vi', 'hi', 'sv'] as const;
 
 export type SupportedLocale =
   | (typeof PRODUCTION_LOCALES)[number]
@@ -106,11 +106,13 @@ export const LOCALE_ENDONYMS: Record<string, string> = {
   it: 'Italiano',
   nl: 'Nederlands',
   pl: 'Polski',
-  sv: 'Svenska',
+  sv: 'Svenska (pågående)',
   fi: 'Suomi',
   is: 'Íslenska',
   ru: 'Русский',
   tr: 'Türkçe',
+  vi: 'Tiếng Việt (đang thực hiện)',
+  hi: 'हिन्दी (कार्य जारी)',
   ja: '日本語',
   'zh-Hant': '繁體中文（台灣）',
   uk: 'Українська',

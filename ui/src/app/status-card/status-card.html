@@ -85,11 +85,11 @@
             rel="noopener noreferrer"
             [title]="display.created_at"
           >
-            · {{ display.created_at | humanTime }}
+            <span class="sep" aria-hidden="true">·</span> {{ display.created_at | humanTime }}
           </a>
         } @else {
           <a class="post-time muted" [routerLink]="threadLink" [title]="display.created_at">
-            · {{ display.created_at | humanTime }}
+            <span class="sep" aria-hidden="true">·</span> {{ display.created_at | humanTime }}
           </a>
         }
         @if (display.pinned) {

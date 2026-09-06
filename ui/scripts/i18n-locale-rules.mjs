@@ -61,6 +61,34 @@ function proseOnly(value) {
 }
 
 export const LOCALE_RULES = {
+  hi: {
+    name: 'Hindi',
+    register: 'neutral concise modern Hindi UI prose; use natural `आप` address consistently',
+    rules: [],
+    traps: {
+      'सिग्नल बढ़ाना': 'Boost is a social-media re-share, not signal amplification',
+      'पीछा करना': 'Follow means follow an account, not chase or stalk',
+      'दरवाज़े का हैंडल': 'Handle is an account identifier, not a physical handle',
+      'सिलाई का धागा': 'Thread is a conversation, not sewing thread',
+      'चालू खाता': 'Current account is the active account, not a bank account',
+      'फ़ोन कॉल': 'API call is not a telephone call',
+      'भोजन': 'Feed is a stream of posts, not food',
+    },
+  },
+  vi: {
+    name: 'Vietnamese',
+    register: 'neutral concise Vietnamese UI prose; natural second-person wording without unnecessary honorifics',
+    rules: [],
+    traps: {
+      'tăng cường tín hiệu': 'Boost is a social-media re-share, not signal amplification',
+      'theo đuổi': 'Follow means follow an account, not pursue or chase',
+      'tay cầm': 'Handle is an account identifier, not a physical handle',
+      'chỉ may': 'Thread is a conversation, not sewing thread',
+      'tài khoản vãng lai': 'Current account is the active account, not a bank account',
+      'cuộc gọi điện thoại': 'API call is not a telephone call',
+      'thức ăn': 'Feed is a stream of posts, not food',
+    },
+  },
   ru: {
     name: 'Russian',
     register: 'neutral concise Russian UI prose; informal singular `ты` and plural `вы`',
@@ -101,6 +129,20 @@ export const LOCALE_RULES = {
       'chamada telefônica': 'API call is not a telephone call',
       'fio de costura': 'Thread is a conversation, not sewing thread',
       alça: 'Handle is an account identifier, not a physical handle',
+    },
+  },
+  sv: {
+    name: 'Swedish',
+    register: 'neutral concise standard Swedish; informal `du` singular and `ni` plural',
+    rules: [],
+    traps: {
+      förstärka: 'Boost is a social-media re-share, not signal amplification',
+      förfölja: 'Follow means följa an account, not pursue',
+      handtag: 'Handle is an account identifier, not a physical handle',
+      sytråd: 'Thread is a conversation, not sewing thread',
+      'löpande konto': 'Current account is the active account, not a bank account',
+      telefonsamtal: 'API call is not a telephone call',
+      mat: 'Feed is a stream of posts, not food',
     },
   },
   it: {
