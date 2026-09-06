@@ -1191,6 +1191,7 @@
             [initialText]="redraftText()"
             [initialVisibility]="display.visibility"
             [inReplyToId]="display.in_reply_to_id ?? undefined"
+            [compact]="true"
             [placeholder]="'statusCard.editAndRepost' | transloco"
             (posted)="onRedrafted($event)"
           />
@@ -1207,6 +1208,7 @@
             <app-compose
               [inReplyToId]="display.id"
               [replyToHandle]="display.account.acct"
+              [compact]="true"
               [placeholder]="'statusCard.postYourReply' | transloco"
               (posted)="onReplied($event)"
             />
@@ -1221,6 +1223,7 @@
           <app-compose
             [quotedStatusId]="display.id"
             [gateable]="true"
+            [compact]="true"
             [placeholder]="'statusCard.addComment' | transloco"
             (posted)="onQuoted($event)"
           />

@@ -1115,6 +1115,20 @@ describe('StatusCard', () => {
 
   // ---------------------------------------------------------------- toggleReply / toggleQuote
 
+  it('opens the inline reply composer compact, with no preview panel', () => {
+    // An inline reply sits under the post being replied to. The full composer's
+    // preview opens on by default, so the seeded @handle alone used to push a
+    // tall duplicate of the post between the reader and the box they are typing
+    // in. Compact starts with the preview off; the 👁 button still turns it on.
+    const f = setUp(makeStatus({}));
+    internals(f).replying.set(true);
+    f.detectChanges();
+
+    const element = f.nativeElement as HTMLElement;
+    expect(element.querySelector('.inline-compose .compose-compact')).not.toBeNull();
+    expect(element.querySelector('.inline-compose .preview')).toBeNull();
+  });
+
   it('toggleReply: flips replying and collapses any open quote composer', () => {
     const f = setUp();
     internals(f).quoting.set(true);

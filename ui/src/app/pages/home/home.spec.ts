@@ -33,6 +33,7 @@ interface HomeInternals {
   reviewBookmarks(): void;
   toggleBoosts(): void;
   toggleReplies(): void;
+  articles: Signal<{ status: Status; card: NonNullable<Status['card']> }[]>;
   view: WritableSignal<'feed' | 'members' | 'analytics' | 'media' | 'articles'>;
   setView(view: 'feed' | 'members' | 'analytics' | 'media' | 'articles'): void;
   onPosted(status: Status): void;
@@ -965,6 +966,43 @@ describe('Home', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('2 posts currently loaded');
     expect(text).toContain('not the whole feed');
+  });
+
+  it('keeps paging while Articles is open until it has enough link cards', () => {
+    // Articles is a projection over loaded posts, and most posts carry no card.
+    // Counting posts (as the ordinary fill does) satisfied feedMin with a
+    // handful of articles on screen, which is what made the view look empty.
+    const withCard = (id: string): Status => ({
+      ...makeStatus(id),
+      card: { url: `https://example.com/${id}`, title: id } as Status['card'],
+    });
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    httpMock.expectOne('/api/v1/announcements').flush([]);
+    // A full page that satisfies feedMin on post count but holds two articles.
+    httpMock
+      .expectOne('/api/v1/timelines/home?limit=20')
+      .flush([
+        withCard('a1'),
+        withCard('a2'),
+        ...Array.from({ length: 18 }, (_, i) => makeStatus(`p${i}`)),
+      ]);
+    fixture.detectChanges();
+
+    internals(fixture).setView('articles');
+    fixture.detectChanges();
+
+    // Opening the view pages again, because two articles is not ten.
+    const more = httpMock.match(
+      (r) => r.url === '/api/v1/timelines/home' && !!r.params.get('max_id'),
+    );
+    expect(more.length).toBeGreaterThan(0);
+    more[0].flush(Array.from({ length: 8 }, (_, i) => withCard(`b${i}`)));
+    fixture.detectChanges();
+
+    // Ten reached, so the fill stops rather than paging on.
+    expect(internals(fixture).articles().length).toBe(10);
+    httpMock.match((r) => r.url === '/api/v1/timelines/home').forEach((r) => r.flush([]));
   });
 
   it('returns to the feed when the active view is toggled off', () => {

@@ -63,6 +63,52 @@ function parseAtUri(uri: string): { repo: string; collection: string; rkey: stri
   return { repo, collection, rkey };
 }
 
+/**
+ * Deterministically turn an arbitrary caller-side id into a valid record key.
+ *
+ * Bluesky record keys for `app.bsky.feed.post` must be TIDs: 13 characters of
+ * base32-sortable, with the top bit of the first character clear. A UUID is
+ * neither, so passing one through rejects the write with
+ * `Invalid TID string (got "…") at $` — which is what a composed thread used to
+ * do on every part.
+ *
+ * The key must also be *stable*: it is the whole idempotency mechanism, letting
+ * a retry after a lost response address the record the PDS already committed
+ * (see {@link BlueskyApi.post}). So this hashes the seed rather than reading the
+ * clock — the same operation and part always mint the same key, across retries
+ * and across page reloads that resume a parked posting operation.
+ *
+ * Sort order is the one TID property we deliberately give up. Real TIDs encode
+ * a timestamp so a repo lists newest-last; these are pseudorandom, so a thread's
+ * parts do not sort by their keys. Nothing reads posts that way — the AppView
+ * orders by `createdAt`, and thread structure comes from `reply.parent` — and
+ * correctness of the retry path is worth more than an ordering nobody consults.
+ */
+export function tidFromSeed(seed: string): string {
+  const alphabet = '234567abcdefghijklmnopqrstuvwxyz';
+  // FNV-1a over the seed, run twice with different offsets: one 32-bit hash is
+  // not enough bits for 13 base32 characters (65 bits), so two independent
+  // ones are concatenated and consumed 5 bits at a time.
+  const fnv = (offset: number): number => {
+    let hash = offset;
+    for (let i = 0; i < seed.length; i++) {
+      hash ^= seed.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash;
+  };
+  let bits = (BigInt(fnv(0x811c9dc5)) << 32n) | BigInt(fnv(0x811c9dc5 ^ 0x5bf03635));
+  const out: string[] = [];
+  for (let i = 0; i < 13; i++) {
+    out.push(alphabet[Number(bits & 31n)]);
+    bits >>= 5n;
+  }
+  // The leading character carries the TID's high bits, where the top bit must be
+  // clear: restrict it to the first half of the alphabet.
+  out[0] = alphabet[alphabet.indexOf(out[0]) % 16];
+  return out.join('');
+}
+
 function isExpiredToken(err: unknown): boolean {
   return (
     err instanceof HttpErrorResponse &&

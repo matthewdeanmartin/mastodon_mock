@@ -7,15 +7,16 @@ import { LocalePicker } from './locale-picker';
 describe('LocalePicker', () => {
   beforeEach(() => localStorage.clear());
 
-  it('renders nothing while only one locale ships', () => {
-    // A one-option language menu is noise on an already-crowded footer. This
-    // expectation inverts in ui-i18n-7 when SUPPORTED_LOCALES grows; until
-    // then it guards against the control shipping visible-but-useless.
+  it('renders the picker now that more than one locale ships', () => {
+    // The inversion ui-i18n-7 anticipated: the control hid itself while `en`
+    // was the only dictionary, and appears now that every translated locale is
+    // in production. What it still guards is the *reason* — the menu exists
+    // only when there is something to choose between.
     const fixture = TestBed.createComponent(LocalePicker);
     fixture.detectChanges();
     const select = (fixture.nativeElement as HTMLElement).querySelector('select');
-    expect(SUPPORTED_LOCALES.length).toBe(1);
-    expect(select).toBeNull();
+    expect(SUPPORTED_LOCALES.length).toBeGreaterThan(1);
+    expect(select).not.toBeNull();
   });
 
   it('names every shipped locale in its own language', () => {
@@ -26,7 +27,7 @@ describe('LocalePicker', () => {
     }
   });
 
-  it('shows in-progress locales when the deployment makes them available', () => {
+  it('lists the deployment’s available locales by their endonyms', () => {
     const choose = vi.fn();
     TestBed.overrideProvider(UiLocale, {
       useValue: {
@@ -44,7 +45,7 @@ describe('LocalePicker', () => {
     expect([...select.options].map((option) => option.textContent?.trim())).toEqual([
       'Automatic (browser)',
       'English',
-      'Deutsch (in Arbeit)',
+      'Deutsch',
     ]);
 
     select.value = 'de';

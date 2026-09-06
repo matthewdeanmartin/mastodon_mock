@@ -59,6 +59,15 @@ const NUDGE_DISMISSED_KEY = 'mockingbird_follow_nudge_dismissed';
 /** How many saved bookmarks one press of "Review bookmarks" appends. */
 const BOOKMARK_PAGE_SIZE = 20;
 
+/**
+ * How many link cards the Articles view pages toward.
+ *
+ * Ten fills the view on a normal screen without turning a glance at Articles
+ * into a long run of timeline requests. It is a target, not a guarantee: a feed
+ * whose posts rarely carry links stops at the feed maximum instead.
+ */
+const ARTICLE_TARGET = 10;
+
 // i18n pages.home.nudge.title: Your timeline gets better with every follow.
 // i18n pages.home.nudge.follow.one: You follow {{count}} account — import a follow list or browse directories to fill your feed.
 // i18n pages.home.nudge.follow.other: You follow {{count}} accounts — import a follow list or browse directories to fill your feed.
@@ -369,6 +378,9 @@ export class Home implements OnInit, OnDestroy {
     this.view.set(view);
     if (view !== 'media') {
       this.openPhoto.set(null);
+    }
+    if (view === 'articles') {
+      this.fillArticles();
     }
   }
 
@@ -937,6 +949,59 @@ export class Home implements OnInit, OnDestroy {
       },
       error: (error: unknown) => {
         this.diagnostics.error('autoload:page-error', error);
+        this.autoLoading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Keep paging until the Articles view has {@link ARTICLE_TARGET} link cards.
+   *
+   * The Articles view is a projection: it shows the `card` of every loaded post
+   * that has one, and most posts do not. `fillToMinimum` counts *posts*, so a
+   * feed that satisfied it perfectly could still leave this view with three
+   * entries — which is what made Articles look broken. This counts what the view
+   * actually renders instead.
+   *
+   * Every other stop condition is deliberately shared with `fillToMinimum`:
+   * the feed maximum, the cap cooldown, and running out of upstream posts all
+   * end the fill. A feed with few link posts therefore stops at `feedMax`
+   * rather than paging forever chasing a target it cannot reach, and the
+   * "Load more" button below the list lets the reader push past it by hand.
+   */
+  private fillArticles(): void {
+    if (
+      this.view() !== 'articles' ||
+      this.articles().length >= ARTICLE_TARGET ||
+      this.statuses().length >= this.prefs.feedMax() ||
+      this.capActive() ||
+      !this.feedHasMore()
+    ) {
+      this.diagnostics.info('articles:autoload-stop', {
+        view: this.view(),
+        articles: this.articles().length,
+        target: ARTICLE_TARGET,
+        stored: this.statuses().length,
+        feedMax: this.prefs.feedMax(),
+        hasMore: this.feedHasMore(),
+      });
+      this.autoLoading.set(false);
+      return;
+    }
+    this.autoLoading.set(true);
+    this.pageSub = this.nextFeedPage().subscribe({
+      next: (more) => {
+        this.mergeStatuses(more);
+        this.diagnostics.info('articles:autoload-page', {
+          received: more.length,
+          articles: this.articles().length,
+        });
+        this.publishMastodon(more);
+        this.cacheAnonymousHome();
+        this.fillArticles();
+      },
+      error: (error: unknown) => {
+        this.diagnostics.error('articles:autoload-error', error);
         this.autoLoading.set(false);
       },
     });

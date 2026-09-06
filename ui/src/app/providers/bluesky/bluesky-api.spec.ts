@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { BlueskyApi } from './bluesky-api';
+import { BlueskyApi, tidFromSeed } from './bluesky-api';
 import { BlueskySession, BskySession } from './bluesky-session';
 import { bskySessionStored, seedBskySession, storedBskyProfile } from '../../testing/seed-storage';
 
@@ -168,6 +168,20 @@ describe('BlueskyApi', () => {
       uri: 'at://did:plc:me/app.bsky.feed.post/operation-1-0',
       cid: 'c1',
     });
+  });
+
+  it('mints record keys the PDS accepts as TIDs, stable per seed', () => {
+    // The PDS rejects anything else outright: a raw UUID rkey came back as
+    // `Invalid TID string (got "…") at $` and lost the whole thread.
+    const tid = /^[234567abcdefghij][234567abcdefghijklmnopqrstuvwxyz]{12}$/;
+    expect(tidFromSeed('63c690fa-ea08-44ec-8a2c-9f1e46fc9596-0')).toMatch(tid);
+    expect(tidFromSeed('63c690fa-ea08-44ec-8a2c-9f1e46fc9596-1')).toMatch(tid);
+
+    // Stability is the whole idempotency mechanism: a retry after a lost
+    // response must address the record the PDS may already have committed.
+    expect(tidFromSeed('op-0')).toBe(tidFromSeed('op-0'));
+    // Distinct parts must not collide, or a thread would overwrite itself.
+    expect(tidFromSeed('op-0')).not.toBe(tidFromSeed('op-1'));
   });
 
   it('refreshes an expired token once and retries the call', () => {

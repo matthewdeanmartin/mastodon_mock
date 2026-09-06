@@ -2,7 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClientPrefs } from '../client-prefs';
 import {
   FALLBACK_LOCALE,
@@ -40,42 +40,68 @@ describe('TranslocoLocaleSync', () => {
 });
 
 describe('supportedLocales', () => {
-  it('keeps in-progress locales off the production root', () => {
-    expect(supportedLocales('https://mawkingbird.com/')).toEqual(['en']);
+  const shipped = [
+    'en',
+    'de',
+    'fr',
+    'id',
+    'ja',
+    'zh-Hant',
+    'uk',
+    'ko',
+    'es',
+    'pt',
+    'it',
+    'nl',
+    'pl',
+    'ru',
+    'tr',
+  ];
+
+  it('ships every translated locale to the production root', () => {
+    expect(supportedLocales('https://mawkingbird.com/')).toEqual(shipped);
   });
 
-  it('offers in-progress locales on test and canary deployments', () => {
-    const expected = [
-      'en',
-      'de',
-      'fr',
-      'id',
-      'ja',
-      'zh-Hant',
-      'uk',
-      'ko',
-      'es',
-      'pt',
-      'it',
-      'nl',
-      'pl',
-      'ru',
-      'tr',
-    ];
-    expect(supportedLocales('https://mawkingbird.com/test/')).toEqual(expected);
-    expect(supportedLocales('https://mawkingbird.com/canary/')).toEqual(expected);
-    expect(supportedLocales('https://example.github.io/mawkingbird/canary/')).toEqual(expected);
+  it('offers the same set on test and canary deployments', () => {
+    expect(supportedLocales('https://mawkingbird.com/test/')).toEqual(shipped);
+    expect(supportedLocales('https://mawkingbird.com/canary/')).toEqual(shipped);
+    expect(supportedLocales('https://example.github.io/mawkingbird/canary/')).toEqual(shipped);
+  });
+
+  it('negotiates a production visitor into their browser language', () => {
+    // The point of the promotion: a reader whose browser asks for German gets
+    // German at the root, not only on a review build.
+    const production = supportedLocales('https://mawkingbird.com/');
+    expect(negotiateLocale(['de-AT', 'en'], production)).toBe('de');
+    expect(negotiateLocale(['tr'], production)).toBe('tr');
+    expect(negotiateLocale(['ru-RU'], production)).toBe('ru');
   });
 });
 
 /**
- * Replace `navigator.languages` for one test.
+ * Replace `navigator.languages` for one test, and put it back afterwards.
  *
- * The suite shares a jsdom realm (see `src/test-setup.ts`), so this must be
- * undone; `configurable: true` lets the next call displace it, and nothing
- * outside these tests reads the value.
+ * The suite shares a jsdom realm (see `src/test-setup.ts`), so a value left
+ * behind here leaks into every spec that runs after it. That used to be
+ * harmless — with only `en` shipped, any browser chain negotiated to English —
+ * but promoting the translated locales to production made the negotiation real,
+ * and a leaked `de-DE` turned `KnownLanguages` German for the trend-filter
+ * suite. Restoring is no longer optional, so the helper owns it rather than
+ * trusting each test to remember.
  */
+let originalLanguages: PropertyDescriptor | undefined;
+
+afterEach(() => {
+  if (originalLanguages) {
+    Object.defineProperty(navigator, 'languages', originalLanguages);
+  } else {
+    delete (navigator as { languages?: unknown }).languages;
+  }
+  originalLanguages = undefined;
+});
+
 function setBrowserLanguages(languages: string[]): void {
+  originalLanguages ??= Object.getOwnPropertyDescriptor(navigator, 'languages');
   Object.defineProperty(navigator, 'languages', {
     value: languages,
     configurable: true,
@@ -96,14 +122,19 @@ describe('negotiateLocale', () => {
   );
 
   it('honours browser order and deployment availability for Chinese', () => {
-    expect(negotiateLocale(['zh-TW'])).toBe('en');
+    // The browser's own order decides: the first tag we ship wins, so a reader
+    // asking for Simplified first still gets whatever they asked for next.
     expect(negotiateLocale(['zh-Hans', 'fr-FR', 'zh-TW'], reviewLocales)).toBe('fr');
     expect(negotiateLocale(['zh-Hans', 'zh-TW'], reviewLocales)).toBe('zh-Hant');
     expect(negotiateLocale(['en', 'zh-TW'], reviewLocales)).toBe('en');
+    // A build that ships only English has nothing to negotiate into.
+    expect(negotiateLocale(['zh-TW'], ['en'])).toBe('en');
   });
 
   it('falls back to English when the browser wants nothing we ship', () => {
-    expect(negotiateLocale(['fr-FR', 'fr'])).toBe(FALLBACK_LOCALE);
+    // Swedish has an endonym but no dictionary, so it is not negotiable.
+    expect(negotiateLocale(['sv-SE', 'sv'])).toBe(FALLBACK_LOCALE);
+    expect(negotiateLocale(['fr-FR', 'fr'], ['en'])).toBe(FALLBACK_LOCALE);
   });
 
   it('matches on the bare tag, so regional variants resolve', () => {

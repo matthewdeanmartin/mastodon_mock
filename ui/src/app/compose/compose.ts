@@ -32,7 +32,7 @@ import { PkmKind, pkmKinds, pkmLabel } from '../pkm/pkm-tags';
 import { TargetAvailability, restorableTarget } from './post-targets';
 import { EmojiPicker } from '../emoji-picker/emoji-picker';
 import { ComposeOptions, MediaAttachment, Status } from '../models';
-import { BlueskyApi } from '../providers/bluesky/bluesky-api';
+import { BlueskyApi, tidFromSeed } from '../providers/bluesky/bluesky-api';
 import { detectFacets, graphemeLength } from '../providers/bluesky/bluesky-facets';
 import { buildLocalBskyStatus } from '../providers/bluesky/bluesky-local-status';
 import { BlueskySession } from '../providers/bluesky/bluesky-session';
@@ -2645,7 +2645,7 @@ export class Compose implements OnDestroy {
               // operation so an ambiguous record retry is byte-equivalent.
               embed: index === 0 ? operation.bsky.embed : undefined,
             },
-            { rkey: `${operation.id}-${index}`, createdAt },
+            { rkey: tidFromSeed(`${operation.id}-${index}`), createdAt },
           );
         }),
       )

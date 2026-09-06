@@ -104,6 +104,16 @@ textarea {
   margin-bottom: 4px;
 }
 
+/*
+ * An inline reply sits *inside* a post, under the thing being replied to, so a
+ * preview as tall as the standalone composer's pushes the conversation off
+ * screen to restate text the user can already see one box above. Half the
+ * height is still enough to show formatting doing its job.
+ */
+.compose-compact .preview {
+  max-height: 8rem;
+}
+
 .preview-card {
   border: 1px dashed var(--border);
   border-radius: 12px;

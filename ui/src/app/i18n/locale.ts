@@ -37,8 +37,8 @@ import { isCanaryBuild, isTestBuild } from '../build-flavor';
  * *only* code change a new language needs — the picker, the negotiation, and
  * the settings control all read from this list.
  */
-export const PRODUCTION_LOCALES = ['en'] as const;
-export const IN_PROGRESS_LOCALES = [
+export const PRODUCTION_LOCALES = [
+  'en',
   'de',
   'fr',
   'id',
@@ -54,6 +54,14 @@ export const IN_PROGRESS_LOCALES = [
   'ru',
   'tr',
 ] as const;
+/**
+ * Locales shipped only to `/test/` and `/canary/`.
+ *
+ * Empty now that every translated dictionary ships to production. A new
+ * language lands here first, gets reviewed on canary, then moves up to
+ * {@link PRODUCTION_LOCALES}.
+ */
+export const IN_PROGRESS_LOCALES = [] as const;
 
 export type SupportedLocale =
   | (typeof PRODUCTION_LOCALES)[number]
@@ -90,23 +98,23 @@ export const FALLBACK_LOCALE: SupportedLocale = 'en';
  */
 export const LOCALE_ENDONYMS: Record<string, string> = {
   en: 'English',
-  de: 'Deutsch (in Arbeit)',
-  fr: 'Français (en cours)',
-  id: 'Bahasa Indonesia (sedang dikerjakan)',
-  es: 'Español (en curso)',
-  pt: 'Português (em andamento)',
-  it: 'Italiano (in corso)',
-  nl: 'Nederlands (in uitvoering)',
-  pl: 'Polski (w toku)',
+  de: 'Deutsch',
+  fr: 'Français',
+  id: 'Bahasa Indonesia',
+  es: 'Español',
+  pt: 'Português',
+  it: 'Italiano',
+  nl: 'Nederlands',
+  pl: 'Polski',
   sv: 'Svenska',
   fi: 'Suomi',
   is: 'Íslenska',
-  ru: 'Русский (в работе)',
-  tr: 'Türkçe (hazırlanıyor)',
-  ja: '日本語（作業中）',
-  'zh-Hant': '繁體中文（台灣，翻譯中）',
-  uk: 'Українська (у процесі)',
-  ko: '한국어 (번역 중)',
+  ru: 'Русский',
+  tr: 'Türkçe',
+  ja: '日本語',
+  'zh-Hant': '繁體中文（台灣）',
+  uk: 'Українська',
+  ko: '한국어',
 };
 
 /** Preserve an explicit script; infer Traditional Chinese only from its regions. */

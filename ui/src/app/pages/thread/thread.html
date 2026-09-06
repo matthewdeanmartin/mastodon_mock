@@ -161,6 +161,7 @@
     <app-compose
       [inReplyToId]="s.id"
       [replyToHandle]="s.account.acct"
+      [compact]="true"
       [placeholder]="'pages.thread.reply.placeholder' | transloco"
       (posted)="onReply($event)"
     />
