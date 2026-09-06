@@ -27,13 +27,14 @@ hand-edit it. Do not emit ICU until the runtime supports it.
 
 ## Dispatch
 
-Use Terra (`gpt-5.6-terra`, explicit low effort) for direct authorship and a
-separate Sol (`gpt-5.6-sol`, explicit low effort) for independent review. Astra
+Use Luna (`gpt-5.6-luna`, explicit low effort) for direct authorship and a
+separate Terra (`gpt-5.6-terra`, explicit low effort) for independent review. Astra
 handles concrete complex source/template defects. This skill permits delegation
 within the user's active translation or benchmark scope.
 
 Use `fork_turns: "none"`. Supply only the worker skill path, role, locale,
-glossary, immutable work order, output path, schema and deadline. No parent
+glossary, immutable work order, output path and schema. Do not send deadlines,
+speed demands or token budgets to workers; the coordinator measures them. No parent
 history, old reports, whole dictionaries or author conversation. Initially one
 fixed batch per context; at most two if measurements justify it. Normally use
 two author slots and one reviewer slot, within the session limit. Review only
@@ -51,7 +52,7 @@ verbose protocol in the benchmark.
 2. Independently review every entry once against English/context/glossary.
    Reviewer outputs corrections only. Apply them mechanically and validate the
    final artifact. No semantic self-review, preference-only polishing, or full
-   Astra re-review after Sol.
+   Astra review per batch. Once the entire Korean locale has passed Terra review, run the user-requested Astra review of all strings.
 3. Allow at most one targeted repair for a concrete remaining defect. If still
    blocked, preserve work and report; do not restart the review cycle.
 4. Serialize writes through `scripts/i18n-merge.mjs` with frozen `--source=`

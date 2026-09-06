@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "runId": "ko-no-deadline-001-2026-09-06",
+  "scope": "Complete fixed batch001: frozen Terra400 plus Luna100, then independent Terra500 review",
+  "startedAt": "2026-09-06T00:23:00.145Z",
+  "status": "accepted-reviewed",
+  "manifestHash": "94e588284f9df4155873f7fa74e31f4cabd8de80d93375d19c81c3fa3bb186cb",
+  "workerDeadlines": false,
+  "budgetMode": "supervisor-observed; historical thresholds diagnostic",
+  "authorCounts": {
+    "terra": 400,
+    "luna": 100
+  },
+  "comparisonLimit": "Mixed authors and mid-run deadline correction; not a controlled model comparison",
+  "events": [],
+  "completedAt": "2026-09-06T00:26:24.657Z",
+  "accepted": 500,
+  "reviewed": 500,
+  "corrections": 24,
+  "workers": [
+    {
+      "sessionId": "01a07415-599d-74b1-9614-54b6ca03ea05",
+      "model": "gpt-5.6-terra",
+      "effort": "low",
+      "counters": {
+        "input_tokens": 384222,
+        "cached_input_tokens": 321792,
+        "output_tokens": 6952,
+        "reasoning_output_tokens": 1514
+      },
+      "uncached": 62430,
+      "firstCounterAt": "2026-09-06T00:19:17.899Z",
+      "lastCounterAt": "2026-09-06T00:21:36.063Z",
+      "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-19-11-01a07415-599d-74b1-9614-54b6ca03ea05.jsonl"
+    },
+    {
+      "sessionId": "01a07418-1925-7523-9cd0-5948aa383ba8",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "counters": {
+        "input_tokens": 129554,
+        "cached_input_tokens": 119808,
+        "output_tokens": 2329,
+        "reasoning_output_tokens": 134
+      },
+      "uncached": 9746,
+      "firstCounterAt": "2026-09-06T00:22:17.908Z",
+      "lastCounterAt": "2026-09-06T00:23:00.462Z",
+      "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-22-11-01a07418-1925-7523-9cd0-5948aa383ba8.jsonl"
+    },
+    {
+      "sessionId": "01a07419-5b40-7041-a821-88ce30ff15c9",
+      "model": "gpt-5.6-terra",
+      "effort": "low",
+      "counters": {
+        "input_tokens": 445434,
+        "cached_input_tokens": 414208,
+        "output_tokens": 3860,
+        "reasoning_output_tokens": 2147
+      },
+      "uncached": 31226,
+      "firstCounterAt": "2026-09-06T00:23:40.816Z",
+      "lastCounterAt": "2026-09-06T00:25:01.033Z",
+      "rolloutPath": "C:\\Users\\matth\\.codex\\sessions\\2026\\09\\05\\rollout-2026-09-05T20-23-34-01a07419-5b40-7041-a821-88ce30ff15c9.jsonl"
+    }
+  ],
+  "provenance": {
+    "externalMTObserved": false,
+    "luna": "Direct explicit-ID authored JSON",
+    "terra": "Directly authored Korean strings; internal positional packaging deviated from explicit-ID author instructions. Final 500 explicit English/candidate pairs independently reviewed with 24 corrections; no unresolved alignment blocker.",
+    "limits": "Tool activity inspection, not enforced network isolation"
+  },
+  "validation": "Exact 500 IDs; original source/context/policy hashes; final merge gate passed; reviewed ledger stamped; locale tests 29 passed; ledger tests 2 passed"
+}

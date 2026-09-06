@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "runId": "ko-luna-pipeline-2026-09-06",
+  "startedAt": "2026-09-06T00:26:24.660Z",
+  "status": "dispatching",
+  "batches": [
+    "002",
+    "003"
+  ],
+  "author": "gpt-5.6-luna",
+  "reviewer": "gpt-5.6-terra",
+  "effort": "low",
+  "workerDeadlines": false,
+  "scope": "Two complete disjoint 500-key Luna author assignments with independent Terra reviews",
+  "events": []
+}

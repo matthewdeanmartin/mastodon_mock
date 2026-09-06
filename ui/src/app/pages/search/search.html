@@ -1,11 +1,11 @@
 <!-- Wide layout (rails are dropped for /search in the shell). The search bar is a
-     full-width header; below it we split into two boxes once a POST search has run
+     full-width header; below it we split into two boxes when a search has results
      (form + refinement controls left, results right). Cramming the search bar into
      the narrow left column overflowed it, so it lives up top spanning both. -->
 @let postSearchRan = !!results() && type() === 'statuses';
 @let postResults = (results()?.statuses?.length ?? 0) > 0 && type() === 'statuses';
 @let accountResultsRan = type() === 'accounts' && loadedAccountCount() > 0;
-@let twoBox = type() === 'statuses' || type() === 'accounts';
+@let twoBox = postResults || accountResultsRan;
 
 <div class="search-shell">
   <div class="search-bar">
@@ -394,7 +394,8 @@
          with filters stacked across the top and a layout of its own — the
          filters were never in a column because there was no column. -->
     <app-bluesky-search-panel
-      class="search-page two-box"
+      class="search-page"
+      [class.two-box]="blueskyPanel()?.twoBox()"
       [query]="query()"
       [target]="blueskyTarget()"
       [advancedOpen]="advancedOpen()"
@@ -410,7 +411,7 @@
         The controls start visible at every width. Readers can collapse them
         using the summary; on phones the controls stay above the results.
       -->
-      <details class="search-form-box" open>
+      <details class="search-form-box" [hidden]="!twoBox && !advancedOpen()" open>
         <summary class="refine-summary">
           <span>{{ 'pages.search.refine.summary' | transloco }}</span>
           @if (activeRefinementCount(); as active) {

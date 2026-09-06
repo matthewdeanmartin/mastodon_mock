@@ -175,6 +175,22 @@ describe('BlueskySearchPanel', () => {
   });
 
   for (const target of ['accounts', 'statuses'] as const) {
+    it(`hides the Bluesky ${target} rail without results unless Advanced is opened`, () => {
+      const fixture = setUp(target);
+      const rail = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+        '.search-form-box',
+      )!;
+      expect(rail.hidden).toBe(true);
+      expect(fixture.componentInstance.twoBox()).toBe(false);
+      internals(fixture).runQuery();
+      fixture.detectChanges();
+      expect(rail.hidden).toBe(true);
+      expect(fixture.componentInstance.twoBox()).toBe(false);
+      fixture.componentRef.setInput('advancedOpen', true);
+      fixture.detectChanges();
+      expect(rail.hidden).toBe(false);
+    });
+
     it(`shows open facets for a single Bluesky ${target} result`, () => {
       postPages = [{ statuses: [makeStatus('1')], cursor: null }];
       accountPages = [
@@ -187,6 +203,11 @@ describe('BlueskySearchPanel', () => {
       internals(fixture).apiBudget.set(1);
       internals(fixture).runQuery();
       fixture.detectChanges();
+      expect(fixture.componentInstance.twoBox()).toBe(true);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.search-form-box')
+          ?.hidden,
+      ).toBe(false);
       const facets = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>(
         '.search-form-box .refine-facets',
       );

@@ -2,7 +2,7 @@
      sticky left column holds the form and every refinement control, the right
      column holds results. The page supplies the query box, the selects, Search,
      Advanced, Syntax, the AI helper, Save and Share above this. -->
-<div class="search-form-box">
+<div class="search-form-box" [hidden]="empty() && !advancedOpen()">
   <!-- How many pages to pull eagerly, so faceting has a corpus to work with.
        Same control, same place and same bargain as the Mastodon side — one
        Bluesky request per page for either target, so pages and calls are the

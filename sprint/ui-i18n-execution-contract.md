@@ -1,7 +1,11 @@
 # Translation preparation and measurement contract
 
-This is preparation for Korean, not a completed speedup or authorization inferred
-from an old plan. No translation or pilot ran during the skill cleanup.
+User's latest direction: Luna-low authors without deadline pressure and a separate
+Terra-low agent reviews. The Terra author experiment was interrupted on request
+after 400 saved entries; Luna completes the remaining 100 in the same batch,
+and Astra reviews the entire Korean locale only after all strings finish those
+stages. The first pilot uses Korean batch 001. No translation ran during the
+earlier skill cleanup; this run measures implementation preparation separately.
 
 ## Readiness before dispatch
 
@@ -9,13 +13,15 @@ from an old plan. No translation or pilot ran during the skill cleanup.
   archive the original verbatim under the skill's references directory.
 - Done: separate a small worker skill; dispatch fresh contexts with no history.
 - Done: define payload, provenance checks, clocks, counters and experiment gates.
-- Pending: implement and test the compact adapter described below. Existing
-  `i18n-fixed-batches.mjs` emits full keys; `i18n-merge.mjs` consumes full keys.
-- Pending: implement counter/event collection and verify it against one existing
-  rollout without launching a translation agent. Counter unavailability must be
-  explicit; do not run a token-budgeted pilot without working measurement.
-- Pending before Korean rollout: glossary, locale registration inspection, and
-  `ko` accepted/reviewed tracking. Currently `trackedLocale` in
+- Done: `ui/scripts/i18n-compact.mjs` prepares immutable manifests, exports compact
+  work orders, binds correction patches, and expands full-key merge inputs.
+  Five targeted tests pass; partial checkpoints cannot pass as complete.
+- Done: `ui/scripts/i18n-metrics.mjs` captures effective model/effort, cumulative
+  counters, reset-aware deltas and coordinator events. Four tests pass and an
+  existing rollout was read successfully before launching the author.
+- Done: Korean glossary established with a Mastodon vocabulary anchor.
+- Pending before Korean rollout: registration and `ko` accepted/reviewed tracking.
+  Currently `trackedLocale` in
   `ui/scripts/i18n-ledger.mjs` contains only `zh-Hant` and `uk`.
 
 ## Compact adapter contract
@@ -60,19 +66,18 @@ synthetic text, not translation agents, for implementation tests.
 
 ## Minimal dispatch
 
-Spawn author Terra-low or reviewer Sol-low with `fork_turns: "none"` and an
+Spawn author Luna-low or reviewer Terra-low with `fork_turns: "none"` and an
 explicit effort. Supply absolute paths and a short prompt:
 
 > Use translate-ui-agent at <path>. Role <author|reviewer>, locale <locale>.
 > Read <glossary> and <work-order> only, except specific ambiguity call sites.
-> Write <output> using the schema in the work order. Deadline <UTC>.
+> Write <output> using the schema in the work order. Stay on the assigned entries.
 > Preserve checkpoints. Return path, count, status and exact blockers.
 
 One 500-key assignment per context initially. 50–100-entry checkpoints are file
 writes, not new dispatches or validation rounds. Coordinator reads summaries,
 counts and failure IDs; it does not echo full payloads or translations into its
-own context. Reviewer corrects all final messages in one pass. No routine second
-linguistic audit by the coordinator. Mechanical checks run at completed-author
+own context. Reviewer corrects all final messages in one pass. No routine second linguistic audit per batch; the user requests one Astra review after all Korean strings pass Terra review. Mechanical checks run at completed-author
 and patched-final boundaries; later checks require a changed artifact or failure.
 
 ## Provenance without pretending to enforce a sandbox
@@ -121,13 +126,25 @@ keys as successful throughput. Byte/character reductions are not token savings.
 
 ## Experiment gates
 
-Retain the speedup plan's pilot: representative fixed 500-key completed-locale
-batch, reference answers withheld, Terra-low author and independent Sol-low
-review. Target <=4 minutes; hard stop at 6 minutes, 12k combined worker output,
-60k uncached input or 1M cached input. Budgets cover continuations and failed
-attempts. Permit one continuation within the same ceiling. Root overhead is
-reported separately. Sampling can overshoot a ceiling; record actual overshoot
-and stop immediately on observation, never claim an exact enforced token cap.
+Use the first fixed 500-key Korean batch, preserving valid authored work, Luna-low
+author and independent Terra-low review. User corrected deadline pressure during
+the second pilot. Workers receive scope and focus instructions, not deadlines,
+speed demands or token ceilings. Coordinator samples progress and usage at least
+once a minute and records the intervention; this is no longer a model-only comparison.
+
+The earlier 4-minute target, 6-minute stop, 12k worker output, 60k uncached input
+and 1M cached input were proposals without a successful end-to-end baseline.
+They are diagnostic thresholds, not automatic cutoffs for this experiment.
+Terra's earlier 565-key authorship alone took 6m 46s; the second pilot's initial
+author context used about 47k uncached tokens before review. Do not present these
+targets as demonstrated capacity or pressure workers to satisfy them.
+
+Bound this experiment by one fixed assignment and one independent review. Allow
+one continuation of valid partial authorship and at most one concrete targeted
+repair. Stop on prohibited shortcuts, a completed worker return with zero useful
+authorship, or an unresolved blocker. Preserve work. Inspect an apparent stall
+before interrupting; time alone does not establish a stall. Root overhead remains
+separate. Report all actual tokens, threshold overruns and failed attempts.
 
 Only advance after coverage, structural correctness, completed independent review
 and no known unresolved/provenance blocker. Record payload bytes and actual model
@@ -135,8 +152,9 @@ token deltas; do not run an extra verbose-format translation merely to estimate
 compression savings. The historical Taiwan resume is not a controlled fresh
 500-key baseline, so label comparisons accordingly.
 
-Next is the separately authorized two-batch pipeline experiment from the plan.
-Then set a per-language ceiling from measured throughput before Korean rollout.
-Do not silently lift budgets, cycle through models, or start a full language as
+If the first pilot passes, next is the two-batch pipeline experiment from the
+plan, within the user's authorized Korean work. Establish realistic coordinator
+ceilings from observed completed throughput before Korean rollout.
+Do not cycle through models or start a full language as
 the experiment. A failed target produces saved work and a concrete bottleneck
 report. This preparation changes no pilot or rollout gate into an automatic pass.

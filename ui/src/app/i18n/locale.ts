@@ -38,7 +38,7 @@ import { isCanaryBuild, isTestBuild } from '../build-flavor';
  * the settings control all read from this list.
  */
 export const PRODUCTION_LOCALES = ['en'] as const;
-export const IN_PROGRESS_LOCALES = ['de', 'fr', 'id', 'ja', 'zh-Hant', 'uk'] as const;
+export const IN_PROGRESS_LOCALES = ['de', 'fr', 'id', 'ja', 'zh-Hant', 'uk', 'ko'] as const;
 
 export type SupportedLocale =
   | (typeof PRODUCTION_LOCALES)[number]
@@ -86,6 +86,7 @@ export const LOCALE_ENDONYMS: Record<string, string> = {
   ja: '日本語（作業中）',
   'zh-Hant': '繁體中文（台灣，翻譯中）',
   uk: 'Українська (у процесі)',
+  ko: '한국어 (번역 중)',
 };
 
 /** Preserve an explicit script; infer Traditional Chinese only from its regions. */

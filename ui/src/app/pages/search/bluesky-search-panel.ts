@@ -303,6 +303,9 @@ export class BlueskySearchPanel {
     });
   }
 
+  /** Give refinement a column only when there are loaded results to refine. */
+  readonly twoBox = computed(() => this.ran() && !this.empty());
+
   /** The current criteria, for the page's save dialog. */
   requestSave(): void {
     this.saveRequested.emit(structuredClone(this.criteria()));

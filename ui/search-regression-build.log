@@ -1,0 +1,145 @@
+npm notice run ui@0.0.0 prebuild
+npm notice run node scripts/import-starter-catalog.mjs --check && node scripts/vendor-analytics.mjs
+Bundled starter catalogue is valid (offline check).
+analytics: count.js unchanged (792b7abd26c1fb6a)
+npm notice run ui@0.0.0 build
+npm notice run ng build
+> Building...
+√ Building...
+Initial chunk files | Names                     |  Raw size | Estimated transfer size
+chunk-GADXEPPR.js   | -                         | 166.18 kB |                49.42 kB
+chunk-ZFJN3GMG.js   | -                         |  92.32 kB |                23.20 kB
+main-Y2T5766O.js    | main                      |  42.21 kB |                10.63 kB
+chunk-ZPB3R73D.js   | -                         |  39.04 kB |                 8.12 kB
+chunk-ZJC42Y3Z.js   | -                         |  34.54 kB |                 8.43 kB
+chunk-KKSFOQZT.js   | -                         |  30.09 kB |                 6.75 kB
+chunk-WQZFZQPX.js   | -                         |  28.67 kB |                 6.97 kB
+chunk-KLTSHIV4.js   | -                         |  24.94 kB |                 7.93 kB
+chunk-YJRWOON3.js   | -                         |  23.26 kB |                 6.10 kB
+chunk-3RZBCUMH.js   | -                         |  23.11 kB |                 7.16 kB
+chunk-W2XKQLYE.js   | -                         |  21.19 kB |                 7.53 kB
+chunk-BAQNFFD4.js   | -                         |  20.36 kB |                 5.76 kB
+chunk-K7CG7OP5.js   | -                         |  18.49 kB |                 4.66 kB
+chunk-B2DEVMQP.js   | -                         |  17.52 kB |                 4.72 kB
+chunk-IQDU4WRZ.js   | -                         |  17.38 kB |                 5.37 kB
+chunk-ZWZUCTMS.js   | -                         |  15.02 kB |                 4.62 kB
+chunk-2GUGGUFJ.js   | -                         |  14.89 kB |                 3.23 kB
+styles-DCQL62YQ.css | styles                    |  12.54 kB |                 3.07 kB
+chunk-XTKCYHSB.js   | -                         |  12.36 kB |                 4.28 kB
+chunk-ZXF7XNAV.js   | -                         |  11.54 kB |                 3.98 kB
+chunk-ZSUG2CR5.js   | -                         |  11.13 kB |                 3.35 kB
+chunk-LP6K7WVG.js   | -                         |   9.91 kB |                 3.27 kB
+chunk-KNMIUL6Q.js   | -                         |   9.71 kB |                 3.33 kB
+chunk-YHMAZK3L.js   | -                         |   9.63 kB |                 2.92 kB
+chunk-JPW7JKNA.js   | -                         |   8.91 kB |                 2.65 kB
+chunk-VNISXMWN.js   | -                         |   8.37 kB |                 2.89 kB
+chunk-OH66KOLK.js   | -                         |   7.96 kB |                 2.24 kB
+chunk-5CUVXJHB.js   | -                         |   7.92 kB |                 2.59 kB
+chunk-GN7PPHFI.js   | -                         |   6.67 kB |                 2.21 kB
+chunk-GF5PAQMH.js   | -                         |   6.39 kB |                 2.00 kB
+chunk-RLCWVVZX.js   | -                         |   5.61 kB |                 1.72 kB
+chunk-AFRAK56C.js   | -                         |   5.42 kB |                 1.89 kB
+chunk-X4QECOPK.js   | -                         |   5.37 kB |                 1.21 kB
+chunk-HEMEZIJS.js   | -                         |   5.37 kB |                 1.87 kB
+chunk-MGSVKFYH.js   | -                         |   5.03 kB |                 1.83 kB
+chunk-F7JS5IXV.js   | -                         |   4.52 kB |                 1.59 kB
+chunk-A4EBIP4S.js   | -                         |   4.52 kB |                 1.73 kB
+chunk-SSZZBOET.js   | -                         |   4.35 kB |                 1.50 kB
+chunk-66SQHO57.js   | -                         |   4.33 kB |                 1.93 kB
+chunk-USL5VHO5.js   | -                         |   3.77 kB |                 1.36 kB
+chunk-2FGVKDKQ.js   | -                         |   3.72 kB |                 1.31 kB
+chunk-CGOFPEPM.js   | -                         |   3.39 kB |                 1.27 kB
+chunk-FTEJOXZP.js   | -                         |   3.39 kB |                 1.33 kB
+chunk-57B5DFNC.js   | -                         |   3.19 kB |                 1.45 kB
+chunk-MXGSAWU4.js   | -                         |   3.10 kB |                 1.25 kB
+chunk-WAQ567MF.js   | -                         |   2.98 kB |                 1.02 kB
+chunk-IPLHPT5Q.js   | -                         |   2.94 kB |                 1.14 kB
+chunk-5QI65E5Q.js   | -                         |   2.75 kB |                 1.08 kB
+chunk-3C3FVRLR.js   | -                         |   2.61 kB |                 1.10 kB
+chunk-DB6W6J32.js   | -                         |   2.46 kB |               892 bytes
+chunk-IMYLYP5X.js   | -                         |   2.31 kB |               823 bytes
+chunk-7FYUQQWY.js   | -                         |   2.30 kB |               947 bytes
+chunk-RHZZZFPO.js   | -                         |   2.18 kB |                 1.00 kB
+chunk-HVWW5UEP.js   | -                         |   2.06 kB |               788 bytes
+chunk-4HM52UDX.js   | -                         |   2.05 kB |               915 bytes
+chunk-V2Z4PYK4.js   | -                         |   1.88 kB |               755 bytes
+chunk-LLM3HXI3.js   | -                         |   1.77 kB |               740 bytes
+chunk-LPNIJD26.js   | -                         |   1.69 kB |               779 bytes
+chunk-GHFFKIFK.js   | -                         |   1.50 kB |               689 bytes
+chunk-WUTGUC26.js   | -                         |   1.35 kB |               627 bytes
+chunk-H22FZUG3.js   | -                         |   1.27 kB |               579 bytes
+chunk-HAPS4RLL.js   | -                         |   1.22 kB |               585 bytes
+chunk-ZW5NV4UO.js   | -                         |   1.20 kB |               518 bytes
+chunk-RDSTFP3D.js   | -                         |   1.09 kB |               556 bytes
+chunk-RYOY4NNC.js   | -                         |   1.02 kB |                 1.02 kB
+chunk-5OJWXUFB.js   | -                         | 916 bytes |               916 bytes
+chunk-UCPZ53VX.js   | -                         | 856 bytes |               856 bytes
+chunk-HS4Y5L2G.js   | -                         | 854 bytes |               854 bytes
+chunk-HTZTNBVC.js   | -                         | 830 bytes |               830 bytes
+chunk-TIO4FDGW.js   | -                         | 760 bytes |               760 bytes
+chunk-WWKF4Z7L.js   | -                         | 755 bytes |               755 bytes
+chunk-FFZJB6FM.js   | -                         | 744 bytes |               744 bytes
+chunk-BOEOILR5.js   | -                         | 685 bytes |               685 bytes
+chunk-TXMK4M42.js   | -                         | 655 bytes |               655 bytes
+chunk-FCERD2IF.js   | -                         | 563 bytes |               563 bytes
+chunk-6ZJ6BOLF.js   | -                         | 561 bytes |               561 bytes
+chunk-CAP7UN4M.js   | -                         | 455 bytes |               455 bytes
+chunk-S2LCZOOX.js   | -                         | 330 bytes |               330 bytes
+chunk-JQ7D7D3Q.js   | -                         | 213 bytes |               213 bytes
+chunk-7EJR4AJT.js   | -                         | 137 bytes |               137 bytes
+chunk-EU2PDMZI.js   | -                         | 128 bytes |               128 bytes
+
+                    | Initial total             | 865.42 kB |               258.60 kB
+
+Lazy chunk files    | Names                     |  Raw size | Estimated transfer size
+chunk-OBSJFESS.js   | -                         | 701.05 kB |               142.26 kB
+chunk-37L7JC3J.js   | index                     | 470.15 kB |                62.67 kB
+chunk-76RVJR3I.js   | native-json               | 434.06 kB |                57.34 kB
+chunk-JVEY5U7X.js   | search                    | 203.53 kB |                39.13 kB
+chunk-GXUESVT2.js   | read-page                 | 146.63 kB |                37.84 kB
+chunk-52VKZBXU.js   | -                         | 142.15 kB |                26.55 kB
+chunk-YBXTKTMC.js   | profile                   | 137.40 kB |                27.86 kB
+chunk-3A3MWYT3.js   | settings-import-export    | 118.25 kB |                23.51 kB
+chunk-2AKLF3ZO.js   | -                         | 117.41 kB |                23.56 kB
+chunk-JDQ6NEX5.js   | -                         | 115.06 kB |                27.54 kB
+chunk-FTZBZZ7U.js   | write-page                | 106.62 kB |                23.61 kB
+chunk-ZQQ5A7Y6.js   | shell                     |  97.03 kB |                21.08 kB
+chunk-CBTSQ2GV.js   | module                    |  77.36 kB |                24.10 kB
+chunk-2Q3FYLZY.js   | settings-mawkingbird-plus |  68.12 kB |                15.19 kB
+chunk-IDSFIPQV.js   | connection-twitter        |  56.44 kB |                13.47 kB
+...and 203 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [33.177 seconds] - 2026-09-06T00:26:40.547Z
+
+▲ [WARNING] bundle initial exceeded maximum budget. Budget 500.00 kB was not met by 365.42 kB with a total of 865.42 kB.
+
+
+▲ [WARNING] src/app/status-card/status-card.css exceeded maximum budget. Budget 8.00 kB was not met by 1.35 kB with a total of 9.35 kB.
+
+
+▲ [WARNING] src/app/shell/shell.css exceeded maximum budget. Budget 8.00 kB was not met by 120 bytes with a total of 8.12 kB.
+
+
+▲ [WARNING] src/app/pages/profile/profile.css exceeded maximum budget. Budget 8.00 kB was not met by 204 bytes with a total of 8.20 kB.
+
+
+▲ [WARNING] Module 'core-js/es/symbol/async-dispose.js' used by 'node_modules/@atproto/oauth-client-browser/dist/index.js' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.dev/tools/cli/build#configuring-commonjs-dependencies
+
+
+▲ [WARNING] Module 'core-js/es/symbol/dispose.js' used by 'node_modules/@atproto/oauth-client-browser/dist/index.js' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.dev/tools/cli/build#configuring-commonjs-dependencies
+
+
+▲ [WARNING] Module '@mozilla/readability' used by 'src/app/providers/article/article-readability.ts' is not ESM
+
+  CommonJS or AMD dependencies can cause optimization bailouts.
+  For more information see: https://angular.dev/tools/cli/build#configuring-commonjs-dependencies
+
+
+Output location: C:\github\mimb\mastodon_mock\mastodon_mock\_ui_dist
+

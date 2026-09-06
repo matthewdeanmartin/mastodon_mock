@@ -21,6 +21,7 @@ import { STARTER_KITS } from '../../starter-collection';
 
 /** Exposes Search's protected signals for white-box testing. */
 interface SearchInternals {
+  advancedOpen: WritableSignal<boolean>;
   query: WritableSignal<string>;
   type: WritableSignal<'accounts' | 'statuses' | 'hashtags'>;
   blueskyMode: WritableSignal<boolean>;
@@ -265,29 +266,38 @@ describe('Search', () => {
    */
   describe('refinement summary', () => {
     for (const type of ['accounts', 'statuses'] as const) {
-      it(`keeps the ${type} rail through idle, loading, empty and populated results`, () => {
+      it(`shows the ${type} rail only when there are loaded results`, () => {
         const fixture = setUp();
         const state = internals(fixture);
         state.type.set(type);
-        const assertRail = () => {
+        const assertRail = (visible: boolean) => {
           fixture.detectChanges();
           const rail = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>(
-            '.search-page.two-box > .search-form-box',
+            '.search-page > .search-form-box',
           );
           expect(rail?.open).toBe(true);
+          expect(rail?.hidden).toBe(!visible);
+          expect(rail?.parentElement?.classList.contains('two-box')).toBe(visible);
         };
-        assertRail();
+        assertRail(false);
         state.searching.set(true);
-        assertRail();
+        assertRail(false);
         state.searching.set(false);
         state.results.set(makeResults());
-        assertRail();
+        assertRail(false);
+        state.advancedOpen.set(true);
+        fixture.detectChanges();
+        expect(
+          (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.search-form-box')
+            ?.hidden,
+        ).toBe(false);
+        state.advancedOpen.set(false);
         if (type === 'accounts') {
           state.accountItems.set([{ account: makeAccount(), matchingPosts: [] }]);
         } else {
           state.results.set(makeResults([makeStatus('1')]));
         }
-        assertRail();
+        assertRail(true);
         const facets = (fixture.nativeElement as HTMLElement).querySelector<HTMLDetailsElement>(
           '.search-form-box .refine-facets',
         );
@@ -303,7 +313,7 @@ describe('Search', () => {
       });
     }
 
-    it('gives Bluesky a rail before results arrive', () => {
+    it('keeps Bluesky help full width before results arrive', () => {
       const fixture = setUp();
       internals(fixture).blueskyMode.set(true);
       fixture.detectChanges();
@@ -311,7 +321,12 @@ describe('Search', () => {
         (fixture.nativeElement as HTMLElement).querySelector(
           'app-bluesky-search-panel.two-box > .search-form-box',
         ),
-      ).not.toBeNull();
+      ).toBeNull();
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+          'app-bluesky-search-panel > .search-form-box',
+        )?.hidden,
+      ).toBe(true);
     });
 
     it('keeps Mastodon account filters open after results arrive', () => {

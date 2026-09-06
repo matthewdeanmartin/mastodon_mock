@@ -1,6 +1,6 @@
 ---
 name: translate-ui-agent
-description: Author or independently review one assigned Mockingbird UI translation batch with a coordinator-provided role, locale, glossary, work order, schema, output path and deadline.
+description: Author or independently review one assigned Mockingbird UI translation batch with a coordinator-provided role, locale, glossary, work order, schema and output path.
 ---
 
 # Assigned UI translation worker
@@ -28,7 +28,9 @@ or source edits. Report broken fragments or vocabulary injection by ID/call site
 Author every assigned entry. Save checkpoints of 50–100 entries to the assigned
 scratch file without rereading earlier output or doing semantic self-review.
 Keep explicit IDs; never infer them from line position. Complete the same batch
-across checkpoints. At deadline, stop and preserve partial work. Do not merge,
+across checkpoints. Stay on the assigned entries; the coordinator measures time
+and manages budgets. Do not abandon work based on a predicted time limit. If
+explicitly interrupted, preserve authored progress. Do not merge,
 write shared files, stage, commit or claim incomplete work is complete.
 
 ## Reviewer

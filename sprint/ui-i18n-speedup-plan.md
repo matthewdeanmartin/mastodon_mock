@@ -1,13 +1,21 @@
 # UI translation speedup plan
 
-Status: skill cleanup and measurement design prepared; translation and benchmarks
-have not started. Korean (`ko`) is the next requested language. The coordinator
+Status: user removed deadline pressure and switched authorship back to Luna-low.
+Terra authored 400 entries before the requested interruption; Luna completes the
+100 remaining entries. A separate Terra reviews the completed 500-key batch.
+The mixed authorship result must not be reported as a clean model comparison.
+The first Korean 500-key benchmark failed: Luna returned
+500 exact English copies, zero Korean translations. Nothing was merged and no
+Terra/Astra linguistic review was dispatched. See
+`ui/i18n-context/benchmark-ko-2026-09-06.json`. The run followed explicit
+user direction to use Luna authoring, Terra review, and Astra whole-locale review
+only after all Korean strings are done. The coordinator
 skill is `.claude/skills/translate-ui/SKILL.md`; the isolated worker version is
 `.claude/skills/translate-ui-agent/SKILL.md`. Implementation readiness and precise
 measurement rules are in [the execution contract](ui-i18n-execution-contract.md).
 The targets below remain unproven. Ukrainian and Taiwan Traditional Chinese are complete
-(5,866 accepted/reviewed keys each). All translation agents are stopped. No new
-language, benchmark or implementation is started by this plan.
+(5,866 accepted/reviewed keys each). Benchmark results and actual counters are
+recorded separately; the earlier completed locales are unchanged.
 
 ## Target and measured baseline
 
@@ -47,12 +55,11 @@ Evidence: `ui/i18n-context/timing-2026-09-05.json`, `usage-2026-09-05.json`, and
 
 ## Changes before another rollout
 
-1. **Use Terra-low to author and a separate Sol-low to review.** This is the
-   provisional pairing supported by the completed final batch. Keep Astra for
-   concrete shared-template defects. Set effort explicitly; omitted effort
-   resolved to medium for Luna. Do not assume a model switch alone saves 5×.
-   Do not use Luna again in production translation until a bounded trial proves
-   reliable direct authorship. No external machine translation or phrase mapping.
+1. **Use Luna-low to author and a separate Terra-low to review.** User selected
+   this pairing after removing deadline pressure. After the entire Korean
+   locale is translated and Terra-reviewed, Astra reviews all 5,866 eligible
+   strings once. Do not run Astra linguistic reviews between batches. Set effort
+   explicitly. No external machine translation or phrase mapping.
 
 2. **Shrink the worker brief and payload.** Replace the long, contradictory
    history in the skill with one current procedure; archive past incidents in
@@ -73,16 +80,17 @@ Evidence: `ui/i18n-context/timing-2026-09-05.json`, `usage-2026-09-05.json`, and
    fixed source batches across languages. Internal 50–100 entry file writes are
    checkpoints, not new assignments, tests or review rounds. Persist authored
    progress immediately; never restore rejected text over it. The coordinator
-   resumes valid partial output within the same batch budget, without replanning
+   resumes valid partial output within the same assignment, without replanning
    the work. Exact assigned-key equality is mandatory before review.
 
-5. **Review every final message once and output corrections only.** Sol receives
+5. **Review every final message once and output corrections only.** Terra receives
    English, necessary context, glossary and the completed candidate—not the
    author's conversation. Review meaning, omissions, grammar/counts, terminology,
    placeholders and markup. Inspect code only for a specific ambiguity. Return
    an explicit-ID correction patch plus reviewed count and manifest hash; tools
-   preserve unchanged values. No preference-only polishing, no full Astra pass
-   after Sol, no semantic self-review. At most one targeted repair for a concrete
+   preserve unchanged values. No preference-only polishing, no per-batch Astra pass,
+   no semantic self-review. Astra's requested whole-locale pass occurs only after
+   all Korean strings finish Terra review. At most one targeted repair for a concrete
    remaining defect. Lower changed-string counts are not proof of better review.
 
 6. **Keep three worker slots productive with disjoint work.** Normally two
@@ -112,25 +120,33 @@ count. Read effective model/effort and token-counter deltas from local rollout
 metadata; keep cached input, uncached input, output and reasoning subsets separate.
 Do not trust a worker's final ten-second timer as its entire task duration.
 
-For the first pilot, use one representative **500-key** work order from an already
-completed locale, withheld from the author as a reference. Include both short UI
-labels and long/parameterized strings. Benchmark the compact format with
-Terra-low authoring and an independent Sol-low review. Do not run another whole
-language as the experiment.
+For the first pilot, use Korean fixed batch 001 (**500 keys**, 111 parameterized
+messages and 15 messages longer than 120 characters). Keep valid work for the
+Korean rollout. Benchmark the compact format with Luna-low authoring and an
+independent Terra-low review. Do not use a whole language as the initial experiment.
 
-Proposed pilot targets:
+Historical proposed pilot targets (diagnostic only after the user's deadline correction):
 
-- End-to-end authoring plus review: **4 minutes or less**; hard stop at **6 minutes**.
+- End-to-end authoring plus review: **4 minutes or less**; former cutoff **6 minutes**.
 - Combined author/reviewer output: **12k tokens or less**.
 - Combined uncached input: **60k or less**; cached input: **1M or less**.
 - Exact coverage and structural checks pass; all substantive review findings fixed
   within the single review pass, with no known blocker or prohibited shortcut.
 
-These are proposed budgets, not claims that the models can already meet them.
-Check counters at each handoff and at least once a minute. Allow only one partial
-continuation within the unchanged total budget. Stop the pilot on a prohibited
-shortcut, zero useful output, the hard time/token budget, or an unresolved blocker.
-Save valid work and report the failure; do not cycle through models or retry all day.
+The user identified deadline pressure during the second experiment. The figures
+above have no successful end-to-end baseline and now serve as reporting thresholds,
+not automatic cutoffs. Do not put them, a deadline or 'finish promptly' in worker
+prompts. Workers stay on scope and save progress; coordinator owns measurement.
+The historical Terra author alone took 6m 46s. This pilot's Terra initial context
+already used about 47k uncached tokens before review, so a 60k combined ceiling
+cannot be assumed realistic.
+
+Check counters at handoffs and at least once a minute. Bound the pilot to one fixed
+assignment, one independent review, one partial continuation and at most one
+targeted repair. Stop on a prohibited shortcut, a worker returning zero useful
+authorship, or an unresolved blocker. Investigate actual progress before treating
+elapsed time as a stall. Save valid work and report actual costs and overruns;
+do not cycle through models or retry all day.
 
 If the pilot passes, the next separately authorized test is two disjoint batches
 through the three-worker pipeline. Measure the complete critical path. The 5×
