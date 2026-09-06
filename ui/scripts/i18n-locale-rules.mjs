@@ -61,6 +61,34 @@ function proseOnly(value) {
 }
 
 export const LOCALE_RULES = {
+  ru: {
+    name: 'Russian',
+    register: 'neutral concise Russian UI prose; informal singular `ты` and plural `вы`',
+    rules: [],
+    traps: {
+      'усилить сигнал': 'Boost is a social-media re-share, not signal amplification',
+      'преследовать': 'Follow means follow an account, not pursue or stalk',
+      'ручка': 'Handle is an account identifier, not a physical handle',
+      'швейная нить': 'Thread is a conversation, not sewing thread',
+      'текущий счёт': 'Current account is the active account, not a bank account',
+      'телефонный звонок': 'API call is not a telephone call',
+      '(?:^|[^А-Яа-яЁё])еда(?:$|[^А-Яа-яЁё])': 'Feed is a stream of posts, not food',
+    },
+  },
+  tr: {
+    name: 'Turkish',
+    register: 'neutral concise Turkish UI prose; informal singular `sen` and plural `siz`',
+    rules: [],
+    traps: {
+      'sinyali güçlendirmek': 'Boost is a social-media re-share, not signal amplification',
+      'takip etmek peşinde': 'Follow means follow an account, not pursue',
+      'kapı kolu': 'Handle is an account identifier, not a physical handle',
+      'dikiş ipliği': 'Thread is a conversation, not sewing thread',
+      'cari hesap': 'Current account is the active account, not a bank account',
+      'telefon görüşmesi': 'API call is not a telephone call',
+      yiyecek: 'Feed is a stream of posts, not food',
+    },
+  },
   pt: {
     name: 'Portuguese',
     register: 'neutral international Portuguese; `você` singular and `vocês` plural',

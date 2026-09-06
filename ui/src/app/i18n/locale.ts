@@ -51,6 +51,8 @@ export const IN_PROGRESS_LOCALES = [
   'it',
   'nl',
   'pl',
+  'ru',
+  'tr',
 ] as const;
 
 export type SupportedLocale =
@@ -99,7 +101,8 @@ export const LOCALE_ENDONYMS: Record<string, string> = {
   sv: 'Svenska',
   fi: 'Suomi',
   is: 'Íslenska',
-  ru: 'Русский',
+  ru: 'Русский (в работе)',
+  tr: 'Türkçe (hazırlanıyor)',
   ja: '日本語（作業中）',
   'zh-Hant': '繁體中文（台灣，翻譯中）',
   uk: 'Українська (у процесі)',

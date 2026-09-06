@@ -59,6 +59,8 @@ describe('supportedLocales', () => {
       'it',
       'nl',
       'pl',
+      'ru',
+      'tr',
     ];
     expect(supportedLocales('https://mawkingbird.com/test/')).toEqual(expected);
     expect(supportedLocales('https://mawkingbird.com/canary/')).toEqual(expected);
