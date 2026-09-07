@@ -25,7 +25,9 @@
         // SITE_BASE is rewritten for a project Pages mirror (e.g. /mawkingbird/).
         // Subpath deployments own an index below that base (e.g. canary/).
         var SITE_BASE = '/';
-        var SUBPATHS = ['canary', 'test'];
+        // Legacy fork: the Pages publishers are archived in .github_backup/.
+        // Active canary/test deployments belong to the mawkingbird repository.
+        var SUBPATHS = [];
         var loc = window.location;
         var path = loc.pathname;
         var base = SITE_BASE;

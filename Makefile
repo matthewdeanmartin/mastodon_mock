@@ -247,9 +247,12 @@ bandit:
 
 audit:
 	@echo "=== uv audit ==="
-	@$(UV) audit
+	# NLTK is a dev-only transitive dependency of troml-dev-status -> textstat.
+	# GHSA-8mgp-746c-j5xp has no fix as of 2026-09-07. uv resumes enforcement
+	# automatically when a fix exists; upgrade then and remove both exceptions.
+	@$(UV) audit --ignore-until-fixed GHSA-8mgp-746c-j5xp
 	@echo "=== pip-audit ==="
-	@$(UV) run pip-audit
+	@$(UV) run pip-audit --ignore-vuln GHSA-8mgp-746c-j5xp
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 

@@ -79,7 +79,10 @@ jobs:
 
       # Cheap and substantive, so they run first and fail before anything expensive.
       - name: Static checks
-        run: npm run check:storage && npm run check:subpaths && npm run starter-kits:check
+        # The frozen client validates its committed catalogue offline. Live account
+        # consent/membership drift is checked by starter-kit-consent.yml; remote
+        # server availability must not decide whether the mock server builds.
+        run: npm run check:storage && npm run check:subpaths && npm run starter-catalog:check && node --test scripts/import-starter-catalog.test.mjs
 
       # Formatting is useful feedback, but it must not block a substantive change.
       - name: Formatting (reported, not enforced)
