@@ -142,7 +142,7 @@ export const LOCALE_RULES = {
       sytråd: 'Thread is a conversation, not sewing thread',
       'löpande konto': 'Current account is the active account, not a bank account',
       telefonsamtal: 'API call is not a telephone call',
-      mat: 'Feed is a stream of posts, not food',
+      '\\bmat\\b': 'Feed is a stream of posts, not food',
     },
   },
   it: {

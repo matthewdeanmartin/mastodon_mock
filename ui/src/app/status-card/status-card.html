@@ -439,6 +439,14 @@
             }}</span></span
           >
         }
+        <!-- Reader entry points, parked rather than deleted.
+             These carry the two longest labels in the row ("Thread reader",
+             "Long text reader") and the action row has nowhere near the space
+             for them: they were the main reason it wrapped to a second line.
+             They are also the most redundant thing here, because clicking the
+             post opens the thread page, which offers both readers itself
+             (see pages/thread/thread.html). Restore by uncommenting.
+
         @if (
           threadable &&
           (display.replies_count > 0 ||
@@ -464,6 +472,7 @@
             <span aria-hidden="true">📄</span> {{ 'reader.open.longText' | transloco }}
           </a>
         }
+        -->
         @if (display.provider === 'rss' && threadable) {
           <a
             class="action"

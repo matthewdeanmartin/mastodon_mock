@@ -438,18 +438,18 @@
    stacked under 40px-tall buttons that turned a two-line toolbar into ~94px of
    mostly-empty space below a 13px line of text.
 
-   The rows still need a little separation, because the buttons claim their
-   fingertip target with a vertical overhang (see `.action::after`) and at
-   row-gap 0 the overhangs of two stacked rows would meet, letting the lower row
-   steal taps aimed at the upper one. 8px is exactly twice the 4px overhang, so
-   the targets touch without overlapping and no space is spent beyond that. */
+   The row does not wrap at all any more. Wrapping was the whole problem: up to
+   27 actions can appear here, and a second line of them under a two-line post
+   left the toolbar dominating the card no matter how short each row was made.
+   A card's action row is a summary, not a menu — the thread page is where the
+   full set lives — so the overflow is now removed rather than re-flowed. */
 .actions {
   display: flex;
-  flex-wrap: wrap;
-  row-gap: 8px;
+  flex-wrap: nowrap;
   column-gap: 14px;
   margin-top: 4px;
   align-items: center;
+  min-width: 0;
 }
 
 .action {
