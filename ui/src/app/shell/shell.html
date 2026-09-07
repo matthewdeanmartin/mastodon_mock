@@ -208,17 +208,35 @@
           <span>{{ 'shell.nav.algo' | transloco }}</span>
         </a>
         @if (!auth.isAnonymous) {
-          <a routerLink="/notifications" routerLinkActive="active">
+          <a
+            routerLink="/notifications"
+            routerLinkActive="active"
+            [class.has-activity]="indicators.ordinary()"
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5" />
             </svg>
             <span>{{ 'shell.nav.inbox' | transloco }}</span>
+            @if (indicators.ordinary()) {
+              <span class="activity-dot" [attr.aria-label]="'shell.nav.newActivity' | transloco"
+                >●</span
+              >
+            }
           </a>
-          <a routerLink="/conversations" routerLinkActive="active">
+          <a
+            routerLink="/conversations"
+            routerLinkActive="active"
+            [class.has-activity]="indicators.chat()"
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 5h16v12H8l-4 4z" />
             </svg>
             <span>{{ 'shell.nav.chat' | transloco }}</span>
+            @if (indicators.chat()) {
+              <span class="activity-dot" [attr.aria-label]="'shell.nav.newActivity' | transloco"
+                >●</span
+              >
+            }
           </a>
         }
         <!-- Anonymous visitors get Chat too, and it is the same page signed-in

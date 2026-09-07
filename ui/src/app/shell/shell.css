@@ -661,3 +661,12 @@
   line-height: 18px;
   vertical-align: middle;
 }
+.has-activity svg {
+  stroke-width: 3;
+}
+.has-activity {
+  font-weight: 700;
+}
+.activity-dot {
+  font-size: 0.6rem;
+}

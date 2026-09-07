@@ -5,6 +5,11 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../auth';
+import { MenuIndicators } from '../menu-indicators';
+
+function fakeIndicators() {
+  return { start: vi.fn(), ordinary: signal(false), chat: signal(false) };
+}
 import { Hotkeys } from '../hotkeys';
 import { ClientPrefs } from '../client-prefs';
 import { PreviewSeed } from '../first-run/preview-seed';
@@ -39,6 +44,7 @@ describe('Shell account switching', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: PlusBadgeEntitlement, useValue: new FakePlusBadgeEntitlement() },
+        { provide: MenuIndicators, useFactory: fakeIndicators },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);
@@ -79,6 +85,28 @@ describe('Shell account switching', () => {
   }
 
   // Rendering the full Shell (rails and all) can exceed the default 5s timeout
+  it('renders the two menu signals independently', () => {
+    const fixture = createShell();
+    const indicators = TestBed.inject(MenuIndicators);
+    indicators.chat.set(true);
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('a[href="/conversations"] .activity-dot'),
+    ).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('a[href="/notifications"] .activity-dot'),
+    ).toBeNull();
+    indicators.ordinary.set(true);
+    indicators.chat.set(false);
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('a[href="/notifications"] .activity-dot'),
+    ).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('a[href="/conversations"] .activity-dot'),
+    ).toBeNull();
+    drainRailRequests();
+  });
   // on a loaded machine; the work is synchronous, just heavy.
   it('switching restores the target instance and verifies against it', { timeout: 20_000 }, () => {
     const fixture = createShell();
@@ -349,6 +377,7 @@ describe('Shell zen modes', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: PlusBadgeEntitlement, useValue: new FakePlusBadgeEntitlement() },
+        { provide: MenuIndicators, useFactory: fakeIndicators },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);
@@ -466,6 +495,7 @@ describe('Shell first-run modal', () => {
         // navigation. Blank component: this suite is about the shell.
         provideRouter([{ path: 'bundled-starter-kits', children: [] }]),
         { provide: PlusBadgeEntitlement, useValue: new FakePlusBadgeEntitlement() },
+        { provide: MenuIndicators, useFactory: fakeIndicators },
       ],
     });
     httpMock = TestBed.inject(HttpTestingController);

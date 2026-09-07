@@ -2090,6 +2090,12 @@ export class Compose implements OnDestroy {
   }
 
   private send(): void {
+    if (this.overLimit()) {
+      this.crossPostError.set(
+        'A thread post is too long. Shorten it before publishing; nothing new was sent.',
+      );
+      return;
+    }
     // Recheck after the undo-send timer: the audience may have changed since submit.
     if (this.bskyAudienceBlocked()) {
       return;
@@ -2209,6 +2215,10 @@ export class Compose implements OnDestroy {
       .map((s) => s.trim())
       .filter((s, i) => i === 0 || s !== '');
     const operation = this.operationFor(posts, options);
+    if (!operation) {
+      this.submitting.set(false);
+      return;
+    }
 
     // Each destination owns its own progress. A retry starts only the missing
     // leg/segment, while an edit changes the fingerprint and starts a fresh
@@ -2226,11 +2236,37 @@ export class Compose implements OnDestroy {
     return this.targetIncludesBsky() ? (this.targetIncludesFedi() ? 'both' : 'bsky') : 'fedi';
   }
 
-  private operationFor(parts: string[], options: ComposeOptions): PostingOperation {
+  private operationFor(parts: string[], options: ComposeOptions): PostingOperation | null {
     const target = this.timelineTarget();
     const fingerprint = this.postingFingerprint(target);
     if (this.postingOperation?.fingerprint === fingerprint) {
       return this.postingOperation;
+    }
+    const previous = this.postingOperation;
+    const completed = previous
+      ? Math.max(previous.fedi.statuses.length, previous.bsky.parts.length)
+      : 0;
+    if (previous && completed) {
+      const withoutText = (value: string): string => {
+        const parsed = JSON.parse(value) as { draft: { segments: string[] } };
+        parsed.draft.segments = [];
+        return JSON.stringify(parsed);
+      };
+      if (
+        withoutText(previous.fingerprint) !== withoutText(fingerprint) ||
+        previous.parts.slice(0, completed).some((part, index) => part !== parts[index])
+      ) {
+        this.crossPostError.set(
+          'This thread has already started. Keep published posts, attachments, account and destination unchanged; edit only unfinished posts to resume.',
+        );
+        return null;
+      }
+      parts.forEach((part, index) => {
+        if (part !== previous.parts[index]) previous.bsky.preparedFacets[index] = undefined;
+      });
+      previous.parts = parts;
+      previous.fingerprint = fingerprint;
+      return previous;
     }
     const operation: PostingOperation = {
       id: crypto.randomUUID(),

@@ -81,6 +81,7 @@ import {
   splitText,
 } from './split-modes';
 import { WriteWorkspace } from './write-workspace';
+import { BlueskyPublication, blueskyThreadError } from './bluesky-publication';
 import { Terminology } from '../../terminology';
 
 type DraftFilter = 'all' | DraftKind;
@@ -133,6 +134,7 @@ export interface Notice {
 // i18n pages.write.pageNote: Drafts, editor and notes, side by side. Nothing else.
 // i18n pages.write.aria.drafts: Drafts
 // i18n pages.write.newDraftButton: New
+// i18n pages.write.publishedHere: Published to Bluesky.
 // i18n pages.write.aria.filterDraftsByKind: Filter drafts by kind
 // i18n pages.write.loadingDrafts: Loading drafts…
 // i18n pages.write.noDraftsOfKind: No drafts of that kind.
@@ -288,9 +290,11 @@ export interface Notice {
   ],
   templateUrl: './write-page.html',
   styleUrls: ['./write-workspace.css', './write-editor.css', './write-overlays.css'],
-  providers: [VisibilityState, LinkShortening],
+  providers: [VisibilityState, LinkShortening, BlueskyPublication],
 })
 export class WritePage implements OnInit, OnDestroy {
+  private blueskyPublication = inject(BlueskyPublication);
+  protected publishedHere = signal(false);
   /** post/tweet/florp vocabulary, per the Blue setting. */
   protected words = inject(Terminology).words;
   private transloco = inject(TranslocoService);
@@ -1202,14 +1206,7 @@ export class WritePage implements OnInit, OnDestroy {
     this.resetProofreading();
   }
 
-  /**
-   * Hand the current text to the composer to publish.
-   *
-   * Publishing itself is not this sprint's job: the handoff slot and Home's
-   * composer already do it, and re-implementing publishing here would mean a
-   * second call site to keep in step with visibility, targets and the
-   * thoughtful-posting gate.
-   */
+  /** Review the current draft, then publish Bluesky in place. */
   protected publish(): void {
     if (!this.hasContent()) {
       return;
@@ -1222,6 +1219,11 @@ export class WritePage implements OnInit, OnDestroy {
       this.setWizardTarget(firstTarget);
     }
     if (!first) {
+      if (this.wizardTarget() === 'bsky') {
+        this.enterWizardStep('targets');
+        void this.wizardFinish();
+        return;
+      }
       // Every step switched off. An empty dialog would be worse than none.
       // Attachments are the exception: their destination determines whether
       // they must be uploaded to Mastodon, so that choice cannot be skipped.
@@ -1350,6 +1352,7 @@ export class WritePage implements OnInit, OnDestroy {
   }
 
   protected wizardBack(): void {
+    if (this.wizardBusy()) return;
     const step = this.wizardStep();
     if (step) {
       this.wizardError.set(null);
@@ -1362,6 +1365,7 @@ export class WritePage implements OnInit, OnDestroy {
 
   /** Cancel: back to the editor, nothing published, nothing lost. */
   protected wizardCancel(): void {
+    if (this.wizardBusy()) return;
     this.wizardStep.set(null);
     this.wizardError.set(null);
     this.wizardBusy.set(false);
@@ -1443,9 +1447,6 @@ export class WritePage implements OnInit, OnDestroy {
     if (target === 'bsky' && this.sensitive()) {
       return 'Sensitive-media marking is not available for Bluesky-only publishing here.';
     }
-    if (target === 'bsky' && hasLanguage) {
-      return 'Post-language metadata is not available for Bluesky-only publishing here.';
-    }
     if (target === 'bsky' && this.media().some((item) => !item.file?.type.startsWith('image/'))) {
       return 'Bluesky accepts images here, not video or audio.';
     }
@@ -1489,12 +1490,22 @@ export class WritePage implements OnInit, OnDestroy {
   /**
    * The end of the wizard.
    *
-   * The composer remains the single provider-specific publishing path. This
-   * page prepares destination-dependent attachments, then hands it the fully
-   * reviewed post with an instruction to publish immediately (or schedule at
-   * the reviewed time), avoiding another round of confirmations.
+   * Bluesky stays in this workspace, including failures and thread recovery.
+   * Other destinations retain their existing reviewed composer handoff.
    */
   private async wizardFinish(): Promise<void> {
+    if (this.wizardBusy()) return;
+    const target = this.wizardTarget();
+    const parts = this.snapshot()
+      .segments.map((part) => part.trim())
+      .filter(Boolean);
+    if (target === 'bsky' || target === 'both') {
+      const threadError = blueskyThreadError(parts);
+      if (threadError) {
+        this.wizardError.set(threadError);
+        return;
+      }
+    }
     const at = this.wizardScheduleAt();
     if (at && Number.isNaN(new Date(at).getTime())) {
       this.wizardError.set('That date could not be read. Pick a time, or publish now.');
@@ -1519,6 +1530,14 @@ export class WritePage implements OnInit, OnDestroy {
     this.wizardBusy.set(true);
     this.wizardError.set(null);
     try {
+      if (target === 'bsky') {
+        await this.blueskyPublication.publish(parts, this.media());
+        this.dirty.set(false);
+        this.wizardStep.set(null);
+        this.newDraft();
+        this.publishedHere.set(true);
+        return;
+      }
       if (
         (this.wizardTarget() === 'fedi' || this.wizardTarget() === 'both') &&
         this.media().some((item) => item.media.id.startsWith('local:'))

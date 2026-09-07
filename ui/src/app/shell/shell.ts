@@ -13,6 +13,7 @@ import { NgOptimizedImage } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { Api } from '../api';
+import { MenuIndicators } from '../menu-indicators';
 import { AccountChoice, Auth, Session } from '../auth';
 import { ClientPrefs } from '../client-prefs';
 import { BotPeers } from '../chat/bot-peers';
@@ -71,6 +72,7 @@ import { TranslocoService, TranslocoPipe } from '@jsverse/transloco';
 // i18n shell.nav.algo: Algo
 // i18n shell.nav.inbox: Inbox
 // i18n shell.nav.chat: Chat
+// i18n shell.nav.newActivity: New activity
 // i18n shell.nav.search: Search
 // i18n shell.nav.feeds: Feeds
 // i18n shell.nav.rss: RSS
@@ -148,6 +150,7 @@ function isWideUrl(url: string): boolean {
   styleUrl: './shell.css',
 })
 export class Shell implements OnInit {
+  protected indicators = inject(MenuIndicators);
   protected auth = inject(Auth);
   private transloco = inject(TranslocoService);
   private bots = inject(BotPeers);
@@ -321,6 +324,7 @@ export class Shell implements OnInit {
   private readonly mainColumn = viewChild<ElementRef<HTMLElement>>('mainColumn');
 
   constructor() {
+    this.indicators.start();
     // Not in ngOnInit: that returns early for anonymous visitors, and route
     // focus has to work for them too.
     this.router.events

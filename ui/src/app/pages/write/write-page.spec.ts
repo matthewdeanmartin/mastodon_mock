@@ -2,7 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Signal, WritableSignal, signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
+import { BlueskyPublication } from './bluesky-publication';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Auth } from '../../auth';
 import { ClientPrefs } from '../../client-prefs';
@@ -551,6 +552,55 @@ describe('WritePage', () => {
   });
 
   // ---------------------------------------------------------------- publishing
+
+  it('publishes Bluesky in Write despite a language selection, without a composer handoff', async () => {
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('ready for Bluesky');
+    page.setWizardTarget('bsky');
+    page.postLanguage.set('en');
+    expect(page.targetUnsupportedReason('bsky')).toBeNull();
+    const publish = vi
+      .spyOn(fixture.debugElement.injector.get(BlueskyPublication), 'publish')
+      .mockResolvedValue();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate');
+    await page.wizardFinish();
+    expect(publish).toHaveBeenCalledWith(['ready for Bluesky'], []);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(TestBed.inject(Drafts).takeHandoff()).toBeNull();
+    expect(page.body()).toBe('');
+  });
+
+  it('keeps all four segments in Write when segment two is oversized', async () => {
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput(['one', 'x'.repeat(301), 'three', 'four'].join('\n---\n'));
+    page.setWizardTarget('bsky');
+    const publish = vi.spyOn(fixture.debugElement.injector.get(BlueskyPublication), 'publish');
+    await page.wizardFinish();
+    expect(page.wizardError()).toContain('post 2 of 4');
+    expect(publish).not.toHaveBeenCalled();
+    expect(page.body()).toContain('four');
+    expect(TestBed.inject(Drafts).takeHandoff()).toBeNull();
+  });
+
+  it('keeps the draft and wizard error in place when Bluesky fails', async () => {
+    const fixture = setUp();
+    const page = internals(fixture);
+    page.newDraft();
+    page.onBodyInput('keep this');
+    page.setWizardTarget('bsky');
+    vi.spyOn(fixture.debugElement.injector.get(BlueskyPublication), 'publish').mockRejectedValue(
+      new Error('post two failed'),
+    );
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate');
+    await page.wizardFinish();
+    expect(page.body()).toBe('keep this');
+    expect(page.wizardError()).toBe('post two failed');
+    expect(navigate).not.toHaveBeenCalled();
+  });
 
   it('hands the text to the composer rather than posting from here', () => {
     signIn();

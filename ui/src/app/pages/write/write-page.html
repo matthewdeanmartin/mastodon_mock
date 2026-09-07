@@ -1268,12 +1268,22 @@
       }
 
       <div class="wizard-actions">
-        <button class="btn btn-outline" type="button" (click)="wizardCancel()">
+        <button
+          class="btn btn-outline"
+          type="button"
+          [disabled]="wizardBusy()"
+          (click)="wizardCancel()"
+        >
           {{ 'pages.write.cancel' | transloco }}
         </button>
         <span class="bar-gap"></span>
         @if (wizardCanGoBack()) {
-          <button class="btn btn-outline" type="button" (click)="wizardBack()">
+          <button
+            class="btn btn-outline"
+            type="button"
+            [disabled]="wizardBusy()"
+            (click)="wizardBack()"
+          >
             {{ 'pages.write.back' | transloco }}
           </button>
         }
@@ -1349,4 +1359,7 @@
       />
     </div>
   </div>
+}
+@if (publishedHere()) {
+  <p role="status">{{ 'pages.write.publishedHere' | transloco }}</p>
 }

@@ -571,6 +571,20 @@ export const STORAGE_KEYS: readonly StorageKeySpec[] = [
 
   // ---- setting: the publishable payload ----
   {
+    base: 'mockingbird_menu_indicator_preferences',
+    storage: 'local',
+    suffix: 'none',
+    sensitivity: 'setting',
+    note: 'Local-hour menu indicator delivery schedule and chat batching.',
+  },
+  {
+    base: 'mockingbird_menu_indicator_state',
+    storage: 'local',
+    suffix: 'account',
+    sensitivity: 'cache',
+    note: 'Acknowledged activity and pending menu indicator batches; never message read state.',
+  },
+  {
     base: 'mockingbird_client_prefs',
     storage: 'local',
     suffix: 'none',

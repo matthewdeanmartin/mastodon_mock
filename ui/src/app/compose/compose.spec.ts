@@ -1657,6 +1657,28 @@ describe('Compose', () => {
     tail.flush({ id: 'm3' });
   });
 
+  it('retains the Bluesky root when an unfinished thread segment is edited', () => {
+    linkBsky();
+    const f = setUp();
+    const c = internals(f);
+    c.target.set('bsky');
+    c.text.set('one');
+    c.addThreadBox();
+    c.setThreadText(0, 'two');
+    c.submit();
+    httpMock.expectOne(CREATE_RECORD).flush({ uri: 'at://root', cid: 'root' });
+    const failed = httpMock.expectOne(CREATE_RECORD);
+    const key = failed.request.body.rkey;
+    failed.flush({ error: 'InvalidRequest' }, { status: 400, statusText: 'Bad Request' });
+    c.setThreadText(0, 'shorter two');
+    c.submit();
+    const resumed = httpMock.expectOne(CREATE_RECORD);
+    expect(resumed.request.body.rkey).toBe(key);
+    expect(resumed.request.body.record.text).toBe('shorter two');
+    expect(resumed.request.body.record.reply.parent).toEqual({ uri: 'at://root', cid: 'root' });
+    resumed.flush({ uri: 'at://second', cid: 'second' });
+  });
+
   it('skips a completed Bluesky leg when Fedi fails, regardless of response ordering', () => {
     linkBsky();
     const f = setUp();
