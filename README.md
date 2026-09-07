@@ -1,3 +1,6 @@
+The bundled `ui/` is a frozen legacy client. New client development lives in
+[mawkingbird](https://github.com/matthewdeanmartin/mawkingbird). See [LEGACY_UI.md](LEGACY_UI.md).
+
 # Mastodon Mock
 
 [![PyPI version](https://badge.fury.io/py/mastodon_mock.svg)](https://badge.fury.io/py/mastodon_mock)

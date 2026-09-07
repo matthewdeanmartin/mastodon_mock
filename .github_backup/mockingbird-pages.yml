@@ -26,6 +26,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: ${{ vars.MAWKINGBIRD_PUBLISH_RETIRED != 'true' }}
     name: Build and deploy production
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -72,6 +73,7 @@ jobs:
         run: bash .github/scripts/publish-gh-pages.sh root ui/dist-mockingbird/browser
 
   mirror:
+    if: ${{ vars.MAWKINGBIRD_PUBLISH_RETIRED != 'true' }}
     name: Build and deploy github.io mirror
     runs-on: ubuntu-latest
     timeout-minutes: 20

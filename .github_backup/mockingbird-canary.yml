@@ -30,6 +30,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ vars.MAWKINGBIRD_PUBLISH_RETIRED != 'true' }}
     name: Build and deploy Canary
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -65,6 +66,7 @@ jobs:
         run: bash .github/scripts/publish-gh-pages.sh canary ui/dist-mockingbird/browser
 
   test-deployment:
+    if: ${{ vars.MAWKINGBIRD_PUBLISH_RETIRED != 'true' }}
     name: Build and deploy /test/
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -122,6 +124,7 @@ jobs:
         run: bash .github/scripts/publish-gh-pages.sh test ui/dist-mockingbird/browser
 
   mirror:
+    if: ${{ vars.MAWKINGBIRD_PUBLISH_RETIRED != 'true' }}
     name: Build and deploy github.io Canary
     runs-on: ubuntu-latest
     timeout-minutes: 20

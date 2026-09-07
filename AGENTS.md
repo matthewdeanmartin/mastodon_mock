@@ -71,3 +71,8 @@ uv run make dead-code       # runs both vulture and deadcode (advisory only, non
 ## Commits
 
 Prefer a single clean commit per logical change on the main branch.
+
+## Legacy UI ownership
+
+`ui/` is frozen at the source split recorded in LEGACY_UI.md. Develop new Mawkingbird
+features in the sibling mawkingbird repository. Preserve the bundled legacy UI.
