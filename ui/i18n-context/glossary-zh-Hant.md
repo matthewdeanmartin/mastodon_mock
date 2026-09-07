@@ -56,29 +56,21 @@ The table locks product decisions where Mastodon does not have a direct analogue
 
 ## Message structure and batching
 
-Latest resume policy: Luna authors, Sol independently reviews final files once;
-Astra handles complex template defects. Complete Taiwan then stop all languages.
-Use the coordinator's disjoint resume work orders (500/565 translation, 699 review
-including saved drafts and targeted vocabulary repairs). Original draft source
-hashes were verified before preparing the resume. Temporary files stay ignored
-under `ui/.i18n-work/zh-Hant/`; no Git staging. Track dispatch/completion wall time.
 Verified optional English vocabulary parameters in
 `ui/scripts/i18n-optional-terminology.mjs` may be omitted in favor of inflected
 canonical Chinese nouns. Preserve real counts, names and data. The resume review
 includes existing Chinese strings still interpolating those English-only nouns.
 
-Use batches of at least 300 keys (larger is welcome); only the final remainder
-and correction-only passes may be smaller. Every batch requires Astra review.
 Chinese cardinal plurals have only `other`; existing English `.one`/`.other`
 **complete message pairs** may have identical natural Chinese values. Translate
 both keys because current call sites still select by English count. Do not emit
 ICU syntax: no ICU compiler is installed. A numeric measure word is still needed.
 Do not translate suffix fragments as if they were complete words, or force Chinese
 into fixed English fragments around interactive links. Report those keys and the
-actual call site to Astra, who owns source restructuring. Keep missing keys as
+actual call site for source restructuring. Keep missing keys as
 English fallback pending the fix, rather than inventing a broken translation.
 
-Use the source snapshot/review workflow in the translate-ui skill. Never run
+Use the source-snapshot workflow in the translate-ui skill. Never run
 legacy `i18n-todo` to certify freshness. Ledger absence means stale, not approved.
 
 ## Corrections and discoveries

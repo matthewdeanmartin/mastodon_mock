@@ -1,170 +1,51 @@
-# Translation preparation and measurement contract
+# Translation execution contract
 
-Korean completion (2026-09-06): all 5,866 strings are accepted, source-current and Terra-reviewed; the final Astra pass covered all 5,866 and applied 212 corrections. Full UI gate: 6,218 passed, no failures or skips. This continuation preserved 341 drafts and authored 3,525 new strings, adding 3,866 accepted entries. Translation plus Terra review took 23.3 minutes; final review, seven targeted runtime/vocabulary repairs and handoff checks are measured separately. One Terra file-patching failure was recovered without losing its 100 saved translations. See [completion benchmark](../ui/i18n-context/ko-completion-2026-09-06.json) and [final audit](../ui/i18n-context/ko-final-audit-2026-09-06.json). Earlier entries below are experiment history.
+## Roles and scope
 
-User's latest experiment: Terra-low authors the exact 250 strings Luna failed, without deadline pressure, and a separate
-Terra-low agent reviews. The Terra author experiment was interrupted on request
-after 400 saved entries; Luna completed the remaining 100 in the same batch,
-and Astra reviews the entire Korean locale only after all strings finish those
-stages. The first pilot uses Korean batch 001. No translation ran during the
-earlier skill cleanup; this run measures implementation preparation separately.
-That mixed batch passed review with 24 corrections. Two subsequent full 500-key
-Luna requests without deadlines failed (generic filler and zero output). The
-pipeline is stopped. The user then authorized 250-entry requests and a 'keep
-going' continuation: two of three 250-entry requests produced substantive drafts;
-one returned filler. The 500-entry continuation produced 91 before stopping.
-Valid partials are preserved and unreviewed, separate from accepted strings.
+The coordinator freezes assignments, dispatches Sol authors, serializes shared
+writes, and runs mechanical validation. Authors translate directly. There is no
+linguistic reviewer role, reviewer queue, correction-patch round, or reviewed
+ledger stamp in this workflow.
 
-## Readiness before dispatch
+## Immutable work orders
 
-- Done: replace accumulated coordinator instructions with one current procedure;
-  archive the original verbatim under the skill's references directory.
-- Done: separate a small worker skill; dispatch fresh contexts with no history.
-- Done: define payload, provenance checks, clocks, counters and experiment gates.
-- Done: `ui/scripts/i18n-compact.mjs` prepares immutable manifests, exports compact
-  work orders, binds correction patches, and expands full-key merge inputs.
-  Five targeted tests pass; partial checkpoints cannot pass as complete.
-- Done: `ui/scripts/i18n-metrics.mjs` captures effective model/effort, cumulative
-  counters, reset-aware deltas and coordinator events. Four tests pass and an
-  existing rollout was read successfully before launching the author.
-- Done: Korean glossary established with a Mastodon vocabulary anchor.
-- Done: Korean is registered for review builds and accepted/reviewed ledger
-  tracking is enabled. The first 500-key batch is accepted and Terra-reviewed;
-  Astra's whole-locale review remains pending until all 5,866 strings are done.
+The fixed batch manifest binds locale, batch ID, validation-policy hash, and each
+record's explicit ID, dotted key, English, context, optional parameters, and
+source hash. Never regenerate a manifest to hide drift or infer IDs by position.
 
-## Compact adapter contract
-
-Keep the fixed inventory authoritative. Coordinator generates an immutable
-manifest with version, locale, batch ID, source/context hashes, validation-policy
-hash, and records `{id,key,english,context,optionalParameters}`. Assign explicit
-IDs such as `b001-001` once from frozen batch membership. Hash the canonical
-manifest, including all fields; do not regenerate it after dispatch. Worker
-payload retains English and necessary context but omits full dotted keys when
-their meaning is already conveyed by context. Keep a compact semantic hint when
-the key is the only disambiguator. Deduplicate repeated context by explicit
-reference, never by removing meaning. Full-key mapping stays with coordinator.
-
-Use arrays of explicit pairs for model output, so ordinary JSON parsing does
-not silently discard duplicate object keys:
+Author output uses explicit pairs so JSON parsing cannot discard duplicate keys:
 
 ```json
 {"manifestHash":"sha256:…","entries":[["b001-001","authored text"]]}
 ```
 
-At author completion freeze the candidate and hash its exact bytes. Review input
-contains ID, English, context and candidate together, plus glossary; reviewer
-never reads the author's dialog. Review output:
+A request may assign a contiguous 150–250-ID slice of a fixed batch. Checkpoints
+may be smaller. A candidate is complete only when every manifest ID appears
+exactly once and no unknown ID appears.
 
-```json
-{"manifestHash":"sha256:…","candidateHash":"sha256:…","reviewedCount":500,"corrections":[["b001-001","corrected text"]],"blockers":[]}
-```
+## Mechanical acceptance
 
-Reject wrong manifest/candidate hashes, duplicate/unknown IDs, malformed values,
-incomplete authorship, incorrect review count, and source/context/policy drift.
-Missing review correction IDs mean unchanged; missing author IDs mean incomplete.
-Patch only the frozen candidate; expand to full-key JSON deterministically and
-use existing placeholder/markup/max/locale gates. Never generate translated text.
-Check exact assignment equality independently of merge dry-run. Stamp review
-only for the exact final values produced by that review and accepted merge.
+Validate the manifest against current English, context, and policy. Expand IDs
+to full dotted keys deterministically. Merge only through
+`scripts/i18n-merge.mjs` with the frozen source snapshot. Reject malformed values,
+incomplete coverage, duplicates, unknown IDs, wrong locale, drift, placeholder
+or markup drift, length-budget failures, and locale-rule failures.
 
-Adapter tests must exercise duplicate/missing/unknown IDs, stale source/context,
-wrong locale, stale candidate review, policy drift, partial checkpoints, empty
-correction patches, unchanged-value preservation and full-key round trip. Use
-synthetic text, not translation agents, for implementation tests.
+The merge records accepted source and translation hashes. Do not pass
+`--reviewed`; absence of a reviewed stamp is intentional. A targeted repair may
+change only an entry named by a failed mechanical gate, then rerun that gate.
 
-## Minimal dispatch
+## Authorship and provenance
 
-Spawn author Terra-low or reviewer Terra-low with `fork_turns: "none"` and an
-explicit effort. Supply absolute paths and a short prompt:
+Use `gpt-5.6-sol` for direct authorship. Do not substitute another model or add a
+semantic review pass. Authors receive the worker skill, locale glossary, and
+immutable work-order slice only. No network services, external MT, phrase maps,
+substitution generators, generic filler, or copying reference locales. Tool logs
+can reveal an observed shortcut but cannot prove network isolation.
 
-> Use translate-ui-agent at <path>. Role <author|reviewer>, locale <locale>.
-> Read <glossary> and <work-order> only, except specific ambiguity call sites.
-> Write <output> using the schema in the work order. Stay on the assigned entries.
-> Preserve checkpoints. Return path, count, status and exact blockers.
+## Completion
 
-Keep the fixed 500-key source assignment for tracking. The supervisor may supply
-an explicit subset as the experimental worker request; record its size and exact
-IDs. Workers never choose their own strings. Within-request checkpoints are file
-writes, not new assignments or semantic review rounds. Coordinator reads summaries,
-counts and failure IDs; it does not echo full payloads or translations into its
-own context. Reviewer corrects all final messages in one pass. No routine second linguistic audit per batch; the user requests one Astra review after all Korean strings pass Terra review. Mechanical checks run at completed-author
-and patched-final boundaries; later checks require a changed artifact or failure.
-
-## Provenance without pretending to enforce a sandbox
-
-Workers are instructed to use no network and no external translation. Coordinator
-checks their task-local tool activity at each handoff for HTTP/browser/MT calls,
-phrase maps, substitution generators and copying reference translations. Record
-the audit result and exact evidence path, without importing transcripts into the
-reviewer's context. Reject observed shortcuts; preserve legitimate partial work.
-Review still checks actual meaning across every entry, because filler can pass
-structural checks. Instructions and tool-log inspection are not network isolation
-or proof of direct authorship. Record hidden/unavailable tool activity as unknown,
-not as verified clean provenance. Do not claim a technical Google Translate block.
-
-## Event record and calculations
-
-Save durable run summaries under `ui/i18n-context/`; scratch payloads live in
-ignored `ui/.i18n-work/<locale>/`. Give each run a unique ID. Capture repository
-revision and dirty-diff hash, source manifest/policy hashes, scope, key count,
-requested/effective model and effort, agent/session IDs, and event records:
-
-`{runId,batchId,agentId,stage,event,atUtc,observedAtUtc,counterSnapshot,artifactHash}`.
-
-Events: preparation start/end, ready, dispatch, first saved output, author
-complete, review dispatch/start/end, patch applied, merge start/end, validation
-start/end, continuation, rejection, stop and delivery. Coordinator timestamps
-are authoritative. File-write event time measures first save where available;
-otherwise record first observed time as an upper bound, not an exact first save.
-
-Read only relevant rollout metadata and `token_count` events. Baseline each
-session before dispatch and sample at handoffs and at least every 60 seconds.
-Use cumulative counter deltas, not the sum of cumulative snapshots. Retain
-input, cached input, output and reasoning output separately. Compute uncached
-input = input - cached input; reasoning is already included in output. Record
-resets/session changes as separate segments and aggregate each once. Track root
-delta separately, including failed attempts and coordination; do not attribute
-earlier conversation usage to this run. Missing values are null, never zero.
-
-Report critical-path wall time from first dispatch through final validation,
-worker intervals, queue time (ready to dispatch), author-to-review wait,
-coordinator merge delay, continuation count and rejected keys. Distinguish
-one-time preparation, benchmark work, per-language work, final repository gates,
-and total request-to-delivery time. Never sum concurrent durations as wall time.
-Report accepted-and-reviewed keys per minute and token totals, not generated
-keys as successful throughput. Byte/character reductions are not token savings.
-
-## Experiment gates
-
-Use fixed 500-key Korean batches, preserving valid authored work, Terra-low
-author and independent Terra-low review. User corrected deadline pressure during
-the second pilot. Workers receive scope and focus instructions, not deadlines,
-speed demands or token ceilings. Coordinator samples progress and usage at least
-once a minute and records the intervention; this is no longer a model-only comparison.
-
-The earlier 4-minute target, 6-minute stop, 12k worker output, 60k uncached input
-and 1M cached input were proposals without a successful end-to-end baseline.
-They are diagnostic thresholds, not automatic cutoffs for this experiment.
-Terra's earlier 565-key authorship alone took 6m 46s; the second pilot's initial
-author context used about 47k uncached tokens before review. Do not present these
-targets as demonstrated capacity or pressure workers to satisfy them.
-
-Bound this experiment by one fixed assignment and one independent review. Allow
-one continuation of valid partial authorship and at most one concrete targeted
-repair. Stop on prohibited shortcuts, a completed worker return with zero useful
-authorship, or an unresolved blocker. Preserve work. Inspect an apparent stall
-before interrupting; time alone does not establish a stall. Root overhead remains
-separate. Report all actual tokens, threshold overruns and failed attempts.
-
-Only advance after coverage, structural correctness, completed independent review
-and no known unresolved/provenance blocker. Record payload bytes and actual model
-token deltas; do not run an extra verbose-format translation merely to estimate
-compression savings. The historical Taiwan resume is not a controlled fresh
-500-key baseline, so label comparisons accordingly.
-
-If the first pilot passes, next is the two-batch pipeline experiment from the
-plan, within the user's authorized Korean work. Establish realistic coordinator
-ceilings from observed completed throughput before Korean rollout.
-Do not cycle through models or start a full language as
-the experiment. A failed target produces saved work and a concrete bottleneck
-report. This preparation changes no pilot or rollout gate into an automatic pass.
+Run exact locale/source/accepted-ledger coverage, dictionary checks, terminology
+checks, locale traps, and the UI gate required by `AGENTS.md` for registration or
+runtime changes. Report directly authored and mechanically accepted counts—not
+reviewed counts. Full coverage does not authorize production promotion.

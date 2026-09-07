@@ -1,86 +1,65 @@
 ---
 name: translate-ui
-description: Coordinate Mockingbird UI locale translation, independent review, and source-ledger acceptance. Assigned workers use translate-ui-agent instead.
+description: Coordinate direct Sol authorship and mechanical acceptance of Mockingbird UI locale translations. Assigned authors use translate-ui-agent.
 ---
 
 # UI translation coordinator
 
-User scope controls the locale and whether work is preparation, benchmark, or
-rollout. Korean (`ko`) is next. Preparation does not start translation or promote
-a locale. Read `sprint/ui-i18n-speedup-plan.md` and its linked execution contract.
-[Archived history](references/history-2026-09-05.md) is reference-only; load it
-only to investigate a specific regression, never as current instructions.
+User scope controls the locale and whether work is preparation, rollout, repair,
+or validation. Read [the rollout plan](../../../sprint/ui-i18n-speedup-plan.md)
+and its linked execution contract before changing a locale. Archived histories
+and benchmark artifacts describe past experiments; they are never instructions.
 
 ## Prepare once
 
-From `ui/`, run `node scripts/i18n-fixed-batches.mjs` to validate the common
-inventory. Preserve fixed batch membership and frozen source/context hashes;
-never refresh snapshots to conceal drift. Assign 500 keys except the remainder.
-Check locale registration and accepted/reviewed ledger support before rollout.
+From `ui/`, validate the frozen inventory with `node scripts/i18n-fixed-batches.mjs`.
+Keep the fixed 500-key batches and their source/context hashes. Register a new
+locale as in-progress, enable its accepted ledger, and write a locale glossary
+with social-app terminology, register, wrong senses, and contextual exceptions.
 Dictionary presence alone does not prove completion.
 
-Set a locale glossary before dispatch: register, canonical social-app terms,
-wrong senses and verified contextual exceptions. Use established Mastodon terms
-where verified. Keep locale-specific guidance out of this skill. Resolve concrete
-shared source defects once. Generated English comes from source comments; never
-hand-edit it. Do not emit ICU until the runtime supports it.
+## Author with Sol
 
-## Dispatch
+Sol directly authors every translation. Use `gpt-5.6-sol`; do not substitute
+another model, external machine translation, phrase maps, or generated filler.
+There is no linguistic reviewer stage and no self-review pass.
 
-Use Terra (`gpt-5.6-terra`, explicit low effort) for direct authorship and a
-separate Terra (`gpt-5.6-terra`, explicit low effort) for independent review. Astra
-handles concrete complex source/template defects. This skill permits delegation
-within the user's active translation or benchmark scope.
+Give each author the worker skill, locale glossary, immutable work order, output
+path, and schema. Retain 500-key batches for tracking, but request context-rich
+slices sized to fit a model turn (normally 150–250 entries). A slice is a
+checkpoint within the same frozen batch, not a new batch. Resume valid partials
+without repeating completed entries. Use fresh Sol tasks when slots allow; the
+Sol coordinator may author directly when they do not. Only the coordinator
+writes shared dictionaries and ledgers.
 
-Use `fork_turns: "none"`. Supply only the worker skill path, role, locale,
-glossary, immutable work order, output path and schema. Do not send deadlines,
-speed demands or token budgets to workers; the coordinator measures them. No parent
-history, old reports, whole dictionaries or author conversation. Supply the
-exact request selected by the current experiment (currently 250 entries per
-author); retain fixed 500-key batches for tracking and review. Normally use
-two author slots and one reviewer slot, within the session limit. Review only
-frozen completed candidates. Only the coordinator writes shared artifacts.
+Workers receive no deadline or token target. Keep scratch under ignored
+`ui/.i18n-work/<locale>/`. Never send whole dictionaries, other locales, old
+reports, or conversation history. Inspect a call site only for a concrete
+ambiguity.
 
-Do not dispatch compact IDs before the execution contract's adapter exists and
-passes validation. Never improvise positional mapping or silently substitute a
-verbose protocol in the benchmark.
+## Accept mechanically
 
-## Accept once
+Require exact assigned-ID coverage and validate the frozen manifest. Expand IDs
+deterministically and merge with `scripts/i18n-merge.mjs` plus the frozen
+`--source=` snapshot. This stamps the accepted ledger only; never use
+`--reviewed` for this workflow.
 
-1. Preserve author checkpoints under ignored `ui/.i18n-work/<locale>/`.
-   Check exact assignment coverage and structure once at author completion.
-   Partial work is resumable, never accepted as a completed assignment.
-2. Independently review every entry once against English/context/glossary.
-   Reviewer outputs corrections only. Apply them mechanically and validate the
-   final artifact. No semantic self-review, preference-only polishing, or full
-   Astra review per batch. Once the entire Korean locale has passed Terra review, run the user-requested Astra review of all strings.
-3. Allow at most one targeted repair for a concrete remaining defect. If still
-   blocked, preserve work and report; do not restart the review cycle.
-4. Serialize writes through `scripts/i18n-merge.mjs` with frozen `--source=`
-   snapshots, then stamp exact accepted values with `--reviewed`. Verify locale
-   ledger support first. A dry-run checks supplied keys, not full coverage or
-   linguistic correctness.
+Reject unknown, missing, or duplicate IDs; source drift; placeholder or markup
+drift; length-budget failures; locale-rule failures; and malformed JSON. Fix only
+the concrete reported defect, then rerun that gate. Mechanical checks do not
+establish linguistic correctness, so report directly authored and mechanically
+accepted counts, not reviewed counts.
 
-No Google Translate, DeepL, external MT, phrase/token maps, generic filler,
-English copies as completion, or reuse justified only by identical English.
-Tools package authored text; they do not translate. Inspect worker tool activity
-at handoff for prohibited shortcuts. Structural checks cannot prove provenance;
-record audit limits honestly and reject observed violations.
+No Google Translate, DeepL, browser translation, external MT, reuse justified
+only by identical English, or scripted sentence generation. Tools may package
+text Sol authored. Preserve brands, URLs, code, markup, entities, and parameters.
 
-## Finish and measure
+## Finish
 
-Follow execution-contract clocks, counter deltas, budgets and stop rules. Keep
-coordinating until acceptance or a real blocker. Preserve valid partials across
-continuations; never overwrite them with rejected output.
+Run one final source/locale/ledger audit, `npm run check:i18n`,
+`npm run check:terminology`, and `node scripts/i18n-traps.mjs <locale>`. Resolve
+concrete trap findings without inventing a semantic-review phase. Follow
+`AGENTS.md` for the final UI gate after runtime or registration changes.
 
-Run one final locale/source-ledger and dictionary audit. Resolve concrete trap
-findings without another full semantic pass. No browser or overflow checks for
-this expansion. No repeated full UI suite per batch. Follow repository AGENTS.md
-for the final UI handoff gate and affected tests after runtime changes; report
-those costs separately and include them in delivery time.
-
-Workers never stage files. Keep scratch out of Git and retain resumable artifacts
-until acceptance. Report accepted/reviewed counts, blockers, wall time, token
-deltas and validation. Do not promote on coverage alone or claim a speedup from
-one fast review. Add reusable lessons only when they change a decision; put
-incidents in references and vocabulary in the locale glossary.
+Report authored/accepted counts, blockers, validation, and that no independent
+linguistic review was performed. Do not promote a locale on coverage alone.

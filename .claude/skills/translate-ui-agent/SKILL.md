@@ -1,50 +1,32 @@
 ---
 name: translate-ui-agent
-description: Author or independently review one assigned Mockingbird UI translation batch with a coordinator-provided role, locale, glossary, work order, schema and output path.
+description: Directly author one assigned slice of a Mockingbird UI translation batch with Sol using a glossary, immutable work order, and explicit-ID output schema.
 ---
 
-# Assigned UI translation worker
+# Assigned UI translation author
 
 Read the assigned work order and glossary once. Inspect a specific UI call site
-only for a concrete ambiguity. Do not load the coordinator skill, history, whole
-dictionaries or other batches. Do not delegate, browse, call network services,
-install packages or run tests.
+only for a concrete ambiguity. Do not load coordinator instructions, histories,
+whole dictionaries, other locales, or other batches. Do not delegate, browse,
+call network services, install packages, run tests, merge, stage, or commit.
 
-Directly translate meaning from English/context. No Google Translate, DeepL,
-external MT, phrase/token maps, substitutions, generic filler, English copies as
-completion, or copying another locale's answers. Code may serialize text you
-authored; it must not generate translated sentences. Report uncertainty as an
-exact-ID blocker instead of guessing or silently omitting an entry.
+Directly translate the supplied English and context with Sol. No linguistic
+review pass is part of this task. Do not use Google Translate, DeepL, browser
+translation, external MT, phrase/token maps, substitutions, generic filler,
+English copies as completion, or another locale's answers. Code may serialize
+text you authored; it must not generate translated sentences.
 
-Preserve real-data `{{parameters}}`, markup, entities, code, URLs, brands and
-context `dnt` text. Only supplied exact key+parameter vocabulary exceptions
-permit omission. Respect `max`, tone and glossary register. Distinguish posts
-from articles, mute from moderation limitation, followers from followed accounts,
-and UI language from posting language. Preserve examples and negation. No ICU
-or source edits. Report broken fragments or vocabulary injection by ID/call site.
+Author every ID in the assigned slice. Preserve existing valid checkpoints and
+write progress every 50–100 entries. Keep explicit IDs; never infer them from
+position. Missing IDs are incomplete, never implicitly unchanged. Legitimate
+brands, URLs, code, parameters, and `dnt` text may remain source-identical.
 
-## Author
+Preserve all `{{parameters}}`, markup, entities, code, URLs, and brands exactly.
+Respect `max`, the glossary's register, and social-app senses: distinguish posts
+from articles, boosts from promotion, mute from block, account handles from
+physical handles, feeds from food, and UI language from posting language. Do not
+emit ICU. Report a concrete ambiguity or broken source as an exact-ID blocker.
 
-Author every assigned entry. Save checkpoints of 50–100 entries to the assigned
-scratch file without rereading earlier output or doing semantic self-review.
-Keep checkpoint JSON valid; with `apply_patch`, put each entry on its own line.
-Keep explicit IDs; never infer them from line position. Complete the same batch
-across checkpoints. Stay on the assigned entries; the coordinator measures time
-and manages budgets. Do not abandon work based on a predicted time limit. If
-explicitly interrupted, preserve authored progress. Do not merge,
-write shared files, stage, commit or claim incomplete work is complete.
-
-## Reviewer
-
-Review every English/candidate pair once for meaning, omissions, grammar/counts,
-terminology, parameters and markup. Output only substantive corrections with
-explicit IDs. Preserve acceptable wording. Do not reproduce the full candidate
-or review your fixes again. Return the supplied manifest and candidate hashes,
-reviewed count, corrections and unresolved IDs. An empty patch is valid only
-after reviewing every assigned entry.
-
-## Output
-
-Use exactly the supplied file schema and path. Missing schema/input is a blocker.
-Final message: output path, authored/reviewed count, complete/partial status and
-blockers only. Coordinator owns validation, timing and token accounting.
+Use exactly the supplied file schema and path. A completed slice must contain
+each assigned ID exactly once and no unassigned IDs. Final message: output path,
+authored count, complete/partial status, and exact blockers only.

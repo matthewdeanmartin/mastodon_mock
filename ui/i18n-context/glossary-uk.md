@@ -101,12 +101,3 @@ Moderation reports are скарги, not звіти. Readability's “firm going
 means difficult reading. Translated origin kinds and split modes are data:
 preserve their placeholders with gender/case-neutral framing rather than omitting
 them or assuming a masculine origin. Server Friends means Підписки на сервері.
-
-Luna authors directly; Astra gives one independent review-and-fix pass, then
-mechanical checks. At most one concrete targeted repair thereafter; no self-review
-loops. Fresh worker context after one or two batches; use available parallel slots
-(currently three workers plus coordinator, per updated user direction).
-Serialize dictionary and ledger writes through the coordinator. `uk` uses
-`ledger-uk.json`, created on accepted merge; preserve legacy locale stamps.
-Missing ledger entries mean stale, not reviewed. No browser or full UI suite
-for these dictionary batches; retain source snapshots and exact accepted values.

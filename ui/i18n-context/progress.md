@@ -29,13 +29,11 @@ The exact source/translation ledger audit reports 5,866 reviewed and no missing,
 stale or unreviewed keys. Review counts and categories are in
 `review-uk-2026-09-05.md`.
 
-Current workflow: three workers plus coordinator (session capacity), fresh
-contexts for one or two fixed batches. Luna directly authors; Sol is being tried
-for routine independent review, while Astra owns complex template repairs.
-One review-and-fix pass, with at most one concrete targeted correction pass.
-No semantic self-review loops. The coordinator serializes dictionary and ledger
-merges. All disposable work stays in ignored `.i18n-work/<locale>/`; no scratch
-files should be staged or committed.
+Current workflow: Sol directly authors context-rich slices of fixed batches.
+There is no linguistic reviewer stage. The coordinator serializes dictionary and
+accepted-ledger merges and runs mechanical source, coverage, placeholder, markup,
+length, terminology and trap checks. All disposable work stays in ignored
+`.i18n-work/<locale>/`; no scratch files should be staged or committed.
 
 No browser or overflow checks by user instruction. Full UI gate passed once
 with 6,209 tests for the Taiwan shared-code changes. Subsequent bounded Ukrainian
