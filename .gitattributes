@@ -4,6 +4,7 @@
 # Files that break with CRLF must always be LF, even on Windows checkouts.
 *.sh   text eol=lf
 *.bash text eol=lf
+*.py   text eol=lf
 Dockerfile*   text eol=lf
 *.dockerfile  text eol=lf
 
