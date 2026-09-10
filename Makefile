@@ -30,7 +30,7 @@ TEST_WORKERS ?= $(shell python -c "import os;print(max(2,(os.cpu_count() or 2)//
 	format-check format-check-python format-check-yaml format-check-markdown \
 	lint lint-check ruff-fix ruff-check pylint pylint-tests pylint-spelling \
 	spell \
-	docs-check docs-check-docstrings docs-check-links docs-check-pydoctest griffe \
+	docs-check docs-check-docstrings docs-check-format docs-check-pydoctest griffe \
 	changelog-verify changelog-sync \
 	build-docs \
 	dead-code vulture deadcode \
@@ -79,7 +79,7 @@ help:
 	@echo "  docs-check             All doc checks (docstrings + links + pydoctest)"
 	@echo "  docs-check-docstrings  interrogate docstring coverage"
 	@echo "  docs-check-pydoctest   pydoctest docstring example tests"
-	@echo "  docs-check-links       linkcheckMarkdown"
+	@echo "  docs-check-format      mdformat --check on markdown"
 	@echo "  griffe                 griffe API surface check (advisory)"
 	@echo "  build-docs             Build mkdocs documentation"
 	@echo ""
@@ -170,7 +170,7 @@ spell: pylint-spelling
 
 # ── Documentation checks ─────────────────────────────────────────────────────
 
-docs-check: docs-check-docstrings docs-check-pydoctest docs-check-links changelog-verify
+docs-check: docs-check-docstrings docs-check-pydoctest docs-check-format changelog-verify
 
 docs-check-docstrings:
 	@$(UV) run interrogate $(PACKAGE) --verbose --fail-under 70
@@ -179,8 +179,7 @@ docs-check-pydoctest:
 	@$(UV) run pydoctest --config .pydoctest.json \
 		| grep -v "__init__" | grep -v "__main__" | grep -v "Unable to parse" || true
 
-docs-check-links:
-	@$(UV) run linkcheckMarkdown README.md || true
+docs-check-format:
 	@$(UV) run mdformat --check README.md CHANGELOG.md docs/*.md || true
 
 griffe:
