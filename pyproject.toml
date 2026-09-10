@@ -6,6 +6,7 @@ readme = "README.md"
 authors = [{ name = "Matthew Martin", email = "matthewdeanmartin@gmail.com" }]
 keywords = ["mastodon", "mock", "fastapi", "testing", "fediverse", "rest-api", "mastodon.py"]
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -24,7 +25,11 @@ classifiers = [
 ]
 dependencies = [
     "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
+    # The [standard] extra pulls httptools and uvloop, neither of which has
+    # published a cp315 wheel. They compile from sdist in seconds, so this is a
+    # policy choice, not a hard failure: on 3.15 take plain uvicorn instead.
+    "uvicorn[standard]>=0.30.0; python_version < '3.15'",
+    "uvicorn>=0.30.0; python_version >= '3.15'",
     "sqlalchemy>=2.0.0",
     "alembic>=1.13.0",
     "pydantic>=2.0.0",
@@ -89,8 +94,18 @@ artifacts = [
 path = "hatch_build.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["/README.md", "LICENSE", "/mastodon_mock", "/tests", "/ui", "/hatch_build.py"]
-exclude = ["mastodon_mock/_ui_dist", "ui/node_modules", "ui/.angular"]
+# Every pattern is anchored with a leading "/". A bare "LICENSE" matches at
+# ANY depth, which swept both Playwright virtualenvs (pwenv/, ui/pwenv/)
+# into the sdist: 4520 files with 17 stray LICENSE entries.
+include = ["/README.md", "/LICENSE", "/mastodon_mock", "/tests", "/ui", "/hatch_build.py"]
+exclude = [
+    "mastodon_mock/_ui_dist",
+    "ui/node_modules",
+    "ui/.angular",
+    "pwenv",
+    "ui/pwenv",
+    "ui/dist-mockingbird",
+]
 
 [dependency-groups]
 dev = [

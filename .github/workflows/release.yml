@@ -82,6 +82,11 @@ jobs:
         run: uv sync --frozen
       - name: Build
         run: uv build --no-sources
+      # Fail before uploading: the publish action's bundled twine rejects
+      # metadata it cannot parse (e.g. Metadata-Version 2.5 from hatchling),
+      # which otherwise only surfaces after the release is already tagged.
+      - name: Validate distribution metadata
+        run: uv run --with 'twine>=7' twine check --strict dist/*
       - name: Verify dist version matches release
         env:
           EXPECTED: ${{ needs.bump.outputs.version }}
@@ -118,6 +123,6 @@ jobs:
           name: packages
           path: dist/
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # v1.14.0
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
         with:
           verbose: 'true'
