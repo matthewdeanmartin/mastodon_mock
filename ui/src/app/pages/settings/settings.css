@@ -1,0 +1,115 @@
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+}
+
+.tab {
+  border: none;
+  background: none;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.profile-form {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.field input[type='text'],
+.field textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-weight: 400;
+}
+
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.field-row input {
+  flex: 1;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 0.85em;
+}
+
+.account-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.account-link .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.names {
+  display: flex;
+  flex-direction: column;
+}
+
+.req-actions {
+  display: flex;
+  gap: 6px;
+}

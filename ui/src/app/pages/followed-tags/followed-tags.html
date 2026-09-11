@@ -1,0 +1,35 @@
+<div class="page-head">Tags</div>
+
+@if (loading()) {
+  <p class="muted center">Loading…</p>
+} @else {
+  <section>
+    <h3 class="section-head">Followed hashtags</h3>
+    @if (!followed().length) {
+      <p class="muted center small">You don't follow any hashtags yet.</p>
+    }
+    <ul class="tag-list">
+      @for (t of followed(); track t.name) {
+        <li class="tag-row">
+          <a class="tag-name" [routerLink]="['/tags', t.name]">#{{ t.name }}</a>
+          <button class="btn btn-outline btn-sm" (click)="unfollow(t)">Unfollow</button>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <section>
+    <h3 class="section-head">Featured on your profile</h3>
+    @if (!featured().length) {
+      <p class="muted center small">No featured hashtags.</p>
+    }
+    <ul class="tag-list">
+      @for (t of featured(); track t.id) {
+        <li class="tag-row">
+          <a class="tag-name" [routerLink]="['/tags', t.name]">#{{ t.name }}</a>
+          <span class="muted small">{{ t.statuses_count }} posts</span>
+        </li>
+      }
+    </ul>
+  </section>
+}

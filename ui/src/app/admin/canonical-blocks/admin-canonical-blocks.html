@@ -4,11 +4,9 @@
     [ngModel]="newEmail()"
     (ngModelChange)="newEmail.set($event)"
     (keyup.enter)="add()"
-    [placeholder]="'adminCanonical.placeholder' | transloco"
+    placeholder="email to block (canonicalized + hashed)"
   />
-  <button class="btn" [disabled]="!newEmail().trim() || submitting()" (click)="add()">
-    {{ 'adminCanonical.block' | transloco }}
-  </button>
+  <button class="btn" [disabled]="!newEmail().trim() || submitting()" (click)="add()">Block</button>
 </div>
 
 <div class="add-block">
@@ -17,34 +15,29 @@
     [ngModel]="testEmail()"
     (ngModelChange)="testEmail.set($event)"
     (keyup.enter)="test()"
-    [placeholder]="'adminCanonical.testPlaceholder' | transloco"
+    placeholder="test an email against existing blocks"
   />
-  <button class="btn btn-outline" [disabled]="!testEmail().trim()" (click)="test()">
-    {{ 'adminCanonical.testMatch' | transloco }}
-  </button>
+  <button class="btn btn-outline" [disabled]="!testEmail().trim()" (click)="test()">Test match</button>
 </div>
 @if (testResult(); as result) {
   <div class="test-result">
     @if (result.length) {
-      {{
-        (result.length === 1 ? 'adminCanonical.matches.one' : 'adminCanonical.matches.other')
-          | transloco: { count: result.length }
-      }}
+      Matches {{ result.length }} block(s): canonicalizes to a blocked hash.
     } @else {
-      {{ 'adminCanonical.noMatch' | transloco }}
+      No match — this email is not blocked.
     }
   </div>
 }
 
 @if (loading()) {
-  <p class="muted center">{{ 'adminCanonical.loading' | transloco }}</p>
+  <p class="muted center">Loading…</p>
 } @else if (!blocks().length) {
-  <p class="muted center">{{ 'adminCanonical.empty' | transloco }}</p>
+  <p class="muted center">No canonical email blocks.</p>
 } @else {
   @for (b of blocks(); track b.id) {
     <div class="block-row">
       <span class="mono">{{ b.canonical_email_hash }}</span>
-      <button class="op warn" (click)="remove(b)">{{ 'adminCanonical.remove' | transloco }}</button>
+      <button class="op warn" (click)="remove(b)">Remove</button>
     </div>
   }
 }

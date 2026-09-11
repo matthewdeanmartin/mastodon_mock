@@ -2,8 +2,7 @@
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
   "cli": {
-    "packageManager": "npm",
-    "analytics": "663c74d4-0c7f-4798-a114-092d4c83db89"
+    "packageManager": "npm"
   },
   "newProjectRoot": "projects",
   "projects": {
@@ -52,15 +51,7 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.css"],
-            "optimization": {
-              "scripts": true,
-              "fonts": true,
-              "styles": {
-                "minify": true,
-                "inlineCritical": false
-              }
-            }
+            "styles": ["src/styles.css"]
           },
           "configurations": {
             "production": {
@@ -72,8 +63,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "8kB",
-                  "maximumError": "10kB"
+                  "maximumWarning": "6kB",
+                  "maximumError": "8kB"
                 }
               ],
               "outputHashing": "all"
@@ -82,37 +73,6 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
-            },
-            "mockingbird": {
-              "outputPath": "dist-mockingbird",
-              "baseHref": "/",
-              "fileReplacements": [
-                {
-                  "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.mockingbird.ts"
-                },
-                {
-                  "replace": "src/app/mock-routes.ts",
-                  "with": "src/app/mock-routes.mockingbird.ts"
-                },
-                {
-                  "replace": "src/app/mock-api.ts",
-                  "with": "src/app/mock-api.mockingbird.ts"
-                }
-              ],
-              "budgets": [
-                {
-                  "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
-                },
-                {
-                  "type": "anyComponentStyle",
-                  "maximumWarning": "8kB",
-                  "maximumError": "10kB"
-                }
-              ],
-              "outputHashing": "all"
             }
           },
           "defaultConfiguration": "production"
@@ -125,9 +85,6 @@
             },
             "development": {
               "buildTarget": "ui:build:development"
-            },
-            "mockingbird": {
-              "buildTarget": "ui:build:mockingbird"
             }
           },
           "defaultConfiguration": "development"
@@ -136,19 +93,8 @@
           "builder": "@angular/build:unit-test",
           "options": {
             "runner": "vitest",
-            "runnerConfig": "vitest.config.ts",
             "buildTarget": "ui:build:development",
-            "tsConfig": "tsconfig.spec.json",
-            "setupFiles": ["src/test-setup.ts"]
-          }
-        },
-        "lint": {
-          "builder": "@angular-eslint/builder:lint",
-          "options": {
-            "lintFilePatterns": [
-              "src/**/*.ts",
-              "src/**/*.html"
-            ]
+            "tsConfig": "tsconfig.spec.json"
           }
         }
       }

@@ -1,24 +1,13 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
 import { RouterLink } from '@angular/router';
 import { AdminApi } from '../admin-api';
 import { Status, TrendingTag } from '../../models';
 import { StatusCard } from '../../status-card/status-card';
 
-// i18n adminTrends.hashtags: Trending hashtags
-// i18n adminTrends.emptyTags: No trending tags.
-// i18n adminTrends.uses.one: {{count}} use
-// i18n adminTrends.uses.other: {{count}} uses
-// i18n adminTrends.approve: Approve
-// i18n adminTrends.reject: Reject
-// i18n adminTrends.posts: Trending posts
-// i18n adminTrends.loading: Loading…
-// i18n adminTrends.emptyPosts: No trending posts.
-
 /** Read-only trends viewer: trending hashtags and most-favourited statuses. */
 @Component({
   selector: 'app-admin-trends',
-  imports: [RouterLink, StatusCard, TranslocoPipe],
+  imports: [RouterLink, StatusCard],
   templateUrl: './admin-trends.html',
   styleUrl: './admin-trends.css',
 })
@@ -61,14 +50,10 @@ export class AdminTrends implements OnInit {
   }
 
   approveStatus(status: Status): void {
-    this.api
-      .approveTrendingStatus(status.id)
-      .subscribe(() => this.mark('status-' + status.id, 'approved'));
+    this.api.approveTrendingStatus(status.id).subscribe(() => this.mark('status-' + status.id, 'approved'));
   }
 
   rejectStatus(status: Status): void {
-    this.api
-      .rejectTrendingStatus(status.id)
-      .subscribe(() => this.mark('status-' + status.id, 'rejected'));
+    this.api.rejectTrendingStatus(status.id).subscribe(() => this.mark('status-' + status.id, 'rejected'));
   }
 }

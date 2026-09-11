@@ -1,24 +1,12 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
 import { FormsModule } from '@angular/forms';
 import { AdminApi } from '../admin-api';
 import { Announcement } from '../../models';
 
-// i18n adminAnnouncements.placeholder: Announcement text (HTML allowed)
-// i18n adminAnnouncements.publishImmediately: Publish immediately
-// i18n adminAnnouncements.create: Create
-// i18n adminAnnouncements.loading: Loading…
-// i18n adminAnnouncements.empty: No announcements.
-// i18n adminAnnouncements.published: Published
-// i18n adminAnnouncements.draft: Draft
-// i18n adminAnnouncements.unpublish: Unpublish
-// i18n adminAnnouncements.publish: Publish
-// i18n adminAnnouncements.delete: Delete
-
 /** Staff management of instance announcements: list / create / publish / delete. */
 @Component({
   selector: 'app-admin-announcements',
-  imports: [FormsModule, TranslocoPipe],
+  imports: [FormsModule],
   templateUrl: './admin-announcements.html',
   styleUrl: './admin-announcements.css',
 })
@@ -68,9 +56,7 @@ export class AdminAnnouncements implements OnInit {
   }
 
   togglePublished(a: Announcement): void {
-    const call = a.published
-      ? this.api.unpublishAnnouncement(a.id)
-      : this.api.publishAnnouncement(a.id);
+    const call = a.published ? this.api.unpublishAnnouncement(a.id) : this.api.publishAnnouncement(a.id);
     call.subscribe((u) => this.replace(u));
   }
 

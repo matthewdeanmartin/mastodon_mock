@@ -3,7 +3,7 @@
     type="text"
     [ngModel]="newIp()"
     (ngModelChange)="newIp.set($event)"
-    [placeholder]="'adminIpBlocks.ipPlaceholder' | transloco"
+    placeholder="IP or CIDR (e.g. 203.0.113.0/24)"
   />
   <select [ngModel]="severity()" (ngModelChange)="severity.set($event)">
     @for (s of severities; track s) {
@@ -15,17 +15,15 @@
     [ngModel]="comment()"
     (ngModelChange)="comment.set($event)"
     (keyup.enter)="add()"
-    [placeholder]="'adminIpBlocks.commentPlaceholder' | transloco"
+    placeholder="comment (optional)"
   />
-  <button class="btn" [disabled]="!newIp().trim() || submitting()" (click)="add()">
-    {{ 'adminIpBlocks.block' | transloco }}
-  </button>
+  <button class="btn" [disabled]="!newIp().trim() || submitting()" (click)="add()">Block</button>
 </div>
 
 @if (loading()) {
-  <p class="muted center">{{ 'adminIpBlocks.loading' | transloco }}</p>
+  <p class="muted center">Loading…</p>
 } @else if (!blocks().length) {
-  <p class="muted center">{{ 'adminIpBlocks.empty' | transloco }}</p>
+  <p class="muted center">No IP blocks.</p>
 } @else {
   @for (b of blocks(); track b.id) {
     <div class="block-row">
@@ -36,7 +34,7 @@
           <span class="muted small">{{ b.comment }}</span>
         }
       </div>
-      <button class="op warn" (click)="remove(b)">{{ 'adminIpBlocks.remove' | transloco }}</button>
+      <button class="op warn" (click)="remove(b)">Remove</button>
     </div>
   }
 }

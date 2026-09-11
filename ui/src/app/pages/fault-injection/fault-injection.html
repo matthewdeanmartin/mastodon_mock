@@ -1,23 +1,23 @@
-<h1>{{ 'pages.faultInjection.title' | transloco }}</h1>
+<h1>Fault injection</h1>
 <p class="muted">
-  {{ 'pages.faultInjection.intro' | transloco }}
-  <code>/api/v1/_mock/*</code> {{ 'pages.faultInjection.introExempt' | transloco }}
+  Inject rate-limits, latency, timeouts, or malformed JSON into matching requests.
+  <code>/api/v1/_mock/*</code> paths are never affected.
 </p>
 
 <div class="rule-form">
-  <h2>{{ 'pages.faultInjection.addRuleHeading' | transloco }}</h2>
+  <h2>Add a rule</h2>
   <div class="row">
     <label>
-      {{ 'pages.faultInjection.methodLabel' | transloco }}
+      Method
       <input
         type="text"
         [ngModel]="method()"
         (ngModelChange)="method.set($event)"
-        [attr.placeholder]="'pages.faultInjection.methodPlaceholder' | transloco"
+        placeholder="POST (any if blank)"
       />
     </label>
     <label>
-      {{ 'pages.faultInjection.pathLabel' | transloco }}
+      Path (exact or glob with *)
       <input
         type="text"
         [ngModel]="path()"
@@ -28,7 +28,7 @@
   </div>
   <div class="row">
     <label class="grow">
-      {{ 'pages.faultInjection.pathRegexLabel' | transloco }}
+      Path regex (alternative to glob)
       <input
         type="text"
         [ngModel]="pathRegex()"
@@ -39,29 +39,29 @@
   </div>
   <div class="row">
     <label>
-      {{ 'pages.faultInjection.effectLabel' | transloco }}
+      Effect
       <select [ngModel]="effectType()" (ngModelChange)="effectType.set($event)">
-        <option value="status">{{ 'pages.faultInjection.effectStatus' | transloco }}</option>
-        <option value="ratelimit">{{ 'pages.faultInjection.effectRatelimit' | transloco }}</option>
-        <option value="latency">{{ 'pages.faultInjection.effectLatency' | transloco }}</option>
-        <option value="timeout">{{ 'pages.faultInjection.effectTimeout' | transloco }}</option>
-        <option value="malformed">{{ 'pages.faultInjection.effectMalformed' | transloco }}</option>
+        <option value="status">status</option>
+        <option value="ratelimit">ratelimit</option>
+        <option value="latency">latency</option>
+        <option value="timeout">timeout</option>
+        <option value="malformed">malformed</option>
       </select>
     </label>
     @if (needsStatus()) {
       <label>
-        {{ 'pages.faultInjection.httpStatusLabel' | transloco }}
+        HTTP status
         <input type="number" [ngModel]="status()" (ngModelChange)="status.set($event)" />
       </label>
     }
     @if (needsDelay()) {
       <label>
-        {{ 'pages.faultInjection.delayLabel' | transloco }}
+        Delay (ms)
         <input type="number" [ngModel]="delayMs()" (ngModelChange)="delayMs.set($event)" />
       </label>
     }
     <label>
-      {{ 'pages.faultInjection.fireCountLabel' | transloco }}
+      Fire count (blank = forever)
       <input
         type="number"
         [ngModel]="count()"
@@ -74,31 +74,29 @@
     <p class="error">{{ error() }}</p>
   }
   <button class="btn" [disabled]="adding()" (click)="addRule()">
-    {{ (adding() ? 'pages.faultInjection.adding' : 'pages.faultInjection.addRule') | transloco }}
+    {{ adding() ? 'Adding…' : 'Add rule' }}
   </button>
 </div>
 
 <div class="rule-list">
   <div class="rule-list-head">
-    <h2>{{ 'pages.faultInjection.activeRulesHeading' | transloco }}</h2>
+    <h2>Active rules</h2>
     @if (rules().length) {
-      <button class="link" (click)="clearAll()">
-        {{ 'pages.faultInjection.clearAll' | transloco }}
-      </button>
+      <button class="link" (click)="clearAll()">clear all</button>
     }
   </div>
   @if (loading()) {
-    <p class="muted center">{{ 'pages.faultInjection.loading' | transloco }}</p>
+    <p class="muted center">Loading…</p>
   } @else if (!rules().length) {
-    <p class="muted center">{{ 'pages.faultInjection.noRules' | transloco }}</p>
+    <p class="muted center">No fault rules active.</p>
   } @else {
     <table>
       <thead>
         <tr>
-          <th>{{ 'pages.faultInjection.colId' | transloco }}</th>
-          <th>{{ 'pages.faultInjection.colMatch' | transloco }}</th>
-          <th>{{ 'pages.faultInjection.colEffect' | transloco }}</th>
-          <th>{{ 'pages.faultInjection.colRemaining' | transloco }}</th>
+          <th>id</th>
+          <th>match</th>
+          <th>effect</th>
+          <th>remaining</th>
           <th></th>
         </tr>
       </thead>
@@ -107,7 +105,7 @@
           <tr>
             <td>{{ r.id }}</td>
             <td>
-              {{ r.match.methods?.join(',') || ('pages.faultInjection.anyMethod' | transloco) }}
+              {{ r.match.methods?.join(',') || 'any' }}
               {{ r.match.path || r.match.path_regex || '*' }}
             </td>
             <td>
@@ -116,14 +114,12 @@
                 ({{ r.effect.status }})
               }
               @if (r.effect.delay_ms) {
-                {{ 'pages.faultInjection.msValue' | transloco: { ms: r.effect.delay_ms } }}
+                {{ r.effect.delay_ms }}ms
               }
             </td>
             <td>{{ r.remaining ?? '∞' }}</td>
             <td>
-              <button class="link" (click)="remove(r.id)">
-                {{ 'pages.faultInjection.remove' | transloco }}
-              </button>
+              <button class="link" (click)="remove(r.id)">remove</button>
             </td>
           </tr>
         }

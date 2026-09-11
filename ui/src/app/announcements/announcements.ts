@@ -1,44 +1,63 @@
-import { Component, inject, OnInit } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { Api } from '../api';
 import { Announcement } from '../models';
-import { AnnouncementStore } from './announcement-store';
-
-// i18n announcements.dismiss: Dismiss
-// i18n announcements.label: 📣 Announcement
-// i18n announcements.react: React {{emoji}}
 
 // A few quick-pick reactions; the API accepts any unicode emoji shortcode/char.
 const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀'];
 
-/**
- * Active instance announcements shown above a timeline (dismiss + react).
- *
- * The data, the dismissed set and the reaction writes all live in
- * {@link AnnouncementStore} now, because the rail's server card and the server
- * page show the same announcements and must not disagree about which are still
- * unread. This component is the banner presentation of that shared state.
- */
+/** Active instance announcements shown above a timeline (dismiss + react). */
 @Component({
   selector: 'app-announcements',
-  imports: [TranslocoPipe],
+  imports: [],
   templateUrl: './announcements.html',
   styleUrl: './announcements.css',
 })
 export class Announcements implements OnInit {
-  protected store = inject(AnnouncementStore);
+  private api = inject(Api);
 
   protected readonly quickReactions = QUICK_REACTIONS;
-  protected announcements = this.store.active;
+  protected announcements = signal<Announcement[]>([]);
 
   ngOnInit(): void {
-    this.store.load();
+    this.api.announcements().subscribe((a) => this.announcements.set(a));
   }
 
   dismiss(a: Announcement): void {
-    this.store.dismiss(a.id);
+    // Optimistically drop it; dismiss is idempotent server-side.
+    this.announcements.update((list) => list.filter((x) => x.id !== a.id));
+    this.api.dismissAnnouncement(a.id).subscribe();
   }
 
   toggleReaction(a: Announcement, name: string): void {
-    this.store.toggleReaction(a, name);
+    const existing = a.reactions.find((r) => r.name === name);
+    const mine = existing?.me ?? false;
+    const call = mine
+      ? this.api.removeAnnouncementReaction(a.id, name)
+      : this.api.addAnnouncementReaction(a.id, name);
+    call.subscribe(() => this.applyReaction(a, name, !mine));
+  }
+
+  /** Patch the local reaction list after a successful toggle (no refetch). */
+  private applyReaction(a: Announcement, name: string, me: boolean): void {
+    this.announcements.update((list) =>
+      list.map((x) => {
+        if (x.id !== a.id) {
+          return x;
+        }
+        const reactions = [...x.reactions];
+        const idx = reactions.findIndex((r) => r.name === name);
+        if (idx === -1) {
+          reactions.push({ name, count: 1, me: true, url: null, static_url: null });
+        } else {
+          const count = reactions[idx].count + (me ? 1 : -1);
+          if (count <= 0) {
+            reactions.splice(idx, 1);
+          } else {
+            reactions[idx] = { ...reactions[idx], count, me };
+          }
+        }
+        return { ...x, reactions };
+      }),
+    );
   }
 }

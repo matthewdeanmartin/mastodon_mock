@@ -1,19 +1,21 @@
-# Frozen legacy UI
+# Mock-server UI ownership
 
-`ui/` is frozen at `4d981c458abc1d1ed7f2929f33e53a4f8fee1ca8` (2026-09-07).
-It remains the bundled mock-server administration and test client. Its source,
-lockfile, build targets, and Python packaging are preserved.
+`ui/` is the bundled lite administration and test client for `mastodon_mock`.
+Mock-focused UI development is welcome here: exercise the REST API, administer
+test data, inject faults, and expose library problems.
 
-New client development belongs in https://github.com/matthewdeanmartin/mawkingbird.
+The client source and lockfile were restored from
+`6239b715c77189e3c221ee241c7ab0563e9ec640` (2026-06-22), immediately before
+the standalone Mockingbird build was introduced. See `ui/ROLLBACK.md` for the
+history, backup, and validation details. This supersedes the September freeze.
+
+Mawkingbird product development and standalone builds belong in
+https://github.com/matthewdeanmartin/mawkingbird (`../mawkingbird`).
 Do not automatically synchronize the two copies.
 
-This repository's `gh-pages` branch continues to host mawkingbird.com. Source
-ownership and hosting ownership are separate. The migration runbook is in
-`../mawkingbird/MIGRATION.md`. Set `MAWKINGBIRD_PUBLISH_RETIRED=true` at cutover to
-retire the old source publishers; drain active runs before enabling new ones.
-
-The two retired deployment workflows are stored in `.github_backup/`, outside
-GitHub Actions discovery. Both remote workflows were disabled and the retirement
-variable set to true on 2026-09-07; no queued or running Actions runs remained.
-To roll back publishing ownership after committing this move, first restore the
-files under `.github/workflows/`, then follow the migration rollback sequence.
+The retired deployment workflows remain in `.github_backup/`, outside GitHub
+Actions discovery. They were disabled and `MAWKINGBIRD_PUBLISH_RETIRED=true`
+was set on 2026-09-07. The sibling repository owns the replacement publishers
+and starter-kit consent checks. This rollback does not change remote Pages
+settings or delete the existing `gh-pages` branch; hosting migration history
+and recovery instructions remain in `../mawkingbird/MIGRATION.md`.

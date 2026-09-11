@@ -1,19 +1,5 @@
 // Mastodon API object shapes (the subset the UI consumes).
 
-/**
- * Where a timeline item came from. Absent means Mastodon (the primary network).
- * Foreign providers (`providers/`) adapt their content into these same Mastodon
- * shapes and tag it, so the rest of the app renders everything identically.
- */
-export type ProviderId =
-  | 'mastodon'
-  | 'anonymous-mastodon'
-  | 'bluesky'
-  | 'rss'
-  | 'paste'
-  | 'blog'
-  | 'twitter';
-
 export interface Role {
   id: string;
   name: string;
@@ -47,24 +33,11 @@ export interface Account {
   avatar: string;
   avatar_static: string;
   header: string;
-  header_static?: string;
   followers_count: number;
   following_count: number;
   statuses_count: number;
-  last_status_at?: string | null;
-  /**
-   * When the account joined, ISO. Mastodon sends this on every account entity,
-   * including the ones in `/followers` and `/following` pages — which is what
-   * makes tenure-adjusted cadence (posts per day since joining) free to compute
-   * in {@link ../effective-audience}. Optional because thin account objects
-   * synthesised by the non-Mastodon providers don't carry it.
-   */
-  created_at?: string;
   bot: boolean;
   locked: boolean;
-  discoverable?: boolean | null;
-  indexable?: boolean | null;
-  noindex?: boolean | null;
   fields: AccountField[];
   // Present on verify_credentials (CredentialAccount): the current user's role, or null.
   role?: Role | null;
@@ -105,37 +78,7 @@ export interface Quote {
   quoted_status: Status | null;
 }
 
-/** `StatusMention` — a resolved @-mention inside a status. */
-export interface Mention {
-  id: string;
-  username: string;
-  acct: string;
-  url: string;
-}
-
-/** Link preview metadata supplied with a Mastodon status. */
-export interface PreviewCard {
-  url: string;
-  title: string;
-  description: string;
-  type: 'link' | 'photo' | 'video' | 'rich' | string;
-  author_name?: string;
-  author_url?: string;
-  provider_name: string;
-  provider_url?: string;
-  html?: string;
-  width?: number;
-  height?: number;
-  image: string | null;
-  embed_url?: string;
-  blurhash?: string | null;
-}
-
 export interface Status {
-  /** Absent = Mastodon. Foreign statuses use namespaced ids (e.g. "rss:…"). */
-  provider?: ProviderId;
-  /** Opaque handle the owning provider needs for interactions (uri/cid etc.). */
-  providerRef?: unknown;
   id: string;
   created_at: string;
   edited_at: string | null;
@@ -147,13 +90,6 @@ export interface Status {
   reblog: Status | null;
   quote: Quote | null;
   in_reply_to_id: string | null;
-  /**
-   * Who this post replies to. Mastodon sends it alongside `in_reply_to_id`, and
-   * it is the only way to know *whom* a reply was to without fetching the parent
-   * — which is what makes "top conversation partner" free over a post sample.
-   * Optional: foreign providers don't supply it.
-   */
-  in_reply_to_account_id?: string | null;
   replies_count: number;
   reblogs_count: number;
   favourites_count: number;
@@ -165,48 +101,7 @@ export interface Status {
   sensitive: boolean;
   poll: Poll | null;
   quote_approval_policy: string | null;
-  /** ISO 639 language code Mastodon detected/declared for the post. Nullable. */
-  language?: string | null;
   media_attachments: MediaAttachment[];
-  /** Preview card for a link in the post. Absent on providers that do not supply one. */
-  card?: PreviewCard | null;
-  /** The app the post was made with (nullable; absent on some providers). */
-  application?: { name: string; website?: string | null } | null;
-  /** Optional: not every provider supplies it, but Mastodon (and the mock) do. */
-  mentions?: Mention[];
-  /**
-   * Hashtags in the post, as `{ name, url }`. Mastodon and the mock both send
-   * them, which is why a tag profile costs no extra requests; foreign providers
-   * generally don't, so treat absence as "unknown", not "none".
-   */
-  tags?: { name: string; url: string }[];
-  /**
-   * The viewer's content filters this status matched, computed by the server
-   * (Mastodon 4.0+). Clients must apply them: `warn` collapses the post,
-   * `hide` drops it. Absent on foreign providers and older servers.
-   */
-  filtered?: FilterResult[];
-  /**
-   * RSS only: whether `content` is the feed's full article body
-   * (`content:encoded` / Atom `<content>`) rather than a teaser
-   * (`<description>` / `<summary>`). Reader mode uses this to suppress or
-   * relabel "Fetch article" — see `providers/article/article-target.ts`.
-   * Undefined on every non-RSS provider.
-   */
-  rssFullContent?: boolean;
-}
-
-/** One matched filter on a status (`Status.filtered[]`). */
-export interface FilterResult {
-  filter: {
-    id: string;
-    title: string;
-    context: FilterContext[];
-    expires_at: string | null;
-    filter_action: FilterAction;
-  };
-  keyword_matches: string[] | null;
-  status_matches: string[] | null;
 }
 
 /** A single edit-history snapshot (`GET /api/v1/statuses/{id}/history`). */
@@ -244,28 +139,6 @@ export interface ComposeOptions {
   sensitive?: boolean;
   mediaIds?: string[];
   poll?: PollDraft;
-  /** ISO datetime; when ≥ ~5 min out the server schedules instead of posting. */
-  scheduledAt?: string;
-  /** ISO 639-1 language for the post; omitted lets the server auto-detect. */
-  language?: string;
-}
-
-/**
- * A status waiting to be published (`/api/v1/scheduled_statuses`). `params`
- * echoes the create-request fields rather than a rendered Status.
- */
-export interface ScheduledStatus {
-  id: string;
-  scheduled_at: string;
-  params: {
-    text: string;
-    visibility?: string;
-    spoiler_text?: string | null;
-    sensitive?: boolean | null;
-    in_reply_to_id?: string | null;
-    poll?: { options: string[] } | null;
-  };
-  media_attachments: MediaAttachment[];
 }
 
 /** A poll being composed (UI-side), serialized to `poll[...]` params. */
@@ -287,8 +160,6 @@ export interface Relationship {
   requested: boolean;
   blocking: boolean;
   muting: boolean;
-  /** Whether boosts/retweets from this followed account appear in home. */
-  showing_reblogs?: boolean;
 }
 
 export interface MastodonNotification {
@@ -302,13 +173,6 @@ export interface MastodonNotification {
 export interface Hashtag {
   name: string;
   url: string;
-  /**
-   * Usage history, when the server sends it. `/api/v2/search?type=hashtags`
-   * returns Tag entities, which carry history — this type was narrower than
-   * the payload. Optional because not every source populates it (the mock
-   * returns an empty array, and older servers may omit it entirely).
-   */
-  history?: TrendingTagHistory[];
 }
 
 export interface AnnouncementReaction {
@@ -355,38 +219,6 @@ export interface SearchResults {
 export interface UserList {
   id: string;
   title: string;
-}
-
-/** A single membership entry inside a Collection (Mastodon 4.6+). */
-export interface CollectionItem {
-  id: string;
-  account_id: string | null;
-  state: 'pending' | 'accepted';
-  created_at: string;
-}
-
-/** A curated collection of accounts a user recommends (Mastodon 4.6+). */
-export interface Collection {
-  id: string;
-  account_id: string;
-  name: string;
-  description: string;
-  discoverable: boolean;
-  sensitive: boolean;
-  local: boolean;
-  item_count: number;
-  items: CollectionItem[];
-  created_at: string;
-  updated_at: string;
-  uri: string;
-  url?: string | null;
-  language?: string | null;
-}
-
-/** GET /api/v1/collections/:id — the collection plus full account entities. */
-export interface CollectionWithAccounts {
-  collection: Collection;
-  accounts: Account[];
 }
 
 /** Mock-only dev account record used by the login screen. */
@@ -619,108 +451,4 @@ export interface OAuthTokenResponse {
   token_type: string;
   scope: string;
   created_at: number;
-}
-
-// --- Filters (v2) ---
-
-export interface FilterKeyword {
-  id: string;
-  keyword: string;
-  whole_word: boolean;
-}
-
-export interface FilterStatus {
-  id: string;
-  status_id: string;
-}
-
-export type FilterContext = 'home' | 'notifications' | 'public' | 'thread' | 'account';
-export type FilterAction = 'warn' | 'hide';
-
-export interface ContentFilter {
-  id: string;
-  title: string;
-  context: FilterContext[];
-  expires_at: string | null;
-  filter_action: FilterAction;
-  keywords: FilterKeyword[];
-  statuses: FilterStatus[];
-}
-
-/** Draft keyword rows sent as `keywords_attributes` when creating a filter. */
-export interface FilterKeywordDraft {
-  keyword: string;
-  whole_word: boolean;
-}
-
-// --- Preferences (`/api/v1/preferences`, read-only) ---
-
-export interface Preferences {
-  'posting:default:visibility': string;
-  'posting:default:sensitive': boolean;
-  'posting:default:language': string | null;
-  'reading:expand:media': string;
-  'reading:expand:spoilers': boolean;
-}
-
-// --- Mock-only settings (`/api/v1/_mock/settings` and friends) ---
-
-export interface AppearanceSettings {
-  theme: 'auto' | 'light' | 'dark';
-  reduce_motion: boolean;
-  disable_swiping: boolean;
-  expand_spoilers: boolean;
-  display_media: 'default' | 'show_all' | 'hide_all';
-}
-
-export interface EmailNotificationSettings {
-  follow: boolean;
-  follow_request: boolean;
-  reblog: boolean;
-  favourite: boolean;
-  mention: boolean;
-  report: boolean;
-  digest: boolean;
-}
-
-export interface PostDeletionSettings {
-  enabled: boolean;
-  min_age_days: number;
-  keep_pinned: boolean;
-  keep_favourited: boolean;
-  keep_media: boolean;
-  keep_polls: boolean;
-  min_favourites: number;
-  min_reblogs: number;
-}
-
-export interface MockSettings {
-  appearance: AppearanceSettings;
-  email_notifications: EmailNotificationSettings;
-  post_deletion: PostDeletionSettings;
-}
-
-export interface Invite {
-  id: string;
-  code: string;
-  url: string;
-  max_uses: number | null;
-  uses: number;
-  expires_at: string | null;
-  created_at: string;
-  revoked: boolean;
-}
-
-export interface AuthorizedApp {
-  id: string;
-  name: string;
-  website: string | null;
-  scopes: string[];
-  last_used_at: string | null;
-}
-
-export interface ImportReport {
-  type: string;
-  imported: number;
-  skipped: string[];
 }

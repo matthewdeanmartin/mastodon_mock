@@ -1,11 +1,9 @@
-<p class="muted small intro">
-  {{ 'adminMetrics.intro' | transloco }}
-</p>
+<p class="muted small intro">Server statistics over the last 30 days (the mock returns zero-valued measures).</p>
 
 @if (loading()) {
-  <p class="muted center">{{ 'adminMetrics.loading' | transloco }}</p>
+  <p class="muted center">Loading…</p>
 } @else if (!measures().length) {
-  <p class="muted center">{{ 'adminMetrics.empty' | transloco }}</p>
+  <p class="muted center">No measures.</p>
 } @else {
   @for (m of measures(); track m.key) {
     <div class="block-row">

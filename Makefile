@@ -41,7 +41,7 @@ TEST_WORKERS ?= $(shell python -c "import os;print(max(2,(os.cpu_count() or 2)//
 	metadata metadata-check version-check dev-status \
 	gha-validate gha-pin gha-upgrade publish-gha \
 	prerelease publish-check publish \
-	ui ui-dev mockingbird \
+	ui ui-dev \
 	vendor-openapi compare-openapi openapi-fuzz \
 	check check-ci \
 	help
@@ -387,15 +387,6 @@ ui:
 
 ui-dev:
 	@cd ui && npm start
-
-# Build the standalone "Mocking Bird" static client (no mock-server tooling).
-# Output: ui/dist-mockingbird/browser — a pure static site for any Mastodon instance.
-# Override the base href for sub-path hosting (e.g. GitHub project Pages):
-#   make mockingbird MOCKINGBIRD_BASE_HREF=/mastodon_mock/
-MOCKINGBIRD_BASE_HREF ?= /
-mockingbird:
-	@echo "Building Mocking Bird static client -> ui/dist-mockingbird (base-href=$(MOCKINGBIRD_BASE_HREF))"
-	@cd ui && npm ci && npm run build -- --configuration mockingbird --base-href $(MOCKINGBIRD_BASE_HREF)
 
 # Re-vendor the upstream Mastodon OpenAPI schema into git. Run this by hand like a
 # formatter: it overwrites the tracked mastodon-openapi/dist/schema.json, then you review

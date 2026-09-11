@@ -97,14 +97,22 @@ path = "hatch_build.py"
 # Every pattern is anchored with a leading "/". A bare "LICENSE" matches at
 # ANY depth, which swept both Playwright virtualenvs (pwenv/, ui/pwenv/)
 # into the sdist: 4520 files with 17 stray LICENSE entries.
-include = ["/README.md", "/LICENSE", "/mastodon_mock", "/tests", "/ui", "/hatch_build.py"]
+# Include only the lite client's build inputs, not the whole UI working directory.
+include = [
+    "/README.md", "/LICENSE", "/mastodon_mock", "/tests", "/hatch_build.py",
+    "/ui/src", "/ui/public", "/ui/angular.json",
+    "/ui/package.json", "/ui/package-lock.json", "/ui/tsconfig*.json",
+    "/ui/Makefile", "/ui/README.md",
+]
 exclude = [
     "mastodon_mock/_ui_dist",
-    "ui/node_modules",
-    "ui/.angular",
-    "pwenv",
-    "ui/pwenv",
-    "ui/dist-mockingbird",
+    "**/node_modules/**",
+    "**/.angular/**",
+    "**/__pycache__/**",
+    "**/.venv*/**",
+    "**/pwenv/**",
+    "**/coverage/**",
+    "**/.test-results/**",
 ]
 
 [dependency-groups]

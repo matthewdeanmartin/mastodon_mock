@@ -1,4 +1,4 @@
-The bundled `ui/` is a frozen legacy client. New client development lives in
+The bundled `ui/` is the lite mock-server administration and test client. Standalone product development lives in
 [mawkingbird](https://github.com/matthewdeanmartin/mawkingbird). See [LEGACY_UI.md](LEGACY_UI.md).
 
 # Mastodon Mock
@@ -150,5 +150,3 @@ MIT. See [LICENSE](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/
 ## Changelog
 
 See [CHANGELOG.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/CHANGELOG.md).
- 
- 

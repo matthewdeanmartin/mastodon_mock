@@ -26,20 +26,19 @@ uv run make check           # everything above together
 ### Angular UI tests
 
 Keep feedback proportional while working in `ui/`. During an edit/test loop,
-run the colocated spec or affected area instead of rebuilding all 2,790 tests:
+run the colocated spec or affected area:
 
 ```bash
 cd ui
-npm run test:subset -- src/app/compose/compose.spec.ts
-npm run test:subset -- src/app/pages/search
+npm test -- --watch=false --include=src/app/pages/home/home.spec.ts
 npm test                    # persistent watch mode for a longer UI session
 ```
 
 Run the complete local UI gate once before handoff with `cd ui && make test`.
 A targeted run is fast feedback, not a substitute for that final gate, and must
 be described as targeted in the handoff. Never skip, focus, delete, or weaken
-tests to reduce wait time; `npm run test:source-integrity` enforces the basic
-inventory rules. GitHub Actions intentionally does not run the Angular suite.
+tests to reduce wait time. GitHub Actions builds the bundled UI; the Angular
+test suite is a local gate.
 
 ## Python conventions
 
@@ -72,7 +71,8 @@ uv run make dead-code       # runs both vulture and deadcode (advisory only, non
 
 Prefer a single clean commit per logical change on the main branch.
 
-## Legacy UI ownership
+## Mock-server UI ownership
 
-`ui/` is frozen at the source split recorded in LEGACY_UI.md. Develop new Mawkingbird
-features in the sibling mawkingbird repository. Preserve the bundled legacy UI.
+`ui/` is the mock-server administration and test client, restored to its pre-Mawkingbird
+baseline as recorded in LEGACY_UI.md. Develop mock-focused UI features here and new
+Mawkingbird product features in the sibling mawkingbird repository.

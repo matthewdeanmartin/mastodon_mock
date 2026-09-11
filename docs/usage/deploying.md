@@ -93,46 +93,14 @@ See
 for the capability matrix (streaming support, persistence behavior) and step-by-step
 instructions per platform.
 
-## Mocking Bird: the standalone client
+## Bundled lite client and standalone Mawkingbird
 
-The same web UI can be built as **Mocking Bird** — a static-only Mastodon web client with
-no mock-server tooling. It runs as a plain static site (no backend of its own) and the
-user points it at any real Mastodon instance, signing in via OAuth or a pasted token.
+`make ui` builds the lite administration and test client into
+`mastodon_mock/_ui_dist/browser`. The Python wheel includes these compiled
+assets and serves them at `/_ui/`. Node dependencies are build inputs only;
+`node_modules` is not shipped. The sdist includes the UI source and lockfile
+so the wheel can rebuild the client from source.
 
-Build it locally:
-
-```bash
-make mockingbird
-# Output: ui/dist-mockingbird/browser — host these static files anywhere.
-```
-
-For sub-path hosting, override the base href:
-
-```bash
-make mockingbird MOCKINGBIRD_BASE_HREF=/mastodon_mock/
-```
-
-### GitHub Pages
-
-The `.github/workflows/mockingbird-pages.yml` workflow builds and deploys Mocking Bird to
-GitHub Pages on every push that touches `ui/`. To enable it once:
-
-1. Repository **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-1. Push a change under `ui/` (or run the workflow manually).
-
-The workflow now targets the custom domain [`mawkingbird.com`](https://mawkingbird.com/),
-builds with `base href=/`, writes a `CNAME` file into the published artifact, and adds a
-`404.html` SPA fallback so deep links resolve on reload.
-
-### How the two builds differ
-
-| | Mock-embedded (`/_ui/`) | Mocking Bird (static) |
-|---|---|---|
-| Served by | the mock server | any static host |
-| Mock login / sample-data seeding | yes | removed |
-| Fault injection page | yes | removed |
-| `_mock/*` control-plane calls | present | compiled out |
-| Default instance | "this server" | none — you must pick one |
-
-Both are produced from the same `ui/` source via Angular build configurations; see
-`ui/src/environments/` and `spec/publish.md` for the mechanism.
+Standalone Mawkingbird builds, publishing, and starter-kit maintenance now
+belong to [the Mawkingbird repository](https://github.com/matthewdeanmartin/mawkingbird)
+(`../mawkingbird`). This repository no longer builds or publishes that site.
