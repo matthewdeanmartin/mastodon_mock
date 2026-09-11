@@ -59,7 +59,19 @@ Mawkingbird publishers and product development belong in `../mawkingbird`.
 - Git comparison confirms no changes to `mastodon_mock/`, `tests/`,
   `hatch_build.py`, or `uv.lock`.
 
-The historical dependency install reports 29 audit findings, including one
+The historical dependency install reported 29 audit findings, including one
 critical. Production dependencies account for six findings (three high and
-three moderate; none critical). Dependency upgrades are separate from this
-source rollback.
+three moderate; none critical).
+
+## Dependency refresh after rollback (2026-09-11)
+
+Ran `npm update` within the existing `package.json` version ranges, then
+verified a clean `npm ci`. No ranges were changed, and no overrides, forced
+versions, or audit-fix commands were used. The refreshed lockfile resolves
+Angular runtime/compiler packages to 21.2.23, Angular CLI/build to 21.2.24,
+Vitest to 4.1.11, and Prettier to 3.9.6, plus compatible transitive updates.
+
+`npm ls --depth=0` passes. The full `make test` suite passes all 42 tests,
+and `npm run build` produces the bundled lite UI successfully. The clean
+install reports zero audit findings at the time of this refresh. Distribution
+sizes above describe the original rollback validation, before this refresh.
