@@ -3,7 +3,7 @@
 The built bundle lives in ``mastodon_mock/_ui_dist/browser`` and is produced by the
 Angular build (``make ui`` locally, or the packaging build hook). When it is absent —
 e.g. an editable install that never ran a UI build — the mount is skipped and the
-server still boots; ``GET /`` simply omits its ``ui`` pointer.
+server still boots; ``GET /`` serves a small HTML landing page instead of redirecting.
 
 See spec/08-admin-ui.md.
 """

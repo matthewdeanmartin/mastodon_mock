@@ -84,7 +84,7 @@ def serialize_instance_v1(session: Session, config: MastodonMockConfig) -> dict[
         "description": config.description,
         "email": config.email,
         "version": config.mocked_version,
-        "urls": {"streaming_api": f"wss://{config.domain}" if config.streaming.enabled else None},
+        "urls": {"streaming_api": config.streaming_url if config.streaming.enabled else None},
         "stats": {"user_count": user_count, "status_count": status_count, "domain_count": 1},
         "thumbnail": None,
         "languages": ["en"],
@@ -114,11 +114,11 @@ def serialize_instance_v2(session: Session, config: MastodonMockConfig) -> dict[
         "usage": {"users": {"active_month": user_count}},
         # The Instance schema requires thumbnail.url to be a string; point at the
         # deterministic generated header art the app actually serves.
-        "thumbnail": {"url": f"https://{config.domain}/headers/generated/instance.svg"},
+        "thumbnail": {"url": f"{config.base_url}/headers/generated/instance.svg"},
         "languages": ["en"],
         "configuration": {
             "accounts": _ACCOUNTS_CONFIG,
-            "urls": {"streaming": f"wss://{config.domain}" if config.streaming.enabled else None},
+            "urls": {"streaming": config.streaming_url if config.streaming.enabled else None},
             "statuses": _STATUS_CONFIG,
             "media_attachments": _MEDIA_CONFIG,
             "polls": _POLL_CONFIG,

@@ -52,7 +52,7 @@ def serialize_tag(
         tag_id = str(int(hashlib.sha256(name.encode("utf-8")).hexdigest()[:8], 16))
     return {
         "name": name,
-        "url": f"https://{config.domain}/tags/{name}",
+        "url": f"{config.base_url}/tags/{name}",
         "history": _tag_history(uses_today),
         "following": following,
         "id": tag_id,
@@ -80,7 +80,7 @@ def serialize_featured_tag(
         "name": name,
         "statuses_count": str(statuses_count),
         "last_status_at": last_status_at,
-        "url": f"https://{config.domain}/@{acct}/tagged/{name}",
+        "url": f"{config.base_url}/@{acct}/tagged/{name}",
     }
 
 

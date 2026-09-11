@@ -249,7 +249,7 @@ def oauth_userinfo(account: RequiredAccount, config: Config) -> dict[str, Any]:
         "sub": sid(account.id),
         "preferred_username": account.username,
         "name": account.display_name,
-        "profile": f"https://{config.domain}/@{acct}",
+        "profile": f"{config.base_url}/@{acct}",
     }
 
 

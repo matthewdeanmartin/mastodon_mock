@@ -72,6 +72,20 @@ following = "bob"
 path = ":memory:"
 ```
 
+For a durable database, set `[database].path` to a SQLite filename. To apply the
+packaged Alembic migrations, run `mastodon_mock db upgrade --config PATH` using
+that config. Relative database paths resolve from the working directory, just
+as they do for `serve`. The command does not require a source checkout and
+rejects `:memory:` because an ephemeral migration cannot upgrade a durable file.
+Files initialized by `serve` or `gen-data` without an Alembic revision are adopted
+only if their schema matches the current version. An older or unknown unversioned
+schema is left unchanged and requires a reviewed migration baseline before upgrading.
+
+The CLI infers `http` or `https` for generated asset and API URLs from its TLS
+settings. When a reverse proxy terminates HTTPS, set top-level `domain` and
+`url_scheme = "https"` in the config to advertise the public origin. Direct
+Python `create_app()` construction retains HTTPS URLs unless `url_scheme` is set.
+
 Sample-data defaults live under `[sample_data]`. They are used by `mastodon_mock gen-data`
 and by the UI's sample-data button, but unlike seed data they append a throwaway cohort
 rather than defining exact startup state.

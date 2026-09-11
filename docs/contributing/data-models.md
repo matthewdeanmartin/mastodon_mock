@@ -51,20 +51,24 @@ are JSON lists because the mock does not need relational queries over their memb
 
 1. Decide whether the state is durable. If a later request must observe it, add a model or
    column; do not keep it only in a router-local dictionary.
-2. Add typed SQLAlchemy fields and a clear docstring in `db/models.py`. Use `BigInteger` IDs,
+
+1. Add typed SQLAlchemy fields and a clear docstring in `db/models.py`. Use `BigInteger` IDs,
    `ForeignKey` constraints, indexes for lookup/pagination columns, and a uniqueness
    constraint where duplicate edges would be invalid.
-3. Create and review an Alembic revision:
+
+1. Create and review an Alembic revision:
 
    ```bash
    uv run alembic revision --autogenerate -m "describe the schema change"
    uv run alembic upgrade head
    ```
 
-4. Update seed/sample data only if the new state is required for a normal fixture or demo.
-5. Update the serializer and route, then add a router/integration test. If a real Mastodon.py
+1. Update seed/sample data only if the new state is required for a normal fixture or demo.
+
+1. Update the serializer and route, then add a router/integration test. If a real Mastodon.py
    method can observe the change, add a contract test as well.
-6. Run `make test` and the migration drift test. Check both a fresh database and an upgraded
+
+1. Run `make test` and the migration drift test. Check both a fresh database and an upgraded
    database; old rows must remain readable.
 
 ## Semantics to preserve

@@ -9,11 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Database upgrades resolve migrations from the installed package and honor the configured SQLite path.
+
+- Generated asset and API URLs use the CLI listener's HTTP/HTTPS scheme, with an explicit proxy override.
+
+- Corrected UI and deployment documentation, synchronized release metadata, and made local audit and documentation checks portable to Windows.
+
 - OAuth `authorization_code` token exchange now rejects disabled/suspended accounts with 403 (previously only `/api/v1/_mock/login` enforced this).
+
 - Test website surfaces explore page
+
 - Test website retweets fixed
+
 - Swagger docs page now groups endpoints by category
+
 - Errors return correct schema now.
+
+### Changed
+
+- Restored the bundled lite UI to its pre-Mawkingbird scope; standalone product builds and publishing belong to the Mawkingbird repository.
+- Refreshed npm dependencies within their existing version ranges and narrowed source-distribution UI inputs to exclude dependency trees and scratch files.
 
 ## [0.6.0] - 2026-06-20
 
@@ -33,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - OpenAPI contract comparison: `mastodon_mock compare-openapi` (and `make compare-openapi`) diffs the mock's published OpenAPI against the upstream Mastodon schema (`mastodon-openapi/dist/schema.json`), writing `spec/openapi_compare_report.md`. A reviewed allow-list (`tests/openapi/allowlist.py`) plus `tests/test_openapi_contract.py` turns this into a CI guard rail against contract drift. An "API Docs" link in the UI's More menu surfaces the always-served Swagger UI at `/docs`. See `spec/openapi_support.md` (Phases 1 & 2).
 - OpenAPI contract fuzzing (opt-in): `make openapi-fuzz` (or `uv run pytest -m contract`) drives [Schemathesis](https://schemathesis.readthedocs.io/) at the running mock using the upstream schema as the oracle. Default mode guarantees the mock never 500s on the shared read-only surface; `CONTRACT_STRICT=1` additionally checks full response-shape conformance (the gap finder for Phase 4). Lives behind a `contract` extra/marker so the default suite stays fast. See `spec/openapi_support.md` (Phase 3).
-- Automated drift detection: a weekly + per-PR `openapi-drift` GitHub Actions workflow clones the (untracked) upstream schema generator, runs the comparison, enforces the contract tests, and uploads the report. New contributor guide [`docs/extending/openapi-sync.md`](docs/extending/openapi-sync.md) documents the whole OpenAPI sync workflow. See `spec/openapi_support.md` (Phase 5).
+- Automated drift detection: a weekly + per-PR `openapi-drift` GitHub Actions workflow clones the (untracked) upstream schema generator, runs the comparison, enforces the contract tests, and uploads the report. New contributor guide [`docs/extending/openapi-sync.md`](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/extending/openapi-sync.md) documents the whole OpenAPI sync workflow. See `spec/openapi_support.md` (Phase 5).
 
 ### Fixed
 

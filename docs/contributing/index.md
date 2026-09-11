@@ -7,11 +7,11 @@ against the mock, start with the [user guide](../index.md) instead.
 
 1. [Architecture](../overview/how-it-works.md#for-contributors) — follow a request from
    FastAPI through the database and serializer layers.
-2. [Data models](data-models.md) — understand the persisted entities and their edges
+1. [Data models](data-models.md) — understand the persisted entities and their edges
    before changing schema or behavior.
-3. [Endpoint workflow](../extending/CONTRIBUTING.md) — add routes, serializers, migrations,
+1. [Endpoint workflow](../extending/CONTRIBUTING.md) — add routes, serializers, migrations,
    and contract tests end to end.
-4. [OpenAPI sync and contract tasks](../extending/openapi-sync.md) — reconcile behavior with
+1. [OpenAPI sync and contract tasks](../extending/openapi-sync.md) — reconcile behavior with
    the Mastodon API contract.
 
 ## Contributor principles

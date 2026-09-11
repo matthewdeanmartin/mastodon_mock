@@ -9,8 +9,7 @@ theme:
   name: readthedocs
   features: [navigation.footer]
 edit_uri: edit/main/docs/
-extra_javascript:
-  - javascripts/nav-sections.js
+extra_javascript: [javascripts/nav-sections.js]
 markdown_extensions:
   - attr_list
   - codehilite
@@ -32,7 +31,6 @@ nav:
           - Deploying and Publishing: usage/deploying.md
       - Reference:
           - What Is and Isn't Mocked: reference/coverage.md
-          - Mataroa API reference: reference/mataroa-api.md
       - Troubleshooting: troubleshooting.md
   - Contributor guide:
       - Start here: contributing/index.md

@@ -84,7 +84,7 @@ def _mentions_from_ctx(accounts: list[Account], config: MastodonMockConfig) -> l
                 "id": sid(acc.id),
                 "username": acc.username,
                 "acct": acct,
-                "url": f"https://{config.domain}/@{acct}",
+                "url": f"{config.base_url}/@{acct}",
             }
         )
     return out
@@ -92,7 +92,7 @@ def _mentions_from_ctx(accounts: list[Account], config: MastodonMockConfig) -> l
 
 def _tags_from_names(names: list[str], config: MastodonMockConfig) -> list[dict[str, Any]]:
     """Format already-loaded tag names to ``Tag`` JSON."""
-    return [{"name": name, "url": f"https://{config.domain}/tags/{name}"} for name in names]
+    return [{"name": name, "url": f"{config.base_url}/tags/{name}"} for name in names]
 
 
 def _serialize_mentions(session: Session, status_id: int, config: MastodonMockConfig) -> list[dict[str, Any]]:
@@ -272,8 +272,8 @@ def serialize_status(
 
     data: dict[str, Any] = {
         "id": sid(status.id),
-        "uri": status.url or status_url(config.domain, acct, status.id),
-        "url": status.url or status_url(config.domain, acct, status.id),
+        "uri": status.url or status_url(config.domain, acct, status.id, scheme=config.url_scheme or "https"),
+        "url": status.url or status_url(config.domain, acct, status.id, scheme=config.url_scheme or "https"),
         "account": serialize_account(session, account, config, ctx=ctx),
         "in_reply_to_id": sid(status.in_reply_to_id),
         "in_reply_to_account_id": sid(status.in_reply_to_account_id),

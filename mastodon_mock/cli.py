@@ -6,6 +6,7 @@ import argparse
 import contextlib
 import os
 import sys
+from pathlib import Path
 
 import orjson
 import uvicorn
@@ -172,6 +173,8 @@ def _serve(args: argparse.Namespace) -> None:
         # use a browser-reachable hostname when deriving links from it.
         display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host  # nosec B104
         config.domain = f"{display_host}:{port}"
+    if config.url_scheme is None:
+        config.url_scheme = "https" if getattr(args, "ssl_certfile", None) else "http"
     app = create_app(config)
     _silence_proactor_connection_reset()
     uvicorn.run(
@@ -271,8 +274,6 @@ def _compare_openapi(args: argparse.Namespace) -> None:
     output = renderer(report)
 
     if args.out:
-        from pathlib import Path
-
         Path(args.out).write_text(output, encoding="utf-8")
         print(f"Wrote {args.format} report to {args.out}")
     else:
@@ -285,11 +286,13 @@ def _compare_openapi(args: argparse.Namespace) -> None:
 def _db(args: argparse.Namespace) -> None:
     """Run a database management command (alembic upgrade head)."""
     if args.db_command == "upgrade":
-        from alembic import command
-        from alembic.config import Config as AlembicConfig
+        from mastodon_mock.db.migrations import upgrade_database
 
-        cfg = AlembicConfig("alembic.ini")
-        command.upgrade(cfg, "head")
+        config = MastodonMockConfig.load(args.config)
+        try:
+            upgrade_database(config.database)
+        except ValueError as exc:
+            sys.exit(str(exc))
         print("Database upgraded to head.")
 
 

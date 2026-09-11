@@ -1,15 +1,14 @@
 # Deploying and Publishing
 
 `mastodon_mock` is primarily a local test dependency, but you can also host it (to demo
-the mock or point a remote client at it) and publish its bundled web UI as a standalone
-client. This page covers three things:
+the mock or point a remote client at it). The lite UI ships with the server;
+standalone Mawkingbird is maintained separately. This page covers:
 
 1. [Running the Docker image](#docker-image) (from GHCR or built locally).
 1. [One-click PaaS deploys](#one-click-paas-deploys) (Render, Railway, Koyeb,
    PythonAnywhere) using the manifests in
    [`examples/deploy/`](https://github.com/matthewdeanmartin/mastodon_mock/tree/main/examples/deploy).
-1. [Publishing the UI as "Mocking Bird"](#mocking-bird-the-standalone-client), a
-   static-only Mastodon web client.
+1. [The bundled lite client and standalone Mawkingbird](#bundled-lite-client-and-standalone-mawkingbird).
 
 !!! warning "Not a production server"
 The mock has no real security (see

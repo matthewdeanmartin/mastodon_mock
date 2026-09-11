@@ -49,7 +49,7 @@ def _do_search(
         if account_is_discoverable(db, account, config, viewer)
     ]
     statuses_data = serialize_status_list(db, list(statuses), config, viewer, filter_context="public")
-    hashtags_data = [{"name": name, "url": f"https://{config.domain}/tags/{name}", "history": []} for name in tag_names]
+    hashtags_data = [{"name": name, "url": f"{config.base_url}/tags/{name}", "history": []} for name in tag_names]
     return accounts_data, statuses_data, hashtags_data
 
 

@@ -22,11 +22,8 @@ Then visit:
 http://127.0.0.1:3000/_ui/
 ```
 
-If the packaged UI bundle is available, `GET /` also includes:
-
-```json
-{"ui": "/_ui/"}
-```
+If the packaged UI bundle is available, `GET /` redirects to `/_ui/`.
+Without a bundle, `/` returns a small HTML landing page; the API remains available.
 
 If the bundle has not been built in an editable checkout, the server still starts and the
 `/_ui/` mount is skipped. Build it from source with:
@@ -91,10 +88,12 @@ Admin trending tags and statuses are derived from local hashtag usage and favour
 counts. They are deterministic fixture rankings, not Mastodon's production ranking
 algorithm.
 
+Trend approve/reject routes persist review decisions; rejected tags and statuses
+are excluded from public trends, while the admin views retain them for review.
+
 These routes remain shallow:
 
 - admin trending links return an empty list;
-- trend approve/reject routes do not persist review decisions;
 - admin measures return zero-valued measures for requested keys;
 - admin dimensions return empty data arrays for requested keys;
 - admin retention returns an empty list.

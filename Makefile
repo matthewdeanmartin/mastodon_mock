@@ -21,7 +21,7 @@ MOCK_DOMAIN := mock.local
 # `httpx2.ReadTimeout` failures (flaky, order-dependent). Capping at half the
 # logical CPUs (floor 2) keeps the suite parallel without oversubscription.
 # Override with `make test-ci TEST_WORKERS=N`.
-TEST_WORKERS ?= $(shell python -c "import os;print(max(2,(os.cpu_count() or 2)//2))")
+TEST_WORKERS ?= $(shell $(UV) run python -c "import os;print(max(2,(os.cpu_count() or 2)//2))")
 
 .PHONY: \
 	sync \
@@ -171,16 +171,19 @@ spell: pylint-spelling
 # ── Documentation checks ─────────────────────────────────────────────────────
 
 docs-check: docs-check-docstrings docs-check-pydoctest docs-check-format changelog-verify
+	@$(UV) run mkdocs build --strict
+	@$(UV) run python -c "from pathlib import Path; assert Path('$(CHANGELOG)').read_bytes() == Path('$(DOCS_CHANGELOG)').read_bytes(), 'Run make changelog-sync'"
 
 docs-check-docstrings:
 	@$(UV) run interrogate $(PACKAGE) --verbose --fail-under 70
 
 docs-check-pydoctest:
-	@$(UV) run pydoctest --config .pydoctest.json \
-		| grep -v "__init__" | grep -v "__main__" | grep -v "Unable to parse" || true
+# Advisory as before: this parser treats omitted Returns sections as type mismatches.
+# Make's ignore-error prefix is portable; shell pipelines and `|| true` are not.
+	-@$(UV) run pydoctest --config .pydoctest.json
 
 docs-check-format:
-	@$(UV) run mdformat --check README.md CHANGELOG.md docs/*.md || true
+	@$(UV) run mdformat --check $(MARKDOWN_TARGETS)
 
 griffe:
 	@echo "=== griffe API surface check (advisory) ==="
@@ -192,11 +195,11 @@ griffe:
 # copies it into docs/ so the two never drift.
 
 changelog-verify:
-	@$(UV) run kacl-cli -f $(CHANGELOG) verify
+	@$(UV) run kaclm --input-file $(CHANGELOG) validate
 
 changelog-sync: changelog-verify
 	@$(UV) run mdformat $(CHANGELOG)
-	@cp $(CHANGELOG) $(DOCS_CHANGELOG)
+	@$(UV) run python -c "from pathlib import Path; Path('$(DOCS_CHANGELOG)').write_bytes(Path('$(CHANGELOG)').read_bytes())"
 	@echo "Synced $(CHANGELOG) -> $(DOCS_CHANGELOG)"
 
 build-docs: changelog-sync
@@ -244,11 +247,11 @@ security: bandit audit
 bandit:
 	@$(UV) run bandit -q -c pyproject.toml -r $(PACKAGE)
 
+# NLTK is a dev-only transitive dependency of troml-dev-status -> textstat.
+# GHSA-8mgp-746c-j5xp has no fix as of 2026-09-07. uv resumes enforcement
+# automatically when a fix exists; upgrade then and remove both exceptions.
 audit:
 	@echo "=== uv audit ==="
-	# NLTK is a dev-only transitive dependency of troml-dev-status -> textstat.
-	# GHSA-8mgp-746c-j5xp has no fix as of 2026-09-07. uv resumes enforcement
-	# automatically when a fix exists; upgrade then and remove both exceptions.
 	@$(UV) audit --ignore-until-fixed GHSA-8mgp-746c-j5xp
 	@echo "=== pip-audit ==="
 	@$(UV) run pip-audit --ignore-vuln GHSA-8mgp-746c-j5xp
@@ -386,7 +389,7 @@ ui:
 	@cd ui && npm ci && npm run build
 
 ui-dev:
-	@cd ui && npm start
+	@cd ui && npm run watch
 
 # Re-vendor the upstream Mastodon OpenAPI schema into git. Run this by hand like a
 # formatter: it overwrites the tracked mastodon-openapi/dist/schema.json, then you review

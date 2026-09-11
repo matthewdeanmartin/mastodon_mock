@@ -28,7 +28,7 @@ def oembed(url: str, config: Config) -> dict[str, Any]:
     the URI format whenever it isn't one.
     """
     del url
-    base = f"https://{config.domain}"
+    base = f"{config.base_url}"
     return {
         "type": "link",
         "version": "1.0",

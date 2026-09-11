@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -369,6 +369,8 @@ class MastodonMockConfig(BaseModel):
 
     mocked_version: str = CURRENT_VERSION
     domain: str = "mock.local"
+    # None preserves HTTPS for direct app construction; the CLI infers its listener's scheme.
+    url_scheme: Literal["http", "https"] | None = None
     title: str = "Mastodon Mock"
     email: str = "admin@mock.local"
     description: str = "A local mock Mastodon instance for testing."
@@ -394,6 +396,16 @@ class MastodonMockConfig(BaseModel):
     terms_of_service: str = ""
     # Instance privacy policy (HTML or plain text). Empty → the endpoint 404s.
     privacy_policy: str = ""
+
+    @property
+    def base_url(self) -> str:
+        """Public origin for generated API links and assets."""
+        return f"{self.url_scheme or 'https'}://{self.domain}"
+
+    @property
+    def streaming_url(self) -> str:
+        """Public WebSocket origin using the same transport as generated HTTP links."""
+        return self.base_url.replace("http", "ws", 1)
 
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> MastodonMockConfig:

@@ -100,12 +100,12 @@ async def put_settings(request: Request, db: DbSession, account: RequiredAccount
     return _deep_merge(DEFAULT_SETTINGS, row.data)
 
 
-def _serialize_invite(invite: Invite, domain: str) -> dict[str, Any]:
+def _serialize_invite(invite: Invite, base_url: str) -> dict[str, Any]:
     """Serialize an invite row for the settings UI."""
     return {
         "id": sid(invite.id),
         "code": invite.code,
-        "url": f"https://{domain}/invite/{invite.code}",
+        "url": f"{base_url}/invite/{invite.code}",
         "max_uses": invite.max_uses,
         "uses": invite.uses,
         "expires_at": iso(invite.expires_at),
@@ -117,9 +117,8 @@ def _serialize_invite(invite: Invite, domain: str) -> dict[str, Any]:
 @router.get("/api/v1/_mock/invites")
 def list_invites(db: DbSession, config: Config, account: RequiredAccount) -> list[dict[str, Any]]:
     """List the authed user's invites, newest first."""
-    domain = config.domain
     invites = db.scalars(select(Invite).where(Invite.account_id == account.id).order_by(Invite.created_at.desc())).all()
-    return [_serialize_invite(i, domain) for i in invites]
+    return [_serialize_invite(i, config.base_url) for i in invites]
 
 
 @router.post("/api/v1/_mock/invites")
@@ -150,7 +149,7 @@ async def create_invite(request: Request, db: DbSession, config: Config, account
     )
     db.add(invite)
     db.commit()
-    return _serialize_invite(invite, config.domain)
+    return _serialize_invite(invite, config.base_url)
 
 
 @router.delete("/api/v1/_mock/invites/{invite_id}", status_code=200)
@@ -161,7 +160,7 @@ def revoke_invite(invite_id: int, db: DbSession, config: Config, account: Requir
         raise HTTPException(status_code=404, detail="Record not found")
     invite.revoked = True
     db.commit()
-    return _serialize_invite(invite, config.domain)
+    return _serialize_invite(invite, config.base_url)
 
 
 @router.get("/api/v1/_mock/apps")

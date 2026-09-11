@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -161,13 +162,18 @@ def test_serve_in_memory_overrides_database_path(monkeypatch: pytest.MonkeyPatch
     assert captured["path"] == ":memory:"
 
 
-def test_db_upgrade_invokes_alembic(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_db_upgrade_invokes_alembic(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
     import alembic.command as alembic_command
 
     upgrade_calls: dict[str, Any] = {}
     monkeypatch.setattr(alembic_command, "upgrade", lambda cfg, rev: upgrade_calls.update(rev=rev))
 
-    args = argparse.Namespace(db_command="upgrade", config=None)
+    config_file = tmp_path / "mock.toml"
+    config_file.write_text("[database]\npath = 'custom.sqlite'\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    args = argparse.Namespace(db_command="upgrade", config=str(config_file))
     cli._db(args)
 
     assert upgrade_calls["rev"] == "head"

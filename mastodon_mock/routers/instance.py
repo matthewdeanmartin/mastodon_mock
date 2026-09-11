@@ -54,7 +54,7 @@ _TRANSLATION_TARGETS = ["en", "es", "fr", "de", "ja", "pt"]
 # behaviour is intentionally minimal — these exist so callers that iterate emoji
 # get a non-empty, correctly-shaped sample.
 def _default_custom_emojis(config: Config) -> list[dict[str, Any]]:
-    base = f"https://{config.domain}/custom_emojis"
+    base = f"{config.base_url}/custom_emojis"
     return [
         {
             "shortcode": shortcode,

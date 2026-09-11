@@ -25,24 +25,24 @@ def account_acct(username: str, domain: str | None) -> str:
     return username if domain is None else f"{username}@{domain}"
 
 
-def profile_url(config_domain: str, acct: str) -> str:
+def profile_url(config_domain: str, acct: str, *, scheme: str = "https") -> str:
     """Compute a profile URL for an account."""
-    return f"https://{config_domain}/@{acct}"
+    return f"{scheme}://{config_domain}/@{acct}"
 
 
-def status_url(config_domain: str, acct: str, status_id: int) -> str:
+def status_url(config_domain: str, acct: str, status_id: int, *, scheme: str = "https") -> str:
     """Compute a canonical status URL."""
-    return f"https://{config_domain}/@{acct}/{status_id}"
+    return f"{scheme}://{config_domain}/@{acct}/{status_id}"
 
 
-def placeholder_avatar(config_domain: str, seed: str) -> str:
+def placeholder_avatar(config_domain: str, seed: str, *, scheme: str = "https") -> str:
     """Return a deterministic per-account identicon avatar URL, keyed by ``seed`` (the acct)."""
-    return f"https://{config_domain}/avatars/generated/{seed}.svg"
+    return f"{scheme}://{config_domain}/avatars/generated/{seed}.svg"
 
 
-def placeholder_header(config_domain: str, seed: str) -> str:
+def placeholder_header(config_domain: str, seed: str, *, scheme: str = "https") -> str:
     """Return a deterministic per-account identicon header URL, keyed by ``seed`` (the acct)."""
-    return f"https://{config_domain}/headers/generated/{seed}.svg"
+    return f"{scheme}://{config_domain}/headers/generated/{seed}.svg"
 
 
 def drop_nulls(data: dict[str, Any]) -> dict[str, Any]:

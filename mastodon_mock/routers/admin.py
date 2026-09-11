@@ -497,14 +497,14 @@ def admin_reject_trending_status(
 def admin_approve_trending_tag(tag_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Approve a trending tag (echo minimal Tag)."""
     _set_trend_decision(db, "tag", tag_id.lower(), True, account.id)
-    return {"name": tag_id, "url": f"https://{config.domain}/tags/{tag_id}"}
+    return {"name": tag_id, "url": f"{config.base_url}/tags/{tag_id}"}
 
 
 @router.post("/api/v1/admin/trends/tags/{tag_id}/reject")
 def admin_reject_trending_tag(tag_id: str, db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Reject a trending tag (echo minimal Tag)."""
     _set_trend_decision(db, "tag", tag_id.lower(), False, account.id)
-    return {"name": tag_id, "url": f"https://{config.domain}/tags/{tag_id}"}
+    return {"name": tag_id, "url": f"{config.base_url}/tags/{tag_id}"}
 
 
 # --- Announcements ------------------------------------------------------------
