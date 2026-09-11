@@ -1,6 +1,3 @@
-The bundled `ui/` is the lite mock-server administration and test client. Standalone product development lives in
-[mawkingbird](https://github.com/matthewdeanmartin/mawkingbird). See [UI ownership](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/LEGACY_UI.md).
-
 # Mastodon Mock
 
 [![PyPI version](https://badge.fury.io/py/mastodon_mock.svg)](https://badge.fury.io/py/mastodon_mock)
