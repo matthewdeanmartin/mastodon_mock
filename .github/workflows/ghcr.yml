@@ -24,25 +24,25 @@ jobs:
       packages: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Set up QEMU
         # Enables building the linux/arm64 variant on an amd64 runner.
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4.1.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1  # v4.4.0
       - name: Set up Buildx
         # We deliberately don't use a GHA build cache (no cache-to/cache-from below), so
         # there are no shared runtime artifacts to poison; the heuristic flag is moot here.
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435  # v3.11.1  # zizmor: ignore[cache-poisoning]
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1  # zizmor: ignore[cache-poisoning]
       - name: Log in to GHCR
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772  # v3.4.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Derive tags
         id: meta
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9  # v6.1.0
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
         with:
           images: ${{ env.IMAGE }}
           # On a release, tag full/minor/major semver + latest. On manual dispatch with a
@@ -57,7 +57,7 @@ jobs:
       - name: Build amd64 image and load for smoke test
         # Build a single-arch image first and load it into the local daemon so we can run
         # it before publishing anything. (Multi-arch images can't be `--load`ed.)
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
           platforms: linux/amd64
@@ -80,7 +80,7 @@ jobs:
           echo "Smoke test passed: API=$code UI=$ui"
           docker stop smoke
       - name: Build and push multi-arch image
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64
