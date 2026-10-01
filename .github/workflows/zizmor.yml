@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: hynek/setup-cached-uv@75e1cf6b4f163bab8f7edbf3d4de55e0f02b5e4c  # v2.6.0
+      - uses: hynek/setup-cached-uv@34e35d30f1ebc7421a5cc733bca38dcc62603960  # v2.6.0
       - name: Run zizmor 🌈
         run: uvx zizmor --format sarif . > results.sarif
         env:
