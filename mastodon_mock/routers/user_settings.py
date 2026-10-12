@@ -13,7 +13,7 @@ import copy
 import csv
 import io
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -139,7 +139,7 @@ async def create_invite(request: Request, db: DbSession, config: Config, account
             expires_in = int(body["expires_in"])
         except (TypeError, ValueError) as exc:
             raise HTTPException(status_code=422, detail="expires_in must be an integer") from exc
-        expires_at = datetime.fromtimestamp(utcnow().timestamp() + expires_in, tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(utcnow().timestamp() + expires_in, tz=UTC)
     invite = Invite(
         account_id=account.id,
         code=secrets.token_urlsafe(8),

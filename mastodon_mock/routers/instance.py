@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -112,7 +112,7 @@ def instance_activity(db: DbSession) -> list[dict[str, str]]:
     with string values). Statuses/registrations are counted from the mock's own
     rows per week; ``logins`` is approximated as the active-account count.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Week boundaries: most recent first, aligned to whole days like the real API.
     this_week_end = now.replace(hour=0, minute=0, second=0, microsecond=0)
     out: list[dict[str, str]] = []

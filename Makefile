@@ -59,7 +59,7 @@ help:
 	@echo ""
 	@echo "  test                   Run pytest suite with coverage"
 	@echo "  test-ci                Run pytest in parallel (-n $(TEST_WORKERS); override TEST_WORKERS=N)"
-	@echo "  tox                    Run tests across py310-py313 via tox-uv"
+	@echo "  tox                    Run tests across py311-py313 via tox-uv"
 	@echo "  smoke                  CLI smoke checks (--help, --version)"
 	@echo "  dev-cert               Generate a self-signed localhost TLS cert into .dev_certs/"
 	@echo "  dev-cert-named         Same, plus MOCK_DOMAIN (default mock.local) in the SAN list"

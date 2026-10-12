@@ -19,6 +19,7 @@ Outputs (in ./data):
     mataroa_subdomains.txt   one <username> per line
     mataroa_subdomains.json  [{"username", "host", "url"}, ...]
 """
+
 from __future__ import annotations
 
 import json
@@ -79,25 +80,15 @@ def usernames(records: list[dict]) -> set[str]:
 
 
 def main() -> None:
-    if len(sys.argv) > 1:
-        records = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    else:
-        records = fetch()
+    records = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")) if len(sys.argv) > 1 else fetch()
 
     users = sorted(usernames(records))
     data_dir = Path(__file__).resolve().parent.parent / "data"
     data_dir.mkdir(exist_ok=True)
 
-    (data_dir / "mataroa_subdomains.txt").write_text(
-        "\n".join(users) + "\n", encoding="utf-8"
-    )
-    rich = [
-        {"username": u, "host": f"{u}.{ROOT}", "url": f"https://{u}.{ROOT}/"}
-        for u in users
-    ]
-    (data_dir / "mataroa_subdomains.json").write_text(
-        json.dumps(rich, indent=2) + "\n", encoding="utf-8"
-    )
+    (data_dir / "mataroa_subdomains.txt").write_text("\n".join(users) + "\n", encoding="utf-8")
+    rich = [{"username": u, "host": f"{u}.{ROOT}", "url": f"https://{u}.{ROOT}/"} for u in users]
+    (data_dir / "mataroa_subdomains.json").write_text(json.dumps(rich, indent=2) + "\n", encoding="utf-8")
     print(f"{len(users)} clean subdomains -> data/mataroa_subdomains.txt / .json")
 
 

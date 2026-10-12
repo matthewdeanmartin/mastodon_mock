@@ -7,7 +7,7 @@ parsing in one place so behaviour is consistent everywhere.
 from __future__ import annotations
 
 import re
-from datetime import timedelta, timezone
+from datetime import UTC, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -148,7 +148,7 @@ def _notification_disposition(
         checks.append(policy.for_not_followers)
     actor_created_at = actor.created_at
     if actor_created_at.tzinfo is None:
-        actor_created_at = actor_created_at.replace(tzinfo=timezone.utc)
+        actor_created_at = actor_created_at.replace(tzinfo=UTC)
     if actor_created_at >= utcnow() - timedelta(days=30):
         checks.append(policy.for_new_accounts)
     if actor.silenced:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -59,7 +59,7 @@ def _expiry(params: dict[str, Any]) -> datetime | None:
     if expires_in in (None, ""):
         return None
     try:
-        return datetime.now(timezone.utc) + timedelta(seconds=int(str(expires_in)))
+        return datetime.now(UTC) + timedelta(seconds=int(str(expires_in)))
     except (TypeError, ValueError):
         return None
 

@@ -7,19 +7,14 @@ defaults. See spec/01-architecture.md.
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
+import tomllib
 from pydantic import BaseModel, Field
 
 from mastodon_mock.versioning import CURRENT_VERSION
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 
 class DatabaseConfig(BaseModel):

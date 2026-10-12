@@ -18,7 +18,6 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-
 ORIGIN = "http://localhost:4200"
 TARGET_WITHOUT_CORS = "https://example.com/"
 TARGET_ECHO = "https://httpbingo.org/anything?cors_probe=1"
@@ -82,8 +81,7 @@ def make_proxy_url(service: str, target: str) -> str:
         api_key = os.environ.get("X2U_API_KEY")
         if email and api_key:
             return (
-                "https://go.x2u.in/proxy?"
-                f"email={quote(email, safe='')}&apiKey={quote(api_key, safe='')}&url={encoded}"
+                f"https://go.x2u.in/proxy?email={quote(email, safe='')}&apiKey={quote(api_key, safe='')}&url={encoded}"
             )
         return f"https://go.x2u.in/proxy?url={encoded}"
     raise ValueError(f"Unknown service: {service}")
@@ -231,11 +229,7 @@ def rapidapi_headers(service: str) -> dict[str, str]:
     key = os.environ.get("RAPIDAPI_KEY")
     if not key:
         return {}
-    host = (
-        "cors-proxy-web-toolbox.p.rapidapi.com"
-        if service == "Abundance APIs"
-        else "http-cors-proxy.p.rapidapi.com"
-    )
+    host = "cors-proxy-web-toolbox.p.rapidapi.com" if service == "Abundance APIs" else "http-cors-proxy.p.rapidapi.com"
     return {"X-RapidAPI-Key": key, "X-RapidAPI-Host": host}
 
 

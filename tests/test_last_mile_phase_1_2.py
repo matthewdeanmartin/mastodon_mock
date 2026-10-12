@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx2 as httpx
 import pytest
@@ -140,7 +140,7 @@ def test_rejecting_trend_removes_it_from_public_results(alice: Mastodon, bob: Ma
 
 def test_scheduled_announcement_visibility(live_server: str) -> None:
     headers = {"Authorization": "Bearer alice_token"}
-    future = datetime.now(timezone.utc) + timedelta(days=1)
+    future = datetime.now(UTC) + timedelta(days=1)
     response = httpx.post(
         f"{live_server}/api/v1/admin/announcements",
         headers=headers,
