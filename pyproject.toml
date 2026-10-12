@@ -30,6 +30,8 @@ dependencies = [
     # policy choice, not a hard failure: on 3.15 take plain uvicorn instead.
     "uvicorn[standard]>=0.30.0; python_version < '3.15'",
     "uvicorn>=0.30.0; python_version >= '3.15'",
+    # Preserve WebSocket streaming without uvicorn[standard] accelerators.
+    "websockets>=13.0",
     "sqlalchemy>=2.0.0",
     "alembic>=1.13.0",
     "pydantic>=2.0.0",
@@ -152,7 +154,7 @@ dev = [
     "yamlfix>=1.19.0",
     "interrogate>=1.5.0",
     "pyenchant>=3.2.2",
-    "mkdocs>=1.6.0",
+    "mkdocs>=1.6.0,<2",
     "mkdocstrings[python]>=0.26.0",
     "git2md>=0.1.0",
     "pyclean>=3.0.0",

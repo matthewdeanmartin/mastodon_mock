@@ -147,3 +147,7 @@ MIT. See [LICENSE](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/
 ## Changelog
 
 See [CHANGELOG.md](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/CHANGELOG.md).
+
+## Python 3.15 wheels-only verification — 2026-10-04
+
+Windows Python 3.15.0rc3 passes 434 configured test cases with two skip records using wheel-installed dependency prereleases, including Pydantic 2.14.0b2. Python 3.14 matches; stable Pydantic core is still wheel-blocked on RC3. The plain-Uvicorn fallback now explicitly retains WebSocket streaming through websockets>=13.0. Both live-wire WebSocket tests also pass with the portable py3-none-any websockets 17.2 wheel and no native speedups. Wheels reused the existing bundled UI; no fresh Angular build/test certification is claimed. No real Mastodon backend or GitHub job was invoked.
