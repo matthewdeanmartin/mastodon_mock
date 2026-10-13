@@ -111,7 +111,8 @@ def _load_status_counts(session: Session, status_ids: list[int], ctx: BatchConte
         .where(Status.reblog_of_id.in_(status_ids))
         .group_by(Status.reblog_of_id)
     ).all():
-        ctx.reblogs_count[status_id] = count
+        if status_id is not None:  # nullable column; the IN filter already excludes NULL
+            ctx.reblogs_count[status_id] = count
 
     for status_id, count in session.execute(
         select(Favourite.status_id, func.count())
@@ -125,7 +126,8 @@ def _load_status_counts(session: Session, status_ids: list[int], ctx: BatchConte
         .where(Status.in_reply_to_id.in_(status_ids))
         .group_by(Status.in_reply_to_id)
     ).all():
-        ctx.replies_count[status_id] = count
+        if status_id is not None:  # nullable column; the IN filter already excludes NULL
+            ctx.replies_count[status_id] = count
 
 
 def _load_viewer_flags(session: Session, status_ids: list[int], viewer_id: int, ctx: BatchContext) -> None:

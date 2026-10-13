@@ -11,7 +11,7 @@ import contextlib
 import random
 import secrets
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -402,7 +402,7 @@ def _bulk_insert(session: Session, model: Any, rows: list[dict[str, Any]], chunk
 
 
 @contextlib.contextmanager
-def _bulk_load_pragmas(engine: Engine) -> Iterator[None]:
+def _bulk_load_pragmas(engine: Engine) -> Generator[None, None, None]:
     """Apply SQLite bulk-load PRAGMAs for the duration of the load, then restore."""
     if engine.dialect.name != "sqlite":
         yield

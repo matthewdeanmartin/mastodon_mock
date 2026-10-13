@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import tempfile
 import weakref
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -93,7 +93,7 @@ def dispose_app_resources(app: FastAPI) -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Dispose of the engine on shutdown to clear connection pool."""
     try:
         yield
