@@ -442,3 +442,6 @@ prerelease: check dev-status docs-check smoke spell publish-check
 	@echo "Pre-release checks complete — ready to publish."
 lease: check dev-status docs-check smoke spell publish-check
 	@echo "Pre-release checks complete — ready to publish."
+
+# `ui` is also a directory in this repo; without .PHONY make can call the target up to date and skip it.
+.PHONY: ui
