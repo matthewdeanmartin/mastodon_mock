@@ -48,7 +48,7 @@ test = [
     "httpx2>=2.4.0",
 ]
 
-# OpenAPI contract fuzzing (Phase 3 of spec/openapi_support.md). Heavy and opt-in:
+# OpenAPI contract fuzzing (see docs/extending/openapi-sync.md). Heavy and opt-in:
 # kept out of the `test` extra so the normal suite stays fast, and the contract
 # tests are marked `contract` (deselected by default). Run with:
 #   uv sync --extra contract && uv run pytest -m contract
@@ -83,7 +83,7 @@ include = [
 ]
 # The built Angular UI lives under a git-ignored directory; `artifacts` forces it into
 # the wheel anyway (plain `include` would skip VCS-ignored files). Produced by the build
-# hook below (or `make ui` locally). See spec/08-admin-ui.md.
+# hook below (or `make ui` locally). See docs/usage/admin-ui.md.
 artifacts = [
     "mastodon_mock/_ui_dist/**",
 ]
@@ -343,7 +343,7 @@ root_packages = ["mastodon_mock"]
 # forbidden_modules = ["tests"]
 
 # mastodon_mock server configuration defaults.
-# See spec/01-architecture.md for the full schema and .mastodon_mock.toml override rules.
+# See docs/overview/how-it-works.md for the full schema and .mastodon_mock.toml override rules.
 [tool.mastodon_mock]
 mocked_version = "4.7.5"
 domain = "mock.local"

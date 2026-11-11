@@ -3,7 +3,7 @@
 Sits between the routers and the :mod:`mastodon_mock.streaming` bus: given a
 freshly written ``Status`` (or notification), it works out the channel keys the
 event belongs to — following Mastodon's visibility rules — serializes the entity
-once, and publishes it. See spec/streaming.md "Event sources".
+once, and publishes it. See docs/usage/writing-tests.md "Event sources".
 
 All functions are no-ops when streaming is disabled (no bus on the app), so
 routers can call them unconditionally.

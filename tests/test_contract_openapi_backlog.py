@@ -1,7 +1,7 @@
-"""Contract tests for the spec/openapi_compare_report.md truth-only backlog.
+"""Contract tests for endpoints covered by the pinned OpenAPI schema.
 
 Each test exercises one of the endpoints added to close that backlog
-(see spec/03-api-coverage.md and tests/openapi/allowlist.py, which is now
+(see docs/reference/coverage.md and tests/openapi/allowlist.py, which is now
 empty of TRUTH_ONLY entries). Endpoints with no Mastodon.py caller are driven
 with plain ``requests`` instead.
 """

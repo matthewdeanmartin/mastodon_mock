@@ -1,8 +1,8 @@
-"""Contract tests for the admin / moderation API (spec/03-api-coverage.md "admin").
+"""Contract tests for the admin / moderation API (docs/reference/coverage.md "admin").
 
 All access goes through Mastodon.py's ``mastodon/admin.py`` methods, per the
 project's "if Mastodon.py supports it" contract. Auth is faked: any seeded account
-may call admin endpoints (no role enforcement — see spec/00-overview.md non-goals).
+may call admin endpoints (no role enforcement — see docs/overview/README.md non-goals).
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Fixtures for the performance benchmark suite (spec/09-sample-data-and-perf.md).
+"""Fixtures for the performance benchmark suite (docs/usage/data-generation.md).
 
 These build a ``medium`` cohort once (module-scoped) into a real threaded uvicorn
 server and drive read endpoints over loopback. Marked ``slow`` so they're excluded from

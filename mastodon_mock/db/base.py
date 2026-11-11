@@ -2,7 +2,7 @@
 
 Handles the SQLite ``:memory:`` quirk by backing the engine with a private temp-file
 database, so every threadpool request gets its own connection onto the same data
-without sharing one fragile connection. See spec/01-architecture.md.
+without sharing one fragile connection. See docs/overview/how-it-works.md.
 """
 
 from __future__ import annotations

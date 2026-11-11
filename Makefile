@@ -315,7 +315,7 @@ test-integration:
 	@$(UV) run pytest -q tests/integration -m integration --timeout=60
 
 # ── Performance ──────────────────────────────────────────────────────────────
-# Benchmark suite (spec/09-sample-data-and-perf.md). Opt-in via the `slow` marker.
+# Benchmark suite (docs/usage/data-generation.md). Opt-in via the `slow` marker.
 
 perf:
 	@$(UV) run pytest -q tests/perf -m slow --timeout=300
@@ -392,33 +392,33 @@ ui-dev:
 	@cd ui && npm run watch
 
 # Re-vendor the upstream Mastodon OpenAPI schema into git. Run this by hand like a
-# formatter: it overwrites the tracked mastodon-openapi/dist/schema.json, then you review
+# formatter: it overwrites the tracked mastodon_openapi/preview/schema.json, then you review
 # the diff and commit it yourself. Not wired into CI or any quality gate. The contract
 # tests (tests/test_openapi_contract.py) compare against the committed snapshot.
 UPSTREAM_OPENAPI_REPO ?= https://github.com/abraham/mastodon-openapi.git
 vendor-openapi:
-	@echo "Re-vendoring upstream schema from $(UPSTREAM_OPENAPI_REPO) -> mastodon-openapi/preview/schema.json"
+	@echo "Re-vendoring upstream schema from $(UPSTREAM_OPENAPI_REPO) -> mastodon_openapi/preview/schema.json"
 	@tmp=$$(mktemp -d) ; \
 	git clone --depth 1 $(UPSTREAM_OPENAPI_REPO) "$$tmp" ; \
 	if [ ! -f "$$tmp/dist/schema.json" ]; then \
 		echo "ERROR: upstream schema not found at dist/schema.json — upstream layout may have changed" >&2 ; \
 		rm -rf "$$tmp" ; exit 1 ; \
 	fi ; \
-	mkdir -p mastodon-openapi/preview ; \
-	cp "$$tmp/dist/schema.json" mastodon-openapi/preview/schema.json ; \
+	mkdir -p mastodon_openapi/preview ; \
+	cp "$$tmp/dist/schema.json" mastodon_openapi/preview/schema.json ; \
 	rm -rf "$$tmp"
-	@git diff --quiet -- mastodon-openapi/preview/schema.json \
+	@git diff --quiet -- mastodon_openapi/preview/schema.json \
 		&& echo "No drift - vendored schema already current." \
-		|| echo "Schema updated. Review 'git diff mastodon-openapi/preview/schema.json', run the contract tests, and commit."
+		|| echo "Schema updated. Review 'git diff mastodon_openapi/preview/schema.json', run the contract tests, and commit."
 
-	@echo "Update mastodon-openapi/provenance.json after review; never overwrite the stable baseline with preview APIs."
+	@echo "Update mastodon_openapi/provenance.json after review; never overwrite the stable baseline with preview APIs."
 
 compare-openapi:
 	@echo "Comparing mock OpenAPI against upstream Mastodon schema -> spec/openapi_compare_report.md"
 	@$(UV) run mastodon_mock compare-openapi --format markdown --out spec/openapi_compare_report.md
 	@$(UV) run mastodon_mock compare-openapi --format text
 
-# OpenAPI contract fuzzing (Phase 3). Needs the `contract` extra; opt-in.
+# OpenAPI contract fuzzing. Needs the `contract` extra; opt-in.
 #   make openapi-fuzz             -> "mock never 500s" on the shared GET surface
 #   CONTRACT_STRICT=1 make openapi-fuzz  -> full schema conformance (finds shape gaps)
 openapi-fuzz:

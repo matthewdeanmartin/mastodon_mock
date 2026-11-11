@@ -2,7 +2,7 @@
 
 None of these have a Mastodon.py caller; they exist only so the mock's contract
 matches upstream's path/method surface. No persistence, no real behavior —
-fixed-shape responses are sufficient (see spec/openapi_support.md Phase 3/4).
+fixed-shape responses are sufficient (see docs/extending/openapi-sync.md).
 """
 
 from __future__ import annotations

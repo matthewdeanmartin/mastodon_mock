@@ -1,4 +1,4 @@
-"""Generation-throughput benchmarks (spec/09-sample-data-and-perf.md).
+"""Generation-throughput benchmarks (docs/usage/data-generation.md).
 
 These are the regression guard for the bulk generator: a 2-3x slowdown (e.g. a lost
 PRAGMA or an accidental per-row flush) drops rows/second below the baseline floor and

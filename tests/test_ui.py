@@ -3,7 +3,7 @@
 The UI is built into ``mastodon_mock/_ui_dist`` by the Angular build (``make ui`` or the
 packaging hook). When it has not been built (e.g. a fresh checkout in CI before the UI
 step runs), ``GET /`` falls back to a minimal HTML stub instead of redirecting into the
-SPA. These tests assert both branches so they pass either way. See spec/08-admin-ui.md.
+SPA. These tests assert both branches so they pass either way. See docs/usage/admin-ui.md.
 """
 
 from __future__ import annotations

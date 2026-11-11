@@ -4,8 +4,7 @@
     var menu = document.querySelector('.wy-menu-vertical');
     if (!menu) return;
 
-    var contributorPath = /\/(contributing|extending)\//.test(window.location.pathname) ||
-      /\/performance_design\//.test(window.location.pathname);
+    var contributorPath = /\/(contributing|extending)\//.test(window.location.pathname);
     var captions = menu.querySelectorAll(':scope > .caption');
     captions.forEach(function (caption) {
       var label = caption.textContent.trim().toLowerCase();

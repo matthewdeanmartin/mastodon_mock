@@ -3,7 +3,7 @@
 Mastodon.py's ``PaginatableList`` relies on a ``Link`` response header carrying
 ``max_id``/``min_id`` to drive ``.next()``/``.previous()``. This module applies
 ``max_id``/``min_id``/``since_id``/``limit`` filters to a query and builds the
-``Link`` header. See spec/03-api-coverage.md "Pagination".
+``Link`` header. See docs/reference/coverage.md "Pagination".
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 ---
 name: Publish image (GHCR)
 # Build the Docker image from source, smoke-test it, and push to the GitHub Container
-# Registry on each release. See spec/publish.md, Track 3.
+# Registry on each release. See docs/usage/deploying.md.
 on:
   release:
     types: [released]

@@ -1,4 +1,4 @@
-"""Accounts endpoints (read + write). See spec/03-api-coverage.md."""
+"""Accounts endpoints (read + write). See docs/reference/coverage.md."""
 
 from __future__ import annotations
 

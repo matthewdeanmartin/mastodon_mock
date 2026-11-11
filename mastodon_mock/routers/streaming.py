@@ -1,4 +1,4 @@
-"""Server-Sent-Events streaming endpoints. See spec/streaming.md.
+"""Server-Sent-Events streaming endpoints. See docs/usage/writing-tests.md.
 
 These hold an open ``text/event-stream`` connection and forward events from the
 in-process bus (:mod:`mastodon_mock.streaming`). ``Mastodon.py`` consumes these

@@ -1,6 +1,6 @@
 """Serialize admin/moderation ORM rows to Mastodon admin entity JSON.
 
-See spec/03-api-coverage.md "admin" and Mastodon.py ``mastodon/admin.py``. These
+See docs/reference/coverage.md "admin" and Mastodon.py ``mastodon/admin.py``. These
 shapes target Mastodon 4.x (the versions the mock pins); e.g. ``AdminAccount.role``
 is a ``Role`` entity (4.0.0+), not the legacy string.
 """

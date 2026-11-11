@@ -1,4 +1,4 @@
-"""Contract tests for the Mastodon-shaped error envelope (spec/fable/roadmap.md 1.1).
+"""Contract tests for the Mastodon-shaped error envelope (docs/extending/openapi-sync.md).
 
 Every non-2xx JSON response must carry ``{"error": "..."}`` — never FastAPI's
 ``{"detail": ...}`` — because real Mastodon does, and Mastodon.py extracts the

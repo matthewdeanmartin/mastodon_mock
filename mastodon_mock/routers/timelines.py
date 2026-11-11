@@ -1,4 +1,4 @@
-"""Timeline endpoints. See spec/03-api-coverage.md "timelines"."""
+"""Timeline endpoints. See docs/reference/coverage.md "timelines"."""
 
 from __future__ import annotations
 

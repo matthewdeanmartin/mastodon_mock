@@ -10,8 +10,8 @@ dist/
 # but DO track the vendored upstream Mastodon OpenAPI schema (re-vendored by
 # .github/workflows/vendor-openapi-schema.yml). Without this the blanket dist/
 # rule above hides it and the contract tests silently skip.
-!mastodon-openapi/dist/
-!mastodon-openapi/dist/schema.json
+!mastodon_openapi/dist/
+!mastodon_openapi/dist/schema.json
 build/
 eggs/
 parts/
@@ -91,8 +91,6 @@ ui/dist/
 
 # Local self-signed TLS dev certs (see README for how to generate)
 .dev_certs/
-/spec/contacts/contacts.csv
-/datar/
 
 # Trial virtualenvs (e.g. .venv315rc2) — the bare `.venv` entry does not
 # match them, and hatchling's default license-file glob will sweep every

@@ -41,7 +41,7 @@ def test_properties_named_like_documentation_are_not_ignored() -> None:
 
 def test_snapshot_provenance_matches_committed_contracts() -> None:
     """Snapshots cannot change silently without updating their reviewed provenance."""
-    root = Path(__file__).resolve().parents[1] / "mastodon-openapi"
+    root = Path(__file__).resolve().parents[1] / "mastodon_openapi"
     provenance = json.loads((root / "provenance.json").read_text(encoding="utf-8"))
     for name, metadata in provenance["snapshots"].items():
         content = (root / name / "schema.json").read_text(encoding="utf-8")

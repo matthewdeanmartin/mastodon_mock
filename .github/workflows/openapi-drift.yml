@@ -1,7 +1,7 @@
 ---
-# Phase 5 of spec/openapi_support.md — automated OpenAPI drift detection.
+# Automated OpenAPI drift detection. See docs/extending/openapi-sync.md.
 #
-# Stable and reviewed-preview snapshots are committed under `mastodon-openapi/`.
+# Stable and reviewed-preview snapshots are committed under `mastodon_openapi/`.
 # This job fetches current upstream separately, runs the spec-vs-spec
 # comparison, contract tests, and a full structural upstream snapshot comparison.
 # New structural drift fails the job and is uploaded for review; no PR is opened.
@@ -17,7 +17,7 @@ on:
       - tests/openapi/**
       - tests/test_openapi_contract.py
       - tests/test_openapi_drift.py
-      - mastodon-openapi/**
+      - mastodon_openapi/**
       - .github/workflows/openapi-drift.yml
   push:
     branches: [main]
@@ -70,7 +70,7 @@ jobs:
       - name: Detect structural upstream changes
         run: >-
           uv run python -m mastodon_mock.openapi_drift
-          mastodon-openapi/preview/schema.json /tmp/upstream-openapi/dist/schema.json
+          mastodon_openapi/preview/schema.json /tmp/upstream-openapi/dist/schema.json
           --out openapi_upstream_changes.generated.json --strict
       - name: Upload drift report
         if: always()
@@ -81,10 +81,10 @@ jobs:
             openapi_compare_report.generated.md
             openapi_upstream_changes.generated.json
           if-no-files-found: warn
-  # Strict response-shape conformance ratchet (spec/fable/roadmap.md 1.3). Runs
+  # Strict response-shape conformance ratchet (docs/extending/openapi-sync.md). Runs
   # against the *committed* schema snapshot (not fresh upstream) so it only fails
   # on mock regressions, never on upstream churn — the drift job above owns that.
-  # Green as of Sprint 1; new failures mean a change broke a response shape and
+  # New failures mean a change broke a response shape and
   # must be fixed or explicitly quarantined with a reviewed reason.
   strict-fuzz:
     name: Strict OpenAPI fuzz (ratchet)

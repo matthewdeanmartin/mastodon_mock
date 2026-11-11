@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     cmp.add_argument(
         "--truth",
-        default="mastodon-openapi/dist/schema.json",
+        default="mastodon_openapi/dist/schema.json",
         help="Path to the ground-truth Mastodon OpenAPI schema",
     )
     cmp.add_argument(
@@ -157,7 +157,7 @@ def _serve(args: argparse.Namespace) -> None:
         config.database.path = ":memory:"
     # Bind precedence: explicit --host/--port flag > $HOST/$PORT env > config default.
     # The env fallback lets PaaS hosts (Render/Railway/Koyeb/...) that inject $PORT run
-    # `mastodon_mock serve` with no extra flags. See spec/publish.md, Track 2.
+    # `mastodon_mock serve` with no extra flags. See docs/usage/deploying.md.
     host = args.host or os.environ.get("HOST") or config.server.host
     port = args.port or _env_port() or config.server.port
     if getattr(args, "domain", None):

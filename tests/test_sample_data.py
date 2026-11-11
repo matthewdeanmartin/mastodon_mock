@@ -1,4 +1,4 @@
-"""Unit tests for the bulk sample-data generator (spec/09-sample-data-and-perf.md)."""
+"""Unit tests for the bulk sample-data generator (docs/usage/data-generation.md)."""
 
 from __future__ import annotations
 

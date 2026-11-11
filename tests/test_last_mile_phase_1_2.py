@@ -1,4 +1,4 @@
-"""Stateful behavior added by the final Phase 1/2 pass."""
+"""Stateful filtering, quote policy, notifications, scheduling, and moderation tests."""
 
 from __future__ import annotations
 

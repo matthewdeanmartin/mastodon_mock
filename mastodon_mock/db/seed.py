@@ -1,4 +1,4 @@
-"""Idempotent seed application. See spec/07-seeding-and-fixtures.md."""
+"""Idempotent seed application. See docs/usage/data-generation.md."""
 
 from __future__ import annotations
 

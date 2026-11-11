@@ -1,8 +1,8 @@
 """Admin / moderation API (``/api/v1/admin/*``, ``/api/v2/admin/*``).
 
-See spec/03-api-coverage.md "admin". Auth is faked like the rest of the mock:
+See docs/reference/coverage.md "admin". Auth is faked like the rest of the mock:
 any authenticated account may call these endpoints (no role enforcement), matching
-the project's "no real security" non-goal in spec/00-overview.md.
+the project's "no real security" non-goal in docs/overview/README.md.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """FastAPI dependencies: DB session, config, current token/account.
 
-Auth is faked, not enforced (see spec/04-auth.md). The bearer token is looked up
+Auth is faked, not enforced (see docs/overview/how-it-works.md). The bearer token is looked up
 in ``oauth_tokens``; a missing/unknown token yields ``None`` unless
 ``auth.permissive`` maps it to the first seeded account.
 """

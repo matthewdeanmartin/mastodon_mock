@@ -1,4 +1,4 @@
-"""Mock-only fault-injection control plane. See spec/fault_injection.md.
+"""Mock-only fault-injection control plane. See docs/usage/writing-tests.md.
 
 Holds an ordered list of fault rules on ``app.state.fault_store`` and a middleware
 that, before each request, applies the first matching rule: a forced status, added

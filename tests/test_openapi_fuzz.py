@@ -1,6 +1,6 @@
-"""Phase 3 — live OpenAPI fuzzing of the mock against the upstream Mastodon schema.
+"""Live OpenAPI fuzzing of the mock against the upstream Mastodon schema.
 
-Loads the ground-truth schema (``mastodon-openapi/dist/schema.json``), boots a real
+Loads the ground-truth schema (``mastodon_openapi/dist/schema.json``), boots a real
 ``MockServer``, and throws Schemathesis-generated requests at every *shared, read-only*
 operation, asserting the responses conform to the schema (status code, content type, and
 — where the mock returns it — response body shape).
@@ -11,7 +11,7 @@ This is **opt-in**: the whole module is marked ``contract`` (deselected by defau
     uv sync --extra contract
     uv run pytest -m contract
 
-Why GET-only and shared-only for now? See ``spec/openapi_support.md``: with many
+Why GET-only and shared-only for now? See ``docs/extending/openapi-sync.md``: with many
 endpoints still unimplemented and handlers returning bare ``dict``/``list`` (no
 ``response_model``), broad write-path fuzzing would mostly rediscover known gaps. The
 *machinery* is what matters here — as endpoints and response shapes land, widen
@@ -44,7 +44,7 @@ from mastodon_mock.testing import MockServer  # noqa: E402
 # booted server can exceed hypothesis' default per-example deadline.
 _MAX_EXAMPLES = int(os.environ.get("HYPOTHESIS_MAX_EXAMPLES", "15"))
 
-TRUTH_PATH = Path(__file__).resolve().parent.parent / "mastodon-openapi" / "dist" / "schema.json"
+TRUTH_PATH = Path(__file__).resolve().parent.parent / "mastodon_openapi" / "dist" / "schema.json"
 
 # The seeded account whose token we authenticate as (see MockServer default seed).
 _AUTH_TOKEN = "alice_token"  # nosec B105 - test fixture token, not a secret
@@ -57,11 +57,11 @@ _AUTH_TOKEN = "alice_token"  # nosec B105 - test fixture token, not a secret
 NOT_FUZZABLE_PREFIXES: tuple[str, ...] = ("/api/v1/streaming",)
 
 # Operations that are shared with upstream but known to diverge today. Each entry is a
-# ``(METHOD, normalized_path)`` plus a reason. Mirrors the Phase 2 allow-list philosophy:
+# ``(METHOD, normalized_path)`` plus a reason. Mirrors the contract allow-list philosophy:
 # don't let known gaps fail the run, but keep them visible and shrinking.
 QUARANTINE: dict[tuple[str, str], str] = {
-    # Ratchet rule (spec/fable/roadmap.md 1.3): entries may be REMOVED when fixed,
-    # never added without a reviewed reason naming the roadmap item that owns it.
+    # Ratchet rule (docs/extending/openapi-sync.md): entries may be REMOVED when fixed,
+    # never added without a reviewed reason explaining the intentional divergence.
     ("GET", "/api/v1/filters"): (
         "Truth-schema reconstruction bug: the 200 response is described as "
         "'List of [V1::Filter]' but typed as a single V1Filter object; the mock "
@@ -69,11 +69,8 @@ QUARANTINE: dict[tuple[str, str], str] = {
     ),
 }
 
-# Cross-cutting strict-mode categories. The first three were closed in Sprint 1
-# (spec/fable/roadmap.md 1.1/1.2): the error envelope, validation body, and
-# instance required fields now conform. The remaining entries are *excluded by
-# design*, not gaps: they describe schemathesis checks that would force the mock
-# to diverge from real Mastodon behavior.
+# These checks are excluded because they would force the mock to diverge from
+# real Mastodon behavior. See docs/extending/openapi-sync.md.
 STRICT_EXCLUDED_CHECKS: dict[str, str] = {
     "negative_data_rejection": (
         "Schemathesis injects unknown query parameters and demands a 4xx; real "
@@ -139,7 +136,7 @@ _collection_schema = (
 #               content type, response body shape). This is the ratchet/reporting mode;
 #               it surfaces the (currently many) places the mock's output diverges from
 #               the upstream schema. Use it locally and in a dedicated, non-blocking CI
-#               job until the gaps are closed (see spec/openapi_support.md, Phase 4).
+#               job until the gaps are closed (see docs/extending/openapi-sync.md).
 _STRICT = os.environ.get("CONTRACT_STRICT") == "1"
 
 

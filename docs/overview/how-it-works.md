@@ -179,8 +179,7 @@ threaded load.)
 
 File-backed SQLite (`path = "./something.db"`) already gives each connection its own handle,
 persists across restarts, and is useful for poking at the mock with `curl` during
-development. See [the architecture spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/01-architecture.md) for the full
-rationale, and [Writing Tests → Parallelism and SQLite](../usage/writing-tests.md#parallelism-and-sqlite)
+development. See [Writing Tests → Parallelism and SQLite](../usage/writing-tests.md#parallelism-and-sqlite)
 for what this means when running suites in parallel.
 
 For how to add a new endpoint end-to-end, see [Contributing](../extending/CONTRIBUTING.md).
@@ -253,4 +252,4 @@ screen. These endpoints are intentionally mock-only.
 - `[tool.mastodon_mock.ratelimit] enabled = true` — return `429` + `X-RateLimit-*` headers
   after `limit` requests per token per window, to exercise Mastodon.py's `ratelimit_method`.
 
-See [the auth spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/04-auth.md) for the exact bearer-token resolution code.
+Bearer-token resolution is implemented in `mastodon_mock/deps.py`.

@@ -5,7 +5,7 @@ Angular build (``make ui`` locally, or the packaging build hook). When it is abs
 e.g. an editable install that never ran a UI build — the mount is skipped and the
 server still boots; ``GET /`` serves a small HTML landing page instead of redirecting.
 
-See spec/08-admin-ui.md.
+See docs/usage/admin-ui.md.
 """
 
 from __future__ import annotations

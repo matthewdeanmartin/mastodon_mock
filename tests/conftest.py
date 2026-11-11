@@ -40,7 +40,7 @@ def live_server() -> Iterator[str]:
         yield server.base_url
 
 
-# --- Session-scoped variant (spec/07 pattern 2): one server for the whole run,
+# --- Session-scoped variant (docs/usage/writing-tests.md): one server for the whole run,
 # state reset between tests via the mock-only /api/v1/_mock/reset endpoint. Much
 # faster for large suites; opt in by depending on ``fast_server`` instead of
 # ``live_server`` (or the alice_fast/bob_fast/carol_fast clients). ---

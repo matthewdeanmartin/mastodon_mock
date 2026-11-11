@@ -1,7 +1,7 @@
 """Reviewed allow-list of intended divergence between the mock's OpenAPI contract
-and the upstream Mastodon ground-truth schema (``mastodon-openapi/dist/schema.json``).
+and the upstream Mastodon ground-truth schema (``mastodon_openapi/dist/schema.json``).
 
-This is the Phase 2 guard rail from ``spec/openapi_support.md``. The contract test
+This is the contract guard rail from ``docs/extending/openapi-sync.md``. The contract test
 (``tests/test_openapi_contract.py``) fails when drift appears that is *not* recorded
 here — so a new accidental endpoint, or a new unimplemented upstream endpoint, breaks
 the build until a human reviews it and either fixes the mock or records the divergence
@@ -9,10 +9,6 @@ with a reason.
 
 Operations are ``(METHOD, normalized_path)`` where path params are collapsed to ``{}``
 (see ``mastodon_mock.openapi_compare.normalize_path``).
-
-The spec proposed a TOML file; we use a plain Python module instead so the allow-list is
-dependency-free and works on Python 3.10 (no ``tomllib``), and so each entry can carry an
-inline reason next to it.
 
 ## The coverage ratchet
 
@@ -46,10 +42,8 @@ MOCK_ONLY: dict[tuple[str, str], str] = {
 }
 
 # Real Mastodon operations the mock does not implement yet (coverage backlog).
-# Empty: the full truth-only backlog from spec/openapi_compare_report.md has been
-# implemented (push subscriptions, profile, filters keywords v2, collections,
-# annual reports, async refreshes, oembed, identity_proofs, etc. — see
-# spec/03-api-coverage.md for what each became (Full/Static/Stub)).
+# Empty: all operations in the pinned schema have routes; behavior levels vary.
+# See docs/reference/coverage.md.
 TRUTH_ONLY: dict[tuple[str, str], str] = {}
 
 # Coverage ratchet: the unimplemented backlog can only shrink. Lower this when you

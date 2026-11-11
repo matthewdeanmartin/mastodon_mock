@@ -1,4 +1,4 @@
-"""Contract tests for the streaming API, SSE and WebSocket (spec/streaming.md).
+"""Contract tests for the streaming API, SSE and WebSocket (docs/usage/writing-tests.md).
 
 These drive the mock through real ``Mastodon.py`` streaming calls, so they prove
 the wire format, the streaming-base-URL rewrite, and the write-path event routing

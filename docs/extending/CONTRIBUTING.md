@@ -79,8 +79,7 @@ the mock to support it statefully.
 
 1. **Write a contract test** (see below) that drives the new endpoint through Mastodon.py.
 
-1. **Update coverage docs** — add a row to [the coverage spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/03-api-coverage.md)
-   and, if it shifts the summary, [the coverage reference](../reference/coverage.md).
+1. **Update coverage docs** — describe the behavior in [the coverage reference](../reference/coverage.md).
 
 1. **Reconcile the OpenAPI contract** — if you implemented a previously-missing real
    endpoint, remove it from the backlog in `tests/openapi/allowlist.py` and regenerate the
@@ -113,7 +112,7 @@ migrations disagree — run `make test` to catch a forgotten migration.
 
 ## Testing layers
 
-The suite has three layers (see [the testing spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/06-testing.md) for detail):
+The suite has three layers (see [the testing spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/usage/writing-tests.md) for detail):
 
 1. **Unit tests** — serializers, pagination, ID generation, config loading, seed
    idempotency. Pure Python, `:memory:` SQLite, no HTTP. Fast; prefer these for logic.

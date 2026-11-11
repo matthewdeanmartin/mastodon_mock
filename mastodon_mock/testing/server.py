@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # byte arrives; closing the connection from another thread (as StreamCollector's
 # __exit__ does) does not interrupt that blocking read on Windows. A short
 # heartbeat keeps that wait bounded so test teardown isn't paced by the 15s
-# production default (see spec/streaming.md).
+# production default (see docs/usage/writing-tests.md).
 _TEST_HEARTBEAT_SECONDS = 0.2
 
 
@@ -241,7 +241,7 @@ class MockServer:
         resp = httpx.post(f"{self.base_url}/api/v1/_mock/reset")
         resp.raise_for_status()
 
-    # --- streaming & faults (see spec/streaming.md, spec/fault_injection.md) ----
+    # --- streaming & faults (see docs/usage/writing-tests.md, docs/usage/writing-tests.md) ----
 
     def stream(
         self,
@@ -284,7 +284,7 @@ class MockServer:
         """Register a fault-injection rule. Use as a context manager to auto-clear.
 
         Flattened kwargs mirror the JSON body of ``POST /api/v1/_mock/faults`` (see
-        spec/fault_injection.md). Returns a :class:`FaultHandle` exposing the rule id.
+        docs/usage/writing-tests.md). Returns a :class:`FaultHandle` exposing the rule id.
         """
         effect: dict[str, Any] = {"type": type, "delay_ms": delay_ms, "truncate": truncate}
         if status is not None:

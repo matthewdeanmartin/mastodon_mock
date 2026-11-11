@@ -1,9 +1,9 @@
-"""Apps & auth endpoints. See spec/04-auth.md.
+"""Apps & auth endpoints. See docs/overview/how-it-works.md.
 
 Security is faked: tokens are random strings mapped 1:1 to accounts. The
 ``client_credentials`` grant always succeeds; ``password`` is rejected (matching
 current Mastodon). ``authorization_code`` is supported via a bare-bones account
-picker at ``/oauth/authorize`` (see "Optional: permissive code flow" in spec/04-auth.md)
+picker at ``/oauth/authorize`` (see "Optional: permissive code flow" in docs/overview/how-it-works.md)
 for GUI clients (Whalebird, Fedistar) that do the full browser-redirect login.
 """
 
@@ -41,7 +41,7 @@ def _encode_authorize_code(username: str) -> str:
     """Build an opaque authorization code that round-trips the chosen username.
 
     There's no server-side "pending authorization" table, so the code is
-    self-describing (mock-only shortcut — see spec/04-auth.md's "Optional: permissive
+    self-describing (mock-only shortcut — see docs/overview/how-it-works.md's "Optional: permissive
     code flow" section).
     """
     return f"{_AUTHORIZE_CODE_PREFIX}{username}"
@@ -437,7 +437,7 @@ def mock_reset(request: Request) -> dict[str, Any]:
 
 # Server-side caps so a browser can't request a "large"/"huge" cohort that wedges the
 # single shared SQLite connection. The "medium" preset (~300k rows, ~3s) is allowed; the
-# CLI is uncapped. See spec/09-sample-data-and-perf.md.
+# CLI is uncapped. See docs/usage/data-generation.md.
 _SAMPLE_MAX_ACCOUNTS = 2000
 _SAMPLE_MAX_ROWS = 750_000
 
@@ -486,7 +486,7 @@ async def mock_sample_data(request: Request) -> dict[str, Any]:
 
 @router.post("/api/v1/_mock/faults", status_code=200)
 async def mock_add_fault(request: Request) -> dict[str, Any]:
-    """Mock-only: register a fault-injection rule. See spec/fault_injection.md."""
+    """Mock-only: register a fault-injection rule. See docs/usage/writing-tests.md."""
     store: FaultStore | None = getattr(request.app.state, "fault_store", None)
     if store is None:
         raise HTTPException(status_code=404, detail="Fault injection is not enabled")

@@ -1,4 +1,4 @@
-"""SQLAlchemy 2.0 declarative models. See spec/02-data-model.md.
+"""SQLAlchemy 2.0 declarative models. See docs/contributing/data-models.md.
 
 All primary keys / FKs are ``BigInteger`` and are serialized as strings in API
 responses (Mastodon ``IdType``). ID values come from ``mastodon_mock.ids.next_id``.
@@ -55,7 +55,7 @@ class Account(Base):
     default_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
     default_language: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    # Admin / moderation state (see spec/03-api-coverage.md "admin"). These back
+    # Admin / moderation state (see docs/reference/coverage.md "admin"). These back
     # the AdminAccount entity and the moderation actions; they have no effect on
     # the public API surface beyond being reported.
     email: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -600,7 +600,7 @@ class PushSubscription(Base):
     policy: Mapped[str] = mapped_column(String, default="all")
 
 
-# --- Admin / moderation (see spec/03-api-coverage.md "admin") -----------------
+# --- Admin / moderation (see docs/reference/coverage.md "admin") -----------------
 
 
 class Report(Base):

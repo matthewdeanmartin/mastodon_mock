@@ -1,6 +1,6 @@
 """Dual-backend integration fixtures: same tests run against the mock and a real server.
 
-This suite is the realization of spec/06-testing.md §2 ("Using mastodon_mock in a
+This suite is the realization of docs/usage/writing-tests.md ("Using mastodon_mock in a
 consuming project's dual suite"), kept *inside this repo* so we continuously prove
 the mock behaves like a real Mastodon for the read surface Mastodon.py exercises.
 

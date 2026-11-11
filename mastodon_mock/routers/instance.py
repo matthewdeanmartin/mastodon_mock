@@ -1,4 +1,4 @@
-"""Instance metadata endpoints. See spec/03-api-coverage.md + 05-versioning.md."""
+"""Instance metadata endpoints. See docs/reference/coverage.md."""
 
 from __future__ import annotations
 
@@ -77,7 +77,7 @@ def _streaming_base(request: Request) -> str:
     Mastodon.py's own ``__get_streaming_base()`` already translates ``wss``/``ws``
     back to ``https``/``http`` + the same netloc before connecting (see
     ``Mastodon.py/mastodon/internals.py``), so it still lands on this same mock
-    instance — no special-casing needed on the mock's side. See spec/streaming.md
+    instance — no special-casing needed on the mock's side. See docs/usage/writing-tests.md
     "Streaming base URL".
     """
     ws_scheme = "wss" if request.url.scheme == "https" else "ws"
@@ -158,7 +158,7 @@ def webfinger(request: Request, db: DbSession, resource: str) -> dict[str, Any]:
 
     Mastodon apps (Whalebird, Fedistar, etc.) hit this during the add-instance flow
     to confirm an account/instance exists, even before any OAuth happens. Only local
-    accounts resolve — remote-account resolution is out of scope (see spec/00-overview.md).
+    accounts resolve — remote-account resolution is out of scope (see docs/overview/README.md).
     """
     username, _, _domain = resource.removeprefix("acct:").partition("@")
     account = db.scalar(select(Account).where(Account.username == username, Account.domain.is_(None)))
@@ -400,7 +400,7 @@ def instance_languages() -> list[str]:
 
 # --- Discovery: suggestions / trends / endorsements / tags -------------------
 # These are derived from the mock's own local data so they return realistic,
-# correctly-shaped content rather than bare empty lists. See spec/03-api-coverage.md.
+# correctly-shaped content rather than bare empty lists. See docs/reference/coverage.md.
 
 
 def _suggestion_accounts(db: DbSession, config: Config, account: Account | None, limit: int) -> list[dict[str, Any]]:

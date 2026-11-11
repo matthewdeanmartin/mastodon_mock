@@ -1,4 +1,4 @@
-"""Contract tests for the fault-injection control plane (spec/fault_injection.md)."""
+"""Contract tests for the fault-injection control plane (docs/usage/writing-tests.md)."""
 
 from __future__ import annotations
 

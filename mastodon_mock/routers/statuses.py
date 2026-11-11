@@ -1,6 +1,6 @@
 """Statuses endpoints (read + write). The highest-priority router.
 
-See spec/03-api-coverage.md "statuses (write)".
+See docs/reference/coverage.md "statuses (write)".
 """
 
 from __future__ import annotations

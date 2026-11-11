@@ -2,7 +2,7 @@
 
 Unlike :mod:`mastodon_mock.db.seed` (find-or-create, one row at a time, fully
 idempotent) this module *appends* a throwaway cohort using chunked bulk inserts and
-pre-allocated IDs, trading idempotency for speed. See spec/09-sample-data-and-perf.md.
+pre-allocated IDs, trading idempotency for speed. See docs/usage/data-generation.md.
 """
 
 from __future__ import annotations

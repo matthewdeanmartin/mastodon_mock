@@ -1,6 +1,6 @@
 """In-process event bus + SSE plumbing for the streaming API.
 
-See spec/streaming.md. ``Mastodon.py`` streams over HTTP Server-Sent-Events, not
+See docs/usage/writing-tests.md. ``Mastodon.py`` streams over HTTP Server-Sent-Events, not
 WebSocket, so this hosts an SSE stream inside the existing FastAPI app.
 
 The write paths (statuses post/edit/delete, notification side effects) call

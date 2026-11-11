@@ -1,6 +1,6 @@
 """Mastodon version awareness ("current and current-1").
 
-See spec/05-versioning.md. The mock pins two version strings and derives the
+See docs/reference/coverage.md. The mock pins two version strings and derives the
 integer ``api_versions.mastodon`` value from the supported release and patch.
 """
 

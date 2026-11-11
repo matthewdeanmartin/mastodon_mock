@@ -2,7 +2,7 @@
 
 Loads from ``.mastodon_mock.toml`` (whole document) or the
 ``[tool.mastodon_mock]`` table of ``pyproject.toml``, falling back to built-in
-defaults. See spec/01-architecture.md.
+defaults. See docs/overview/how-it-works.md.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ class RateLimitConfig(BaseModel):
 
 
 class StreamingConfig(BaseModel):
-    """Server-Sent-Events streaming behaviour. See spec/streaming.md.
+    """Server-Sent-Events streaming behaviour. See docs/usage/writing-tests.md.
 
     Streaming is on by default. When ``enabled`` is false the
     ``/api/v1/streaming/*`` routes (except ``health``) return ``404``, matching an
@@ -69,7 +69,7 @@ class StreamingConfig(BaseModel):
 
 
 class FaultConfig(BaseModel):
-    """Mock-only fault-injection control plane. See spec/fault_injection.md.
+    """Mock-only fault-injection control plane. See docs/usage/writing-tests.md.
 
     The control plane is available by default but inert until a rule is added.
     Set ``enabled = false`` to remove the ``/_mock/faults`` routes and the
@@ -161,7 +161,7 @@ class SampleDataConfig(BaseModel):
 
     Unlike :class:`SeedConfig` this is *not* applied at startup; it is the default
     profile used by the ``gen-data`` CLI command and the ``/_mock/sample_data``
-    endpoint. See spec/09-sample-data-and-perf.md.
+    endpoint. See docs/usage/data-generation.md.
     """
 
     accounts: int = 100
@@ -175,7 +175,7 @@ class SampleDataConfig(BaseModel):
     chunk_size: int = 5000
 
 
-# Named presets that scale the whole shape together. See spec/09-sample-data-and-perf.md.
+# Named presets that scale the whole shape together. See docs/usage/data-generation.md.
 PRESETS: dict[str, SampleDataConfig] = {
     "tiny": SampleDataConfig(accounts=10, followers_per_account=5, statuses_per_account=10),
     "small": SampleDataConfig(accounts=100, followers_per_account=20, statuses_per_account=50),
@@ -249,7 +249,7 @@ DEMO_SEED = SeedConfig(
         ),
         # A storm-shaped thread by @ada (root + self-replies): the demo tenant
         # connects @ada's identity, so this is what makes the demo blog actually
-        # render a storm (self-reply chain by one author). See remaining_work §3.4.
+        # render a storm (self-reply chain by one author).
         SeedStatus(
             account="ada",
             text=(
@@ -406,7 +406,7 @@ class MastodonMockConfig(BaseModel):
 
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> MastodonMockConfig:
-        """Load configuration following the precedence in spec/01-architecture.md.
+        """Load configuration following the precedence in docs/overview/how-it-works.md.
 
         1. An explicit ``config_path`` (or ``./.mastodon_mock.toml``) → whole document.
         2. ``[tool.mastodon_mock]`` in ``./pyproject.toml``.

@@ -5,7 +5,7 @@ handful of ``COUNT``/``EXISTS`` queries each. That's fine for one row but is an 
 serializing a timeline page (~16 queries x 20 statuses). This module computes all of
 those aggregates for a *page* of statuses in a small, constant number of grouped
 queries, and the serializers read from the resulting :class:`BatchContext` instead of
-querying per-row. See spec/09-sample-data-and-perf.md finding F1.
+querying per-row. See docs/usage/data-generation.md.
 """
 
 from __future__ import annotations

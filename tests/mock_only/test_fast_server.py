@@ -1,4 +1,4 @@
-"""Exercise the session-scoped server + /api/v1/_mock/reset pattern (spec/07 #2).
+"""Exercise the session-scoped server + /api/v1/_mock/reset pattern (docs/usage/writing-tests.md).
 
 These prove the ``fast_server`` fixture resets state between tests: mutations made
 in one test must not bleed into the next, even though both share one uvicorn

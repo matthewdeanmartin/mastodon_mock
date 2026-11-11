@@ -1,6 +1,6 @@
 """Hashtag endpoints: fetch, follow/unfollow, feature/unfeature, and listings.
 
-See spec/03-api-coverage.md. Tag names are matched case-insensitively (Mastodon
+See docs/reference/coverage.md. Tag names are matched case-insensitively (Mastodon
 normalizes hashtags to lowercase); follows live in ``followed_tags`` and features
 in ``featured_tags``. ``FeaturedTag`` usage stats are derived at read time.
 """

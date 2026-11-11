@@ -1,7 +1,7 @@
-"""Phase 2 contract guard rail: the mock's OpenAPI must not drift from the upstream
+"""Contract guard rail: the mock's OpenAPI must not drift from the upstream
 Mastodon ground-truth schema except where ``tests/openapi/allowlist.py`` records it.
 
-See ``spec/openapi_support.md``. The point is a *ratchet*: new accidental endpoints,
+See ``docs/extending/openapi-sync.md``. The point is a *ratchet*: new accidental endpoints,
 newly-discovered unimplemented upstream endpoints, and required-param disagreements all
 fail the build until a human reviews them and either fixes the mock or records the
 intended divergence with a reason.
@@ -17,7 +17,7 @@ from mastodon_mock import openapi_compare as oc
 from mastodon_mock.app import create_app
 from tests.openapi import allowlist
 
-TRUTH_PATH = Path(__file__).resolve().parent.parent / "mastodon-openapi" / "dist" / "schema.json"
+TRUTH_PATH = Path(__file__).resolve().parent.parent / "mastodon_openapi" / "dist" / "schema.json"
 
 
 @pytest.fixture(scope="module")

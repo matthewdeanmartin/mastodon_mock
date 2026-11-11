@@ -2,9 +2,8 @@
 
 This page summarises how faithfully each part of the Mastodon API is implemented, so you
 know — before you assert on something — whether you're testing real behaviour or a
-placeholder. The authoritative, endpoint-by-endpoint matrix (with the exact Mastodon.py
-method that hits each route) lives in the
-[API coverage spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/03-api-coverage.md).
+placeholder. Browse `/docs` on a running server for its endpoint schemas;
+see [OpenAPI maintenance](../extending/openapi-sync.md) for contract comparisons.
 
 ## Coverage levels
 
@@ -73,7 +72,7 @@ relationships, notifications, and pagination you'd expect.
   Events (`update` / `status_update` / `delete` / `notification` / `conversation`) are
   generated as side effects of the same write paths as the REST API, routed by
   visibility. The legacy WebSocket multiplex endpoint is also implemented. See
-  [streaming spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/streaming.md).
+  [streaming spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/usage/writing-tests.md).
 - **Admin / moderation API** (`mastodon/admin.py`) — account listing & filtering (v1 + v2),
   account moderation actions (enable / approve / reject / silence / suspend / sensitive /
   delete) and `admin_account_moderate`, the report queue (list / fetch / assign / unassign /
@@ -88,7 +87,7 @@ relationships, notifications, and pagination you'd expect.
   seeded users, create/list dev users, append capped sample-data cohorts, and a
   **fault-injection control plane** (`/api/v1/_mock/faults`) for forcing `5xx`/`429`,
   latency, malformed JSON, or timeouts on matching requests. See
-  [fault-injection spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/fault_injection.md).
+  [fault-injection spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/docs/usage/writing-tests.md).
 
 ## Static (correct shape, fixed values)
 
@@ -164,6 +163,4 @@ remaining out-of-scope pieces are behavior behind routed endpoints:
 - **The bundled UI is a client of the same API.** It is served at `/_ui/` when built and
   uses the mock-only dev helpers plus regular Mastodon/admin endpoints.
 
-When in doubt, the [coverage spec](https://github.com/matthewdeanmartin/mastodon_mock/blob/main/spec/03-api-coverage.md)
-lists every route and the
-Mastodon.py call that reaches it.
+For executable examples of client behavior, see the contract tests in `tests/`.

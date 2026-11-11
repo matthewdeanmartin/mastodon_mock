@@ -13,7 +13,7 @@ Behavior:
   would silently regress ``/_ui/``.
 
 Set ``MASTODON_MOCK_SKIP_UI_BUILD=1`` to skip the build entirely (e.g. when the UI was
-built in a separate step). See spec/08-admin-ui.md.
+built in a separate step). See docs/usage/admin-ui.md.
 """
 
 from __future__ import annotations

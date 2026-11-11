@@ -1,4 +1,4 @@
-"""Read-path latency benchmarks under a medium cohort (spec/09-sample-data-and-perf.md).
+"""Read-path latency benchmarks under a medium cohort (docs/usage/data-generation.md).
 
 Times representative endpoints (timeline_home, account_statuses, notifications, status
 detail) against a generated ``medium`` world via in-process ASGI transport, and asserts
