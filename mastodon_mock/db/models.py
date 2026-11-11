@@ -45,6 +45,10 @@ class Account(Base):
     hide_collections: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
     header_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    avatar_description: Mapped[str] = mapped_column(Text, default="")
+    header_description: Mapped[str] = mapped_column(Text, default="")
+    invalid_handle: Mapped[bool] = mapped_column(Boolean, default=False)
+    requested_deletion_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     fields: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     default_privacy: Mapped[str] = mapped_column(String, default="public")
@@ -67,6 +71,37 @@ class Account(Base):
     invite_request: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (UniqueConstraint("username", "domain", name="uq_account_username_domain"),)
+
+
+class Collection(Base):
+    """A locally authored collection of recommended accounts."""
+
+    __tablename__ = "collections"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), index=True)
+    name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
+    sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
+    discoverable: Mapped[bool] = mapped_column(Boolean, default=False)
+    tag_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class CollectionItem(Base):
+    """An account's accepted, pending, or revoked collection membership."""
+
+    __tablename__ = "collection_items"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=_id)
+    collection_id: Mapped[int] = mapped_column(ForeignKey("collections.id"), index=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), index=True)
+    state: Mapped[str] = mapped_column(String, default="accepted")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    __table_args__ = (UniqueConstraint("collection_id", "account_id", name="uq_collection_account"),)
 
 
 class OAuthApp(Base):
@@ -335,6 +370,7 @@ class Notification(Base):
     type: Mapped[str] = mapped_column(String)
     from_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"))
     status_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=True)
+    collection_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("collections.id"), nullable=True)
     request_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("notification_requests.id"), nullable=True, index=True
     )

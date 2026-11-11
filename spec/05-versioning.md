@@ -27,8 +27,8 @@ task (not automatically):
 
 ```toml
 [tool.mastodon_mock]
-mocked_version = "4.6.0"        # current mastodon.social-compatible target
-# mocked_version = "4.5.7"      # best-effort current-1 compatibility target
+mocked_version = "4.7.5"        # current mastodon.social-compatible target
+# mocked_version = "4.6.11"      # best-effort current-1 compatibility target
 ```
 
 - `mocked_version` is a single value per running server instance — there is **one**
@@ -38,28 +38,11 @@ mocked_version = "4.6.0"        # current mastodon.social-compatible target
   two pytest fixture parametrizations), once per `mocked_version`, NOT a single server
   that pretends to be two versions at once.
 
-- `mastodon_api_version` (the `api_versions.mastodon` integer) is derived from
-  `mocked_version` via a small lookup table in `mastodon_mock/versioning.py`:
-
-  ```python
-  # mastodon_mock/versioning.py
-  API_VERSION_BY_MASTODON_VERSION = {
-      (4, 6): 10,
-      (4, 5): 7,
-      (4, 4): 3,
-      (4, 3): 2,
-      (4, 2): 1,
-      (4, 1): 1,
-      (4, 0): 1,
-  }
-
-  def api_version_for(mocked_version: str) -> int:
-      major, minor, _ = parse_version_string(mocked_version)
-      return API_VERSION_BY_MASTODON_VERSION.get((major, minor), 2)
-  ```
-
-  (Values taken from Mastodon's own changelog notes about API versioning introduced in
-  4.3; update the table when bumping `mocked_version` defaults.)
+- `mastodon_api_version` comes from `mastodon_mock/versioning.py`. Mastodon 4.6.0
+  reports 10; 4.6.1 and the supported 4.7 line report 11. Patch versions matter.
+  Unknown future versions conservatively retain the newest supported capability
+  (11); configuring a future version does not implement its features. The 5.0
+  preview capability 12 is deliberately not advertised yet.
 
 ## What "current" and "current-1" mean in practice for this project
 
@@ -96,7 +79,7 @@ mocked_version = "4.6.0"        # current mastodon.social-compatible target
   "short_description": "A local mock Mastodon instance for testing.",
   "description": "A local mock Mastodon instance for testing.",
   "email": "admin@mock.local",
-  "version": "4.6.0",
+  "version": "4.7.5",
   "urls": {"streaming_api": "wss://mock.local"},
   "stats": {"user_count": 0, "status_count": 0, "domain_count": 1},
   "thumbnail": null,
@@ -138,7 +121,7 @@ Adds/renames per `InstanceV2`:
 {
   "domain": "mock.local",
   "title": "Mastodon Mock",
-  "version": "4.6.0",
+  "version": "4.7.5",
   "source_url": "https://github.com/matthewdeanmartin/mastodon_mock",
   "description": "A local mock Mastodon instance for testing.",
   "usage": {"users": {"active_month": 0}},
@@ -149,7 +132,7 @@ Adds/renames per `InstanceV2`:
   "contact": {"email": "admin@mock.local", "account": null},
   "rules": [],
   "icon": [],
-  "api_versions": {"mastodon": 10}
+  "api_versions": {"mastodon": 11}
 }
 ```
 
@@ -161,7 +144,7 @@ Adds/renames per `InstanceV2`:
 ```json
 {
   "version": "2.0",
-  "software": {"name": "mastodon", "version": "4.6.0"},
+  "software": {"name": "mastodon", "version": "4.7.5"},
   "protocols": ["activitypub"],
   "usage": {"users": {"total": 0}, "localPosts": 0},
   "openRegistrations": true
@@ -177,7 +160,7 @@ nodeinfo-reported version sees the same value as `/api/v1/instance`.
 # tests/conftest.py (in the *consuming* project)
 import pytest
 
-@pytest.fixture(params=["4.6.0", "4.5.7"])
+@pytest.fixture(params=["4.7.5", "4.6.11"])
 def mock_server(request, tmp_path):
     config = MastodonMockConfig(mocked_version=request.param, database=DatabaseConfig(path=":memory:"), ...)
     # spin up app with this config, yield base_url
@@ -193,9 +176,11 @@ the reported strings) behave for both.
 This is a **manual maintenance task**, not automatic:
 
 1. Check the latest Mastodon stable release.
-1. Update `CURRENT_VERSION` (and shift the old `CURRENT_VERSION` into
-   `PREVIOUS_VERSION`) in `mastodon_mock/versioning.py`.
-1. Update `API_VERSION_BY_MASTODON_VERSION` if a new minor line is added.
+1. Update `CURRENT_VERSION` and the latest patch of the previous minor line in
+   `PREVIOUS_VERSION`, in `mastodon_mock/versioning.py`.
+1. Update the checkout override in `pyproject.toml` to the same current version.
+1. Check upstream API capabilities, including changes introduced in patch releases,
+   and update `api_version_for` and `API_VERSION_BY_MASTODON_VERSION` as needed.
 1. Re-run `tests/test_versions.py` and the consuming project's dual suite.
 1. Note the bump in `CHANGELOG.md`.
 

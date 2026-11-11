@@ -14,8 +14,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from mastodon_mock.config import MastodonMockConfig
-from mastodon_mock.db.models import Account, Notification, Status
+from mastodon_mock.db.models import Account, Collection, Notification, Status
 from mastodon_mock.serializers.accounts import serialize_account
+from mastodon_mock.serializers.collections import serialize_collection
 from mastodon_mock.serializers.common import iso, sid
 
 # Types Mastodon will collapse into one group when they share a target.
@@ -49,7 +50,7 @@ def _serialize_group(notifs: list[Notification]) -> dict[str, Any]:
         "group_key": group_key_for(most_recent),
         "notifications_count": len(ordered),
         "type": most_recent.type,
-        "most_recent_notification_id": sid(most_recent.id),
+        "most_recent_notification_id": most_recent.id,
         "page_min_id": sid(ordered[-1].id),
         "page_max_id": sid(most_recent.id),
         "latest_page_notification_at": iso(most_recent.created_at),
@@ -77,6 +78,11 @@ def serialize_grouped_notifications(
         groups[key].append(n)
 
     notification_groups = [_serialize_group(groups[key]) for key in order]
+    for key, group in zip(order, notification_groups, strict=True):
+        collection_id = groups[key][0].collection_id
+        if collection_id is not None:
+            collection = session.get(Collection, collection_id)
+            group["collection"] = serialize_collection(session, collection, config, viewer) if collection else None
 
     # Collect referenced accounts + statuses (de-duplicated) for the container.
     account_ids: dict[int, None] = {}

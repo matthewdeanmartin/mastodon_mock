@@ -23,7 +23,7 @@ from mastodon_mock.db.models import (
 
 def account_is_active(account: Account) -> bool:
     """Whether an account may authenticate and perform writes."""
-    return account.approved and not account.disabled and not account.suspended
+    return account.approved and not account.disabled and not account.suspended and account.requested_deletion_at is None
 
 
 def account_is_discoverable(
@@ -33,6 +33,8 @@ def account_is_discoverable(
     viewer: Account | None = None,
 ) -> bool:
     """Whether an account belongs in public timelines, search, and suggestions."""
+    if account.requested_deletion_at is not None:
+        return False
     if viewer is not None and viewer.id == account.id:
         return True
     if config.moderation.enforce_actions:

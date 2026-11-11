@@ -73,6 +73,7 @@ Prefer a single clean commit per logical change on the main branch.
 
 ## Mock-server UI ownership
 
-`ui/` is the mock-server administration and test client, restored to its pre-Mawkingbird
-baseline as recorded in LEGACY_UI.md. Develop mock-focused UI features here and new
-Mawkingbird product features in the sibling mawkingbird repository.
+`ui/` is frozen at the mock-server administration and test-client baseline recorded in
+LEGACY_UI.md. Do not develop new UI features or update it for Mastodon REST API changes.
+Continued UI development belongs in the sibling mawkingbird repository. API maintenance
+here targets the Python mock server; Python-only changes do not require the UI test gate.

@@ -1,10 +1,10 @@
 ---
 # Phase 5 of spec/openapi_support.md — automated OpenAPI drift detection.
 #
-# The upstream Mastodon schema lives in the *vendored, untracked* `mastodon-openapi/`
-# tool, which CI does not have. This job clones it fresh, runs the spec-vs-spec
-# comparison + the Phase 2 contract tests, and (on the weekly schedule) opens a PR when
-# the regenerated upstream schema introduces drift the allow-list doesn't yet cover.
+# Stable and reviewed-preview snapshots are committed under `mastodon-openapi/`.
+# This job fetches current upstream separately, runs the spec-vs-spec
+# comparison, contract tests, and a full structural upstream snapshot comparison.
+# New structural drift fails the job and is uploaded for review; no PR is opened.
 #
 # On pull_request / push it runs as a plain check (no PR creation): un-allow-listed drift
 # fails the build, exactly like running `make compare-openapi` + `pytest
@@ -16,6 +16,8 @@ on:
       - mastodon_mock/**
       - tests/openapi/**
       - tests/test_openapi_contract.py
+      - tests/test_openapi_drift.py
+      - mastodon-openapi/**
       - .github/workflows/openapi-drift.yml
   push:
     branches: [main]
@@ -37,32 +39,25 @@ jobs:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: '3.14'
       - name: Set up uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
       - name: Set up Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
           node-version: '22'
-      # The upstream schema generator is a separate repo. The repo now vendors a snapshot
-      # at mastodon-openapi/dist/schema.json (committed), so we can't clone on top of it.
-      # Clone fresh into a temp dir and overwrite the vendored copy, so this drift check
-      # always compares against current upstream rather than the committed snapshot. Pinned
-      # to a tag would be more reproducible; main gives us "latest upstream" for alerting.
-      - name: Vendor upstream Mastodon OpenAPI schema
-        run: |
-          set -euo pipefail
-          git clone --depth 1 https://github.com/abraham/mastodon-openapi.git /tmp/upstream-openapi
-          mkdir -p mastodon-openapi/dist
-          cp /tmp/upstream-openapi/dist/schema.json mastodon-openapi/dist/schema.json
+      # Keep the stable conformance baseline intact. Latest documentation can
+      # describe unreleased APIs even when its info.version still says 4.7.0.
+      - name: Fetch upstream Mastodon OpenAPI schema
+        run: git clone --depth 1 https://github.com/abraham/mastodon-openapi.git /tmp/upstream-openapi
       - name: Sync dependencies
         run: uv sync --extra test
       - name: Generate drift report
@@ -70,13 +65,21 @@ jobs:
       - name: Show drift summary
         run: uv run mastodon_mock compare-openapi --format text
       - name: Enforce contract (fails on un-allow-listed drift)
-        run: uv run pytest tests/test_openapi_contract.py -q
+        run: uv run pytest tests/test_openapi_contract.py tests/test_openapi_drift.py
+          -q
+      - name: Detect structural upstream changes
+        run: >-
+          uv run python -m mastodon_mock.openapi_drift
+          mastodon-openapi/preview/schema.json /tmp/upstream-openapi/dist/schema.json
+          --out openapi_upstream_changes.generated.json --strict
       - name: Upload drift report
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: openapi-drift-report
-          path: openapi_compare_report.generated.md
+          path: |
+            openapi_compare_report.generated.md
+            openapi_upstream_changes.generated.json
           if-no-files-found: warn
   # Strict response-shape conformance ratchet (spec/fable/roadmap.md 1.3). Runs
   # against the *committed* schema snapshot (not fresh upstream) so it only fails
@@ -91,15 +94,15 @@ jobs:
       contents: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: '3.14'
       - name: Set up uv
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
           enable-cache: true
       - name: Sync dependencies (contract extra)

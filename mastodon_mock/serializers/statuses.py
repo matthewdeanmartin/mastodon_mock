@@ -82,8 +82,8 @@ def _mentions_from_ctx(accounts: list[Account], config: MastodonMockConfig) -> l
         out.append(
             {
                 "id": sid(acc.id),
-                "username": acc.username,
-                "acct": acct,
+                "username": str(acc.id) if acc.invalid_handle and acc.domain else acc.username,
+                "acct": f"{acc.id}@handle.invalid" if acc.invalid_handle and acc.domain else acct,
                 "url": f"{config.base_url}/@{acct}",
             }
         )

@@ -65,6 +65,8 @@ def _ensure_account(session: Session, spec: SeedAccount) -> Account:
         fields=[],
         email=email,
         role=spec.role,
+        invalid_handle=spec.invalid_handle,
+        requested_deletion_at=spec.requested_deletion_at,
     )
     session.add(account)
     session.flush()

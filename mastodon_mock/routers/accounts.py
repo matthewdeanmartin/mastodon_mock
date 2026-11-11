@@ -40,7 +40,7 @@ def _get_account_or_404(db: DbSession, account_id: str) -> Account:
     """Fetch an account by id or raise 404."""
     pid = parse_db_id(account_id)
     account = db.get(Account, pid) if pid is not None else None
-    if account is None:
+    if account is None or account.requested_deletion_at is not None:
         raise HTTPException(status_code=404, detail="Record not found")
     return account
 
@@ -172,7 +172,7 @@ def accounts_many(
     for raw in array_query(request, "id"):
         pid = parse_db_id(raw)
         acc = db.get(Account, pid) if pid is not None else None
-        if acc is not None:
+        if acc is not None and acc.requested_deletion_at is None:
             out.append(serialize_account(db, acc, config))
     return out
 
@@ -197,6 +197,7 @@ def account_statuses(
     pinned: bool = False,
     exclude_replies: bool = False,
     exclude_reblogs: bool = False,
+    exclude_direct: bool = False,
     tagged: str | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch an account's statuses with filters + pagination."""
@@ -209,6 +210,8 @@ def account_statuses(
         query = query.where(Status.in_reply_to_id.is_(None))
     if exclude_reblogs:
         query = query.where(Status.reblog_of_id.is_(None))
+    if exclude_direct:
+        query = query.where(Status.visibility != "direct")
     if only_media:
         query = query.where(
             Status.id.in_(select(MediaAttachment.status_id).where(MediaAttachment.status_id.is_not(None)))
@@ -227,7 +230,7 @@ def account_statuses(
         since_id=params.since_id,
         limit=params.limit,
     )
-    set_link_header(request, response, page)
+    set_link_header(request, response, page, dict(request.query_params))
     return serialize_status_list(db, list(page.items), config, viewer, filter_context="account")
 
 
@@ -246,7 +249,10 @@ def _filter_account_statuses_visible_to(query: Any, viewer: Account | None) -> A
         or_(
             public_profile,
             Status.account_id == viewer.id,
-            and_(Status.visibility == "private", Status.account_id.in_(followed_accounts)),
+            and_(
+                Status.visibility == "private",
+                or_(Status.account_id.in_(followed_accounts), Status.id.in_(mentioned_statuses)),
+            ),
             and_(Status.visibility == "direct", Status.id.in_(mentioned_statuses)),
         )
     )
@@ -482,37 +488,43 @@ async def update_credentials(
     account: RequiredAccount,
 ) -> dict[str, Any]:
     """Update the authed account's profile fields and avatar/header."""
-    async with request.form() as form:
+    form = await read_body(request)
 
-        def get_value(name: str) -> Any:
-            return form.get(name)
+    def get_value(name: str) -> Any:
+        return form.get(name)
 
-        if (v := get_value("display_name")) is not None:
-            account.display_name = str(v)
-        if (v := get_value("note")) is not None:
-            account.note = str(v)
-        if (v := get_value("locked")) is not None:
-            account.locked = str(v).lower() in ("true", "1", "on")
-        if (v := get_value("bot")) is not None:
-            account.bot = str(v).lower() in ("true", "1", "on")
-        if (v := get_value("discoverable")) is not None:
-            account.discoverable = str(v).lower() in ("true", "1", "on")
-        if (v := get_value("source[privacy]")) is not None:
-            account.default_privacy = str(v)
-        if (v := get_value("source[sensitive]")) is not None:
-            account.default_sensitive = str(v).lower() in ("true", "1", "on")
-        if (v := get_value("source[language]")) is not None:
-            account.default_language = str(v)
+    if (v := get_value("display_name")) is not None:
+        account.display_name = str(v)
+    if (v := get_value("note")) is not None:
+        account.note = str(v)
+    for name in ("avatar_description", "header_description"):
+        if name in form:
+            value = form[name]
+            if value is not None and len(str(value)) > 150:
+                raise HTTPException(status_code=422, detail=f"{name} is too long (maximum is 150 characters)")
+            setattr(account, name, str(value) if value is not None else "")
+    if (v := get_value("locked")) is not None:
+        account.locked = str(v).lower() in ("true", "1", "on")
+    if (v := get_value("bot")) is not None:
+        account.bot = str(v).lower() in ("true", "1", "on")
+    if (v := get_value("discoverable")) is not None:
+        account.discoverable = str(v).lower() in ("true", "1", "on")
+    if (v := get_value("source[privacy]")) is not None:
+        account.default_privacy = str(v)
+    if (v := get_value("source[sensitive]")) is not None:
+        account.default_sensitive = str(v).lower() in ("true", "1", "on")
+    if (v := get_value("source[language]")) is not None:
+        account.default_language = str(v)
 
-        fields = _collect_fields(form)
-        if fields is not None:
-            account.fields = fields
+    fields = _collect_fields(form)
+    if fields is not None:
+        account.fields = fields
 
-        await _store_upload(request, form.get("avatar"), account, "avatar")
-        await _store_upload(request, form.get("header"), account, "header")
+    await _store_upload(request, form.get("avatar"), account, "avatar")
+    await _store_upload(request, form.get("header"), account, "header")
 
-        db.commit()
-        return serialize_account(db, account, config, with_source=True)
+    db.commit()
+    return serialize_account(db, account, config, with_source=True)
 
 
 @router.get("/api/v1/profile")
@@ -525,8 +537,8 @@ def get_profile(db: DbSession, config: Config, account: RequiredAccount) -> dict
     data = serialize_account(db, account, config, with_source=True)
     data.update(
         {
-            "avatar_description": "",
-            "header_description": "",
+            "avatar_description": account.avatar_description,
+            "header_description": account.header_description,
             "show_featured": True,
             "show_media": True,
             "show_media_replies": True,
@@ -550,6 +562,7 @@ async def patch_profile(
 def delete_avatar(db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Clear the authed account's avatar."""
     account.avatar_url = None
+    account.avatar_description = ""
     db.commit()
     return serialize_account(db, account, config, with_source=True)
 
@@ -558,6 +571,7 @@ def delete_avatar(db: DbSession, config: Config, account: RequiredAccount) -> di
 def delete_header(db: DbSession, config: Config, account: RequiredAccount) -> dict[str, Any]:
     """Clear the authed account's header."""
     account.header_url = None
+    account.header_description = ""
     db.commit()
     return serialize_account(db, account, config, with_source=True)
 

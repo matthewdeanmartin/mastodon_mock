@@ -103,6 +103,8 @@ class SeedAccount(BaseModel):
     # Admin / moderation seed fields (optional).
     email: str | None = None
     role: str = "user"
+    invalid_handle: bool = False
+    requested_deletion_at: datetime | None = None
 
 
 class SeedFollow(BaseModel):

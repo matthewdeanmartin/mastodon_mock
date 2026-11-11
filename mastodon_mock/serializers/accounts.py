@@ -117,8 +117,10 @@ def serialize_account(
         "uri": url,
         "avatar": avatar,
         "avatar_static": avatar,
+        "avatar_description": account.avatar_description,
         "header": header,
         "header_static": header,
+        "header_description": account.header_description,
         "followers_count": followers,
         "following_count": following,
         "statuses_count": statuses,
@@ -135,12 +137,23 @@ def serialize_account(
         "limited": account.silenced or None,
     }
 
+    if account.invalid_handle and account.domain is not None:
+        data["invalid_handle"] = True
+        data["username"] = str(account.id)
+        data["acct"] = f"{account.id}@handle.invalid"
+
     if with_source:
         follow_requests_count = (
             session.scalar(
                 select(func.count())
                 .select_from(Relationship)
-                .where(Relationship.target_account_id == account.id, Relationship.requested_by.is_(True))
+                .join(Account, Account.id == Relationship.source_account_id)
+                .where(
+                    Relationship.target_account_id == account.id,
+                    Relationship.requested_by.is_(True),
+                    Account.suspended.is_(False),
+                    Account.requested_deletion_at.is_(None),
+                )
             )
             or 0
         )
@@ -150,7 +163,7 @@ def serialize_account(
             "language": account.default_language,
             "note": account.note,
             "fields": account.fields or [],
-            "follow_requests_count": follow_requests_count,
+            "follow_requests_count": min(follow_requests_count, 40),
             "discoverable": account.discoverable,
             "indexable": account.indexable,
             "hide_collections": account.hide_collections,

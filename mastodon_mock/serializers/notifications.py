@@ -7,8 +7,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from mastodon_mock.config import MastodonMockConfig
-from mastodon_mock.db.models import Account, Notification, Status
+from mastodon_mock.db.models import Account, Collection, Notification, Status
 from mastodon_mock.serializers.accounts import serialize_account
+from mastodon_mock.serializers.collections import serialize_collection
 from mastodon_mock.serializers.common import iso, sid
 
 
@@ -30,7 +31,7 @@ def serialize_notification(
         if status is not None:
             status_data = serialize_status(session, status, config, viewer, filter_context=filter_context)
 
-    return {
+    data = {
         "id": sid(notification.id),
         "type": notification.type,
         "created_at": iso(notification.created_at),
@@ -38,3 +39,7 @@ def serialize_notification(
         "status": status_data,
         "group_key": f"ungrouped-{notification.id}",
     }
+    if notification.collection_id is not None:
+        collection = session.get(Collection, notification.collection_id)
+        data["collection"] = serialize_collection(session, collection, config, viewer) if collection else None
+    return data

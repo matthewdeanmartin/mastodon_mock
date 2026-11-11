@@ -25,6 +25,7 @@ from mastodon_mock.middleware import add_middleware
 from mastodon_mock.routers import (
     accounts,
     admin,
+    collections,
     conversations,
     favourites_bookmarks,
     filters,
@@ -194,6 +195,7 @@ def create_app(config: MastodonMockConfig | None = None) -> FastAPI:
         polls,
         preferences,
         push,
+        collections,
         conversations,
         admin,
         tags,

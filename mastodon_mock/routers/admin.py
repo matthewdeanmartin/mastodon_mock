@@ -22,6 +22,9 @@ from mastodon_mock.db.models import (
     AdminEmailDomainBlock,
     AdminIpBlock,
     Announcement,
+    Collection,
+    CollectionItem,
+    Notification,
     Report,
     Status,
     TrendReview,
@@ -247,6 +250,17 @@ def _delete_account_statuses(db: Session, account_id: int) -> None:
     and any later read of one crashes ``serialize_status`` (it requires the
     author to resolve).
     """
+    owned = select(Collection.id).where(Collection.account_id == account_id)
+    for notification in db.scalars(select(Notification).where(Notification.collection_id.in_(owned))).all():
+        db.delete(notification)
+    for item in db.scalars(
+        select(CollectionItem).where(
+            (CollectionItem.account_id == account_id) | CollectionItem.collection_id.in_(owned)
+        )
+    ).all():
+        db.delete(item)
+    for collection in db.scalars(select(Collection).where(Collection.account_id == account_id)).all():
+        db.delete(collection)
     for status in db.scalars(select(Status).where(Status.account_id == account_id)).all():
         db.delete(status)
 

@@ -291,9 +291,9 @@ all stateful fakes.
 | Method | Path | Mastodon.py caller(s) | Coverage |
 |--------|------|------------------------|----------|
 | GET | `/api/oembed` | no Mastodon.py caller | **Static** — minimal link response; does not resolve the referenced status |
-| `/api/v1/collections*` | no Mastodon.py caller | **Stub** — create/read/item routes are null, empty, 404, or no-op; no collection persistence |
-| `/api/v1/{account_id}/collections` | no Mastodon.py caller | **Stub** — empty |
-| `/api/v1/{account_id}/in_collections` | no Mastodon.py caller | **Stub** — empty |
+| `/api/v1/collections*` | no Mastodon.py caller | **Stateful** — CRUD, ownership, eligibility, revocation, and local notifications; remote items remain pending without federation |
+| `/api/v1/accounts/{account_id}/collections` | no Mastodon.py caller | **Stateful** — viewer-aware offset pagination; legacy alias retained |
+| `/api/v1/accounts/{account_id}/in_collections` | no Mastodon.py caller | **Stateful** — authenticated account memberships; legacy alias retained |
 | `/api/v1/annual_reports*` | no Mastodon.py caller | **Stub** — empty/ineligible; generate/read are no-ops |
 | GET | `/api/v1_alpha/async_refreshes/{id}` | no Mastodon.py caller | **Static** — every id is immediately `finished` |
 

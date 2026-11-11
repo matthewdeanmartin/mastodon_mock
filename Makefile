@@ -397,19 +397,21 @@ ui-dev:
 # tests (tests/test_openapi_contract.py) compare against the committed snapshot.
 UPSTREAM_OPENAPI_REPO ?= https://github.com/abraham/mastodon-openapi.git
 vendor-openapi:
-	@echo "Re-vendoring upstream schema from $(UPSTREAM_OPENAPI_REPO) -> mastodon-openapi/dist/schema.json"
+	@echo "Re-vendoring upstream schema from $(UPSTREAM_OPENAPI_REPO) -> mastodon-openapi/preview/schema.json"
 	@tmp=$$(mktemp -d) ; \
 	git clone --depth 1 $(UPSTREAM_OPENAPI_REPO) "$$tmp" ; \
 	if [ ! -f "$$tmp/dist/schema.json" ]; then \
 		echo "ERROR: upstream schema not found at dist/schema.json — upstream layout may have changed" >&2 ; \
 		rm -rf "$$tmp" ; exit 1 ; \
 	fi ; \
-	mkdir -p mastodon-openapi/dist ; \
-	cp "$$tmp/dist/schema.json" mastodon-openapi/dist/schema.json ; \
+	mkdir -p mastodon-openapi/preview ; \
+	cp "$$tmp/dist/schema.json" mastodon-openapi/preview/schema.json ; \
 	rm -rf "$$tmp"
-	@git diff --quiet -- mastodon-openapi/dist/schema.json \
+	@git diff --quiet -- mastodon-openapi/preview/schema.json \
 		&& echo "No drift - vendored schema already current." \
-		|| echo "Schema updated. Review 'git diff mastodon-openapi/dist/schema.json', run the contract tests, and commit."
+		|| echo "Schema updated. Review 'git diff mastodon-openapi/preview/schema.json', run the contract tests, and commit."
+
+	@echo "Update mastodon-openapi/provenance.json after review; never overwrite the stable baseline with preview APIs."
 
 compare-openapi:
 	@echo "Comparing mock OpenAPI against upstream Mastodon schema -> spec/openapi_compare_report.md"
